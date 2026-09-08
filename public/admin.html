@@ -1086,10 +1086,26 @@ async function loadAll() {
 async function downloadDatabase() {
   toast('🔄 מכין קובץ להורדה...');
   try {
-    window.location.href = '/api/admin/database/download';
+    const token = localStorage.getItem('ib_access_token') || sessionStorage.getItem('ib_access_token');
+    const res = await fetch('/api/admin/database/download', {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'ironbend.db';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast('✅ הורדת הגיבוי החלה!');
   } catch (e) {
-    toast('❌ שגיאה בהורדת הגיבוי', true);
+    toast('❌ שגיאה בהורדת הגיבוי: ' + e.message, true);
   }
 }
 
@@ -1115,8 +1131,10 @@ async function handleDbUpload(file) {
   formData.append('dbFile', file);
 
   try {
+    const token = localStorage.getItem('ib_access_token') || sessionStorage.getItem('ib_access_token');
     const res = await fetch('/api/admin/database/upload', {
       method: 'POST',
+      headers: { Authorization: 'Bearer ' + token },
       body: formData
     });
     const data = await res.json();
