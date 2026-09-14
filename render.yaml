@@ -24,7 +24,7 @@ services:
       - key: LICENSE_SERVER
         value: "https://tene-license.onrender.com"
       - key: BASE_URL
-        value: "https://ironbend.onrender.com"
+        value: "https://ironbend-hmd.onrender.com"
       - key: AI_ENABLED
         value: "false"
       - key: INTAKE_AI_ENABLED
