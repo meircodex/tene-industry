@@ -1,6 +1,7 @@
 'use strict';
 
 const { randomUUID } = require('node:crypto');
+const { validateCustomerTaxId, normalizeCustomerTaxId, findCustomersByTaxId, customerIdentityError, mergedCustomerId } = require('./customerIdentity');
 
 function required(name, value) {
   if (!value) throw new Error(`services/orderQuotes missing dependency: ${name}`);
@@ -54,8 +55,29 @@ function createOrderQuoteService(db, deps = {}) {
     const validationError = quotePayloadError(payload);
     if (validationError) throw Object.assign(new Error(validationError), { statusCode: 400 });
 
-    const customer = payload.customer || {};
-    const customerId = Number(customer.id || 0) || null;
+    let customer = payload.customer || {};
+    let customerId = Number(customer.id || 0) || null;
+    const canonicalId = customerId ? mergedCustomerId(db, customerId) : null;
+    if (canonicalId) {
+      const canonical = db.prepare('SELECT id,name,tax_id FROM customers WHERE id=?').get(canonicalId);
+      customerId = canonical.id;
+      customer = { ...customer, id: customerId, name: canonical.name, taxId: customer.taxId || customer.tax_id || canonical.tax_id };
+      payload = { ...payload, customer };
+    }
+    const taxId = validateCustomerTaxId(customer.taxId ?? customer.tax_id);
+    if (taxId) {
+      const matches = findCustomersByTaxId(db, taxId);
+      if (matches.length > 1) throw customerIdentityError('ambiguous_customer_tax_id', 'ח.פ זה מופיע בכמה כרטיסים. יש לבדוק את הכפילות לפני פתיחת הצעה.', 409);
+      const selected = customerId ? db.prepare('SELECT id,name,tax_id FROM customers WHERE id=?').get(customerId) : null;
+      if (customerId && !selected) throw customerIdentityError('customer_not_found', 'כרטיס הלקוח שנבחר לא נמצא', 404);
+      if (selected && ((normalizeCustomerTaxId(selected.tax_id) && normalizeCustomerTaxId(selected.tax_id) !== taxId) || (matches[0] && matches[0].id !== customerId))) {
+        throw customerIdentityError('customer_tax_id_mismatch', 'הח.פ אינו תואם לכרטיס הלקוח שנבחר', 409);
+      }
+      const existing = selected || matches[0];
+      customerId = existing?.id || null;
+      customer = { ...customer, id: customerId, name: existing?.name || customer.name, taxId };
+      payload = { ...payload, customer };
+    }
     const totalWeight = numeric(payload.order?.totalWeight);
     const snapshot = parseJsonObject(pricingSnapshot, pricingSnapshot && typeof pricingSnapshot === 'object' ? pricingSnapshot : null);
     const temporaryNum = `QT-PENDING-${randomUUID()}`;

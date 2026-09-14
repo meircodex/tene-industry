@@ -38,6 +38,11 @@
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.14);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
+#customerMergeDialog { background:#fff; font-family:inherit; line-height:1.6; overflow:auto; }
+#customerMergeDialog::backdrop { background:rgba(2,26,72,.55); }
+#customerMergeDialog > .ib-window-back-row { display:none; }
+#customerMergeDialog th,#customerMergeDialog td { padding:6px; border-bottom:1px solid var(--border); }
+#customerMergeDialog ul { padding-inline-start:22px; margin:12px 0; }
 body { font-family:'Heebo',sans-serif; background:#f0f4f8; color:var(--text); min-height:100vh; }
 
 /* ── LAYOUT ── */
@@ -857,7 +862,7 @@ body { font-family:'Heebo',sans-serif; background:#f0f4f8; color:var(--text); mi
         <button class="btn-new" onclick="openModal()">＋ לקוח חדש</button>
       </div>
       <div class="search-wrap">
-        <input type="search" id="searchInput" placeholder="חיפוש לפי שם, טלפון, איש קשר או מספר לקוח..."
+        <input type="search" id="searchInput" placeholder="חיפוש לפי ח.פ, שם, טלפון, איש קשר או מספר לקוח..."
           oninput="onSearch(this.value)" autocomplete="off">
         <span class="search-icon">🔍</span>
       </div>
@@ -940,6 +945,33 @@ body { font-family:'Heebo',sans-serif; background:#f0f4f8; color:var(--text); mi
   </div>
 </div>
 
+<dialog id="customerMergeDialog" aria-labelledby="customerMergeTitle" style="width:min(760px,calc(100% - 28px));max-height:90vh;margin:auto;border:1px solid var(--border);border-radius:16px;padding:24px;direction:rtl;color:var(--text)">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">
+    <h3 id="customerMergeTitle">איחוד לקוחות — מנהל מערכת</h3>
+    <button type="button" class="modal-close" id="customerMergeClose" onclick="closeCustomerMerge()" aria-label="סגור איחוד לקוחות">✕</button>
+  </div>
+  <div id="customerMergeTarget"></div>
+  <div class="form-group" style="margin:16px 0">
+    <label for="customerMergeSearch">איזה כרטיס להעביר לכרטיס הראשי? חיפוש לפי ח.פ, שם או מספר לקוח</label>
+    <div style="display:flex;gap:8px"><input id="customerMergeSearch" type="search" style="flex:1;min-width:0" oninput="invalidateCustomerMergeSelection()"><button type="button" class="btn-action" id="customerMergeSearchBtn" onclick="searchCustomerMerge()">חפש</button></div>
+  </div>
+  <div id="customerMergeResults" style="display:grid;gap:8px"></div>
+  <div class="form-group" style="margin:16px 0">
+    <label for="customerMergeTaxId">ח.פ / מספר עוסק של הלקוח המאוחד</label>
+    <input id="customerMergeTaxId" type="text" inputmode="numeric" dir="ltr" oninput="invalidateCustomerMergePreview()">
+    <small>אפשר לאחד כרטיס ישן שחסר בו ח.פ רק לאחר אישור שהוא שייך לאותו לקוח. ח.פ שונים אינם ניתנים לאיחוד.</small>
+  </div>
+  <button type="button" class="btn-action" id="customerMergePreviewBtn" onclick="previewCustomerMerge()" disabled>הצג תצוגה מקדימה</button>
+  <div id="customerMergePreview" style="margin:16px 0"></div>
+  <div id="customerMergeApproval" hidden>
+    <label style="display:flex;align-items:flex-start;gap:8px"><input id="customerMergeAcknowledge" type="checkbox" onchange="updateCustomerMergeConfirmation()">אני מאשר ששני הכרטיסים שייכים לאותו לקוח, ובדקתי את הנתונים ואת השפעת האיחוד על הגישה לפורטל.</label>
+    <div class="form-group" style="margin:12px 0"><label for="customerMergeConfirmTaxId">להשלמת האישור, הקלד שוב את הח.פ</label><input id="customerMergeConfirmTaxId" inputmode="numeric" dir="ltr" oninput="updateCustomerMergeConfirmation()"></div>
+  </div>
+  <div id="customerMergeStatus" role="status" aria-live="polite" style="margin:12px 0;white-space:pre-wrap"></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="btn-cancel" id="customerMergeCancel" onclick="closeCustomerMerge()">ביטול — לא לאחד</button><button type="button" class="btn-save" id="customerMergeConfirm" onclick="confirmCustomerMerge()" disabled>כן, לאחד את הלקוחות</button></div>
+</dialog>
+<script src="/customer-merge.js" defer></script>
+
 <!-- Add / Edit Customer Modal -->
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
@@ -971,8 +1003,9 @@ body { font-family:'Heebo',sans-serif; background:#f0f4f8; color:var(--text); mi
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>ח.פ / עוסק מורשה</label>
-          <input type="text" id="fTaxId" placeholder="מספר ח.פ" dir="ltr">
+          <label for="fTaxId">ח.פ / מספר עוסק — מזהה לקוח</label>
+          <input type="text" id="fTaxId" placeholder="9 ספרות" inputmode="numeric" dir="ltr" aria-describedby="taxIdHelp">
+          <small id="taxIdHelp">חובה בלקוח חדש. ח.פ אחד שייך לכרטיס לקוח אחד; יש להשלים מזהה בכרטיסים ישנים.</small>
         </div>
         <div class="form-group">
           <label>תצוגת מחירון בפורטל</label>
@@ -1032,6 +1065,7 @@ body { font-family:'Heebo',sans-serif; background:#f0f4f8; color:var(--text); mi
         </div>
       </div>
     </div>
+    <div id="customerSaveError" role="alert" style="padding:0 24px;color:var(--danger)" hidden></div>
     <div class="modal-foot">
       <button class="btn-cancel" onclick="closeModal()">ביטול</button>
       <button class="btn-save" id="saveBtn" onclick="saveCustomer()">שמור לקוח</button>
@@ -1222,6 +1256,8 @@ function renderList() {
         '<div class="cust-orders-badge">'+cnt+' הזמנות</div>' +
       '</div>' +
       '<div class="cust-meta">' +
+        '<span>'+esc(c.tax_id ? 'ח.פ ' + c.tax_id : 'חסר ח.פ · לקוח #' + c.id)+'</span>' +
+        (c.tax_id_duplicate ? '<span style="color:var(--danger)">ח.פ כפול — נדרשת בדיקה</span>' : '') +
         (phone ? '<span>'+esc(phone)+'</span>' : '') +
         (last  ? '<span>'+esc(last)+'</span>'  : '') +
       '</div>' +
@@ -1274,6 +1310,11 @@ async function selectCustomer(id) {
   try {
     const r = await fetch('/api/customers/' + id);
     const c = await r.json();
+    if (!r.ok) throw new Error(c.error || 'שגיאה בטעינת לקוח');
+    if (Number(c.id) !== Number(id)) {
+      activeId = Number(c.id);
+      document.querySelectorAll('.cust-card').forEach(el => el.classList.toggle('active', Number(el.dataset.id) === activeId));
+    }
     renderDetail(c);
   } catch(e) {
     document.getElementById('detailPanel').innerHTML =
@@ -1296,6 +1337,8 @@ function renderDetail(c) {
     '<div class="detail-header-info">' +
       '<div class="detail-name">'+esc(c.name)+'</div>' +
       '<div class="detail-sub">' +
+        '<span>'+esc(c.tax_id ? 'ח.פ ' + c.tax_id + ' · לקוח #' + c.id : 'חסר ח.פ · לקוח #' + c.id)+'</span>' +
+        (c.tax_id_duplicate ? '<span style="color:var(--danger)">ח.פ משויך לכמה כרטיסים — נדרשת בדיקה לפני איחוד</span>' : '') +
         (c.phone    ? '<span>📞 <a href="tel:'+esc(c.phone)+'">'+esc(c.phone)+'</a></span>' : '') +
         (c.email    ? '<span>✉️ <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a></span>' : '') +
         (c.address  ? '<span>📍 '+esc(c.address)+'</span>' : '') +
@@ -1306,10 +1349,12 @@ function renderDetail(c) {
       '<button class="btn-action" onclick="openSiteModal('+c.id+')">🏗 אתר חדש</button>' +
       '<button class="btn-action" onclick="openPriceListFor('+c.id+')">🏷 מחירון</button>' +
       '<button class="btn-action" onclick="openModal('+c.id+')">✏️ עריכה</button>' +
+      (isSystemAdmin() ? '<button class="btn-action" onclick="openCustomerMerge('+c.id+')">איחוד לקוחות</button>' : '') +
     '</div>' +
   '</div>';
 
   // ── Stats ──
+  if (c.merged_cards?.length) html += '<div class="info-section"><h4>כרטיסים שאוחדו לכרטיס זה</h4>' + c.merged_cards.map(row => '<p>' + esc('#' + row.old_customer_id + ' · ' + row.name) + ' — נשמר בארכיון האיחוד</p>').join('') + '</div>';
   html += '<div class="stats-row">' +
     stat('הזמנות',        stats.order_count || 0,          '',        '📋') +
     stat('סה"כ משקל',     fmtWeight(stats.total_weight_sum),'',        '⚖️') +
@@ -1875,6 +1920,9 @@ async function revokePortalLink(id) {
 function openModal(id) {
   const modal = document.getElementById('modalBackdrop');
   const title = document.getElementById('modalTitle');
+  document.getElementById('customerSaveError').hidden = true;
+  document.getElementById('fTaxId').required = !id;
+  document.getElementById('fTaxId').style.borderColor = '';
   if (id) {
     title.textContent = 'עריכת לקוח';
     document.getElementById('editId').value = id;
@@ -1943,6 +1991,10 @@ function closeModal() {
 }
 
 async function saveCustomer() {
+  const btn = document.getElementById('saveBtn');
+  if (btn.disabled) return;
+  const errorBox = document.getElementById('customerSaveError');
+  errorBox.hidden = true;
   const name = document.getElementById('fName').value.trim();
   if (!name) {
     document.getElementById('fName').focus();
@@ -1950,8 +2002,18 @@ async function saveCustomer() {
     return;
   }
   document.getElementById('fName').style.borderColor = '';
-
-  const btn = document.getElementById('saveBtn');
+  const editId = document.getElementById('editId').value;
+  const taxInput = document.getElementById('fTaxId');
+  const taxId = taxInput.value.replace(/[ \t\r\n\u00a0\u200e\u200f-]/g, '');
+  if ((!editId && !taxId) || (taxId && (!/^[0-9]{9}$/.test(taxId) || taxId === '000000000'))) {
+    errorBox.textContent = 'יש להזין ח.פ / מספר עוסק בן 9 ספרות';
+    errorBox.hidden = false;
+    taxInput.style.borderColor = 'var(--danger)';
+    taxInput.focus();
+    return;
+  }
+  taxInput.style.borderColor = '';
+  taxInput.value = taxId;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>';
 
@@ -1960,7 +2022,7 @@ async function saveCustomer() {
     phone:        document.getElementById('fPhone').value.trim()        || null,
     email:        document.getElementById('fEmail').value.trim()        || null,
     address:      document.getElementById('fAddress').value.trim()      || null,
-    taxId:        document.getElementById('fTaxId').value.trim()        || null,
+    taxId:        taxId || null,
     paymentTerms: document.getElementById('fPaymentTerms').value.trim() || null,
     portalPriceListVisibility: document.getElementById('fPortalPriceListVisibility').value || 'none',
     portalCanCreateSites: document.getElementById('fPortalCanCreateSites').checked,
@@ -1973,10 +2035,9 @@ async function saveCustomer() {
     notes:        document.getElementById('fNotes').value.trim()        || null,
   };
 
-  const editId = document.getElementById('editId').value;
-
+  let d;
   try {
-    let r, d;
+    let r;
     if (editId) {
       r = await fetch('/api/customers/' + editId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       d = await r.json().catch(() => ({}));
@@ -1993,6 +2054,30 @@ async function saveCustomer() {
     if (editId) selectCustomer(Number(editId));
     else if (d.id) selectCustomer(d.id);
   } catch(e) {
+    errorBox.textContent = e.message || 'שגיאה בשמירה';
+    errorBox.hidden = false;
+    if (d?.code === 'duplicate_customer_tax_id') {
+      taxInput.focus();
+      const existingId = Number(d.existingCustomer?.id);
+      if (Number.isSafeInteger(existingId) && existingId > 0) {
+        const link = document.createElement('a');
+        link.href = '/customers.html?customer_id=' + existingId;
+        link.textContent = ' פתיחת כרטיס הלקוח הקיים';
+        errorBox.appendChild(link);
+        if (editId && typeof isSystemAdmin === 'function' && isSystemAdmin()) {
+          const mergeButton = document.createElement('button');
+          mergeButton.type = 'button';
+          mergeButton.className = 'btn-action';
+          mergeButton.textContent = 'האם לאחד עם הכרטיס הקיים? הצג אפשרויות איחוד';
+          mergeButton.onclick = () => openCustomerMerge(existingId, Number(editId), taxId);
+          errorBox.appendChild(mergeButton);
+        } else if (!editId) {
+          const question = document.createElement('p');
+          question.textContent = 'הכרטיס החדש לא נוצר. אפשר להשתמש בכרטיס הקיים; הפרטים שהוקלדו כאן לא ידרסו את פרטיו.';
+          errorBox.appendChild(question);
+        }
+      }
+    }
     window.showToast && window.showToast(e.message || 'שגיאה בשמירה', true);
   } finally {
     btn.disabled = false;
@@ -2007,6 +2092,7 @@ document.getElementById('modalBackdrop').addEventListener('click', function(e) {
 
 // Enter submits modal
 document.addEventListener('keydown', function(e) {
+  if (document.getElementById('customerMergeDialog')?.open) return;
   if (e.key === 'Enter' && document.getElementById('modalBackdrop').classList.contains('open')) {
     if (e.target.tagName !== 'TEXTAREA') saveCustomer();
   }

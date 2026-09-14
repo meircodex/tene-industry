@@ -84,11 +84,18 @@ test('QR scanning supports open mode and passwordless one-time device activation
   assert.match(admin, /צור ושלח QR/);
 });
 
-test('public portal does not query internal order search', () => {
+test('public portal is a secure handoff to customer portal', () => {
   const portal = read('public/portal.html');
 
+  assert.match(portal, /הגישה לפורטל הלקוחות מתבצעת באמצעות קישור או קוד מאובטח/);
+  assert.match(portal, /href=\"\/customer\.html\"/);
   assert.doesNotMatch(portal, /\/api\/orders\?order_num=/);
-  assert.match(portal, /customer-scoped portal token/);
+  assert.doesNotMatch(portal, /DEMO_ORDERS/);
+  assert.doesNotMatch(portal, /1042/);
+  assert.doesNotMatch(portal, /1055/);
+  assert.doesNotMatch(portal, /גבעון מתכות בע\"?מ/);
+  assert.doesNotMatch(portal, /אזה\"?ת/);
+  assert.doesNotMatch(portal, /wa\.me/);
 });
 
 test('production card preview mode shows cards but locks printing before approval', () => {
@@ -428,7 +435,10 @@ test('customer portal order detail projection hides internal production fields',
   assert.match(detailBlock, /portalPublicItem/);
   assert.match(detailBlock, /projectPortalOrderDetail/);
   assert.doesNotMatch(customerPage, /item\.production_qty|item\.produced_qty|item\.machine/);
-  assert.match(customerPage, /shapeSnapshot:i\.shapeSnapshot \|\| null/);
+  const client = require('./helpers/customer-portal-client').loadPortalClient();
+  const payload = client.select({ family: 'bars', shapeType: 'straight_bar', diameter: 12, sides: [1000], angles: [] });
+  assert.equal(payload.shapeSnapshot.contractVersion, 2);
+  assert.deepEqual(payload.shapeSnapshot.data.sides, [1000]);
   assert.match(customerPage, /portalItemShapeMetrics/);
 });
 

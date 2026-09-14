@@ -220,8 +220,8 @@ function createPricer(db) {
       return {
         diameter: item.diameter,
         weight: +weight.toFixed(3),
-        pricePerKg: ppu === null ? null : +ppu.toFixed(2),
-        price_per_kg: ppu === null ? null : +ppu.toFixed(2),
+        pricePerKg: ppu === null ? null : +ppu.toFixed(3),
+        price_per_kg: ppu === null ? null : +ppu.toFixed(3),
         price: +price.toFixed(2),
         pricingSource: resolved.pricingSource,
         pricingLabel: resolved.pricingLabel,

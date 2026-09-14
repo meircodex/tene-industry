@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { effectiveProductionEvidence } = require('./orderCancellation');
 
 const FACTORY_TIME_ZONE = 'Asia/Jerusalem';
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -114,6 +115,30 @@ function recordActualWeightChange(db, {
   return event;
 }
 
+// Raw production events remain immutable audit evidence.  When a later
+// historical reconciliation corrects the physical quantity, operational
+// summaries project the same proportional effective weight without changing
+// those original rows.  Rows without enough item quantity evidence retain
+// their measured amount rather than inventing a conversion ratio.
+function effectiveEvidenceWeight(db, itemId, recordedWeightKg) {
+  const grossWeightKg = roundKg(recordedWeightKg);
+  const item = db.prepare(`
+    SELECT i.*,p.order_id AS pallet_order_id
+    FROM items i LEFT JOIN pallets p ON p.id=i.pallet_id
+    WHERE i.id=?
+  `).get(itemId);
+  if (!item) return { recorded_weight_kg: grossWeightKg, effective_weight_kg: grossWeightKg, corrected: false };
+  const truth = effectiveProductionEvidence(db, item);
+  if (!(truth.corrected_produced_qty > 0) || !(truth.recorded_produced_qty > 0)) {
+    return { recorded_weight_kg: grossWeightKg, effective_weight_kg: grossWeightKg, corrected: false };
+  }
+  return {
+    recorded_weight_kg: grossWeightKg,
+    effective_weight_kg: roundKg(grossWeightKg * truth.effective_produced_qty / truth.recorded_produced_qty),
+    corrected: true,
+  };
+}
+
 // Canonical per-card output evidence. Aggregates must be built from these
 // rows so a dashboard number can always be traced back to its cards.
 function getDailyProductionActualRows(db, day = israelDay()) {
@@ -131,8 +156,9 @@ function getDailyProductionActualRows(db, day = israelDay()) {
   `).all(day);
   for (const row of eventRows) {
     const itemId = Number(row.item_id);
+    const weight = effectiveEvidenceWeight(db, itemId, row.weight_kg);
     accountedItemIds.add(itemId);
-    rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: Number(row.weight_kg) || 0, source: 'production_event', event_count: Number(row.event_count) || 0 });
+    rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: weight.effective_weight_kg, recorded_weight_kg: weight.recorded_weight_kg, corrected: weight.corrected, source: 'production_event', event_count: Number(row.event_count) || 0 });
   }
 
   // Before the ledger existed, the only reliable measured evidence is the saved
@@ -147,8 +173,9 @@ function getDailyProductionActualRows(db, day = israelDay()) {
   for (const row of legacyCardRows) {
     const itemId = Number(row.item_id);
     if (accountedItemIds.has(itemId)) continue;
+    const weight = effectiveEvidenceWeight(db, itemId, row.weight_kg);
     accountedItemIds.add(itemId);
-    rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: Number(row.weight_kg) || 0, source: 'legacy_card_snapshot', card_count: Number(row.card_count) || 0 });
+    rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: weight.effective_weight_kg, recorded_weight_kg: weight.recorded_weight_kg, corrected: weight.corrected, source: 'legacy_card_snapshot', card_count: Number(row.card_count) || 0 });
   }
 
   // Some old worker cards saved an item-level actual weight without individual
@@ -172,11 +199,13 @@ function getDailyProductionActualRows(db, day = israelDay()) {
     const actualWeightKg = Number(row.actual_weight_kg);
     const theoreticalWeightKg = Number(row.theoretical_weight_kg);
     if (Number.isFinite(actualWeightKg) && actualWeightKg > 0) {
+      const weight = effectiveEvidenceWeight(db, itemId, actualWeightKg);
       accountedItemIds.add(itemId);
-      rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: actualWeightKg, source: 'completed_item_actual' });
+      rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: weight.effective_weight_kg, recorded_weight_kg: weight.recorded_weight_kg, corrected: weight.corrected, source: 'completed_item_actual' });
     } else if (Number.isFinite(theoreticalWeightKg) && theoreticalWeightKg > 0) {
+      const weight = effectiveEvidenceWeight(db, itemId, theoreticalWeightKg);
       accountedItemIds.add(itemId);
-      rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: theoreticalWeightKg, source: 'completed_item_theoretical' });
+      rows.push({ item_id: itemId, machine: row.machine || '', weight_kg: weight.effective_weight_kg, recorded_weight_kg: weight.recorded_weight_kg, corrected: weight.corrected, source: 'completed_item_theoretical' });
     } else {
       unweighedCompletedItems += 1;
     }

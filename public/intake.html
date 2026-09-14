@@ -2191,7 +2191,7 @@ async function searchCustomerForIntake(id) {
   const input = document.getElementById('customerSearch_' + id);
   const results = document.getElementById('customerResults_' + id);
   const q = input.value.trim();
-  if (!q) return toast('צריך להקליד שם, טלפון או מייל לחיפוש', true);
+  if (!q) return toast('צריך להקליד ח.פ, שם, טלפון או מייל לחיפוש', true);
   results.innerHTML = '<div class="meta">מחפש...</div>';
   const rows = await fetch('/api/customers?q=' + encodeURIComponent(q) + '&limit=8').then(r => r.json()).catch(() => []);
   if (!rows.length) {
@@ -2200,7 +2200,7 @@ async function searchCustomerForIntake(id) {
   }
   results.innerHTML = rows.map(customer => `
     <button class="customer-pick" onclick="selectCustomerForIntake(${id}, ${customer.id})">
-      <strong>${escapeHtml(customer.name)}</strong>
+      <strong>${escapeHtml(customer.name)} · ${escapeHtml(customer.tax_id ? 'ח.פ ' + customer.tax_id : 'חסר ח.פ · #' + customer.id)}</strong>
       <span class="meta">${escapeHtml(customer.phone || '')}${customer.email ? ' · ' + escapeHtml(customer.email) : ''}${customer.priority_id ? ' · ' + escapeHtml(customer.priority_id) : ''}</span>
     </button>
   `).join('');

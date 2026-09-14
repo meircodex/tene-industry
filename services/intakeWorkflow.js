@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { normalizeCustomerTaxId } = require('./customerIdentity');
 const { buildFullShapeSnapshot, buildMachineProfilesPlaceholder } = require('./shapeSnapshot');
 const { mapOcrItemToShapeSnapshot } = require('./ocrShapeSnapshotMapper');
 const { rebarKgPerMeter } = require('../constants');
@@ -181,6 +182,7 @@ function buildOrderImportPreview(buffer, { orderExists = () => false, sourceIden
     const sourceOrderNum = String(importCell(row, ['order_num', 'ordernum', 'order', 'מספרהזמנה', 'הזמנה']) || '').trim();
     const customerName = String(importCell(row, ['customer_name', 'customer', 'client', 'לקוח', 'שםלקוח']) || '').trim();
     const customerPhone = String(importCell(row, ['customer_phone', 'phone', 'טלפון', 'טלפוןלקוח']) || '').trim();
+    const customerTaxId = normalizeCustomerTaxId(importCell(row, ['customer_tax_id', 'tax_id', 'taxId', 'ח.פ', 'חפ', 'מספרעוסק']));
     const deliveryDate = String(importCell(row, ['delivery_date', 'deliverydate', 'אספקה', 'תאריךאספקה']) || '').trim();
     const deliveryAddress = String(importCell(row, ['delivery_address', 'address', 'כתובת', 'כתובתאספקה']) || '').trim();
     const diameter = Number(importCell(row, ['diameter', 'dia', 'קוטר']));
@@ -198,7 +200,11 @@ function buildOrderImportPreview(buffer, { orderExists = () => false, sourceIden
       errors.push({ row: index + 2, errors: rowErrors });
       return;
     }
-    const groupKey = sourceOrderNum || `${customerName}|${deliveryDate}|${deliveryAddress}`;
+    const groupKey = sourceOrderNum || `${customerTaxId || customerName}|${deliveryDate}|${deliveryAddress}`;
+    if (groups.has(groupKey) && customerTaxId && groups.get(groupKey).payload.customer.taxId && groups.get(groupKey).payload.customer.taxId !== customerTaxId) {
+      errors.push({ row: index + 2, errors: ['The same order number contains different customer tax IDs'] });
+      return;
+    }
     if (!groups.has(groupKey)) {
       const orderReviewNotes = buildStructuredReviewNotes({ customer_name: customerName, delivery_date: deliveryDate, delivery_address: deliveryAddress, items: [] }, { sourceIdentity });
       groups.set(groupKey, {
@@ -206,7 +212,7 @@ function buildOrderImportPreview(buffer, { orderExists = () => false, sourceIden
         duplicate: Boolean(sourceOrderNum && orderExists(sourceOrderNum)),
         review_notes: orderReviewNotes,
         payload: {
-          customer: { name: customerName, phone: customerPhone, address: deliveryAddress },
+          customer: { name: customerName, phone: customerPhone, address: deliveryAddress, ...(customerTaxId ? { taxId: customerTaxId } : {}) },
           order: { orderNum: sourceOrderNum || undefined, channel: 'spreadsheet', deliveryDate, deliveryAddress, priority: 'regular', reviewNotes: orderReviewNotes },
           pallets: [{ maxWeight: 9999, items: [] }],
         },
@@ -283,6 +289,7 @@ function resolveIntakeCustomer(parsed = {}, rawContent = '', lookups = {}) {
   const phone = normalizeIntakePhone(parsed.customer_phone || parsed.customerPhone || parsed.phone || extractFirstPhoneFromText(rawContent));
   const email = String(parsed.customer_email || parsed.customerEmail || extractFirstEmailFromText(rawContent) || '').trim().toLowerCase();
   const priorityId = String(parsed.priority_id || parsed.priorityId || parsed.customer_id || parsed.customerId || '').trim();
+  const taxId = normalizeCustomerTaxId(parsed.customer_tax_id || parsed.customerTaxId || parsed.tax_id || parsed.taxId);
   const candidates = [];
   const pushCandidate = (row, matchType, confidence) => {
     if (!row || candidates.some(candidate => candidate.id === row.id)) return;
@@ -292,19 +299,24 @@ function resolveIntakeCustomer(parsed = {}, rawContent = '', lookups = {}) {
       phone: row.phone,
       email: row.email,
       priority_id: row.priority_id,
+      tax_id: row.tax_id,
       match_type: matchType,
       confidence,
     });
   };
 
-  if (phone) pushCandidate(lookups.byPhone?.(phone), 'phone', 0.98);
-  if (email) pushCandidate(lookups.byEmail?.(email), 'email', 0.96);
-  if (priorityId) pushCandidate(lookups.byPriorityId?.(priorityId), 'priority_id', 0.92);
-  if (name) pushCandidate(lookups.byName?.(name), 'name', 0.82);
+  if (taxId) {
+    if (/^[0-9]{9}$/.test(taxId)) pushCandidate(lookups.byTaxId?.(taxId), 'tax_id', 1);
+  } else {
+    if (phone) pushCandidate(lookups.byPhone?.(phone), 'phone', 0.98);
+    if (email) pushCandidate(lookups.byEmail?.(email), 'email', 0.96);
+    if (priorityId) pushCandidate(lookups.byPriorityId?.(priorityId), 'priority_id', 0.92);
+    if (name) pushCandidate(lookups.byName?.(name), 'name', 0.82);
+  }
 
   const best = candidates[0] || null;
   return {
-    input: { name, phone, email, priority_id: priorityId },
+    input: { name, phone, email, priority_id: priorityId, tax_id: taxId || null },
     customer: best,
     candidates,
     needs_customer_review: !best || best.confidence < 0.9,
@@ -707,6 +719,7 @@ function buildIntakeOrderPayload(parsed = {}, {
       name: customerOverride?.name || selectedCustomer?.name || cleanRecognizedCustomerName(parsed.customer_name || parsed.customerName) || 'Unidentified customer',
       phone: customerOverride?.phone || selectedCustomer?.phone || parsed.customer_phone || parsed.customerPhone || '',
       email: customerOverride?.email || selectedCustomer?.email || parsed.customer_email || parsed.customerEmail || extractFirstEmailFromText(rawContent),
+      taxId: selectedCustomer?.tax_id || customerOverride?.taxId || parsed.customer_tax_id || parsed.customerTaxId || parsed.tax_id || parsed.taxId || null,
       address: parsed.delivery_address || parsed.deliveryAddress || '',
     },
     order: {

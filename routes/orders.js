@@ -11,7 +11,7 @@ const {
   sourceIdentityConflictPayload,
   sourceIdentityFromRequest,
 } = require('../services/importSourceIdentity');
-const { ORDER_STATUS } = require('../status-contracts');
+const { ORDER_STATUS, ITEM_STATUS } = require('../status-contracts');
 const {
   calculateMaterialStockPosition,
   releaseAllReservationsForOrder,
@@ -22,6 +22,8 @@ const { createPricer } = require('../services/pricer');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
 const { buildOrderCommercialSummary } = require('../services/orderCommercialSummary');
 const { createOrderQuoteService } = require('../services/orderQuotes');
+const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
+const { createHistoricalProductionReconciliationService } = require('../services/historicalProductionReconciliation');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/orders missing dependency: ${name}`);
@@ -241,6 +243,8 @@ module.exports = function createOrdersRouter(deps) {
   const productionCards = deps.productionCards || require('../services/productionCards');
   const pricer = deps.pricer || createPricer(db);
   const quotes = createOrderQuoteService(db, { createOrderFromPayload });
+  const cancellations = createOrderCancellationService(db);
+  const historicalReconciliations = createHistoricalProductionReconciliationService(db);
 
   function normalizePreviewItem(item = {}, index = 0) {
     const shapeSnapshot = parseJsonObject(item.shape_snapshot_json) || parseJsonObject(item.shapeSnapshot) || null;
@@ -521,6 +525,111 @@ module.exports = function createOrdersRouter(deps) {
     res.json(db.prepare(sql).all(...params));
   });
 
+  // Cancellation has its own review and commit routes.  A regular status
+  // change is never allowed to bypass the production/disposition ledger.
+  router.get('/orders/cancellation/warehouses', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (_req, res) => {
+    res.json({ warehouses: cancellations.listWarehouses() });
+  });
+
+  router.get('/orders/:id/cancellation-review', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    try {
+      res.json(cancellations.review({
+        order_id: req.params.id,
+        scope: 'order',
+        production_record_correction_authorized: canCorrectStartedProduction(req.userPerm),
+      }));
+    } catch (error) {
+      res.status(error.statusCode || 400).json({ success: false, error: error.code || error.message, details: error.details || null });
+    }
+  });
+
+  router.get('/orders/:orderId/items/:itemId/cancellation-review', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    try {
+      res.json(cancellations.review({
+        order_id: req.params.orderId,
+        item_id: req.params.itemId,
+        scope: 'item',
+        production_record_correction_authorized: canCorrectStartedProduction(req.userPerm),
+      }));
+    } catch (error) {
+      res.status(error.statusCode || 400).json({ success: false, error: error.code || error.message, details: error.details || null });
+    }
+  });
+
+  function submitCancellation(req, res, scope) {
+    try {
+      const bodyItems = req.body?.items ?? req.body?.item_dispositions ?? req.body?.itemDispositions
+        ?? (scope === 'item' ? [{ ...req.body, item_id: req.params.itemId }] : undefined);
+      const result = cancellations.cancel({
+        ...req.body,
+        items: bodyItems,
+        order_id: req.params.orderId || req.params.id,
+        item_id: scope === 'item' ? req.params.itemId : undefined,
+        scope,
+        actor_id: req.auth?.sub || req.userId || null,
+        actor_name: req.auth?.display_name || null,
+        production_record_correction_authorized: canCorrectStartedProduction(req.userPerm),
+      });
+      const order = db.prepare('SELECT id,order_num,status,customer_id FROM orders WHERE id=?').get(result.order_id);
+      wsBroadcast('order_cancellation_disposition', {
+        id: result.order_id,
+        orderNum: order?.order_num || null,
+        cancellationUid: result.cancellation_uid,
+        scope: result.scope,
+      });
+      if (order?.status === ORDER_STATUS.CANCELLED) {
+        wsBroadcast('order_status', { id: order.id, status: order.status, orderNum: order.order_num });
+        if (!result.replay && order.customer_id) {
+          const customer = db.prepare('SELECT phone FROM customers WHERE id=?').get(order.customer_id);
+          if (customer?.phone) intake.notifyOrderStatus(customer.phone, order.order_num, order.status).catch(() => {});
+        }
+      }
+      res.status(result.replay ? 200 : 201).json(result);
+    } catch (error) {
+      const known = error instanceof OrderCancellationError;
+      res.status(error.statusCode || 400).json({ success: false, error: known ? error.code : error.message, details: error.details || null });
+    }
+  }
+
+  router.post('/orders/:id/cancel', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    submitCancellation(req, res, 'order');
+  });
+
+  router.post('/orders/:orderId/items/:itemId/cancel', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    submitCancellation(req, res, 'item');
+  });
+
+  // Historical correction has a separate, manager-level route and never
+  // changes the order lifecycle or inserts a cancellation transaction.
+  router.get('/orders/:orderId/items/:itemId/historical-production-reconciliation-review', requireAnyRole(['manager', 'admin']), (req, res) => {
+    try {
+      res.json(historicalReconciliations.review({ order_id: req.params.orderId, item_id: req.params.itemId }));
+    } catch (error) {
+      res.status(error.statusCode || 400).json({ success: false, error: error.code || error.message, details: error.details || null });
+    }
+  });
+
+  router.post('/orders/:orderId/items/:itemId/historical-production-reconciliation', requireAnyRole(['manager', 'admin']), (req, res) => {
+    try {
+      const result = historicalReconciliations.reconcile({
+        ...req.body,
+        order_id: req.params.orderId,
+        item_id: req.params.itemId,
+        actor_id: req.auth?.sub || req.userId || null,
+        actor_name: req.auth?.display_name || req.userRole || null,
+        historical_reconciliation_authorized: canCorrectStartedProduction(req.userPerm),
+      });
+      wsBroadcast('historical_production_reconciled', {
+        orderId: Number(req.params.orderId), itemId: Number(req.params.itemId),
+        reconciliationUid: result.historical_reconciliation_uid,
+      });
+      res.status(result.replay ? 200 : 201).json(result);
+    } catch (error) {
+      const known = error instanceof OrderCancellationError;
+      res.status(error.statusCode || 400).json({ success: false, error: known ? error.code : error.message, details: error.details || null });
+    }
+  });
+
   router.get('/orders/:id', requireAnyRole(['office', 'production', 'sales', 'manager', 'admin']), (req, res) => {
     const order = db.prepare(`SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email
       FROM orders o LEFT JOIN customers c ON o.customer_id=c.id WHERE o.id=?`).get(req.params.id);
@@ -650,10 +759,30 @@ module.exports = function createOrdersRouter(deps) {
           COALESCE(i.produced_qty, 0) > 0
           OR i.started_at IS NOT NULL
           OR i.completed_at IS NOT NULL
+          OR COALESCE(i.actual_weight_kg, 0) > 0
           OR i.status IN ('בייצור', 'הושלם', 'סופק')
+          OR EXISTS (SELECT 1 FROM production_card_weights pcw WHERE pcw.item_id=i.id AND COALESCE(pcw.actual_weight_kg,0) > 0)
+          OR EXISTS (SELECT 1 FROM production_output_events poe WHERE poe.item_id=i.id AND COALESCE(poe.delta_weight_kg,0) <> 0)
         )
       LIMIT 1
     `).get(orderId));
+  }
+
+  function hasOrderCancellationHistory(orderId) {
+    return Boolean(db.prepare(`
+      SELECT 1 FROM order_cancellation_transactions WHERE order_id=? LIMIT 1
+    `).get(orderId));
+  }
+
+  function itemHasProductionEvidence(item) {
+    if (Number(item.produced_qty || 0) > 0 || Number(item.actual_weight_kg || 0) > 0
+      || item.started_at !== null || item.completed_at !== null
+      || ['בייצור', 'הושלם', 'סופק'].includes(item.status)) return true;
+    return Boolean(db.prepare(`
+      SELECT 1
+      WHERE EXISTS (SELECT 1 FROM production_card_weights WHERE item_id=? AND COALESCE(actual_weight_kg,0)>0)
+         OR EXISTS (SELECT 1 FROM production_output_events WHERE item_id=? AND COALESCE(delta_weight_kg,0)<>0)
+    `).get(item.id, item.id));
   }
 
   function correctionReason(value) {
@@ -668,6 +797,9 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   function baseOrderEditError(order) {
+    if (normalizeOrderStatus(order.status) === ORDER_STATUS.CANCELLED) {
+      return { statusCode: 409, message: 'לא ניתן לערוך הזמנה שבוטלה; היסטוריית הביטול נשמרת' };
+    }
     if (order.locked) {
       return { statusCode: 403, message: 'לא ניתן לערוך הזמנה נעולה' };
     }
@@ -700,16 +832,19 @@ module.exports = function createOrdersRouter(deps) {
     if (hasOrderProductionActivity(order.id || order.order_id)) {
       return { statusCode: 409, message: 'לא ניתן למחוק הזמנה לאחר שהחלה ייצור באחת הכרטיסיות' };
     }
+    if (hasOrderCancellationHistory(order.id || order.order_id)) {
+      return { statusCode: 409, message: 'לא ניתן למחוק הזמנה עם היסטוריית ביטול' };
+    }
     return null;
   }
 
   function itemUpdateError(item, { permission, correctionReason: reason } = {}) {
     const baseError = baseOrderEditError({ id: item.order_id, locked: item.locked, status: item.order_status });
     if (baseError) return baseError;
-    const itemStarted = Number(item.produced_qty || 0) > 0
-      || item.started_at !== null
-      || item.completed_at !== null
-      || ['בייצור', 'הושלם', 'סופק'].includes(item.status);
+    if (item.status === ITEM_STATUS.CANCELLED || item.cancelled_at != null || item.production_stopped_at != null) {
+      return { statusCode: 409, message: 'לא ניתן לערוך כרטיסייה שבוטלה; היסטוריית הייצור וההחלטה נשמרות' };
+    }
+    const itemStarted = itemHasProductionEvidence(item);
     if (itemStarted) {
       if (!canCorrectStartedProduction(permission)) {
         return { statusCode: 403, message: 'לאחר תחילת ייצור של הכרטיסייה רק מנהל מורשה יכול לתקן אותה' };
@@ -724,10 +859,10 @@ module.exports = function createOrdersRouter(deps) {
   function itemDeleteError(item) {
     const baseError = baseOrderEditError({ id: item.order_id, locked: item.locked, status: item.order_status });
     if (baseError) return baseError;
-    const itemStarted = Number(item.produced_qty || 0) > 0
-      || item.started_at !== null
-      || item.completed_at !== null
-      || ['בייצור', 'הושלם', 'סופק'].includes(item.status);
+    const itemStarted = itemHasProductionEvidence(item);
+    const itemCancelled = item.status === ITEM_STATUS.CANCELLED || item.cancelled_at != null
+      || Boolean(db.prepare('SELECT 1 FROM order_cancellation_item_dispositions WHERE source_order_item_id=?').get(item.id));
+    if (itemCancelled) return { statusCode: 409, message: 'לא ניתן למחוק כרטיסייה עם היסטוריית ביטול' };
     return itemStarted
       ? { statusCode: 409, message: 'לא ניתן למחוק כרטיסייה שכבר החלה ייצור; מנהל יכול לבצע תיקון מתועד בלבד' }
       : null;
@@ -837,6 +972,13 @@ module.exports = function createOrdersRouter(deps) {
     const requestedStatus = normalizeOrderStatus(status);
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
     if (!order) return res.status(404).json({ error: 'לא נמצא' });
+    if (requestedStatus === ORDER_STATUS.CANCELLED) {
+      return res.status(409).json({
+        error: 'cancellation_review_required',
+        message: 'ביטול הזמנה מתבצע רק דרך סקירת ביטול והחלטת מלאי/גריטה',
+        cancellation_review_url: `/api/orders/${order.id}/cancellation-review`,
+      });
+    }
     if (order.locked) return res.status(403).json({ error: 'הזמנה נעולה' });
     let transition;
     try {
@@ -854,9 +996,7 @@ module.exports = function createOrdersRouter(deps) {
     db.prepare(
       'UPDATE orders SET status=?, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
     ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
-    const releasedReservations = requestedStatus === ORDER_STATUS.CANCELLED
-      ? releaseAllReservationsForOrder(db, { order_id: order.id })
-      : { order_id: order.id, released: 0 };
+    const releasedReservations = { order_id: order.id, released: 0 };
     auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, null, req.userId || userId || null, req.auth?.display_name || userName || null);
     if (transition.isApproval) {
       auditLog('order', order.id, order.order_num, 'manager_approval', 'approved_by', null, req.userId || userId || null, null, req.userId || userId || null, req.auth?.display_name || userName || null);
@@ -1089,9 +1229,12 @@ module.exports.manifest = {
   ],
   access: {
     default: 'hidden',
-    roles: { admin: 'edit', manager: 'edit', office: 'edit', finance: 'read', production: 'read', sales: 'read' },
+    roles: { admin: 'edit', manager: 'edit', office: 'edit', warehouse: 'edit', finance: 'read', production: 'read', sales: 'read' },
   },
-  consumes: [{ table: 'customers' }, { table: 'orders' }, { table: 'order_quotes' }, { table: 'items' }],
+  consumes: [
+    { table: 'customers' }, { table: 'orders' }, { table: 'order_quotes' }, { table: 'items' }, { table: 'production_output_events' },
+    { table: 'historical_production_reconciliation_transactions' }, { table: 'historical_production_reconciliation_items' },
+  ],
   produces: [
     { event: 'new_order' },
     { event: 'order_quote_created' },
@@ -1102,6 +1245,8 @@ module.exports.manifest = {
     { event: 'order_item_updated' },
     { event: 'order_item_added' },
     { event: 'order_item_deleted' },
+    { event: 'order_cancellation_disposition' },
+    { event: 'historical_production_reconciled' },
     { event: 'order_deleted' },
     { event: 'machine_assign' },
   ],

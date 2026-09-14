@@ -34,6 +34,7 @@ const {
 } = require('./inventory');
 const { createStableOrderId, buildOrderItemUid, shapeSnapshotJson, isShapeDataContractV2, withShapeContractLegacyFields } = require('./orderContracts');
 const { reserveMaterialForOrder } = require('./inventoryReservation');
+const { validateCustomerTaxId, normalizeCustomerTaxId, findCustomersByTaxId, assertCustomerTaxIdAvailable, customerIdentityError, mergedCustomerId } = require('./customerIdentity');
 
 function parseShapeSnapshotObject(value) {
   if (!value) return null;
@@ -101,18 +102,48 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
     let customerId;
     const phone = (customer.phone || '').trim();
     const name = (customer.name || '').trim();
+    const taxId = validateCustomerTaxId(customer.taxId ?? customer.tax_id);
     let existing = null;
+    let matchedByArchive = false;
     if (customer.id) {
-      existing = db.prepare('SELECT id,name,phone,email,address,contact_name,contact_phone FROM customers WHERE id=?').get(customer.id);
+      existing = db.prepare('SELECT id,name,phone,email,address,contact_name,contact_phone,tax_id FROM customers WHERE id=?').get(customer.id);
+      if (!existing) {
+        const canonicalId = mergedCustomerId(db, customer.id);
+        if (canonicalId) {
+          existing = db.prepare('SELECT id,name,phone,email,address,contact_name,contact_phone,tax_id FROM customers WHERE id=?').get(canonicalId);
+          matchedByArchive = true;
+        }
+      }
+      if (!existing) throw customerIdentityError('customer_not_found', 'כרטיס הלקוח שנבחר לא נמצא', 404);
+      if (taxId && normalizeCustomerTaxId(existing.tax_id) && normalizeCustomerTaxId(existing.tax_id) !== taxId) {
+        throw customerIdentityError('customer_tax_id_mismatch', 'הח.פ אינו תואם לכרטיס הלקוח שנבחר', 409);
+      }
+      if (taxId && !normalizeCustomerTaxId(existing.tax_id)) assertCustomerTaxIdAvailable(db, taxId, existing.id);
     }
-    if (!existing && phone) {
-      existing = db.prepare('SELECT id FROM customers WHERE phone=?').get(phone);
+    let matchedByTaxId = matchedByArchive || Boolean(taxId && normalizeCustomerTaxId(existing?.tax_id));
+    if (!existing && taxId) {
+      const matches = findCustomersByTaxId(db, taxId);
+      if (matches.length > 1) throw customerIdentityError('ambiguous_customer_tax_id', 'ח.פ זה מופיע בכמה כרטיסים קיימים. נדרשת בדיקת מנהל לפני שיוך ההזמנה.', 409);
+      if (matches.length === 1) {
+        existing = db.prepare('SELECT * FROM customers WHERE id=?').get(matches[0].id);
+        matchedByTaxId = true;
+      }
     }
-    if (!existing && name) {
-      existing = db.prepare("SELECT id FROM customers WHERE name=? AND (phone IS NULL OR phone='') ORDER BY id DESC LIMIT 1").get(name);
+    if (!existing && !taxId && phone) {
+      const matches = db.prepare('SELECT id FROM customers WHERE phone=? LIMIT 2').all(phone);
+      if (matches.length > 1) throw customerIdentityError('ambiguous_customer_phone', 'הטלפון מופיע בכמה לקוחות. יש לבחור כרטיס לקוח או להזין ח.פ.', 409);
+      existing = matches[0] || null;
+    }
+    if (!existing && !taxId && name) {
+      const matches = db.prepare("SELECT id FROM customers WHERE name=? AND (phone IS NULL OR phone='') ORDER BY id DESC LIMIT 2").all(name);
+      if (matches.length > 1) throw customerIdentityError('ambiguous_customer_name', 'נמצאו כמה לקוחות בשם זה. יש לבחור כרטיס לקוח או להזין ח.פ.', 409);
+      existing = matches[0] || null;
     }
     if (existing) {
       customerId = existing.id;
+      // A tax-ID match identifies the account; an order is not permission to
+      // rename it or overwrite its contact details with differently typed text.
+      if (!matchedByTaxId) {
       db.prepare(`
         UPDATE customers
         SET name=COALESCE(?,name),
@@ -131,9 +162,11 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
         customer.contactPhone || null,
         customerId
       );
+      }
+      if (taxId && !normalizeCustomerTaxId(existing.tax_id)) db.prepare('UPDATE customers SET tax_id=? WHERE id=?').run(taxId, customerId);
     } else {
-      const r = db.prepare('INSERT INTO customers (name,phone,email,address,contact_name,contact_phone) VALUES (?,?,?,?,?,?)')
-        .run(name || customer.name, phone || null, customer.email || null, customer.address, customer.contactName, customer.contactPhone);
+      const r = db.prepare('INSERT INTO customers (name,phone,email,address,contact_name,contact_phone,tax_id) VALUES (?,?,?,?,?,?,?)')
+        .run(name || customer.name, phone || null, customer.email || null, customer.address, customer.contactName, customer.contactPhone, taxId);
       customerId = r.lastInsertRowid;
     }
 

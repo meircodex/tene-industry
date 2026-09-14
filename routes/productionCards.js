@@ -63,7 +63,7 @@ module.exports = function createProductionCardsRouter(deps) {
   const statusContracts = required('statusContracts', deps.statusContracts);
   const productionActuals = required('productionActuals', deps.productionActuals);
   const settingsService = deps.settingsService || null;
-  const { ORDER_STATUS } = statusContracts;
+  const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
   const productionCardOrderGateStatuses = new Set([
     ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
     ORDER_STATUS.PRODUCTION_QUEUE,
@@ -214,6 +214,9 @@ router.patch('/orders/:orderId/production-card-weight', requireAnyRole(['product
     WHERE i.id=? AND p.order_id=?
   `).get(itemId, orderId);
   if (!item) return res.status(404).json({ error: 'item not found' });
+  if (item.status === ITEM_STATUS.CANCELLED || item.cancelled_at != null || item.production_stopped_at != null) {
+    return res.status(409).json({ error: 'production_stopped_by_cancellation' });
+  }
   if (!canCreateProductionCards({ status: item.order_status })) {
     return res.status(409).json({ error: 'order_not_released_to_production_cards', order_status: item.order_status });
   }

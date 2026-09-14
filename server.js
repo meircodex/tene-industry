@@ -470,10 +470,17 @@ const { createOrderFromPayload, createOrderTransaction, calcWeightPerUnit } = cr
 
 function resolveIntakeCustomer(parsed = {}, rawContent = '') {
   return intakeWorkflow.resolveIntakeCustomer(parsed, rawContent, {
+    byTaxId: taxId => {
+      const matches = require('./services/customerIdentity').findCustomersByTaxId(db, taxId);
+      return matches.length === 1 ? db.prepare('SELECT id,name,phone,email,priority_id,tax_id FROM customers WHERE id=?').get(matches[0].id) : null;
+    },
     byPhone: phone => db.prepare("SELECT id,name,phone,email,priority_id FROM customers WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(phone, '-', ''), ' ', ''), '(', ''), ')', ''), '+972', '0')=? LIMIT 1").get(phone),
     byEmail: email => db.prepare('SELECT id,name,phone,email,priority_id FROM customers WHERE LOWER(email)=? LIMIT 1').get(email),
     byPriorityId: priorityId => db.prepare('SELECT id,name,phone,email,priority_id FROM customers WHERE priority_id=? LIMIT 1').get(priorityId),
-    byName: name => db.prepare('SELECT id,name,phone,email,priority_id FROM customers WHERE name=? LIMIT 1').get(name),
+    byName: name => {
+      const matches = db.prepare('SELECT id,name,phone,email,priority_id,tax_id FROM customers WHERE name=? LIMIT 2').all(name);
+      return matches.length === 1 ? matches[0] : null;
+    },
   });
 }
 
@@ -492,7 +499,7 @@ function intakeToOrderPayload(parsed = {}, source = 'intake', customerOverride =
     source,
     customerOverride,
     rawContent,
-    findCustomerById: id => db.prepare('SELECT id,name,phone,email FROM customers WHERE id=?').get(id),
+    findCustomerById: id => db.prepare('SELECT id,name,phone,email,tax_id FROM customers WHERE id=?').get(id),
     resolveCustomer: (payload, content) => resolveIntakeCustomer(payload, content).customer,
     calcWeightPerUnit,
   });

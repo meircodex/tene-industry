@@ -444,7 +444,7 @@
     <div id="priceBox" class="price-box" style="display:none">
       <div style="font-size:13px;color:rgba(255,255,255,.7);margin-bottom:10px">הערכת מחיר</div>
       <div id="priceBreakdown"></div>
-      <div class="price-note">* המחיר כולל 3% תוספת פסולת · אינו כולל מע"מ</div>
+      <div class="price-note">* המחיר כולל את התוספת לחיוב המפורטת בהצעה · אינו כולל מע"מ</div>
     </div>
     <button class="btn btn-secondary" id="quoteBtn" onclick="calcQuote(event)" style="margin-bottom:10px;width:100%">קבל הצעת מחיר</button>
     <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder(event)">שלח הזמנה ✓</button>
@@ -1583,13 +1583,53 @@ function portalParsedShapeSnapshot(value) {
 
 function portalItemShapeMetrics(item = {}) {
   const helper = window.IronBendShapeSnapshot;
-  if (helper && typeof helper.itemShapeMetrics === 'function') {
-    return helper.itemShapeMetrics({ ...item, shapeSnapshot: item.shapeSnapshot || item.shape_snapshot_json });
+  const qty = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
+  const metrics = helper && typeof helper.itemShapeMetrics === 'function'
+    ? helper.itemShapeMetrics({
+      ...item,
+      quantity: qty,
+      shapeSnapshot: portalShapeOnlySnapshot(item.shapeSnapshot || item.shape_snapshot_json),
+    }) : {};
+  const totalLengthMm = metrics.totalLengthMm ?? (Number(item.total_length_mm || 0) || (item.sides || []).reduce((sum, side) => sum + (Number(side) || 0), 0));
+  const diameter = portalItemDiameter(item);
+  const kgPerM = window.IronBendRebar?.kgPerMeter(diameter) ?? WEIGHTS[diameter] ?? (diameter * diameter * 0.00617);
+  const unitWeightKg = metrics.unitWeightKg ?? (totalLengthMm / 1000) * kgPerM;
+  const totalWeightKg = metrics.totalWeightKg ?? (Number(item.total_weight || 0) || unitWeightKg * qty);
+  return { totalLengthMm, unitWeightKg, totalWeightKg, quantity: qty };
+}
+
+function portalShapeOnlySnapshot(value) {
+  const source = portalParsedShapeSnapshot(value);
+  if (!source || Number(source.contractVersion) !== 2) return source;
+  const snapshot = JSON.parse(JSON.stringify(source));
+  // ShapeEditor emits quantity/name beside the contract and mirrors its unit
+  // weight into totalWeightKg. Neither alias represents the whole order row.
+  for (const key of ['orderItemQuantity', 'quantity', 'qty', 'structElement', 'elementName']) delete snapshot[key];
+  if (snapshot.source === 'shape-editor') {
+    for (const payload of [snapshot.calculated, snapshot.machineOutput?.generic]) {
+      if (payload && Number(payload.weightKg) > 0) delete payload.totalWeightKg;
+    }
   }
-  const qty = Math.max(1, Number(item.quantity ?? item.qty ?? 1) || 1);
-  const totalLengthMm = Number(item.total_length_mm || 0) || (item.sides || []).reduce((sum, side) => sum + (Number(side) || 0), 0);
-  const totalWeightKg = Number(item.total_weight || 0) || null;
-  return { totalLengthMm, totalWeightKg, quantity: qty };
+  return snapshot;
+}
+
+function portalOrderItemPayload(item = {}) {
+  const shapeSnapshot = portalShapeOnlySnapshot(item.shapeSnapshot || item.shape_snapshot_json);
+  return {
+    shapeId: item.shapeId,
+    shapeName: item.shapeName,
+    elementName: item.elementName ?? item.structElement ?? item.struct_element ?? '',
+    family: shapeSnapshot?.family || item.family || 'bars',
+    diameter: portalItemDiameter(item),
+    sides: item.sides,
+    angles: item.angles,
+    azAngles: item.azAngles,
+    elAngles: item.elAngles,
+    is3d: item.is3d,
+    quantity: Number(item.qty ?? item.quantity ?? 1),
+    note: item.note || '',
+    shapeSnapshot,
+  };
 }
 
 function portalItemDiameter(item = {}) {
@@ -1683,7 +1723,7 @@ function renderDetail(order) {
 
   const price = order.portal_price ? `<div class="price-box" style="margin-top:16px">
     <div class="price-row"><span>משקל לחיוב</span><span>${(+order.billing_weight).toFixed(2)} ק"ג</span></div>
-    <div class="price-row total"><span>סה"כ לתשלום</span><span>₪${(+order.portal_price).toLocaleString('he',{minimumFractionDigits:2})}</span></div>
+    <div class="price-row total"><span>סה"כ לתשלום</span><span>₪${(+order.portal_price).toLocaleString('he',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
     <div class="price-note">* לא כולל מע"מ</div>
   </div>` : '';
 
@@ -1802,6 +1842,7 @@ function removeItem(id) {
 }
 
 function renderItems() {
+  document.getElementById('priceBox').style.display = 'none';
   const el = document.getElementById('itemsList');
   el.innerHTML = orderItems.map((item,idx) => renderPortalOrderItemCard(item, idx+1)).join('');
 }
@@ -1822,7 +1863,7 @@ function renderPortalOrderItemCard(item, num) {
     </button>
     <div class="item-main no-item-main ib-line-main">
       <div class="item-title-row no-item-title-row ib-line-title">
-        <div><h3 class="no-item-title">${shapeLabel}</h3><div class="no-item-sub ib-line-sub">פריט #${num}</div></div>
+        <div><h3 class="no-item-title">${shapeLabel}</h3><div class="no-item-sub ib-line-sub">פריט #${num}${item.elementName ? ' · ' + escapeHtml(item.elementName) : ''}</div></div>
         <button type="button" class="no-small-btn ib-view-mode-btn" onclick="togglePortalItemPreviewMode()">${portalItemThumb3D ? '3D' : '2D'}</button>
       </div>
       <div class="item-metrics no-item-metrics ib-item-metrics">
@@ -1936,6 +1977,9 @@ function changeShape(id, sel) {
   item.azAngles  = [];
   item.elAngles  = [];
   item.is3d      = 0;
+  item.shapeSnapshot = null;
+  item.editorData = null;
+  item.family = 'bars';
   renderItems();
 }
 
@@ -1943,12 +1987,16 @@ function updateSeg(id, segIdx, val) {
   const item = orderItems.find(i=>i.id===id);
   if (!item) return;
   item.sides[segIdx] = val;
+  item.shapeSnapshot = null;
+  item.editorData = null;
+  renderItems();
 }
 
 function updateField(id, field, val) {
   const item = orderItems.find(i=>i.id===id);
   if (!item) return;
   item[field] = val;
+  if (field === 'diameter') { item.shapeSnapshot = null; item.editorData = null; }
   renderItems();
 }
 
@@ -1978,7 +2026,15 @@ function openPortalShapeEditor(id) {
   if (!portalShapeEditor) portalShapeEditor = new ShapeEditorModal(portalShapeSelected);
   const snapshot = portalParsedShapeSnapshot(item.shapeSnapshot || item.shape_snapshot_json);
   const snapshotData = snapshot?.contractVersion === 2 && snapshot.data && typeof snapshot.data === 'object' ? snapshot.data : null;
-  const editorData = snapshotData ? {
+  // Keep the editor's own input units (pile dimensions use centimetres),
+  // separately from the millimetre contract sent to the server.
+  const editorData = item.editorData ? {
+    ...JSON.parse(JSON.stringify(item.editorData)),
+    quantity: Math.max(1, Number(item.qty || 1)),
+    diameter: portalItemDiameter(item),
+    itemNumber: orderItems.findIndex(entry => entry.id === id) + 1,
+    itemTotal: orderItems.length,
+  } : snapshotData ? {
     ...snapshotData,
     family: snapshot.family,
     shapeType: snapshot.shapeType,
@@ -2003,6 +2059,7 @@ function openPortalShapeEditor(id) {
     itemNumber: orderItems.findIndex(entry => entry.id === id) + 1,
     itemTotal: orderItems.length,
   };
+  editorData.structElement = item.elementName ?? item.structElement ?? item.struct_element ?? '';
   portalShapeEditor.open(editorData);
 }
 
@@ -2020,7 +2077,9 @@ function portalShapeSelected(data) {
   item.family = data.family || item.family || 'bars';
   item.diameter = Number(data.diameter || snapshotData.diameter || snapshotData.barDiameter || snapshotData.longitudinalDiameter || snapshotData.longitudinalBars?.defaultDiameterMm || item.diameter || 12);
   item.qty = Math.max(1, Number(data.orderItemQuantity || data.quantity || item.qty || 1) || 1);
-  item.shapeSnapshot = data && Number(data.contractVersion) === 2 ? data : null;
+  if (data.structElement !== undefined) item.elementName = String(data.structElement || '').trim();
+  item.editorData = portalShapeEditor?.current ? JSON.parse(JSON.stringify(portalShapeEditor.current)) : null;
+  item.shapeSnapshot = data && Number(data.contractVersion) === 2 ? portalShapeOnlySnapshot(data) : null;
   portalShapeTargetId = null;
   renderItems();
   toast('הצורה עודכנה בפריט');
@@ -2134,13 +2193,20 @@ async function calcQuote(event) {
   const btn = event?.currentTarget || document.getElementById('quoteBtn');
   if (!orderItems.length) { toast('הוסף לפחות פריט אחד', true); return; }
   setButtonBusy(btn, true, 'מחשב...');
-  const items = orderItems.map(i=>({ diameter:portalItemDiameter(i), sides:i.sides, angles:i.angles, qty:i.qty, shapeSnapshot:i.shapeSnapshot || null }));
+  const items = orderItems.map(portalOrderItemPayload);
+  const quotedItems = JSON.stringify(items);
   const data = await fetch('/api/c/quote',{
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ token:TOKEN, items })
   }).then(r=>r.json()).catch(()=>null);
 
+  if (quotedItems !== JSON.stringify(orderItems.map(portalOrderItemPayload))) {
+    setButtonBusy(btn, false);
+    toast('הפריטים השתנו בזמן החישוב; יש לחשב הצעת מחיר מחדש', true);
+    return;
+  }
   if (!data) { setButtonBusy(btn, false); toast('שגיאה בחישוב', true); return; }
+  if (data.error) { setButtonBusy(btn, false); toast(data.error, true); return; }
   if (data.priceHidden) { setButtonBusy(btn, false); toast('אין הרשאת צפייה במחיר', true); return; }
 
   if (data.requiresPriceListUpdate) {
@@ -2157,17 +2223,17 @@ async function calcQuote(event) {
 
   const bkd = data.breakdown.map(b => {
     const ppu = b.price_per_kg ?? b.pricePerKg;
-    return `<div class="price-row"><span>Ø${b.diameter} – ${b.weight.toFixed(2)} ק"ג × ₪${ppu}</span><span>₪${b.price.toFixed(0)}</span></div>`;
+    return `<div class="price-row"><span>Ø${b.diameter} – ${b.weight.toFixed(2)} ק"ג × ₪${ppu}</span><span>₪${b.price.toFixed(2)}</span></div>`;
   }).join('');
 
   document.getElementById('priceBreakdown').innerHTML = `
     ${bkd}
-    <div class="price-row" style="margin-top:8px;color:rgba(255,255,255,.7)"><span>פסולת 3%</span><span>₪${(data.billingPrice-data.totalPrice).toFixed(0)}</span></div>
-    <div class="price-row total"><span>סה"כ לתשלום</span><span>₪${data.billingPrice.toLocaleString('he',{minimumFractionDigits:0})}</span></div>
+    <div class="price-row" style="margin-top:8px;color:rgba(255,255,255,.7)"><span>תוספת לחיוב ${Number(data.wastePct ?? 3)}%</span><span>₪${(data.billingPrice-data.totalPrice).toFixed(2)}</span></div>
+    <div class="price-row total"><span>סה"כ לתשלום</span><span>₪${data.billingPrice.toLocaleString('he',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
   `;
   document.getElementById('priceBox').style.display = '';
   setButtonBusy(btn, false);
-  toast(`הצעת מחיר: ₪${data.billingPrice.toFixed(0)}`);
+  toast(`הצעת מחיר: ₪${data.billingPrice.toFixed(2)}`);
 }
 
 // ──────────────────────────────────────────────────────
@@ -2192,7 +2258,7 @@ async function submitOrder(event) {
 
   const body = {
     token:       TOKEN,
-    items:       orderItems.map(i=>({ shapeId:i.shapeId, shapeName:i.shapeName, family:i.family || 'bars', diameter:portalItemDiameter(i), sides:i.sides, angles:i.angles, azAngles:i.azAngles, elAngles:i.elAngles, is3d:i.is3d, qty:i.qty, note:i.note, shapeSnapshot:i.shapeSnapshot || null })),
+    items:       orderItems.map(portalOrderItemPayload),
     deliveryDate: document.getElementById('delivDate').value,
     deliveryTime: document.getElementById('delivTime').value,
     deliveryAddress: document.getElementById('delivAddr').value + ' ' + document.getElementById('delivMode').value,
@@ -2214,6 +2280,9 @@ async function submitOrder(event) {
     toast(`הזמנה ${res.orderNum} נשלחה בהצלחה! ✓`);
   }
   setTimeout(async () => {
+    orderItems = [];
+    portalSourceFiles = [];
+    setButtonBusy(btn, false);
     await showHome(null);
     if (res.awaitingApproval) {
       // Auto-open the order so customer can approve inline too

@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { itemShapeMetrics, isShapeDataContractV2 } = require('../services/shapeSnapshot');
 const { reportProductionTiming } = require('../services/productionTiming');
+const { effectiveProductionQuantity } = require('../services/orderCancellation');
 
 function roundMetric(value, digits = 3) {
   const numeric = Number(value) || 0;
@@ -145,7 +146,7 @@ function machineEfficiencyByPeriod(db, fromDate, toDate, doneStatus) {
     };
     const metrics = itemReportMetrics(row);
     current.completed_items += 1;
-    current.total_units += Number(row.produced_qty || row.quantity) || metrics.quantity || 1;
+    current.total_units += effectiveProductionQuantity(db, row) || 0;
     current.total_weight_kg += metrics.totalWeightKg;
     current.total_waste += Number(row.actual_waste) || 0;
     current.total_length_mm += metrics.totalLengthMm;
@@ -431,7 +432,7 @@ module.exports = function createReportsRouter(deps) {
       shape_name: item.shape_name || item.shape_id || 'פריט ייצור',
       diameter_mm: Number(item.diameter) || null,
       quantity: metrics.quantity,
-      produced_quantity: Number(item.produced_qty) || 0,
+      produced_quantity: effectiveProductionQuantity(db, item),
       total_length_mm: Number.isFinite(Number(metrics.totalLengthMm)) && Number(metrics.totalLengthMm) > 0 ? roundMetric(metrics.totalLengthMm) : null,
       theoretical_weight_kg: hasTheoreticalWeight ? roundMetric(theoreticalWeightKg) : null,
       display_weight_kg: outputKg ?? fallbackWeightKg,

@@ -206,6 +206,414 @@ function ensureProductionCardLoadingSchema(db) {
   `);
 }
 
+// A cancellation is an inventory event, not a destructive edit.  Finished
+// goods are intentionally kept outside raw_material: a produced bar cannot
+// become raw coil again just because its sales order was cancelled.
+function ensureOrderCancellationSchema(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS finished_goods_warehouses (
+      id                INTEGER PRIMARY KEY AUTOINCREMENT,
+      warehouse_code    TEXT NOT NULL UNIQUE,
+      name              TEXT NOT NULL,
+      requires_location INTEGER NOT NULL DEFAULT 1 CHECK (requires_location IN (0,1)),
+      active            INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0,1)),
+      created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS order_cancellation_transactions (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      cancellation_uid    TEXT NOT NULL UNIQUE,
+      order_id            INTEGER NOT NULL,
+      scope_type          TEXT NOT NULL CHECK (scope_type IN ('order','item')),
+      idempotency_key     TEXT NOT NULL UNIQUE,
+      payload_fingerprint TEXT NOT NULL,
+      reason              TEXT NOT NULL,
+      actor_id            INTEGER,
+      actor_name          TEXT,
+      created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_cancellation_transactions_order
+      ON order_cancellation_transactions(order_id, id);
+
+    -- One row freezes the reconciliation used to cancel one order item.  The
+    -- unique item constraint is the last line of defence against a second
+    -- disposition silently double-counting physical output.
+    CREATE TABLE IF NOT EXISTS order_cancellation_item_dispositions (
+      id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+      cancellation_transaction_id INTEGER NOT NULL,
+      order_id                  INTEGER NOT NULL,
+      source_order_item_id      INTEGER NOT NULL UNIQUE,
+      ordered_qty               REAL NOT NULL,
+      recorded_produced_qty     REAL NOT NULL DEFAULT 0,
+      confirmed_produced_qty    REAL NOT NULL,
+      erroneous_production_correction_qty REAL NOT NULL DEFAULT 0,
+      delivered_qty             REAL NOT NULL DEFAULT 0,
+      packed_qty                REAL NOT NULL DEFAULT 0,
+      picked_qty                REAL NOT NULL DEFAULT 0,
+      previous_stock_qty        REAL NOT NULL DEFAULT 0,
+      previous_scrap_qty        REAL NOT NULL DEFAULT 0,
+      eligible_produced_qty     REAL NOT NULL DEFAULT 0,
+      stock_disposition_qty     REAL NOT NULL DEFAULT 0,
+      scrap_disposition_qty     REAL NOT NULL DEFAULT 0,
+      cancelled_unproduced_qty  REAL NOT NULL DEFAULT 0,
+      production_state          TEXT NOT NULL CHECK (production_state IN ('NOT_PRODUCED','PARTIALLY_PRODUCED','FULLY_PRODUCED')),
+      disposition_type          TEXT NOT NULL CHECK (disposition_type IN ('NONE','FINISHED_GOODS_STOCK','SCRAP','SPLIT_STOCK_AND_SCRAP')),
+      source_production_refs_json TEXT NOT NULL DEFAULT '{}',
+      reconciliation_json       TEXT NOT NULL DEFAULT '{}',
+      created_at                DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cancellation_item_dispositions_order
+      ON order_cancellation_item_dispositions(order_id, source_order_item_id);
+
+    -- A correction changes the business interpretation of an erroneous
+    -- production record.  It never deletes or edits the original card/output
+    -- event, and it is deliberately separate from physical stock or scrap.
+    CREATE TABLE IF NOT EXISTS production_record_correction_events (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      correction_uid             TEXT NOT NULL UNIQUE,
+      correction_type            TEXT NOT NULL CHECK (correction_type IN ('ERRONEOUS_PRODUCTION_RECORD')),
+      cancellation_transaction_id INTEGER NOT NULL,
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      recorded_produced_qty      REAL NOT NULL,
+      correction_qty             REAL NOT NULL CHECK (correction_qty > 0),
+      effective_produced_qty_before REAL NOT NULL,
+      effective_produced_qty_after  REAL NOT NULL,
+      reason                     TEXT NOT NULL,
+      source_production_refs_json TEXT NOT NULL DEFAULT '{}',
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id),
+      UNIQUE(cancellation_transaction_id, source_order_item_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_production_record_corrections_item
+      ON production_record_correction_events(source_order_item_id, id);
+
+    -- Lots remain source-level records even when availability is aggregated by
+    -- physical_spec_fingerprint in a read model.
+    CREATE TABLE IF NOT EXISTS finished_goods_lots (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      lot_uid                    TEXT NOT NULL UNIQUE,
+      warehouse_id               INTEGER NOT NULL,
+      location_code              TEXT,
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      cancellation_transaction_id INTEGER NOT NULL,
+      source_production_refs_json TEXT NOT NULL,
+      physical_spec_json         TEXT NOT NULL,
+      physical_spec_fingerprint  TEXT NOT NULL,
+      produced_quantity          REAL NOT NULL CHECK (produced_quantity > 0),
+      available_quantity         REAL NOT NULL CHECK (available_quantity >= 0),
+      calculated_weight_kg       REAL,
+      measured_weight_kg         REAL,
+      production_date            TEXT,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (warehouse_id) REFERENCES finished_goods_warehouses(id),
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_finished_goods_lots_availability
+      ON finished_goods_lots(warehouse_id, location_code, physical_spec_fingerprint, available_quantity);
+    CREATE INDEX IF NOT EXISTS idx_finished_goods_lots_source
+      ON finished_goods_lots(source_order_id, source_order_item_id);
+
+    CREATE TABLE IF NOT EXISTS finished_goods_movements (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      movement_uid               TEXT NOT NULL UNIQUE,
+      movement_type              TEXT NOT NULL CHECK (movement_type IN ('cancellation_to_stock')),
+      lot_id                     INTEGER NOT NULL,
+      warehouse_id               INTEGER NOT NULL,
+      location_code              TEXT,
+      quantity                   REAL NOT NULL CHECK (quantity > 0),
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      cancellation_transaction_id INTEGER NOT NULL,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (lot_id) REFERENCES finished_goods_lots(id),
+      FOREIGN KEY (warehouse_id) REFERENCES finished_goods_warehouses(id),
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+
+    -- This is deliberately separate from raw material and only ever receives
+    -- append-only write-off rows.
+    CREATE TABLE IF NOT EXISTS finished_goods_scrap_movements (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      movement_uid               TEXT NOT NULL UNIQUE,
+      movement_type              TEXT NOT NULL CHECK (movement_type IN ('cancellation_scrap_write_off')),
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      cancellation_transaction_id INTEGER NOT NULL,
+      source_production_refs_json TEXT NOT NULL,
+      quantity                   REAL NOT NULL CHECK (quantity > 0),
+      calculated_weight_kg       REAL,
+      measured_weight_kg         REAL,
+      reason                     TEXT NOT NULL,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_finished_goods_scrap_source
+      ON finished_goods_scrap_movements(source_order_id, source_order_item_id);
+
+    CREATE TABLE IF NOT EXISTS inventory_reservation_release_events (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_reservation_id      INTEGER NOT NULL UNIQUE,
+      cancellation_transaction_id INTEGER NOT NULL,
+      order_id                   INTEGER NOT NULL,
+      item_id                    INTEGER,
+      reserved_kg_before          REAL NOT NULL,
+      released_kg                REAL NOT NULL,
+      retained_for_production_kg REAL NOT NULL,
+      reason                     TEXT NOT NULL,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (source_reservation_id) REFERENCES inventory_reservations(id),
+      FOREIGN KEY (cancellation_transaction_id) REFERENCES order_cancellation_transactions(id),
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      FOREIGN KEY (item_id) REFERENCES items(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+
+    CREATE TRIGGER IF NOT EXISTS finished_goods_movements_no_update
+      BEFORE UPDATE ON finished_goods_movements
+      BEGIN SELECT RAISE(ABORT, 'finished_goods_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS finished_goods_movements_no_delete
+      BEFORE DELETE ON finished_goods_movements
+      BEGIN SELECT RAISE(ABORT, 'finished_goods_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS finished_goods_scrap_movements_no_update
+      BEFORE UPDATE ON finished_goods_scrap_movements
+      BEGIN SELECT RAISE(ABORT, 'finished_goods_scrap_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS finished_goods_scrap_movements_no_delete
+      BEFORE DELETE ON finished_goods_scrap_movements
+      BEGIN SELECT RAISE(ABORT, 'finished_goods_scrap_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS production_record_corrections_no_update
+      BEFORE UPDATE ON production_record_correction_events
+      BEGIN SELECT RAISE(ABORT, 'production_record_corrections_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS production_record_corrections_no_delete
+      BEFORE DELETE ON production_record_correction_events
+      BEGIN SELECT RAISE(ABORT, 'production_record_corrections_are_append_only'); END;
+
+    -- Historical reconciliation is intentionally distinct from cancellation:
+    -- it changes no order status and never masquerades as a new cancellation.
+    CREATE TABLE IF NOT EXISTS historical_production_reconciliation_transactions (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      reconciliation_uid  TEXT NOT NULL UNIQUE,
+      order_id            INTEGER NOT NULL,
+      idempotency_key     TEXT NOT NULL UNIQUE,
+      payload_fingerprint TEXT NOT NULL,
+      reason              TEXT NOT NULL,
+      actor_id            INTEGER,
+      actor_name          TEXT,
+      created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_historical_reconciliation_order
+      ON historical_production_reconciliation_transactions(order_id, id);
+
+    -- One immutable event freezes both the correction of legacy evidence and
+    -- the physical disposition that made its effective truth complete.
+    CREATE TABLE IF NOT EXISTS historical_production_reconciliation_items (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      reconciliation_transaction_id INTEGER NOT NULL,
+      order_id                   INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL UNIQUE,
+      ordered_qty                REAL NOT NULL,
+      recorded_produced_qty      REAL NOT NULL,
+      effective_produced_qty_before REAL NOT NULL,
+      production_correction_qty  REAL NOT NULL DEFAULT 0,
+      effective_produced_qty_after REAL NOT NULL,
+      delivered_qty              REAL NOT NULL DEFAULT 0,
+      packed_qty                 REAL NOT NULL DEFAULT 0,
+      picked_qty                 REAL NOT NULL DEFAULT 0,
+      previous_stock_qty         REAL NOT NULL DEFAULT 0,
+      previous_scrap_qty         REAL NOT NULL DEFAULT 0,
+      eligible_produced_qty      REAL NOT NULL DEFAULT 0,
+      stock_disposition_qty      REAL NOT NULL DEFAULT 0,
+      scrap_disposition_qty      REAL NOT NULL DEFAULT 0,
+      unreconciled_physical_qty  REAL NOT NULL DEFAULT 0,
+      production_reality         TEXT NOT NULL CHECK (production_reality IN ('PRODUCED_AS_RECORDED','NOT_ACTUALLY_PRODUCED','PARTIALLY_PRODUCED')),
+      source_production_refs_json TEXT NOT NULL DEFAULT '{}',
+      reconciliation_json        TEXT NOT NULL DEFAULT '{}',
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (reconciliation_transaction_id) REFERENCES historical_production_reconciliation_transactions(id),
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_historical_reconciliation_items_order
+      ON historical_production_reconciliation_items(order_id, source_order_item_id);
+
+    CREATE TABLE IF NOT EXISTS historical_finished_goods_lots (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      lot_uid                    TEXT NOT NULL UNIQUE,
+      warehouse_id               INTEGER NOT NULL,
+      location_code              TEXT,
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      reconciliation_transaction_id INTEGER NOT NULL,
+      source_production_refs_json TEXT NOT NULL,
+      physical_spec_json         TEXT NOT NULL,
+      physical_spec_fingerprint  TEXT NOT NULL,
+      produced_quantity          REAL NOT NULL CHECK (produced_quantity > 0),
+      available_quantity         REAL NOT NULL CHECK (available_quantity >= 0),
+      calculated_weight_kg       REAL,
+      measured_weight_kg         REAL,
+      production_date            TEXT,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (warehouse_id) REFERENCES finished_goods_warehouses(id),
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (reconciliation_transaction_id) REFERENCES historical_production_reconciliation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_historical_finished_goods_lots_availability
+      ON historical_finished_goods_lots(warehouse_id, location_code, physical_spec_fingerprint, available_quantity);
+    CREATE INDEX IF NOT EXISTS idx_historical_finished_goods_lots_source
+      ON historical_finished_goods_lots(source_order_id, source_order_item_id);
+
+    CREATE TABLE IF NOT EXISTS historical_finished_goods_movements (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      movement_uid               TEXT NOT NULL UNIQUE,
+      movement_type              TEXT NOT NULL CHECK (movement_type IN ('historical_reconciliation_to_stock')),
+      lot_id                     INTEGER NOT NULL,
+      warehouse_id               INTEGER NOT NULL,
+      location_code              TEXT,
+      quantity                   REAL NOT NULL CHECK (quantity > 0),
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      reconciliation_transaction_id INTEGER NOT NULL,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (lot_id) REFERENCES historical_finished_goods_lots(id),
+      FOREIGN KEY (warehouse_id) REFERENCES finished_goods_warehouses(id),
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (reconciliation_transaction_id) REFERENCES historical_production_reconciliation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS historical_finished_goods_scrap_movements (
+      id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+      movement_uid               TEXT NOT NULL UNIQUE,
+      movement_type              TEXT NOT NULL CHECK (movement_type IN ('historical_reconciliation_scrap_write_off')),
+      source_order_id            INTEGER NOT NULL,
+      source_order_item_id       INTEGER NOT NULL,
+      reconciliation_transaction_id INTEGER NOT NULL,
+      source_production_refs_json TEXT NOT NULL,
+      quantity                   REAL NOT NULL CHECK (quantity > 0),
+      calculated_weight_kg       REAL,
+      measured_weight_kg         REAL,
+      reason                     TEXT NOT NULL,
+      actor_id                   INTEGER,
+      created_at                 DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (source_order_id) REFERENCES orders(id),
+      FOREIGN KEY (source_order_item_id) REFERENCES items(id),
+      FOREIGN KEY (reconciliation_transaction_id) REFERENCES historical_production_reconciliation_transactions(id),
+      FOREIGN KEY (actor_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_historical_finished_goods_scrap_source
+      ON historical_finished_goods_scrap_movements(source_order_id, source_order_item_id);
+
+    CREATE TRIGGER IF NOT EXISTS historical_finished_goods_movements_no_update
+      BEFORE UPDATE ON historical_finished_goods_movements
+      BEGIN SELECT RAISE(ABORT, 'historical_finished_goods_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS historical_finished_goods_movements_no_delete
+      BEFORE DELETE ON historical_finished_goods_movements
+      BEGIN SELECT RAISE(ABORT, 'historical_finished_goods_movements_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS historical_finished_goods_scrap_no_update
+      BEFORE UPDATE ON historical_finished_goods_scrap_movements
+      BEGIN SELECT RAISE(ABORT, 'historical_finished_goods_scrap_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS historical_finished_goods_scrap_no_delete
+      BEFORE DELETE ON historical_finished_goods_scrap_movements
+      BEGIN SELECT RAISE(ABORT, 'historical_finished_goods_scrap_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS historical_reconciliation_items_no_update
+      BEFORE UPDATE ON historical_production_reconciliation_items
+      BEGIN SELECT RAISE(ABORT, 'historical_reconciliation_items_are_append_only'); END;
+    CREATE TRIGGER IF NOT EXISTS historical_reconciliation_items_no_delete
+      BEFORE DELETE ON historical_production_reconciliation_items
+      BEGIN SELECT RAISE(ABORT, 'historical_reconciliation_items_are_append_only'); END;
+
+    -- Inventory reads intentionally span both immutable sources.  A
+    -- historical reconciliation must be available to operations just like a
+    -- cancellation lot, while the source lot and its transaction stay
+    -- individually traceable instead of being overwritten by an aggregate.
+    CREATE VIEW IF NOT EXISTS finished_goods_source_lot_availability AS
+      SELECT
+        'cancellation' AS source_type,
+        l.id AS lot_id,
+        l.lot_uid,
+        l.warehouse_id,
+        l.location_code,
+        l.source_order_id,
+        l.source_order_item_id,
+        l.cancellation_transaction_id AS source_transaction_id,
+        l.physical_spec_fingerprint,
+        l.physical_spec_json,
+        l.produced_quantity,
+        l.available_quantity,
+        l.created_at
+      FROM finished_goods_lots l
+      UNION ALL
+      SELECT
+        'historical_reconciliation' AS source_type,
+        l.id AS lot_id,
+        l.lot_uid,
+        l.warehouse_id,
+        l.location_code,
+        l.source_order_id,
+        l.source_order_item_id,
+        l.reconciliation_transaction_id AS source_transaction_id,
+        l.physical_spec_fingerprint,
+        l.physical_spec_json,
+        l.produced_quantity,
+        l.available_quantity,
+        l.created_at
+      FROM historical_finished_goods_lots l;
+
+    CREATE VIEW IF NOT EXISTS finished_goods_availability AS
+      SELECT warehouse_id, location_code, physical_spec_fingerprint,
+             SUM(available_quantity) AS available_quantity,
+             COUNT(*) AS source_lot_count
+      FROM finished_goods_source_lot_availability
+      GROUP BY warehouse_id, location_code, physical_spec_fingerprint;
+  `);
+
+  ensureColumn(db, 'items', 'cancelled_at', 'DATETIME');
+  ensureColumn(db, 'items', 'cancelled_by', 'INTEGER');
+  ensureColumn(db, 'items', 'cancellation_reason', 'TEXT');
+  ensureColumn(db, 'items', 'production_stopped_at', 'DATETIME');
+  ensureColumn(db, 'items', 'cancelled_unproduced_qty', 'REAL');
+  ensureColumn(db, 'order_cancellation_item_dispositions', 'recorded_produced_qty', 'REAL NOT NULL DEFAULT 0');
+  ensureColumn(db, 'order_cancellation_item_dispositions', 'erroneous_production_correction_qty', 'REAL NOT NULL DEFAULT 0');
+
+  // The default is explicit and requires a location.  Additional warehouses
+  // can set requires_location=0 where their configuration permits it.
+  db.prepare(`
+    INSERT OR IGNORE INTO finished_goods_warehouses (warehouse_code,name,requires_location,active)
+    VALUES ('finished-goods-main','מוצרים מוגמרים',1,1)
+  `).run();
+}
+
 function ensurePendingRawMaterialReceiptV2Schema(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS pending_raw_material_receipts_v2 (
@@ -1527,6 +1935,7 @@ function ensureCoreSchema(db) {
   ensurePendingRawMaterialReceiptV2Schema(db);
   ensureProcurementRecommendationV2Schema(db);
   ensureProductionCardLoadingSchema(db);
+  ensureOrderCancellationSchema(db);
 
   // A completed loading session is one physical truck departure.  These
   // additive columns keep the delivery note and partial/full outcome
@@ -1562,4 +1971,5 @@ module.exports = {
   ensurePendingRawMaterialReceiptV2Schema,
   ensureProcurementRecommendationV2Schema,
   ensureProductionCardLoadingSchema,
+  ensureOrderCancellationSchema,
 };

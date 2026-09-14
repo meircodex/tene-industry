@@ -73,8 +73,21 @@ module.exports = function createProductionRouter(deps) {
 
   function isProductionGateOpen(item) {
     return Boolean(item)
+      && !isCancellationStopped(item)
       && productionOrderGateStatuses.has(statusContracts.normalizeOrderStatus(item.order_status))
       && productionStartItemStatuses.has(item.status);
+  }
+
+  function isCancellationStopped(item) {
+    return item?.status === ITEM_STATUS.CANCELLED || item?.cancelled_at != null || item?.production_stopped_at != null;
+  }
+
+  function sendCancellationStoppedError(res, item) {
+    return res.status(409).json({
+      error: 'production_stopped_by_cancellation',
+      item_status: item?.status || null,
+      order_status: item?.order_status || null,
+    });
   }
 
   function sendProductionGateError(res, item) {
@@ -380,6 +393,7 @@ module.exports = function createProductionRouter(deps) {
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
+    if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
@@ -400,6 +414,7 @@ module.exports = function createProductionRouter(deps) {
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
+    if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     const { produced_qty, actual_weight_kg, note } = req.body || {};
     const fields = [], vals = [];
     let previousActualWeight = null;
@@ -580,6 +595,9 @@ module.exports = function createProductionRouter(deps) {
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
     const allowed = ['ממתין','בייצור','הושלם','סופק','בהמתנה','בוטל'];
     if (!allowed.includes(status)) return res.status(400).json({ error: 'invalid status' });
+    if (status === ITEM_STATUS.CANCELLED) {
+      return res.status(409).json({ error: 'cancellation_review_required' });
+    }
     const item = db.prepare(`
       SELECT i.*, p.order_id, o.order_num, o.status AS order_status
       FROM items i
@@ -588,6 +606,7 @@ module.exports = function createProductionRouter(deps) {
       WHERE i.id=?
     `).get(req.params.id);
     if (!item) return res.status(404).json({ error: 'not found' });
+    if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     if (!productionWritableItemStatuses.has(status)) return res.status(400).json({ error: 'invalid production status' });
     if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const updates = { status };
@@ -688,6 +707,9 @@ module.exports = function createProductionRouter(deps) {
       if (!addStatusUpdate(item, status)) return;
     }
     if (!fields.length) return res.json({ ok: true });
+    const cancellationCheckItem = loadProductionItem();
+    if (!cancellationCheckItem) return res.status(404).json({ error: 'not found' });
+    if (isCancellationStopped(cancellationCheckItem)) return sendCancellationStoppedError(res, cancellationCheckItem);
     vals.push(req.params.id);
     db.transaction(() => {
       db.prepare(`UPDATE items SET ${fields.join(',')} WHERE id=?`).run(...vals);

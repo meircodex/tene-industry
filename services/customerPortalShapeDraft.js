@@ -19,6 +19,8 @@ const SHAPE_TYPE_ALIASES = Object.freeze({
   straight: 'straight_bar',
   straight_bar: 'straight_bar',
   bar: 'straight_bar',
+  'ישר': 'straight_bar',
+  'מוט ישר': 'straight_bar',
   l: 'l_bar',
   l_bar: 'l_bar',
   u: 'u_bar',
@@ -93,11 +95,11 @@ function normalizeSides(values, expectedCount = null) {
 
 function shapeTypeLabel(shapeType) {
   switch (shapeType) {
-    case 'straight_bar': return '׳׳•׳˜ ׳™׳©׳¨';
+    case 'straight_bar': return 'מוט ישר';
     case 'l_bar': return 'L';
     case 'u_bar': return 'U';
-    case 'stirrup': return '׳—׳™׳©׳•׳§';
-    default: return '׳¦׳•׳¨׳”';
+    case 'stirrup': return 'חישוק';
+    default: return 'צורה';
   }
 }
 
@@ -120,10 +122,13 @@ function normalizeDraftGeometry(input = {}) {
   if (!ALLOWED_FAMILIES.has(family)) {
     throw portalDraftError('shape family is not supported', 'unsupported_shape_family');
   }
-  const shapeType = normalizeShapeType(draft.shapeType || input.shapeType || input.shapeName || input.shape_name);
+  const legacyType = Array.isArray(input.sides)
+    ? (input.sides.length === 1 ? 'straight_bar' : 'custom_bar')
+    : (input.shapeName || input.shape_name);
+  const shapeType = normalizeShapeType(draft.shapeType || input.shapeType || legacyType);
 
   if (shapeType === 'straight_bar') {
-    const length = positiveNumber(data.A ?? data.a ?? data.length ?? data.lengthMm ?? data.sides?.[0] ?? input.length, 'length');
+    const length = positiveNumber(data.A ?? data.a ?? data.length ?? data.lengthMm ?? data.sides?.[0] ?? input.length ?? input.sides?.[0], 'length');
     return { family, shapeType, sides: [length], angles: [] };
   }
 
@@ -204,6 +209,9 @@ function readShapeSnapshot(input = {}) {
     ?? input.shapeDraft?.shape_snapshot
     ?? null;
   const snapshot = parseJsonObject(candidate);
+  if (candidate != null && !isShapeDataContractV2(snapshot)) {
+    throw portalDraftError('shape snapshot is invalid', 'invalid_shape_snapshot');
+  }
   return isShapeDataContractV2(snapshot) ? snapshot : null;
 }
 
@@ -465,6 +473,14 @@ function normalizeShapeSnapshotDraft(input = {}) {
       : family === 'spirals'
         ? buildSpiralSnapshot(snapshot, rawData)
         : buildBarsSnapshot(snapshot, rawData);
+  // Every server-built snapshot describes one shape, never an order quantity.
+  // Ring/pile engines may include total aliases for that single unit.
+  for (const payload of [normalized.shapeSnapshot.data, normalized.shapeSnapshot.calculated, normalized.shapeSnapshot.machineOutput?.generic]) {
+    if (!payload) continue;
+    delete payload.quantity;
+    delete payload.qty;
+    if (Number(payload.weightKg) > 0) delete payload.totalWeightKg;
+  }
   return { ...normalized, quantity, fromShapeSnapshot: true };
 }
 
@@ -485,7 +501,7 @@ function buildPortalShapeDraft(input = {}, ctx = {}) {
   const normalized = validatePortalShapeDraft(input, ctx);
   if (normalized.fromShapeSnapshot) {
     const elementName = cleanText(
-      input.elementName ?? input.struct_element ?? input.shapeName ?? normalized.shapeSnapshot.displayName,
+      input.elementName ?? input.structElement ?? input.struct_element ?? readShapeSnapshot(input)?.structElement ?? input.shapeName ?? normalized.shapeSnapshot.displayName,
       normalized.shapeSnapshot.displayName || 'Shape',
     );
     const note = cleanText(input.note ?? input.noteForCustomer, '');
@@ -508,7 +524,7 @@ function buildPortalShapeDraft(input = {}, ctx = {}) {
       shapePreview: buildPortalPreview(shapeName, normalized.shapeDimsText),
     };
   }
-  const elementName = cleanText(input.elementName ?? input.struct_element ?? input.shapeName, shapeTypeLabel(normalized.shapeType));
+  const elementName = cleanText(input.elementName ?? input.structElement ?? input.struct_element ?? input.shapeName, shapeTypeLabel(normalized.shapeType));
   const note = cleanText(input.note ?? input.noteForCustomer, '');
   const totalLengthMm = normalized.sides.reduce((sum, length) => sum + length, 0);
   const weightPerUnit = (totalLengthMm / 1000) * rebarKgPerMeter(normalized.diameter);
@@ -516,7 +532,7 @@ function buildPortalShapeDraft(input = {}, ctx = {}) {
   const bendCount = normalized.angles.filter(angle => Number.isFinite(Number(angle)) && Math.abs(Number(angle) - 180) > 0.001).length;
   const segments = segmentsFromSides(normalized.sides, normalized.angles);
   const shapeId = cleanText(input.shapeId || `portal-${normalized.shapeType}-${crypto.createHash('sha1').update(JSON.stringify({ sides: normalized.sides, angles: normalized.angles, diameter: normalized.diameter })).digest('hex').slice(0, 10)}`);
-  const displayName = elementName || shapeTypeLabel(normalized.shapeType);
+  const displayName = cleanText(input.shapeName, shapeTypeLabel(normalized.shapeType));
   const snapshot = buildFullShapeSnapshot({
     shapeVersion: 1,
     shapeId,

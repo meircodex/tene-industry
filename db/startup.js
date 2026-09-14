@@ -4,6 +4,8 @@ const { ensureCoreSchema, ensureMaterialRequirementV2Schema } = require('./coreS
 const { seedCoreData } = require('./seed');
 const { ensureVehicleCompatibility } = require('./vehicleMigrations');
 const { seedLegacyDiameterCatalog } = require('../services/materialCatalog');
+const { ensureCustomerIdentityConstraints } = require('../services/customerIdentity');
+const { ensureCustomerMergeSchema } = require('./customerMergeSchema');
 
 function ensureRawMaterialVerificationStatusConstraint(db) {
   const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='raw_material'").get()?.sql || '';
@@ -59,6 +61,7 @@ function ensureRawMaterialVerificationStatusConstraint(db) {
 }
 
 function runCoreMigrations(db) {
+  ensureCustomerMergeSchema(db);
   // ── MIGRATIONS (safe column additions) ────────────────────────────
   function addCol(table, col, def) {
     const cols = db.pragma(`table_info(${table})`).map(c => c.name);
@@ -70,6 +73,7 @@ function runCoreMigrations(db) {
   addCol('customers',  'email',              'TEXT');
   addCol('customers',  'notes',              'TEXT');
   addCol('customers',  'tax_id',             'TEXT');
+  ensureCustomerIdentityConstraints(db);
   addCol('customers',  'payment_terms',      'TEXT');
   addCol('customers',  'portal_price_list_visibility', "TEXT DEFAULT 'none'"); // 'none' | 'general' | 'customer'
   addCol('customers',  'portal_can_manage_users', 'INTEGER DEFAULT 0');

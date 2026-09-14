@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -9,563 +9,145 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --accent:#c9621a; --accent-light:#e07b39;
-  --text:#1a2533; --text-dim:#526070; --text-muted:#8fa0b0;
-  --border:rgba(0,0,0,0.09); --success:#1a7a42; --danger:#b83227;
-  --warning:#a86b00; --info:#1560a8;
+  --accent: #c9621a;
+  --accent-light: #e07b39;
+  --text: #1a2533;
+  --text-dim: #526070;
+  --text-muted: #8fa0b0;
+  --border: rgba(0,0,0,0.09);
 }
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-  font-family:'Heebo',sans-serif;
-  background:#f0f4f8;
-  color:var(--text);
-  direction:rtl;
-  min-height:100vh;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Heebo', sans-serif;
+  background: #f0f4f8;
+  color: var(--text);
+  direction: rtl;
+  min-height: 100vh;
 }
-
-/* TOP BAR */
-.topbar{
-  background:#fff;
-  border-bottom:1px solid var(--border);
-  padding:0 20px;
-  height:60px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+.topbar {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
-.logo{display:flex;align-items:center;gap:9px;}
-.logo-icon{
-  width:36px;height:36px;
-  background:linear-gradient(145deg,#df8640 0%,#c9621a 55%,#a4500f 100%);
-  border-radius:9px;display:flex;align-items:center;justify-content:center;
-  font-size:18px;
-  box-shadow:0 3px 8px rgba(201,98,26,0.30);
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
-.logo-text{display:flex;flex-direction:column;line-height:1.2;}
-.logo-name{font-size:16px;font-weight:800;color:var(--text);}
-.logo-img{width:160px;height:auto;display:block;filter:drop-shadow(0 3px 8px rgba(2,26,72,0.10));}
-.logo-sub{font-size:11px;font-weight:600;color:var(--accent);}
-.topbar-badge{
-  padding:6px 14px;
-  border-radius:20px;
-  background:rgba(201,98,26,0.08);
-  color:var(--accent);
-  font-size:12px;
-  font-weight:700;
-  border:1px solid rgba(201,98,26,0.15);
+.logo-img {
+  width: 160px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 3px 8px rgba(2,26,72,0.10));
 }
-
-/* MAIN */
-.main{max-width:700px;margin:0 auto;padding:24px 16px;}
-
-/* ENTRY SCREEN */
-.entry-card{
-  background:#fff;
-  border-radius:18px;
-  padding:40px 32px;
-  text-align:center;
-  box-shadow:0 4px 24px rgba(0,0,0,0.08);
-  margin-top:40px;
+.logo-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
 }
-.entry-icon{font-size:56px;margin-bottom:16px;}
-.entry-title{font-size:24px;font-weight:900;color:var(--text);margin-bottom:8px;}
-.entry-sub{font-size:14px;color:var(--text-dim);margin-bottom:32px;line-height:1.6;}
-.entry-input-row{display:flex;gap:10px;max-width:360px;margin:0 auto 16px;}
-.entry-input{
-  flex:1;
-  padding:14px 16px;
-  border:2px solid var(--border);
-  border-radius:12px;
-  font-family:'Heebo',sans-serif;
-  font-size:18px;
-  font-weight:700;
-  text-align:center;
-  letter-spacing:3px;
-  outline:none;
-  transition:border-color 0.2s, box-shadow 0.2s;
-  color:var(--text);
-  background:#fafbfc;
+.logo-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
 }
-.entry-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(201,98,26,0.12);}
-.btn-primary{
-  padding:14px 28px;
-  background:linear-gradient(135deg,var(--accent-light),var(--accent));
-  color:#fff;
-  border:none;
-  border-radius:12px;
-  font-family:'Heebo',sans-serif;
-  font-size:15px;
-  font-weight:800;
-  cursor:pointer;
-  transition:all 0.2s;
-  box-shadow:0 4px 16px rgba(201,98,26,0.30);
-  white-space:nowrap;
+.topbar-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(201,98,26,0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid rgba(201,98,26,0.15);
 }
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(201,98,26,0.40);}
-.entry-hint{font-size:12px;color:var(--text-muted);}
-.entry-error{
-  display:none;
-  margin-top:14px;
-  padding:10px 16px;
-  background:#fff0ef;
-  border:1px solid var(--danger);
-  border-radius:8px;
-  color:var(--danger);
-  font-size:13px;
-  font-weight:600;
+.main {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px 16px;
 }
-.entry-error.show{display:block;}
-
-/* ORDER VIEW */
-.order-view{display:none;}
-.order-view.show{display:block;}
-
-.order-header{
-  background:#fff;
-  border-radius:16px;
-  padding:24px;
-  margin-bottom:16px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+.entry-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 36px 32px;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  margin-top: 40px;
 }
-.order-num-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  flex-wrap:wrap;
-  gap:10px;
-  margin-bottom:12px;
+.entry-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
 }
-.order-num{font-size:22px;font-weight:900;color:var(--text);}
-.status-badge{
-  padding:6px 16px;
-  border-radius:20px;
-  font-size:13px;
-  font-weight:800;
-  display:inline-block;
+.entry-title {
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text);
+  margin-bottom: 8px;
 }
-.status-production{background:rgba(21,96,168,0.10);color:var(--info);}
-.status-ready{background:rgba(168,107,0,0.10);color:var(--warning);}
-.status-done{background:rgba(26,122,66,0.10);color:var(--success);}
-.status-ordered{background:rgba(0,0,0,0.06);color:var(--text-dim);}
-
-.order-meta{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:12px;
-  margin-bottom:16px;
+.entry-sub {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 22px;
+  line-height: 1.7;
 }
-.meta-item{display:flex;flex-direction:column;gap:2px;}
-.meta-label{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;}
-.meta-value{font-size:15px;font-weight:700;color:var(--text);}
-
-/* PROGRESS */
-.progress-section{
-  background:#fff;
-  border-radius:16px;
-  padding:24px;
-  margin-bottom:16px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+.btn-primary {
+  display: inline-block;
+  padding: 14px 28px;
+  background: linear-gradient(135deg,var(--accent-light),var(--accent));
+  color: #fff;
+  border-radius: 12px;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(201,98,26,0.30);
+  cursor: pointer;
+  border: none;
 }
-.section-title{
-  font-size:14px;
-  font-weight:800;
-  color:var(--text);
-  margin-bottom:18px;
-  display:flex;
-  align-items:center;
-  gap:6px;
+.entry-note {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
-.progress-bar-wrap{
-  background:#f0f4f8;
-  border-radius:20px;
-  height:12px;
-  margin-bottom:20px;
-  overflow:hidden;
-}
-.progress-bar-fill{
-  height:100%;
-  border-radius:20px;
-  background:linear-gradient(90deg,var(--success),#2ab562);
-  transition:width 1s ease;
-}
-.progress-pct{
-  text-align:center;
-  font-size:13px;
-  font-weight:700;
-  color:var(--text-dim);
-  margin-bottom:20px;
-}
-
-/* TIMELINE */
-.timeline{display:flex;flex-direction:column;gap:0;}
-.tl-item{
-  display:flex;
-  align-items:flex-start;
-  gap:14px;
-  padding-bottom:20px;
-  position:relative;
-}
-.tl-item:last-child{padding-bottom:0;}
-.tl-line{
-  position:absolute;
-  right:19px;
-  top:32px;
-  bottom:0;
-  width:2px;
-  background:var(--border);
-}
-.tl-item:last-child .tl-line{display:none;}
-.tl-dot{
-  width:40px;
-  height:40px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:18px;
-  flex-shrink:0;
-  position:relative;
-  z-index:1;
-}
-.tl-dot.done{background:rgba(26,122,66,0.12);border:2px solid var(--success);}
-.tl-dot.active{background:rgba(21,96,168,0.12);border:2px solid var(--info);}
-.tl-dot.pending{background:#f0f4f8;border:2px solid var(--border);}
-.tl-content{flex:1;padding-top:8px;}
-.tl-stage{font-size:14px;font-weight:700;color:var(--text);}
-.tl-date{font-size:12px;color:var(--text-muted);margin-top:2px;}
-.tl-note{font-size:12px;color:var(--text-dim);margin-top:4px;background:#f8fafc;padding:8px 12px;border-radius:8px;}
-
-/* PACKAGES */
-.packages-section{
-  background:#fff;
-  border-radius:16px;
-  padding:24px;
-  margin-bottom:16px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06);
-}
-.pkg-item{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:12px 0;
-  border-bottom:1px solid var(--border);
-}
-.pkg-item:last-child{border-bottom:none;}
-.pkg-name{font-size:14px;font-weight:600;color:var(--text);}
-.pkg-qty{font-size:12px;color:var(--text-dim);margin-top:2px;}
-.pkg-status{
-  font-size:11px;
-  font-weight:700;
-  padding:4px 10px;
-  border-radius:20px;
-}
-.pkg-done{background:rgba(26,122,66,0.10);color:var(--success);}
-.pkg-wip{background:rgba(21,96,168,0.10);color:var(--info);}
-.pkg-pending{background:rgba(0,0,0,0.05);color:var(--text-muted);}
-
-/* CONTACT */
-.contact-card{
-  background:#fff;
-  border-radius:16px;
-  padding:24px;
-  margin-bottom:16px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.06);
-  text-align:center;
-}
-.contact-card p{font-size:14px;color:var(--text-dim);margin-bottom:16px;line-height:1.6;}
-.btn-whatsapp{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:14px 28px;
-  background:#25d366;
-  color:#fff;
-  border:none;
-  border-radius:12px;
-  font-family:'Heebo',sans-serif;
-  font-size:15px;
-  font-weight:800;
-  cursor:pointer;
-  text-decoration:none;
-  box-shadow:0 4px 16px rgba(37,211,102,0.30);
-  transition:all 0.2s;
-}
-.btn-whatsapp:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(37,211,102,0.40);}
-
-.back-link{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  color:var(--text-dim);
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-  margin-bottom:16px;
-  background:none;
-  border:none;
-  font-family:'Heebo',sans-serif;
-  padding:0;
-}
-.back-link:hover{color:var(--accent);}
-
-@media(max-width:480px){
-  .entry-input-row{flex-direction:column;}
-  .order-num{font-size:18px;}
+@media (max-width: 480px) {
+  .entry-card {
+    margin-top: 24px;
+    padding: 30px 22px;
+  }
+  .entry-title {
+    font-size: 21px;
+  }
 }
 </style>
 <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
-
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="logo">
-    <img class="logo-img" src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל">
-    <div class="logo-text">
-      <div class="logo-name">IronBend</div>
-      <div class="logo-sub">פורטל לקוח</div>
-    </div>
-  </div>
-  <div class="topbar-badge">🔒 גישה מוגבלת</div>
-</div>
-
-<div class="main">
-
-  <!-- ENTRY SCREEN -->
-  <div id="entryScreen">
-    <div class="entry-card">
-      <div class="entry-icon">📦</div>
-      <div class="entry-title">מעקב הזמנה</div>
-      <div class="entry-sub">
-        הכנס את מספר ההזמנה שלך כדי לצפות בסטטוס עדכני,<br>
-        שלבי הייצור ומועד האספקה המשוער.
+  <div class="topbar">
+    <div class="logo">
+      <img class="logo-img" src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל">
+      <div>
+        <div class="logo-name">IronBend</div>
+        <div class="logo-sub">פורטל לקוח</div>
       </div>
-      <div class="entry-input-row">
-        <input class="entry-input" id="orderCodeInput" placeholder="לדוגמה: 1042" maxlength="6" inputmode="numeric"
-          onkeydown="if(event.key==='Enter')lookupOrder()">
-        <button class="btn-primary" onclick="lookupOrder()">חפש</button>
-      </div>
-      <div class="entry-hint">מספר ההזמנה מופיע באישור ההזמנה שנשלח אליך</div>
-      <div class="entry-error" id="entryError">מספר הזמנה לא נמצא. בדוק שוב או צור קשר.</div>
     </div>
+    <div class="topbar-badge">🔒 גישה מוגבלת</div>
   </div>
 
-  <!-- ORDER VIEW -->
-  <div class="order-view" id="orderView">
-
-    <button class="back-link" onclick="resetView()">← חזור לחיפוש</button>
-
-    <!-- HEADER -->
-    <div class="order-header">
-      <div class="order-num-row">
-        <div class="order-num" id="viewOrderNum">הזמנה #1042</div>
-        <div class="status-badge status-production" id="viewStatusBadge">בייצור</div>
-      </div>
-      <div class="order-meta">
-        <div class="meta-item">
-          <span class="meta-label">לקוח</span>
-          <span class="meta-value" id="viewCustomer">—</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">תאריך הזמנה</span>
-          <span class="meta-value" id="viewOrderDate">—</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">מועד אספקה משוער</span>
-          <span class="meta-value" id="viewDelivery">—</span>
-        </div>
-        <div class="meta-item">
-          <span class="meta-label">כתובת</span>
-          <span class="meta-value" id="viewAddress">—</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- PROGRESS -->
-    <div class="progress-section">
-      <div class="section-title">📊 התקדמות ייצור</div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-fill" id="viewProgressBar" style="width:0%"></div>
-      </div>
-      <div class="progress-pct" id="viewProgressPct">0% הושלם</div>
-
-      <!-- TIMELINE -->
-      <div class="timeline" id="viewTimeline"></div>
-    </div>
-
-    <!-- PACKAGES -->
-    <div class="packages-section">
-      <div class="section-title">📋 פריטים בהזמנה</div>
-      <div id="viewPackages"></div>
-    </div>
-
-    <!-- CONTACT -->
-    <div class="contact-card">
-      <div class="section-title" style="justify-content:center;">💬 צור קשר</div>
-      <p>שאלות לגבי ההזמנה? צוות הייצור שלנו זמין לעזור.</p>
-      <a class="btn-whatsapp" id="waLink" href="https://wa.me/9720501234567" target="_blank">
-        📱 WhatsApp ← שלח הודעה
-      </a>
-    </div>
-
-  </div><!-- /order-view -->
-</div><!-- /main -->
-
-<script>
-// Deprecated public lookup data. Real customer access must use customer.html
-// with a customer-scoped portal token, not internal order search.
-const DEMO_ORDERS = {
-  '1042': {
-    num: '1042',
-    customer: 'גבעון מתכות בע"מ',
-    orderDate: '12/05/2026',
-    delivery: '25/05/2026',
-    address: 'אזה"ת פולג, נתניה',
-    status: 'production',
-    statusLabel: 'בייצור',
-    progressPct: 60,
-    phone: '972501234567',
-    timeline: [
-      { emoji:'✅', label:'הוזמנה', date:'12/05/2026', note:'', state:'done' },
-      { emoji:'✅', label:'אושרה', date:'13/05/2026', note:'אושרה ע"י מנהל ייצור', state:'done' },
-      { emoji:'🔄', label:'בייצור', date:'15/05/2026', note:'60% מהפריטים הושלמו', state:'active' },
-      { emoji:'⏳', label:'מוכן לאיסוף / משלוח', date:'~25/05/2026', note:'', state:'pending' },
-      { emoji:'🚚', label:'נמסרה', date:'', note:'', state:'pending' },
-    ],
-    packages: [
-      { name:'קורת U 100×50 L=6,000', qty:'20 יח׳', status:'done' },
-      { name:'זווית 60×60×6 L=4,500', qty:'30 יח׳', status:'done' },
-      { name:'צינור מרובע 80×80×4 L=3,000', qty:'15 יח׳', status:'wip' },
-      { name:'פלטה 200×10 L=2,000', qty:'10 יח׳', status:'pending' },
-    ]
-  },
-  '1055': {
-    num: '1055',
-    customer: 'אורן הנדסה',
-    orderDate: '10/05/2026',
-    delivery: '20/05/2026',
-    address: 'אזה"ת תלמי יפה, אשקלון',
-    status: 'ready',
-    statusLabel: 'מוכן לאיסוף',
-    progressPct: 100,
-    phone: '972501234567',
-    timeline: [
-      { emoji:'✅', label:'הוזמנה', date:'10/05/2026', note:'', state:'done' },
-      { emoji:'✅', label:'אושרה', date:'11/05/2026', note:'', state:'done' },
-      { emoji:'✅', label:'בייצור', date:'12/05/2026', note:'הושלם', state:'done' },
-      { emoji:'✅', label:'מוכן לאיסוף', date:'18/05/2026', note:'ניתן לאסוף מהמחסן', state:'done' },
-      { emoji:'⏳', label:'נמסרה', date:'', note:'', state:'pending' },
-    ],
-    packages: [
-      { name:'עמוד HEB200 L=4,000', qty:'8 יח׳', status:'done' },
-      { name:'קרן IPE240 L=6,000', qty:'12 יח׳', status:'done' },
-    ]
-  }
-};
-
-const STATUS_CLASS = { production:'status-production', ready:'status-ready', done:'status-done', ordered:'status-ordered' };
-const PKG_STATUS = { done:{ cls:'pkg-done', label:'הושלם' }, wip:{ cls:'pkg-wip', label:'בייצור' }, pending:{ cls:'pkg-pending', label:'ממתין' } };
-
-function lookupOrder() {
-  const code = document.getElementById('orderCodeInput').value.trim();
-  document.getElementById('entryError').classList.remove('show');
-
-  const order = DEMO_ORDERS[code];
-  if (!order) {
-    // Try real API
-    fetchOrder(code);
-    return;
-  }
-  showOrder(order);
-}
-
-async function fetchOrder(code) {
-  document.getElementById('entryError').textContent =
-    'הגישה למעקב הזמנות מתבצעת דרך קישור מאובטח שנשלח ללקוח. פנה למשרד לקבלת קישור.';
-  document.getElementById('entryError').classList.add('show');
-}
-
-function mapApiOrder(o) {
-  return {
-    num: o.order_num || o.id,
-    customer: o.customer_name || o.customer,
-    orderDate: o.created_at ? o.created_at.slice(0,10) : '—',
-    delivery: o.delivery_date || '—',
-    address: o.delivery_address || '—',
-    status: o.status || 'ordered',
-    statusLabel: o.status_label || o.status,
-    progressPct: o.progress_pct || 0,
-    phone: '972501234567',
-    timeline: [
-      { emoji:'✅', label:'הוזמנה', date: o.created_at ? o.created_at.slice(0,10) : '', note:'', state:'done' },
-      { emoji: o.status !== 'ordered' ? '✅' : '⏳', label:'אושרה', date:o.approved_at || '', note:'', state: o.status !== 'ordered' ? 'done' : 'pending' },
-      { emoji:'🔄', label:'בייצור', date:'', note:'', state: o.status === 'production' ? 'active' : (o.status === 'ready' || o.status === 'done' ? 'done' : 'pending') },
-      { emoji:'⏳', label:'מוכן לאיסוף', date:'', note:'', state: o.status === 'ready' ? 'active' : (o.status === 'done' ? 'done' : 'pending') },
-      { emoji:'🚚', label:'נמסרה', date:'', note:'', state: o.status === 'done' ? 'done' : 'pending' },
-    ],
-    packages: (o.items || []).map(i => ({ name: i.description || i.name, qty: (i.qty || '') + ' יח׳', status: i.status || 'pending' }))
-  };
-}
-
-function showOrder(order) {
-  document.getElementById('entryScreen').style.display = 'none';
-  document.getElementById('orderView').classList.add('show');
-
-  document.getElementById('viewOrderNum').textContent = 'הזמנה #' + order.num;
-  const badge = document.getElementById('viewStatusBadge');
-  badge.textContent = order.statusLabel;
-  badge.className = 'status-badge ' + (STATUS_CLASS[order.status] || 'status-ordered');
-  document.getElementById('viewCustomer').textContent = order.customer;
-  document.getElementById('viewOrderDate').textContent = order.orderDate;
-  document.getElementById('viewDelivery').textContent = order.delivery;
-  document.getElementById('viewAddress').textContent = order.address;
-
-  // Progress
-  document.getElementById('viewProgressBar').style.width = order.progressPct + '%';
-  document.getElementById('viewProgressPct').textContent = order.progressPct + '% הושלם';
-
-  // Timeline
-  const tlEl = document.getElementById('viewTimeline');
-  tlEl.innerHTML = order.timeline.map(s => `
-    <div class="tl-item">
-      <div class="tl-dot ${s.state}"><span>${s.emoji}</span></div>
-      <div class="tl-line"></div>
-      <div class="tl-content">
-        <div class="tl-stage">${s.label}</div>
-        ${s.date ? '<div class="tl-date">'+s.date+'</div>' : ''}
-        ${s.note ? '<div class="tl-note">'+s.note+'</div>' : ''}
-      </div>
-    </div>
-  `).join('');
-
-  // Packages
-  const pkgEl = document.getElementById('viewPackages');
-  if (!order.packages || !order.packages.length) {
-    pkgEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">אין פירוט פריטים</p>';
-  } else {
-    pkgEl.innerHTML = order.packages.map(p => {
-      const s = PKG_STATUS[p.status] || PKG_STATUS.pending;
-      return `<div class="pkg-item">
-        <div>
-          <div class="pkg-name">${p.name}</div>
-          <div class="pkg-qty">${p.qty}</div>
-        </div>
-        <span class="pkg-status ${s.cls}">${s.label}</span>
-      </div>`;
-    }).join('');
-  }
-
-  // WhatsApp
-  document.getElementById('waLink').href = 'https://wa.me/' + order.phone + '?text=' + encodeURIComponent('שלום, שאלה לגבי הזמנה #' + order.num);
-}
-
-function resetView() {
-  document.getElementById('orderView').classList.remove('show');
-  document.getElementById('entryScreen').style.display = 'block';
-  document.getElementById('orderCodeInput').value = '';
-  document.getElementById('entryError').classList.remove('show');
-}
-</script>
+  <div class="main">
+    <section class="entry-card">
+      <div class="entry-icon">🔐</div>
+      <h1 class="entry-title">פורטל לקוח מאובטח</h1>
+      <p class="entry-sub">
+        הגישה לפורטל הלקוחות מתבצעת באמצעות קישור או קוד מאובטח.
+      </p>
+      <a class="btn-primary" href="/customer.html">כניסה לפורטל הלקוחות</a>
+      <p class="entry-note">
+        אם לא הגיע אליכם קישור מאובטח, פנו למוקד השיווק או לשירות לקוחות לקבלת גישה.
+      </p>
+    </section>
+  </div>
 </body>
 </html>

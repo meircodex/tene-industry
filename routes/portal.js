@@ -61,6 +61,10 @@ module.exports = function createPortalRouter(deps) {
       itemIndex: index + 1,
     }));
   }
+  function portalWastePct() {
+    const value = Number(settingsService.get('WASTE_PCT_DEFAULT', 3));
+    return Number.isFinite(value) && value >= 0 ? value : 3;
+  }
   const {
     normalizePortalPhone,
     resolveCustomer,
@@ -340,6 +344,7 @@ module.exports = function createPortalRouter(deps) {
     if (!c) return res.status(401).json({ error: 'Invalid code' });
     // משתמש פורטל + תפקיד + טוקן פר-משתמש (הטלפון יכול להיות אישי, לא של החברה)
     const user = findOrCreatePortalUser(c.id, phone, c.name);
+    if (!user || Number(user.active) !== 1) return res.status(403).json({ error: 'גישת המשתמש מושהית. יש לפנות למנהל המערכת לבדיקת הרשאות.' });
     const { token, expiresAt } = issueUserToken(user);
     const freshUser = db.prepare('SELECT * FROM portal_users WHERE id=?').get(user.id);
     const portal = portalContext(c, freshUser);
@@ -956,14 +961,9 @@ module.exports = function createPortalRouter(deps) {
       return portalDraftErrorResponse(res, err);
     }
 
-    const priceItems = portalItems.map(item => ({
-      diameter: item.diameter,
-      totalWeight: item.totalWeight,
-      shapeSnapshot: item.shapeSnapshot,
-    }));
-
-    const result = pricer.calcOrderPriceForCustomer(priceItems, c);
-    res.json(result);
+    const wastePct = portalWastePct();
+    const result = pricer.calcOrderPriceForCustomer(portalItems, c, { wastePct });
+    res.json({ ...result, wastePct });
   });
 
   // Submit order from portal
@@ -987,13 +987,9 @@ module.exports = function createPortalRouter(deps) {
     const orderSite = resolvedSite.site;
 
     // Calculate price via pricer service
-    const wastePct = settingsService.getNum('WASTE_PCT_DEFAULT', 3);
-    const priceChecks = portalItems.map(item => pricer.resolveDiameterPrice(item.diameter, {
-      tier: c.price_tier === 'customer' ? 'customer' : 'general',
-      customerId: c.id,
-      discountPct: c.discount_pct || 0,
-    }));
-    const missingPrice = priceChecks.find(row => row.requiresPriceListUpdate);
+    const wastePct = portalWastePct();
+    const pricing = pricer.calcOrderPriceForCustomer(portalItems, c, { wastePct });
+    const missingPrice = pricing.warnings.find(row => row.requiresPriceListUpdate);
     if (missingPrice) {
       return res.status(409).json({
         error: 'מחירון דורש עדכון',
@@ -1004,7 +1000,7 @@ module.exports = function createPortalRouter(deps) {
         pricingLabel: missingPrice.pricingLabel,
       });
     }
-    let totalWeight = 0, totalPrice = 0;
+    const totalWeight = portalItems.reduce((sum, item) => sum + item.totalWeight, 0);
     const orderNum = generateOrderNum();
     const confirmToken = crypto.randomBytes(16).toString('hex');
 
@@ -1026,14 +1022,6 @@ module.exports = function createPortalRouter(deps) {
     portalItems.forEach(item => {
       const totalLengthMm = item.totalLengthMm;
       const weight = item.totalWeight;
-      const priceDecision = pricer.resolveDiameterPrice(item.diameter, {
-        tier: c.price_tier === 'customer' ? 'customer' : 'general',
-        customerId: c.id,
-        discountPct: c.discount_pct || 0,
-      });
-      const ppu = priceDecision.pricePerKg;
-      totalWeight += weight;
-      totalPrice += weight * ppu;
       const itemRow = db.prepare(`INSERT INTO items (pallet_id,order_id,shape_snapshot_json,shape_id,shape_name,diameter,segments,total_length_mm,quantity,weight_per_unit,total_weight,note,struct_element)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
         .run(palletId, orderId, item.shapeSnapshotJson, item.shapeId, item.shapeName, item.diameter, item.segments, totalLengthMm,
@@ -1043,7 +1031,7 @@ module.exports = function createPortalRouter(deps) {
       itemLines.push(`${item.quantity || 1} x D${item.diameter} ${item.elementName || item.shapeName || 'shape'} - ${Math.round(totalLengthMm / 10)} cm${itemCustomerDescription ? ' - ' + itemCustomerDescription : ''}`);
     });
     const billingWeight = totalWeight * (1 + wastePct/100);
-    const portalPrice   = totalPrice  * (1 + wastePct/100);
+    const portalPrice   = pricing.billingPrice;
     db.prepare('UPDATE orders SET total_weight=?,billing_weight=?,portal_price=? WHERE id=?')
       .run(totalWeight, billingWeight, portalPrice, orderId);
     db.prepare('UPDATE pallets SET total_weight=? WHERE id=?').run(totalWeight, palletId);
@@ -1054,7 +1042,7 @@ module.exports = function createPortalRouter(deps) {
     const approveLink = `${portalAccess.configuredBaseUrl(requestPublicBaseUrl(req))}/api/c/approve/${encodeURIComponent(confirmToken)}`;
     const delivInfo = deliveryDate ? `📅 אספקה: ${deliveryDate}${deliveryTime ? ' ' + deliveryTime : ''}` : '';
     const addrInfo  = deliveryAddress ? `📍 ${deliveryAddress}` : '';
-    const waMsg = `📋 *הזמנה ${orderNum} – ממתינה לאישורך*\n\nשלום ${c.name},\nקיבלנו את הזמנתך:\n\n${itemLines.join('\n')}\n\n⚖️ משקל לחיוב: ${billingWeight.toFixed(1)} ק"ג\n💰 סה"כ: ₪${portalPrice.toFixed(0)}\n${delivInfo}\n${addrInfo}\n\n*לאישור פרטי ההזמנה ושליחה לבדיקה – לחץ כאן:*\n${approveLink}\n\n_⚠️ ייצור יתחיל רק לאחר בדיקה ואישור פנימי של טנא_`;
+    const waMsg = `📋 *הזמנה ${orderNum} – ממתינה לאישורך*\n\nשלום ${c.name},\nקיבלנו את הזמנתך:\n\n${itemLines.join('\n')}\n\n⚖️ משקל לחיוב: ${billingWeight.toFixed(2)} ק"ג\n💰 סה"כ: ₪${portalPrice.toFixed(2)}\n${delivInfo}\n${addrInfo}\n\n*לאישור פרטי ההזמנה ושליחה לבדיקה – לחץ כאן:*\n${approveLink}\n\n_⚠️ ייצור יתחיל רק לאחר בדיקה ואישור פנימי של טנא_`;
 
     if (c.phone) intake.sendWhatsApp(c.phone, waMsg).catch(e => console.warn('[Order confirm WA]', e));
 

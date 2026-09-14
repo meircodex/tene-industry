@@ -1665,13 +1665,18 @@
               <label><span class="required">*</span>חיפוש / שם לקוח</label>
               <div class="customer-search-wrap">
                 <span class="customer-search-mark">&#8981;</span>
-                <input type="text" id="customerSearch" placeholder="שם לקוח, טלפון או מספר לקוח..." autocomplete="off" oninput="onCustomerSearchInput(this.value)">
+                <input type="text" id="customerSearch" placeholder="ח.פ, שם לקוח, טלפון או מספר לקוח..." autocomplete="off" oninput="onCustomerSearchInput(this.value)">
                 <div class="customer-results" id="customerResults"></div>
               </div>
             </div>
             <div class="field">
               <label>טלפון להזמנה</label>
               <input type="tel" id="customerPhone" placeholder="050-0000000" oninput="updateCustomerSummary()">
+            </div>
+            <div class="field">
+              <label for="customerTaxId">ח.פ / מספר עוסק</label>
+              <input type="text" id="customerTaxId" placeholder="9 ספרות — לזיהוי הלקוח" inputmode="numeric" dir="ltr">
+              <small>ח.פ קיים משייך את ההזמנה לאותו כרטיס לקוח.</small>
             </div>
           </div>
           <div class="customer-status-row">
@@ -2537,6 +2542,7 @@ function activeCustomerSites(sites) {
 function clearSelectedCustomerBinding() {
   window._selectedCustomerId = null;
   window._selectedCustomerName = '';
+  setInputValue('customerTaxId', '');
   selectedCustomerSites = [];
   selectedCustomerAccountSummary = null;
   setInputValue('orderSiteId', '');
@@ -2561,6 +2567,7 @@ function applyCustomerDetails(c = {}) {
   window._selectedCustomerName = c.name || '';
   setInputValue('customerSearch', c.name || '');
   setInputValue('customerPhone', c.phone || '');
+  setInputValue('customerTaxId', c.tax_id || '');
   setInputValue('customerPriorityId', c.priority_id || '');
   setInputValue('contactName', c.contact_name || '');
   setInputValue('contactPhone', c.contact_phone || '');
@@ -2622,6 +2629,7 @@ async function hydrateSelectedCustomer(customerId, seed = {}) {
       fetch('/api/customers/' + encodeURIComponent(id) + '/portal-sites'),
     ]);
     const customer = customerRes.ok ? await customerRes.json() : seed;
+    if (customerRes.ok && Number(customer.id) && Number(customer.id) !== id) return hydrateSelectedCustomer(Number(customer.id), customer);
     const sitesData = sitesRes.ok ? await sitesRes.json() : { sites: [] };
     applyCustomerDetails({ ...seed, ...customer, id });
     renderCustomerSiteChoice(sitesData.sites || [], { ...seed, ...customer, id });
@@ -2643,6 +2651,7 @@ function captureOrderDraft() {
       id: window._selectedCustomerId || null,
       name: document.getElementById('customerSearch')?.value || '',
       phone: document.getElementById('customerPhone')?.value || '',
+      taxId: document.getElementById('customerTaxId')?.value || '',
       priorityId: document.getElementById('customerPriorityId')?.value || '',
       contactName: document.getElementById('contactName')?.value || '',
       contactPhone: document.getElementById('contactPhone')?.value || '',
@@ -2678,6 +2687,7 @@ function restoreOrderDraft() {
   window._selectedCustomerName = c.name || '';
   setInputValue('customerSearch', c.name || '');
   setInputValue('customerPhone', c.phone || '');
+  setInputValue('customerTaxId', c.taxId || '');
   setInputValue('customerPriorityId', c.priorityId || '');
   setInputValue('contactName', c.contactName || '');
   setInputValue('contactPhone', c.contactPhone || '');
@@ -2696,7 +2706,7 @@ function restoreOrderDraft() {
     pallets = draft.pallets;
     renderPallets();
   }
-  if (c.id) hydrateSelectedCustomer(c.id, { id: c.id, name: c.name, phone: c.phone, priority_id: c.priorityId, contact_name: c.contactName, contact_phone: c.contactPhone });
+  if (c.id) hydrateSelectedCustomer(c.id, { id: c.id, name: c.name, phone: c.phone, tax_id: c.taxId, priority_id: c.priorityId, contact_name: c.contactName, contact_phone: c.contactPhone });
   setCustomerState(c.id ? '\u05d8\u05d9\u05d5\u05d8\u05d4 \u05e9\u05d5\u05d7\u05d6\u05e8\u05d4' : '\u05dc\u05e7\u05d5\u05d7 \u05de\u05d8\u05d9\u05d5\u05d8\u05d4', '\u05d4\u05d8\u05d5\u05e4\u05e1 \u05e9\u05d5\u05d7\u05d6\u05e8 \u05de\u05e9\u05de\u05d9\u05e8\u05d4 \u05de\u05e7\u05d5\u05de\u05d9\u05ea.');
   updateDeliverySummary();
   updateCustomerSummary();
@@ -2742,7 +2752,7 @@ function searchCustomer(query) {
         <div class="customer-result-item" onclick="selectCustomer(JSON.parse(decodeURIComponent('${encodeURIComponent(JSON.stringify(c))}')))" >
           <div>
             <div class="customer-result-name">${escapeHtml(c.name)}</div>
-            <div class="customer-result-phone">${escapeHtml([c.phone, c.contact_name, c.priority_id].filter(Boolean).join(' · '))}</div>
+            <div class="customer-result-phone">${escapeHtml([c.tax_id ? 'ח.פ ' + c.tax_id : 'חסר ח.פ · #' + c.id, c.phone, c.contact_name, c.priority_id].filter(Boolean).join(' · '))}</div>
           </div>
           <div class="customer-result-action">בחר</div>
         </div>
@@ -3649,6 +3659,7 @@ function newOrder() {
   document.getElementById('quoteSuccessOverlay')?.classList.remove('show');
   document.getElementById('customerSearch').value = '';
   document.getElementById('customerPhone').value = '';
+  setInputValue('customerTaxId', '');
   document.getElementById('customerPriorityId').value = '';
   document.getElementById('contactName').value = '';
   document.getElementById('contactPhone').value = '';
@@ -3702,6 +3713,10 @@ function buildOrderPayload() {
   const driverNotesRaw = (document.getElementById('driverNotes')?.value || '').trim();
   const driverNotes = deliverySiteName ? (`\u05d0\u05ea\u05e8: ${deliverySiteName}` + (driverNotesRaw ? ` | ${driverNotesRaw}` : '')) : driverNotesRaw;
   const selectedCustomerId = Number(window._selectedCustomerId || 0) || null;
+  const customerTaxId = (document.getElementById('customerTaxId')?.value || '').replace(/[ \t\r\n\u00a0\u200e\u200f-]/g, '');
+  if (customerTaxId && (!/^[0-9]{9}$/.test(customerTaxId) || customerTaxId === '000000000')) {
+    openCustomerDetails(); alert('ח.פ / מספר עוסק חייב להכיל 9 ספרות'); return null;
+  }
   const selectedSiteId = selectedCustomerId ? (document.getElementById('orderSiteId')?.value || null) : null;
 
   return {
@@ -3709,6 +3724,7 @@ function buildOrderPayload() {
       id: selectedCustomerId,
       name: document.getElementById('customerSearch').value,
       phone: document.getElementById('customerPhone').value,
+      taxId: customerTaxId || null,
       address: document.getElementById('deliveryAddress').value,
       contactName: document.getElementById('contactName').value,
       contactPhone: document.getElementById('contactPhone').value,
@@ -4051,6 +4067,7 @@ function applyAnalyzedMeta(data) {
   if (!data) return;
   setIfEmpty('customerSearch', data.customer_name);
   setIfEmpty('customerPhone', data.customer_phone);
+  setIfEmpty('customerTaxId', data.customer_tax_id || data.customerTaxId || data.tax_id || data.taxId);
   setIfEmpty('deliveryDate', data.delivery_date);
   setIfEmpty('deliveryAddress', data.delivery_address);
   if (data.notes || data.supplier_order_num || data.document_type) {

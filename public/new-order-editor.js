@@ -1284,6 +1284,7 @@
     const ids = [
       'customerSearch',
       'customerPhone',
+      'customerTaxId',
       'customerPriorityId',
       'contactName',
       'contactPhone',

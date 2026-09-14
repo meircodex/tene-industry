@@ -1514,8 +1514,9 @@ function printSelectedCards(orderId) {
   closePrintDialog('productionCardPrintDialog');
 }
 
-function openA4PrintDialog(orderId) {
+function openA4PrintDialog(orderId, mode = 'print') {
   closePrintDialog('a4PrintDialog');
+  const actionMode = mode === 'send' ? 'send' : 'print';
   const dialog = document.createElement('div');
   dialog.id = 'a4PrintDialog';
   dialog.setAttribute('role', 'dialog');
@@ -1523,15 +1524,24 @@ function openA4PrintDialog(orderId) {
   dialog.style.cssText = 'position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,34,27,.48);';
   dialog.innerHTML = `<div style="width:min(430px,100%);box-sizing:border-box;padding:22px;border-radius:16px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.24);direction:rtl;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-      <div><h2 style="margin:0;color:#183d2b;font-size:22px;">הדפסת A4</h2><p style="margin:6px 0 0;color:#587060;font-size:13px;">בחר שפה לפני פתיחת ההדפסה.</p></div>
+      <div><h2 style="margin:0;color:#183d2b;font-size:22px;">${actionMode === 'send' ? 'שליחת קובץ A4' : 'הדפסת A4'}</h2><p style="margin:6px 0 0;color:#587060;font-size:13px;">${actionMode === 'send' ? 'בחר שפה למסמך שיישמר כ‑PDF ולשליחה.' : 'בחר שפה לפני פתיחת ההדפסה.'}</p></div>
       <button type="button" onclick="closePrintDialog('a4PrintDialog')" aria-label="סגור" style="border:0;background:transparent;color:#587060;font-size:26px;line-height:1;cursor:pointer;">&times;</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;">
-      <button type="button" onclick="printA4Document(${orderId}, 'he')" style="padding:16px 12px;border:1px solid #9eb4a5;border-radius:10px;background:#fff;color:#183d2b;cursor:pointer;font-weight:700;">עברית</button>
-      <button type="button" onclick="printA4Document(${orderId}, 'th')" style="padding:16px 12px;border:0;border-radius:10px;background:#16753e;color:#fff;cursor:pointer;font-weight:700;">ไทย</button>
+      <button type="button" onclick="chooseA4DocumentLanguage(${orderId}, 'he', '${actionMode}')" style="padding:16px 12px;border:1px solid #9eb4a5;border-radius:10px;background:#fff;color:#183d2b;cursor:pointer;font-weight:700;">עברית</button>
+      <button type="button" onclick="chooseA4DocumentLanguage(${orderId}, 'th', '${actionMode}')" style="padding:16px 12px;border:0;border-radius:10px;background:#16753e;color:#fff;cursor:pointer;font-weight:700;">ไทย · תאילנדית</button>
     </div>
   </div>`;
   document.body.appendChild(dialog);
+}
+
+function chooseA4DocumentLanguage(orderId, language, mode) {
+  if (mode === 'send') {
+    closePrintDialog('a4PrintDialog');
+    openSendFile(null, orderId, language === 'th' ? 'print-a4-th' : 'print-a4');
+    return;
+  }
+  printA4Document(orderId, language);
 }
 
 function printA4Document(orderId, language) {
@@ -1713,7 +1723,7 @@ async function openOrderEdit(event, orderId) {
     const select = document.getElementById('orderEditCustomer');
     const currentCustomerId = Number(order.customer_id || 0);
     const customerOptions = Array.isArray(customers) ? customers : [];
-    select.innerHTML = `<option value="">ללא לקוח</option>${customerOptions.map(customer => `<option value="${Number(customer.id)}">${escHtml(customer.name || `לקוח #${customer.id}`)}</option>`).join('')}`;
+    select.innerHTML = `<option value="">ללא לקוח</option>${customerOptions.map(customer => `<option value="${Number(customer.id)}">${escHtml(customer.name || `לקוח #${customer.id}`)} · ${escHtml(customer.tax_id ? 'ח.פ ' + customer.tax_id : 'חסר ח.פ · #' + customer.id)}</option>`).join('')}`;
     if (currentCustomerId && !customerOptions.some(customer => Number(customer.id) === currentCustomerId)) {
       select.insertAdjacentHTML('beforeend', `<option value="${currentCustomerId}">${escHtml(order.customer_name || `לקוח #${currentCustomerId}`)}</option>`);
     }
@@ -2288,9 +2298,9 @@ function buildDetailHTML(o, pkgs) {
 
   // ── Print buttons
   const prints = `<div class="print-btns">
-    <a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a>
-    <a class="print-btn a4" href="/order-print.html?id=${o.id}&kind=print-a4" target="_blank" rel="noopener">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</a>
-    <a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">&#128203; &#1514;&#1506;&#1493;&#1491;&#1514; &#1502;&#1513;&#1500;&#1493;&#1495;</a>
+    <div class="print-action-pair"><button type="button" class="print-btn cards" onclick="openProductionCardPrintDialog(${o.id})">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</button><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">&#128203; &#1514;&#1506;&#1493;&#1491;&#1514; &#1502;&#1513;&#1500;&#1493;&#1495;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
   </div>`;
 
   // ── Info

@@ -629,28 +629,44 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal(updated.stable_order_id, 'ORDER-CONTRACT-APPROVE');
   });
 
-  await t.test('order cancellation releases all active inventory reservations', async () => {
+  await t.test('order cancellation uses the disposition workflow and releases only unproduced reservations', async () => {
     const customerId = seedCustomer();
     const orderId = seedInternalOrder(customerId, 'ORDER-CANCEL-RESERVATIONS');
     const otherOrderId = seedInternalOrder(customerId, 'ORDER-CANCEL-RESERVATIONS-OTHER');
+    const palletId = db.prepare('INSERT INTO pallets (order_id,pallet_num,total_weight) VALUES (?,?,?)').run(orderId, 1, 10).lastInsertRowid;
+    const itemId = db.prepare(`
+      INSERT INTO items (pallet_id,order_id,shape_id,shape_name,diameter,total_length_mm,quantity,production_qty,weight_per_unit,total_weight,status,produced_qty)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    `).run(palletId, orderId, 'straight_bar', 'straight_bar', 12, 1000, 10, 10, 1, 10, 'ממתין', 0).lastInsertRowid;
 
     const insertReservation = db.prepare(`
       INSERT INTO inventory_reservations (order_id, item_id, diameter, material_type, reserved_kg, status)
       VALUES (?, ?, ?, ?, ?, ?)
     `);
-    insertReservation.run(orderId, null, 12, 'coil', 100, 'active');
-    insertReservation.run(orderId, null, 12, 'coil', 75, 'active');
-    insertReservation.run(orderId, null, 12, 'coil', 25, 'released');
+    insertReservation.run(orderId, itemId, 12, 'coil', 100, 'active');
+    insertReservation.run(orderId, itemId, 12, 'coil', 75, 'active');
+    insertReservation.run(orderId, itemId, 12, 'coil', 25, 'released');
     insertReservation.run(otherOrderId, null, 12, 'coil', 50, 'active');
 
-    const response = await request(`/api/orders/${orderId}/status`, {
+    const bypass = await request(`/api/orders/${orderId}/status`, {
       method: 'PATCH',
       headers: authHeaders(manager),
       body: JSON.stringify({ status: statusContracts.ORDER_STATUS.CANCELLED }),
     });
-    assert.equal(response.status, 200);
+    assert.equal(bypass.status, 409);
+
+    const response = await request(`/api/orders/${orderId}/cancel`, {
+      method: 'POST',
+      headers: authHeaders(manager),
+      body: JSON.stringify({
+        reason: 'ביטול בדיקת הרשאות',
+        idempotency_key: 'security-cancel-reservations-v1',
+        items: [{ item_id: itemId, stock_disposition_qty: 0, scrap_disposition_qty: 0 }],
+      }),
+    });
+    assert.equal(response.status, 201);
     const result = await response.json();
-    assert.deepEqual(result.releasedReservations, { order_id: orderId, released: 2 });
+    assert.deepEqual(result.released_reservations, { count: 2, kg: 175 });
 
     const rows = db.prepare('SELECT order_id,status FROM inventory_reservations WHERE order_id IN (?, ?) ORDER BY id').all(orderId, otherOrderId);
     assert.deepEqual(rows, [

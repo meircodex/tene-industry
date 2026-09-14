@@ -1,4 +1,6 @@
 const router = require('express').Router();
+const { validateCustomerTaxId, normalizeCustomerTaxId, customerTaxIdSql, assertCustomerTaxIdAvailable } = require('../services/customerIdentity');
+const { createCustomerMergeService } = require('../services/customerMerge');
 const {
   getCustomerAccountSummary,
   createInvoiceDraftFromBillableOrders,
@@ -13,6 +15,16 @@ module.exports = function createCustomersRouter(deps) {
   const db = required('db', deps.db);
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
   const pricer = deps.pricer || null;
+  const customerMerge = createCustomerMergeService(db);
+
+  router.post('/customers/merge/preview', requireAnyRole(['admin']), (req, res, next) => {
+    try { res.json(customerMerge.preview(req.body || {}, req.auth?.sub || req.userId)); }
+    catch (err) { customerSaveError(err, res, next); }
+  });
+  router.post('/customers/merge/confirm', requireAnyRole(['admin']), async (req, res, next) => {
+    try { res.json(await customerMerge.merge(req.body || {}, req.auth?.sub || req.userId)); }
+    catch (err) { customerSaveError(err, res, next); }
+  });
 
   function normalizePortalPriceListVisibility(value) {
     return ['none', 'general', 'customer'].includes(value) ? value : 'none';
@@ -47,7 +59,7 @@ module.exports = function createCustomersRouter(deps) {
   }
 
   router.get('/customers', requireAnyRole(['office', 'sales', 'manager', 'admin']), (req, res) => {
-    const q = req.query.q || '';
+    const q = String(req.query.q || '').trim();
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     // BUG-26: no portal_token in list response
     const rows = db.prepare(`
@@ -57,6 +69,7 @@ module.exports = function createCustomersRouter(deps) {
              COALESCE(cc.open_debt,0) AS balance,
              COALESCE(cc.credit_limit,0) AS credit_limit,
              c.created_at,
+             (${customerTaxIdSql('c.tax_id')}<>'' AND EXISTS (SELECT 1 FROM customers other WHERE other.id<>c.id AND ${customerTaxIdSql('other.tax_id')}=${customerTaxIdSql('c.tax_id')})) AS tax_id_duplicate,
              COUNT(o.id)        AS order_count,
              COALESCE(SUM(o.total_weight),0) AS total_weight_sum,
              MAX(o.created_at)  AS last_order_at
@@ -64,10 +77,11 @@ module.exports = function createCustomersRouter(deps) {
       LEFT JOIN customer_credit cc ON cc.customer_id = c.id
       LEFT JOIN orders o ON o.customer_id = c.id
       WHERE c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ? OR c.priority_id LIKE ?
+         OR ${customerTaxIdSql('c.tax_id')} LIKE ? OR c.contact_name LIKE ? OR CAST(c.id AS TEXT)=?
       GROUP BY c.id
       ORDER BY c.name
       LIMIT ?
-    `).all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, limit);
+    `).all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${normalizeCustomerTaxId(q)}%`, `%${q}%`, q, limit);
     res.json(rows);
   });
 
@@ -100,8 +114,12 @@ module.exports = function createCustomersRouter(deps) {
   // BUG-26: no portal_token in admin customer detail — use dedicated /token endpoint
   const CUSTOMER_ADMIN_COLS = 'c.id,c.name,c.phone,c.email,c.address,c.tax_id,c.payment_terms,c.portal_price_list_visibility,c.portal_can_manage_users,c.portal_can_create_sites,c.portal_can_set_budgets,c.portal_can_expose_prices,c.contact_name,c.contact_phone,c.priority_id,c.notes,c.price_tier,c.discount_pct,c.portal_profile_locked_at,COALESCE(cc.open_debt,0) AS balance,COALESCE(cc.credit_limit,0) AS credit_limit,c.created_at';
   router.get('/customers/:id', requireAnyRole(['office', 'sales', 'manager', 'admin']), (req, res) => {
-    const c = db.prepare(`SELECT ${CUSTOMER_ADMIN_COLS} FROM customers c LEFT JOIN customer_credit cc ON cc.customer_id=c.id WHERE c.id=?`).get(req.params.id);
+    const alias = db.prepare('SELECT target_customer_id FROM customer_merge_archive WHERE old_customer_id=?').get(req.params.id);
+    const c = db.prepare(`SELECT ${CUSTOMER_ADMIN_COLS} FROM customers c LEFT JOIN customer_credit cc ON cc.customer_id=c.id WHERE c.id=?`).get(alias?.target_customer_id || req.params.id);
     if (!c) return res.status(404).json({ error: 'לא נמצא' });
+    if (alias) c.merged_from_customer_id = Number(req.params.id);
+    c.merged_cards = db.prepare('SELECT old_customer_id,name,tax_id,created_at FROM customer_merge_archive WHERE target_customer_id=? ORDER BY created_at DESC').all(c.id);
+    c.tax_id_duplicate = normalizeCustomerTaxId(c.tax_id) ? Number(Boolean(db.prepare(`SELECT 1 FROM customers WHERE id<>? AND ${customerTaxIdSql()}=?`).get(c.id, normalizeCustomerTaxId(c.tax_id)))) : 0;
     const activePriceBook = safeQuery(null, () => db.prepare(`
       SELECT b.id,b.code,b.name,b.price_type,b.status,b.updated_at
       FROM pricing_price_books b
@@ -337,19 +355,44 @@ module.exports = function createCustomersRouter(deps) {
     res.json(c);
   });
 
-  router.post('/customers', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
+  router.post('/customers', requireAnyRole(['office', 'manager', 'admin']), (req, res, next) => {
     const { name, phone, email, address, taxId, paymentTerms, portalPriceListVisibility, portalCanManageUsers, portalCanCreateSites, portalCanSetBudgets, portalCanExposePrices, contactName, contactPhone, priorityId, notes } = req.body;
-    if (!name) return res.status(400).json({ error: 'שם חובה' });
+    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'שם חובה' });
+    let normalizedTaxId;
+    try {
+      normalizedTaxId = validateCustomerTaxId(taxId, { required: true });
+      assertCustomerTaxIdAvailable(db, normalizedTaxId);
+    } catch (err) { return customerSaveError(err, res, next); }
+    try {
     const r = db.prepare(`INSERT INTO customers (name,phone,email,address,tax_id,payment_terms,portal_price_list_visibility,portal_can_manage_users,portal_can_create_sites,portal_can_set_budgets,portal_can_expose_prices,contact_name,contact_phone,priority_id,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(name, phone, email, address, taxId, paymentTerms, normalizePortalPriceListVisibility(portalPriceListVisibility), boolFlag(portalCanManageUsers), boolFlag(portalCanCreateSites), boolFlag(portalCanSetBudgets), boolFlag(portalCanExposePrices), contactName, contactPhone, priorityId, notes);
+      .run(name.trim(), phone, email, address, normalizedTaxId, paymentTerms, normalizePortalPriceListVisibility(portalPriceListVisibility), boolFlag(portalCanManageUsers), boolFlag(portalCanCreateSites), boolFlag(portalCanSetBudgets), boolFlag(portalCanExposePrices), contactName, contactPhone, priorityId, notes);
     res.json({ id: r.lastInsertRowid });
+    } catch (err) { return customerSaveError(err, res, next); }
   });
 
-  router.patch('/customers/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-    const { name, phone, email, address, taxId, paymentTerms, portalPriceListVisibility, portalCanManageUsers, portalCanCreateSites, portalCanSetBudgets, portalCanExposePrices, contactName, contactPhone, priorityId, notes } = req.body;
+  function customerSaveError(err, res, next) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message, code: err.code, existingCustomer: err.customer || undefined });
+    if (err.message === 'duplicate_customer_tax_id') return res.status(409).json({ error: 'ח.פ זה כבר משויך ללקוח אחר. יש לרענן ולבחור את הלקוח הקיים.', code: 'duplicate_customer_tax_id' });
+    return next(err);
+  }
+
+  router.patch('/customers/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res, next) => {
+    const current = db.prepare('SELECT * FROM customers WHERE id=?').get(req.params.id);
+    if (!current) return res.status(404).json({ error: 'לא נמצא' });
+    const body = req.body || {};
+    const value = (key, column) => Object.hasOwn(body, key) ? body[key] : current[column];
+    const name = value('name', 'name');
+    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'שם חובה' });
+    let taxId = current.tax_id;
+    try {
+      if (Object.hasOwn(body, 'taxId') && normalizeCustomerTaxId(body.taxId) !== normalizeCustomerTaxId(current.tax_id)) {
+        taxId = validateCustomerTaxId(body.taxId, { required: Boolean(normalizeCustomerTaxId(current.tax_id)) });
+        assertCustomerTaxIdAvailable(db, taxId, current.id);
+      }
     db.prepare(`UPDATE customers SET name=?,phone=?,email=?,address=?,tax_id=?,payment_terms=?,portal_price_list_visibility=?,portal_can_manage_users=?,portal_can_create_sites=?,portal_can_set_budgets=?,portal_can_expose_prices=?,contact_name=?,contact_phone=?,priority_id=?,notes=? WHERE id=?`)
-      .run(name, phone, email, address, taxId, paymentTerms, normalizePortalPriceListVisibility(portalPriceListVisibility), boolFlag(portalCanManageUsers), boolFlag(portalCanCreateSites), boolFlag(portalCanSetBudgets), boolFlag(portalCanExposePrices), contactName, contactPhone, priorityId, notes, req.params.id);
+      .run(name.trim(), value('phone', 'phone'), value('email', 'email'), value('address', 'address'), taxId, value('paymentTerms', 'payment_terms'), normalizePortalPriceListVisibility(value('portalPriceListVisibility', 'portal_price_list_visibility')), boolFlag(value('portalCanManageUsers', 'portal_can_manage_users')), boolFlag(value('portalCanCreateSites', 'portal_can_create_sites')), boolFlag(value('portalCanSetBudgets', 'portal_can_set_budgets')), boolFlag(value('portalCanExposePrices', 'portal_can_expose_prices')), value('contactName', 'contact_name'), value('contactPhone', 'contact_phone'), value('priorityId', 'priority_id'), value('notes', 'notes'), req.params.id);
     res.json({ success: true });
+    } catch (err) { return customerSaveError(err, res, next); }
   });
 
   router.post('/customers/:id/profile-change-requests/:requestId/approve', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
