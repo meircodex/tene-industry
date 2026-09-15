@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const router = require('express').Router();
 
 function required(name, value) {
@@ -25,6 +27,25 @@ module.exports = function createAdminRouter(deps) {
 
   const db = () => getDb();
   const settingsService = required('settingsService', deps.settingsService);
+
+  function cleanPin(value, { required = false } = {}) {
+    const pin = value == null ? '' : String(value).trim();
+    if (!pin && !required) return null;
+    if (!/^\d{4}$/.test(pin)) return { error: 'PIN חייב להכיל 4 ספרות' };
+    return pin;
+  }
+
+  function uniqueTemporaryPin() {
+    const users = db().prepare("SELECT pin,pin_hash FROM users WHERE COALESCE(pin_hash,'')<>'' OR COALESCE(pin,'')<>''").all();
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const pin = String(crypto.randomInt(0, 10000)).padStart(4, '0');
+      const inUse = users.some(user => user.pin_hash
+        ? bcrypt.compareSync(pin, user.pin_hash)
+        : String(user.pin || '') === pin);
+      if (!inUse) return pin;
+    }
+    throw new Error('לא ניתן ליצור PIN ייחודי. נסה שוב.');
+  }
 
   function validateUploadedDatabase(req, res, next) {
     if (!req.file) return res.status(400).json({ ok: false, error: 'Database file is required' });
@@ -170,7 +191,11 @@ module.exports = function createAdminRouter(deps) {
   });
 
   router.get('/users', requireRole('admin'), (req, res) => {
-    res.json(db().prepare('SELECT id,username,display_name,role,phone,active,last_login,created_at FROM users ORDER BY role,display_name').all());
+    res.json(db().prepare(`
+      SELECT id,username,display_name,role,phone,active,last_login,created_at,
+             CASE WHEN COALESCE(pin_hash,'')<>'' OR COALESCE(pin,'')<>'' THEN 1 ELSE 0 END AS pin_configured
+      FROM users ORDER BY role,display_name
+    `).all());
   });
 
   router.get('/kiosk/operators', requireAnyRole(['kiosk', 'production', 'manager', 'admin']), (req, res) => {
@@ -185,9 +210,11 @@ module.exports = function createAdminRouter(deps) {
   router.post('/users', requireRole('admin'), (req, res) => {
     const { username, display_name, role, pin, phone } = req.body;
     if (!username || !display_name) return res.status(400).json({ error: 'שם משתמש ושם תצוגה חובה' });
+    const clean = cleanPin(pin);
+    if (clean?.error) return res.status(400).json({ error: clean.error });
     try {
       const r = db().prepare('INSERT INTO users (username,display_name,role,pin,pin_hash,phone,password_changed_at) VALUES (?,?,?,?,?,?,?)')
-        .run(username, display_name, role || 'operator', pin || null, hashPin(pin), phone || null, pin ? new Date().toISOString() : null);
+        .run(username, display_name, role || 'operator', null, hashPin(clean), phone || null, clean ? new Date().toISOString() : null);
       res.json({ id: r.lastInsertRowid });
     } catch (e) {
       if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'שם משתמש קיים' });
@@ -197,9 +224,27 @@ module.exports = function createAdminRouter(deps) {
 
   router.patch('/users/:id', requireRole('admin'), (req, res) => {
     const f = req.body;
-    db().prepare('UPDATE users SET display_name=COALESCE(?,display_name),role=COALESCE(?,role),pin=COALESCE(?,pin),pin_hash=COALESCE(?,pin_hash),phone=COALESCE(?,phone),active=COALESCE(?,active),password_changed_at=CASE WHEN ? IS NULL THEN password_changed_at ELSE ? END WHERE id=?')
-      .run(f.display_name || null, f.role || null, f.pin || null, hashPin(f.pin), f.phone || null, f.active ?? null, f.pin || null, f.pin ? new Date().toISOString() : null, req.params.id);
+    const clean = Object.hasOwn(f, 'pin') ? cleanPin(f.pin) : null;
+    if (clean?.error) return res.status(400).json({ error: clean.error });
+    const changingPin = Boolean(clean);
+    db().prepare('UPDATE users SET display_name=COALESCE(?,display_name),role=COALESCE(?,role),pin=CASE WHEN ? THEN NULL ELSE pin END,pin_hash=COALESCE(?,pin_hash),phone=COALESCE(?,phone),active=COALESCE(?,active),password_changed_at=CASE WHEN ? THEN ? ELSE password_changed_at END WHERE id=?')
+      .run(f.display_name || null, f.role || null, changingPin ? 1 : 0, hashPin(clean), f.phone || null, f.active ?? null, changingPin ? 1 : 0, changingPin ? new Date().toISOString() : null, req.params.id);
     res.json({ success: true });
+  });
+
+  router.post('/users/:id/reset-pin', requireRole('admin'), (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const user = db().prepare('SELECT id,username,display_name FROM users WHERE id=?').get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'המשתמש לא נמצא' });
+    const temporaryPin = uniqueTemporaryPin();
+    const changedAt = new Date().toISOString();
+    db().transaction(() => {
+      db().prepare('UPDATE users SET pin=NULL,pin_hash=?,failed_attempts=0,locked_until=NULL,password_changed_at=? WHERE id=?')
+        .run(hashPin(temporaryPin), changedAt, user.id);
+      db().prepare('INSERT INTO audit_log (entity_type,entity_id,entity_ref,action,notes,user_id,user_name) VALUES (?,?,?,?,?,?,?)')
+        .run('user', user.id, user.username, 'pin_reset', 'איפוס PIN על ידי מנהל; הקוד לא נשמר ביומן', Number(req.auth?.sub) || null, req.auth?.display_name || null);
+    })();
+    res.json({ success: true, user: { id: user.id, display_name: user.display_name }, temporaryPin });
   });
 
   router.get('/admin/data-audit', requireAnyRole(['manager', 'admin']), (req, res) => {

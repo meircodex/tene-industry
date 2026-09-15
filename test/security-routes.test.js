@@ -52,18 +52,24 @@ function seedPortalCustomer(name, phone, tokenValue) {
 }
 
 function seedPortalOrder(customerId, orderNum, status = 'ממתינה לאישור לקוח') {
+  const site = db.prepare('SELECT id FROM customer_sites WHERE customer_id=? ORDER BY id LIMIT 1').get(customerId);
+  const siteId = site?.id || db.prepare('INSERT INTO customer_sites(customer_id,name) VALUES (?,?)').run(customerId, 'Test site').lastInsertRowid;
   return db.prepare(`
-    INSERT INTO orders (order_num,customer_id,channel,status,portal_order,portal_price)
-    VALUES (?,?,?,?,?,?)
-  `).run(orderNum, customerId, 'פורטל לקוח', status, 1, 100).lastInsertRowid;
+    INSERT INTO orders (order_num,customer_id,channel,status,portal_order,portal_price,site_id)
+    VALUES (?,?,?,?,?,?,?)
+  `).run(orderNum, customerId, 'פורטל לקוח', status, 1, 100,siteId).lastInsertRowid;
 }
 
 
 function seedPortalUser(customerId, phone, role = 'orderer', tokenValue = `portal-user-${Date.now()}`) {
-  db.prepare(`
-    INSERT INTO portal_users (customer_id,phone,name,role,active,token,token_expires_at)
-    VALUES (?,?,?,?,?,?,?)
-  `).run(customerId, phone, phone, role, 1, tokenValue, new Date(Date.now() + 86400000).toISOString());
+  const canApprove = ['both','approver','customer_admin'].includes(role) ? 1 : 0;
+  const user = db.prepare(`
+    INSERT INTO portal_users (customer_id,phone,name,role,active,token,token_expires_at,can_approve_orders,can_view_prices,can_create_sites)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
+  `).run(customerId, phone, phone, role, 1, tokenValue, new Date(Date.now() + 86400000).toISOString(),canApprove,canApprove,role==='both'?1:0);
+  let sites = db.prepare('SELECT id FROM customer_sites WHERE customer_id=?').all(customerId);
+  if (!sites.length) sites = [{id: db.prepare('INSERT INTO customer_sites(customer_id,name) VALUES (?,?)').run(customerId, 'Test site').lastInsertRowid}];
+  for (const site of sites) db.prepare('INSERT INTO customer_site_users(customer_id,site_id,portal_user_id) VALUES (?,?,?)').run(customerId,site.id,user.lastInsertRowid);
   return tokenValue;
 }
 
@@ -201,7 +207,27 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal((await request('/api/users')).status, 401);
     assert.equal((await request('/api/users', { headers: { 'x-user-role': 'admin' } })).status, 401);
     assert.equal((await request('/api/users', { headers: authHeaders(manager) })).status, 403);
-    assert.equal((await request('/api/users', { headers: authHeaders(admin) })).status, 200);
+    const response = await request('/api/users', { headers: authHeaders(admin) });
+    assert.equal(response.status, 200);
+    const users = await response.json();
+    assert.equal(Object.hasOwn(users[0], 'pin'), false);
+    assert.equal(Object.hasOwn(users[0], 'pin_hash'), false);
+    assert.equal(users.find(user => user.username === 'office').pin_configured, 1);
+  });
+
+  await t.test('only an admin can reset a PIN; the replacement is shown once and never stored in plaintext', async () => {
+    assert.equal((await request('/api/users/3/reset-pin', { method: 'POST', headers: authHeaders(manager) })).status, 403);
+    const response = await request('/api/users/3/reset-pin', { method: 'POST', headers: authHeaders(admin) });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.match(body.temporaryPin, /^\d{4}$/);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal((await request('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'office', pin: '1003' }) })).status, 401);
+    assert.equal((await request('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'office', pin: body.temporaryPin }) })).status, 200);
+    const stored = db.prepare("SELECT pin,pin_hash FROM users WHERE username='office'").get();
+    assert.equal(stored.pin, null);
+    const audit = db.prepare("SELECT notes FROM audit_log WHERE action='pin_reset' ORDER BY id DESC LIMIT 1").get();
+    assert.doesNotMatch(audit.notes, new RegExp(body.temporaryPin));
   });
 
   await t.test('kiosk operator list is scoped and never exposes PIN data', async () => {
@@ -878,6 +904,19 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal(me.supportPreview, true);
     assert.equal(me.customer.id, customerId);
 
+    seedPortalUser(customerId, '0500000188', 'field_manager', 'support-field-session');
+    const fieldUser = db.prepare("SELECT id FROM portal_users WHERE token='support-field-session'").get();
+    const exactResponse = await request(`/api/customers/${customerId}/portal-preview?portalUserId=${fieldUser.id}`, { headers: authHeaders(admin) });
+    assert.equal(exactResponse.status, 200);
+    assert.equal(exactResponse.headers.get('cache-control'), 'no-store');
+    const exact = await exactResponse.json();
+    assert.equal(exact.portalUser.id, fieldUser.id);
+    const exactToken = new URL(exact.link).searchParams.get('token');
+    const exactMe = await (await request(`/api/c/me?token=${encodeURIComponent(exactToken)}`)).json();
+    assert.equal(exactMe.caps.seePrice, false);
+    assert.equal((await request(`/api/customers/${customerId}/portal-preview?portalUserId=999999`, { headers: authHeaders(admin) })).status, 404);
+    assert.equal((await request(`/api/customers/${customerId}/portal-preview?portalUserId=bad`, { headers: authHeaders(admin) })).status, 400);
+
     const siteResponse = await request('/api/c/sites', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -925,6 +964,33 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal((await request(`/api/customers/${customerId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: updateBody })).status, 401);
     assert.equal((await request(`/api/customers/${customerId}`, { method: 'PATCH', headers: authHeaders(production), body: updateBody })).status, 403);
     assert.equal((await request(`/api/customers/${customerId}`, { method: 'PATCH', headers: authHeaders(office), body: updateBody })).status, 200);
+  });
+
+  await t.test('portal inbox persists ownership and handling, excludes approved orders and scopes source downloads', async () => {
+    const customerId = seedPortalCustomer('Inbox Customer', '0500000995', 'inbox-legacy');
+    const pending = seedPortalOrder(customerId,'INBOX-1');
+    const approved = seedPortalOrder(customerId,'INBOX-APPROVED',statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    assert.equal((await request('/api/portal-requests')).status,401);
+    assert.equal((await request('/api/portal-requests',{headers:authHeaders(production)})).status,403);
+    const initial = await (await request('/api/portal-requests',{headers:authHeaders(office)})).json();
+    assert.ok(initial.orders.some(o=>o.id===pending && o.unread===1));
+    assert.ok(!initial.orders.some(o=>o.id===approved));
+    const change = action=>request(`/api/portal-requests/${pending}`,{method:'PATCH',headers:authHeaders(office),body:JSON.stringify({action})});
+    assert.equal((await change('claim')).status,200);
+    assert.equal((await change('handled')).status,409);
+    db.prepare('UPDATE orders SET status=? WHERE id=?').run(statusContracts.ORDER_STATUS.PENDING_APPROVAL,pending);
+    assert.equal((await change('handled')).status,200);
+    const current = (await (await request('/api/portal-requests',{headers:authHeaders(office)})).json()).orders.find(o=>o.id===pending);
+    assert.ok(current.owner_user_id && current.read_at && current.handled_at);
+    assert.equal((await change('reopen')).status,200);
+    const doc = db.prepare("INSERT INTO customer_portal_order_documents(order_id,customer_id,original_name,mime_type,data_url,size_bytes) VALUES (?,?,'source.pdf','application/pdf','data:application/pdf;base64,AQID',3)").run(pending,customerId).lastInsertRowid;
+    const download = `/api/orders/${pending}/portal-source-documents/${doc}/download`;
+    assert.equal((await request(download)).status,401);
+    assert.equal((await request(download,{headers:authHeaders(production)})).status,403);
+    const file = await request(download,{headers:authHeaders(office)});
+    assert.equal(file.status,200);
+    assert.deepEqual(Buffer.from(await file.arrayBuffer()),Buffer.from([1,2,3]));
+    assert.equal((await request(`/api/orders/${approved}/portal-source-documents/${doc}/download`,{headers:authHeaders(office)})).status,404);
   });
 
   await t.test('order reads and documents require appropriate internal roles', async () => {
@@ -1200,6 +1266,8 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     const customerB = seedPortalCustomer('Portal Customer B', '0500000002', 'portal-token-b');
     const orderA = seedPortalOrder(customerA, 'PORTAL-A-1');
     const orderB = seedPortalOrder(customerB, 'PORTAL-B-1');
+    seedPortalUser(customerA, '0500000001', 'both', 'portal-token-a');
+    seedPortalUser(customerB, '0500000002', 'both', 'portal-token-b');
 
     assert.equal((await request(`/api/c/orders/${orderA}`)).status, 401);
     assert.equal((await request(`/api/c/orders/${orderA}?token=portal-token-b`)).status, 404);
@@ -1261,6 +1329,8 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     const customerA = seedPortalCustomer('Portal Customer C', '0500000003', 'portal-token-c');
     const customerB = seedPortalCustomer('Portal Customer D', '0500000004', 'portal-token-d');
     const orderA = seedPortalOrder(customerA, 'PORTAL-C-1');
+    seedPortalUser(customerA, '0500000003', 'both', 'portal-token-c');
+    seedPortalUser(customerB, '0500000004', 'both', 'portal-token-d');
     const body = (tokenValue) => JSON.stringify({ token: tokenValue, orderId: orderA });
 
     assert.equal((await request('/api/c/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body('') })).status, 401);

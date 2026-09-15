@@ -14,7 +14,7 @@ const {
   parseJsonObject,
 } = require('./shapeSnapshot');
 
-const ALLOWED_FAMILIES = new Set(['bars', 'mesh', 'piles', 'spirals']);
+const ALLOWED_FAMILIES = new Set(['bars', 'mesh', 'piles', 'spirals', 'lifts']);
 const SHAPE_TYPE_ALIASES = Object.freeze({
   straight: 'straight_bar',
   straight_bar: 'straight_bar',
@@ -459,6 +459,29 @@ function buildPileSnapshot(snapshot, rawData = {}) {
   };
 }
 
+function buildLiftSnapshot(snapshot, rawData = {}) {
+  const barLengthMm = positiveNumber(rawData.barLength ?? rawData.barLengthMm, 'barLength');
+  // The measured line weight is the authoritative lift value. Never trust a
+  // client-calculated `calculated.weightKg` fallback for commercial pricing.
+  const weighedKg = positiveNumber(rawData.weighedKg, 'weighedKg');
+  const diameter = normalizeDiameter(rawData.diameter ?? rawData.diameterMm);
+  const shapeSnapshot = {
+    ...snapshot,
+    family: 'lifts',
+    shapeType: 'lift_package',
+    source: 'customer-portal',
+    data: { ...rawData, diameter, barLength: barLengthMm, weighedKg },
+    calculated: { ...snapshot.calculated, totalLengthMm: barLengthMm, weightKg: weighedKg, weighedKg },
+    machineOutput: { ...(snapshot.machineOutput || {}), generic: { ...(snapshot.machineOutput?.generic || {}), family: 'lifts', shapeType: 'lift_package', diameter, barLength: barLengthMm, weighedKg } },
+  };
+  return {
+    shapeSnapshot,
+    family: 'lifts', shapeType: 'lift_package', shapeId: canonicalShapeId(snapshot.shapeId, 'portal-lift'), diameter,
+    sides: [], angles: [], segments: [], totalLengthMm: barLengthMm, weightPerUnit: weighedKg,
+    shapeDimsText: `Ø${diameter} · L=${Math.round(barLengthMm)} · ${weighedKg.toFixed(3)} ק״ג נשקל`,
+  };
+}
+
 function normalizeShapeSnapshotDraft(input = {}) {
   const snapshot = readShapeSnapshot(input);
   if (!snapshot) return null;
@@ -470,10 +493,14 @@ function normalizeShapeSnapshotDraft(input = {}) {
     ? buildMeshSnapshot(snapshot, normalizeMeshData(rawData))
     : family === 'piles'
       ? buildPileSnapshot(snapshot, rawData)
-      : family === 'spirals'
+    : family === 'spirals'
         ? buildSpiralSnapshot(snapshot, rawData)
+        : family === 'lifts'
+          ? buildLiftSnapshot(snapshot, rawData)
         : buildBarsSnapshot(snapshot, rawData);
-  // Every server-built snapshot describes one shape, never an order quantity.
+  // A lift's weighing covers the entire line, matching the factory editor.
+  if (family === 'lifts') normalized.weightPerUnit /= quantity;
+  // Other server-built snapshots describe one shape, never an order quantity.
   // Ring/pile engines may include total aliases for that single unit.
   for (const payload of [normalized.shapeSnapshot.data, normalized.shapeSnapshot.calculated, normalized.shapeSnapshot.machineOutput?.generic]) {
     if (!payload) continue;

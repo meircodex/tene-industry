@@ -67,7 +67,9 @@ const createCustomersRouter = require('./routes/customers');
 const createAuthRouter = require('./routes/auth');
 const createAdminRouter = require('./routes/admin');
 const createPortalRouter = require('./routes/portal');
+const createPortalGuaranteesAdmin = require('./routes/portalGuaranteesAdmin');
 const createPortalAdminRouter = require('./routes/portalAdmin');
+const createPortalDocumentsRouter = require('./routes/portalDocuments');
 const createWarehouseRouter = require('./routes/warehouse');
 const createReportsRouter = require('./routes/reports');
 const createCatalogRouter = require('./routes/catalog');
@@ -322,6 +324,7 @@ const allRouteFactories = [
   createFinanceCostsRouter, createFinanceLedgerRouter, createFinanceCreditRouter,
   createCompaniesRouter, createAdminRouter, createLogisticsRouter, createPortalRouter,
   createPortalAdminRouter, createAlertsRouter, createAiRouter, createBvbsRouter,
+  createPortalDocumentsRouter,
   createSearchRouter, createIntakeChannelsRouter, createIntakeReviewRouter, createIntakeTrainingRouter,
   createInventoryVisionRouter, createOrderDocumentsRouter, createOrderDeliveryCertificateRouter,
   createOrderPrintA4Router, createProductionMetricsRouter, createProductionShiftsRouter,
@@ -386,6 +389,8 @@ const moduleMap = createModuleMapService({
     { file: 'routes/orders.js', factory: createOrdersRouter },
     { file: 'routes/portal.js', factory: createPortalRouter },
     { file: 'routes/portalAdmin.js', factory: createPortalAdminRouter },
+    { file: 'routes/portalDocuments.js', factory: createPortalDocumentsRouter },
+    { file: 'routes/portalGuaranteesAdmin.js', factory: createPortalGuaranteesAdmin },
     { file: 'routes/priority.js', factory: createPriorityRouter },
     { file: 'routes/priorityExport.js', factory: createPriorityExportRouter },
     { file: 'routes/procurement.js', factory: createProcurementRouter },
@@ -836,6 +841,8 @@ app.use('/api', requireModule('portal'), createPortalRouter({
   PORT,
   IS_TEST,
 }));
+app.use('/api', requireModule('portal'), createPortalDocumentsRouter({ db, settingsService, PORT, customerPortalActionLimiter }));
+app.use('/api', requireModule('portal'), createPortalGuaranteesAdmin({ db, requireAnyRole, auditLog }));
 app.use('/api', requireModule('warehouse'), createWarehouseRouter({
   db,
   requireAnyRole,

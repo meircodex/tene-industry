@@ -721,7 +721,7 @@ html, body { background:#f0f4f8; color:#1a2533; font-family:'Heebo',sans-serif; 
                 <option value="operator" selected>מפעיל ישן</option>
               </select></div>
             <div class="inline-field"><label>PIN (4 ספרות)</label>
-              <input id="uPin" type="text" maxlength="4" pattern="[0-9]{4}" placeholder="1234"></div>
+              <input id="uPin" type="text" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="1234"></div>
             <div class="inline-field"><label>טלפון</label>
               <input id="uPhone" type="tel"></div>
           </div>
@@ -731,6 +731,16 @@ html, body { background:#f0f4f8; color:#1a2533; font-family:'Heebo',sans-serif; 
             <button class="btn btn-primary" onclick="saveUser()">💾 שמור</button>
           </div>
         </div>
+        <dialog id="temporaryPinDialog" onclose="clearTemporaryPinDialog()" style="width:min(420px,calc(100% - 32px));margin:auto;background:#fff;border:1px solid var(--border);border-radius:14px;padding:24px;direction:rtl;color:var(--text)">
+          <h3 style="margin-top:0">PIN חדש</h3>
+          <p id="temporaryPinUser" style="color:var(--muted)"></p>
+          <p>ה-PIN החדש מוצג עכשיו בלבד. יש להעביר אותו לעובד באופן מאובטח.</p>
+          <div id="temporaryPinValue" dir="ltr" style="font:700 30px/1.2 monospace;letter-spacing:6px;text-align:center;padding:14px;background:#f3f6f8;border-radius:10px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px"><button class="btn btn-outline" onclick="copyTemporaryPin()">העתק קוד</button><button class="btn btn-primary" onclick="closeTemporaryPinDialog()">סגור</button></div>
+        </dialog>
+        <style>
+          #temporaryPinDialog::backdrop { background:rgba(15,23,42,.62); }
+        </style>
       </div>
 
       <!-- TAB: PERSONAL WORKER INVITATIONS -->
@@ -1591,11 +1601,12 @@ async function loadUsers() {
     <td style="padding:10px 12px;font-weight:700">${escHtml(u.display_name)}</td>
     <td style="padding:10px 12px;font-size:12px;color:var(--muted)">${escHtml(u.username)}</td>
     <td style="padding:10px 12px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:12px;background:rgba(201,98,26,0.1);color:var(--accent)">${ROLE_LABELS[u.role]||u.role}</span></td>
-    <td style="padding:10px 12px;font-family:monospace;letter-spacing:2px">${u.pin ? '••••' : '—'}</td>
+    <td style="padding:10px 12px">${u.pin_configured ? 'מוגדר' : '—'}</td>
     <td style="padding:10px 12px;font-size:12px">${escHtml(u.phone||'—')}</td>
     <td style="padding:10px 12px"><span style="color:${u.active?'var(--success)':'var(--muted)'};font-weight:700">${u.active?'✅':'❌'}</span></td>
     <td style="padding:10px 12px;display:flex;gap:6px">
       <button onclick="editUser(${u.id})" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">עריכה</button>
+      <button onclick="resetUserPin(${u.id})" style="padding:4px 10px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">אפס PIN</button>
       <button onclick="toggleUser(${u.id},${u.active?0:1})" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">${u.active?'השבת':'הפעל'}</button>
     </td>
   </tr>`).join('');
@@ -1645,6 +1656,42 @@ async function saveUser() {
 async function toggleUser(id, active) {
   await fetch(`/api/users/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ active }) });
   loadUsers();
+}
+
+async function resetUserPin(id) {
+  if (resetUserPin.inFlight) return;
+  const user = usersData.find(row => Number(row.id) === Number(id));
+  if (!user || !confirm(`לאפס PIN עבור ${user.display_name || user.username}? הקוד הקודם יפסיק לעבוד.`)) return;
+  resetUserPin.inFlight = true;
+  try {
+    const response = await fetch(`/api/users/${id}/reset-pin`, { method:'POST', headers:{'Content-Type':'application/json'} });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return alert(data.error || 'איפוס ה-PIN נכשל');
+    document.getElementById('temporaryPinUser').textContent = `למשתמש: ${data.user.display_name}`;
+    document.getElementById('temporaryPinValue').textContent = data.temporaryPin;
+    document.getElementById('temporaryPinDialog').showModal();
+    loadUsers();
+  } catch (error) {
+    alert('איפוס ה-PIN נכשל. נסה שוב.');
+  } finally {
+    resetUserPin.inFlight = false;
+  }
+}
+resetUserPin.inFlight = false;
+function clearTemporaryPinDialog() {
+  document.getElementById('temporaryPinValue').textContent = '';
+  document.getElementById('temporaryPinUser').textContent = '';
+}
+function closeTemporaryPinDialog() {
+  const dialog = document.getElementById('temporaryPinDialog');
+  if (dialog.open) dialog.close();
+  clearTemporaryPinDialog();
+}
+async function copyTemporaryPin() {
+  const code = document.getElementById('temporaryPinValue').textContent;
+  if (!code) return;
+  try { await navigator.clipboard.writeText(code); toast('הקוד הועתק'); }
+  catch { alert('לא ניתן להעתיק אוטומטית. העתק את הקוד המוצג.'); }
 }
 
 // ── PERSONAL WORKER INVITATIONS ─────────────────────────────────

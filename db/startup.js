@@ -162,6 +162,8 @@ function runCoreMigrations(db) {
   addCol('orders',     'portal_order',       'INTEGER DEFAULT 0'); // 1 = placed by customer portal
   addCol('orders',     'portal_price',       'REAL DEFAULT 0');   // calculated price in ILS
   addCol('orders',     'confirm_token',      'TEXT');             // one-time approval token
+  addCol('orders',     'created_by_portal_user_id', 'INTEGER');   // portal actor identity
+  addCol('orders',     'pricing_snapshot_json', 'TEXT');          // immutable customer quote inputs/result
   addCol('customers',  'price_approved_at',  'TEXT');             // last time customer approved the price list
   addCol('customers',  'portal_profile_locked_at', 'TEXT');       // first customer profile edit locks future changes for approval
   addCol('orders',     'site_id',            'INTEGER');          // delivery site
@@ -172,6 +174,35 @@ function runCoreMigrations(db) {
   addCol('items',      'qc_status',          "TEXT DEFAULT 'לא נבדק'"); // 'לא נבדק'|'עבר'|'נכשל'
   addCol('items',      'batch_id',           'INTEGER');          // raw material batch used
   addCol('items',      'total_weight',       'REAL DEFAULT 0');   // alias for weight column (compat)
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      portal_user_id INTEGER,
+      idempotency_key TEXT NOT NULL,
+      payload_fingerprint TEXT NOT NULL,
+      order_id INTEGER NOT NULL,
+      response_json TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(customer_id, portal_user_id, idempotency_key)
+    );
+    CREATE INDEX IF NOT EXISTS idx_portal_order_idempotency_order
+      ON customer_portal_order_idempotency(order_id);
+    CREATE TABLE IF NOT EXISTS customer_portal_order_documents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_id INTEGER NOT NULL,
+      customer_id INTEGER NOT NULL,
+      portal_user_id INTEGER,
+      original_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      data_url TEXT NOT NULL,
+      size_bytes INTEGER DEFAULT 0,
+      uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (order_id) REFERENCES orders(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_portal_order_documents_order ON customer_portal_order_documents(order_id);
+  `);
   addCol('machines',   'oee_score',          'REAL DEFAULT 0');   // OEE %
   addCol('machines',   'tons_today',         'REAL DEFAULT 0');   // tons produced today
   addCol('orders',     'cost_material',      'REAL DEFAULT 0');   // cost of steel used
@@ -370,6 +401,8 @@ function runCoreMigrations(db) {
   addCol('portal_users', 'can_view_payment_alerts', 'INTEGER DEFAULT 0');
   addCol('portal_users', 'default_site_id', 'INTEGER');
   addCol('portal_users', 'updated_at', 'TEXT');
+  addCol('customer_guarantee_documents', 'valid_until', 'TEXT');
+  addCol('customer_guarantee_documents', 'reviewed_by_user_id', 'INTEGER');
   addCol('order_imports', 'source_system', 'TEXT');
   addCol('order_imports', 'external_id', 'TEXT');
   addCol('order_imports', 'order_ids_json', 'TEXT');

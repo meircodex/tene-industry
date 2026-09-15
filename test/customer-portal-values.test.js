@@ -124,7 +124,7 @@ test('HTTP quote -> submission -> database -> detail -> print preserve the real 
   const base = `http://127.0.0.1:${server.address().port}`;
   const customerId = db.prepare("INSERT INTO customers(name,phone,price_tier,discount_pct,portal_can_expose_prices) VALUES ('בדיקת ערכים','','list',0,1)").run().lastInsertRowid;
   const token = 'portal-values-test-token';
-  const userId = db.prepare("INSERT INTO portal_users(customer_id,phone,name,role,active,token,token_expires_at) VALUES (?,'0509000999','בדיקה','customer_admin',1,?,'2099-01-01T00:00:00Z')").run(customerId, token).lastInsertRowid;
+  const userId = db.prepare("INSERT INTO portal_users(customer_id,phone,name,role,active,token,token_expires_at,can_create_orders,can_view_prices,can_approve_orders,can_view_budget,can_view_invoices,can_view_payment_alerts) VALUES (?,'0509000999','בדיקה','customer_admin',1,?,'2099-01-01T00:00:00Z',1,1,1,1,1,1)").run(customerId, token).lastInsertRowid;
   const siteId = db.prepare("INSERT INTO customer_sites(customer_id,name,status) VALUES (?,'אתר בדיקה','active')").run(customerId).lastInsertRowid;
   db.prepare('INSERT INTO customer_site_users(customer_id,site_id,portal_user_id,is_default) VALUES (?,?,?,1)').run(customerId, siteId, userId);
   const book = db.prepare("INSERT INTO pricing_price_books(code,name,price_type,status) VALUES ('VALUES','בדיקה','general','active')").run().lastInsertRowid;

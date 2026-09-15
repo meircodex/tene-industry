@@ -338,6 +338,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 <body data-page="orders">
 
 <div class="page">
+  <a id="portalInboxLink" href="/portal-requests.html" style="display:block;padding:14px;margin-bottom:12px;background:#fff3e6;border:1px solid #c9621a;border-radius:10px;color:#8a3c0b;font-weight:700">בקשות לקוח — תיבה נפרדת מאושרו</a>
   <!-- WS + title row -->
   <div class="ws-row">
     <span id="ordersPageTitle" style="font-size:18px;font-weight:900;color:var(--text)">📋 הזמנות</span>
@@ -617,6 +618,9 @@ function connectWS() {
 
 // ── Data ───────────────────────────────────────────────────────────────
 async function fetchOrders() {
+  fetch('/api/portal-requests').then(r=>r.ok?r.json():null).then(data=>{
+    if(data) document.getElementById('portalInboxLink').textContent=`בקשות לקוח: ${data.pendingCount} לטיפול · ${data.unreadCount} חדשות — פתח תיבה`;
+  }).catch(()=>{});
   try {
     const url = viewMode === 'quotes'
       ? '/api/order-quotes' + (activeStatus ? '?status=' + encodeURIComponent(activeStatus) : '')
@@ -1382,12 +1386,41 @@ async function openDetail(id) {
   document.getElementById('detailCustomer').textContent = [`הזמנה ${o.order_num}`, o.customer_name].filter(Boolean).join(' · ');
   resetPrintCardSelection(o.id);
   document.getElementById('detailBody').innerHTML = buildDetailHTML(o, pkgs);
+  if (Number(o.portal_order) === 1) loadPortalSourceDocuments(o.id);
   document.getElementById('detailOverlay').classList.add('show');
   requestAnimationFrame(() => {
     renderDetailShapes();
     syncPrintCardSelection();
   });
   history.replaceState(null, '', `?id=${id}`);
+}
+
+async function loadPortalSourceDocuments(orderId) {
+  try {
+    const response = await fetch(`/api/orders/${orderId}/portal-source-documents`);
+    if (!response.ok) return;
+    const data = await response.json();
+    if (Number(currentDetailOrder?.id) !== Number(orderId)) return;
+    const box = document.createElement('section');
+    box.innerHTML = '<h3>מסמכי מקור מהלקוח</h3>';
+    if (!data.documents.length) { box.appendChild(document.createTextNode('לא צורפו קבצי מקור.')); }
+    for (const doc of data.documents) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'btn-sm'; button.textContent = `הורד ${doc.original_name}`;
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const file = await fetch(`/api/orders/${orderId}/portal-source-documents/${doc.id}/download`);
+          if (!file.ok) throw Error('הורדת המסמך נכשלה');
+          const url = URL.createObjectURL(await file.blob());
+          const link = document.createElement('a'); link.href = url; link.download = doc.original_name;
+          document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+        } catch(e) { alert(e.message); } finally { button.disabled = false; }
+      };
+      box.appendChild(button);
+    }
+    document.getElementById('detailBody').appendChild(box);
+  } catch(e) { console.warn('Portal source documents unavailable', e); }
 }
 
 function orderHasStartedProduction(order) {

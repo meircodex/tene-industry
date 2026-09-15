@@ -91,23 +91,25 @@ function createPortalAccessService(deps) {
     const customerAdmin = r === 'customer_admin';
     const userCan = name => isUser ? bool(portalUserOrRole[name]) : false;
     const priceExposureAllowed = customerCaps.canExposePrices || customer.portal_price_list_visibility !== 'none';
-    const canViewPrices = priceExposureAllowed && (oldApprover || finance || customerAdmin || userCan('can_view_prices'));
-    const canViewInvoices = finance || customerAdmin || userCan('can_view_invoices');
-    const canViewPaymentAlerts = finance || customerAdmin || canViewInvoices || userCan('can_view_payment_alerts');
+    const canViewPrices = priceExposureAllowed && (isUser ? userCan('can_view_prices') : (oldApprover || finance || customerAdmin));
+    const canViewInvoices = isUser ? userCan('can_view_invoices') : (finance || customerAdmin);
+    const canViewPaymentAlerts = isUser ? userCan('can_view_payment_alerts') : (finance || customerAdmin);
+    const canOrder = !isUser ? true : userCan('can_create_orders');
+    const canApprove = !isUser ? oldApprover : userCan('can_approve_orders');
     return {
       role: r,
-      canOrder: !isUser || userCan('can_create_orders') || oldApprover || fieldManager || customerAdmin,
+      canOrder,
       seePrice: canViewPrices,
-      canApprove: oldApprover || customerAdmin || userCan('can_approve_orders'),
-      canManageUsers: customerCaps.canManageUsers && (customerAdmin || oldApprover || userCan('can_manage_users')),
-      canCreateSites: customerCaps.canCreateSites && (customerAdmin || r === 'both' || userCan('can_create_sites')),
-      canAssignSiteUsers: customerCaps.canManageUsers && (customerAdmin || userCan('can_assign_site_users')),
-      canViewBudget: (customerAdmin || finance || userCan('can_view_budget')) && (customerCaps.canSetBudgets || userCan('can_view_budget')),
-      canSetBudget: customerCaps.canSetBudgets && (customerAdmin || finance || userCan('can_set_budget')),
-      canApproveBudgetOverrun: customerCaps.canSetBudgets && (customerAdmin || finance || userCan('can_approve_budget_overrun')),
+      canApprove,
+      canManageUsers: customerCaps.canManageUsers && (!isUser ? (customerAdmin || oldApprover) : userCan('can_manage_users')),
+      canCreateSites: customerCaps.canCreateSites && (!isUser ? (customerAdmin || r === 'both') : userCan('can_create_sites')),
+      canAssignSiteUsers: customerCaps.canManageUsers && (!isUser ? customerAdmin : userCan('can_assign_site_users')),
+      canViewBudget: (isUser ? userCan('can_view_budget') : (customerAdmin || finance)) && (customerCaps.canSetBudgets || (isUser && userCan('can_view_budget'))),
+      canSetBudget: customerCaps.canSetBudgets && (isUser ? userCan('can_set_budget') : (customerAdmin || finance)),
+      canApproveBudgetOverrun: customerCaps.canSetBudgets && (isUser ? userCan('can_approve_budget_overrun') : (customerAdmin || finance)),
       canViewInvoices,
       canViewPaymentAlerts,
-      canViewDeliveryNotes: !isUser || userCan('can_view_delivery_notes') || oldApprover || fieldManager || finance || customerAdmin,
+      canViewDeliveryNotes: !isUser || userCan('can_view_delivery_notes'),
     };
   }
 
@@ -188,7 +190,12 @@ function createPortalAccessService(deps) {
   function resolveAuthorizedSite(customerId, portalUser, requestedSiteId) {
     const customer = db.prepare(`SELECT ${CUSTOMER_PORTAL_COLS} FROM customers WHERE id=?`).get(customerId) || { id: customerId };
     const ctx = portalContext(customer, portalUser);
-    if (!ctx.sites.length) return { ok: true, site: null, context: ctx };
+    if (!ctx.sites.length) {
+      // A scoped portal user must never create or approve an unassigned order.
+      // A null user is reserved for explicitly privileged support previews.
+      if (portalUser) return { ok: false, status: 403, error: 'למשתמש זה אין אתרים מורשים', context: ctx };
+      return { ok: true, site: null, context: ctx };
+    }
     const wanted = Number(requestedSiteId || ctx.defaultSiteId || 0);
     const site = ctx.sites.find(row => Number(row.id) === wanted);
     if (!site) return { ok: false, status: 403, error: 'האתר לא מורשה למשתמש זה', context: ctx };
@@ -257,6 +264,7 @@ function createPortalAccessService(deps) {
       const user = claims.portalUserId
         ? db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=? AND active=1').get(claims.portalUserId, customer.id)
         : null;
+      if (claims.portalUserId && !user) return null;
       return {
         customer,
         user: user || null,

@@ -6,6 +6,9 @@ const { ORDER_STATUS } = require('../status-contracts');
 const { projectPortalCustomer, projectPortalOrder, projectPortalOrderDetail } = require('../services/customerPortalProjection');
 const { portalShapeDraftToOrderItem } = require('../services/customerPortalShapeDraft');
 const productionCards = require('../services/productionCards');
+const portalGuarantees = require('../services/portalGuarantees');
+const { portalInvoices } = require('../services/customerPortalFinance');
+const { evaluatePortalBudget } = require('../services/portalBudget');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/portal missing dependency: ${name}`);
@@ -60,6 +63,13 @@ module.exports = function createPortalRouter(deps) {
       ...ctx,
       itemIndex: index + 1,
     }));
+  }
+  function portalPayloadFingerprint(payload) {
+    return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  }
+  function portalIdempotencyKey(value) {
+    const key = String(value || '').trim();
+    return key ? key.slice(0, 200) : null;
   }
   function portalWastePct() {
     const value = Number(settingsService.get('WASTE_PCT_DEFAULT', 3));
@@ -201,6 +211,7 @@ module.exports = function createPortalRouter(deps) {
       can_view_prices: user.can_view_prices,
       can_view_budget: user.can_view_budget,
       can_set_budget: user.can_set_budget,
+      can_approve_budget_overrun: user.can_approve_budget_overrun,
       can_view_invoices: user.can_view_invoices,
       can_view_delivery_notes: user.can_view_delivery_notes,
       can_view_payment_alerts: user.can_view_payment_alerts,
@@ -225,11 +236,10 @@ module.exports = function createPortalRouter(deps) {
       params.push(Number(siteId));
     } else if (s.user) {
       where.push(`(
-        ${alias}.site_id IS NULL
-        OR ${alias}.site_id IN (SELECT site_id FROM customer_site_users WHERE portal_user_id=?)
+        ${alias}.site_id IN (SELECT site_id FROM customer_site_users WHERE portal_user_id=? AND customer_id=?)
         OR ${alias}.site_id=?
       )`);
-      params.push(s.user.id, s.user.default_site_id || 0);
+      params.push(s.user.id, s.customer.id, s.user.default_site_id || 0);
     }
     return { where: where.join(' AND '), params };
   }
@@ -274,32 +284,11 @@ module.exports = function createPortalRouter(deps) {
 
   function customerPaymentAlerts(s, siteId = null) {
     if (!s.caps.canViewPaymentAlerts && !s.caps.canViewInvoices && !s.caps.seePrice) return [];
-    const termsDays = parsePaymentTermsDays(s.customer.payment_terms);
-    const access = orderAccessWhere(s, 'o', siteId);
-    const rows = db.prepare(`
-      SELECT o.id,o.order_num,o.status,o.created_at,o.delivery_date,o.portal_price,o.billing_weight,o.site_id,cs.name AS site_name
-      FROM orders o
-      LEFT JOIN customer_sites cs ON cs.id=o.site_id
-      WHERE ${access.where}
-        AND COALESCE(o.portal_price,0)>0
-      ORDER BY COALESCE(o.delivery_date,o.created_at) DESC
-      LIMIT 100
-    `).all(...access.params);
-    return rows.map(row => {
-      const anchorDate = row.delivery_date || row.created_at;
-      const dueDate = addDays(anchorDate, termsDays);
-      const due = paymentDueStatus(dueDate);
+    const rows = portalInvoices(db, { customerId: s.customer.id, siteIds: s.portal.sites.map(site => site.id), siteId });
+    return rows.filter(row => row.amount > 0 && row.dueDate).map(row => {
+      const due = paymentDueStatus(row.dueDate);
       return {
-        source: 'order',
-        orderId: row.id,
-        orderNum: row.order_num,
-        siteId: row.site_id,
-        siteName: row.site_name || 'ללא אתר',
-        anchor: 'delivery_or_order_date',
-        anchorDate: dateOnly(anchorDate),
-        dueDate,
-        amount: Number(row.portal_price || 0),
-        billingWeight: Number(row.billing_weight || 0),
+        ...row,
         status: due.status,
         days: due.days,
       };
@@ -434,7 +423,7 @@ module.exports = function createPortalRouter(deps) {
     const users = db.prepare(`
       SELECT id,phone,name,email,role,active,default_site_id,
              can_manage_users,can_create_sites,can_assign_site_users,can_create_orders,can_approve_orders,
-             can_view_prices,can_view_budget,can_set_budget,can_view_invoices,can_view_delivery_notes,can_view_payment_alerts
+             can_view_prices,can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,can_view_delivery_notes,can_view_payment_alerts
       FROM portal_users
       WHERE customer_id=?
       ORDER BY active DESC, id
@@ -475,6 +464,7 @@ module.exports = function createPortalRouter(deps) {
       can_view_prices: s.caps.seePrice && portalBoolFlag(req.body.canViewPrices) ? 1 : 0,
       can_view_budget: s.caps.canViewBudget && portalBoolFlag(req.body.canViewBudget) ? 1 : 0,
       can_set_budget: s.caps.canSetBudget && portalBoolFlag(req.body.canSetBudget) ? 1 : 0,
+      can_approve_budget_overrun: s.caps.canApproveBudgetOverrun && portalBoolFlag(req.body.canApproveBudgetOverrun) ? 1 : 0,
       can_view_invoices: s.caps.canViewInvoices && portalBoolFlag(req.body.canViewInvoices) ? 1 : 0,
       can_view_delivery_notes: portalBoolFlag(req.body.canViewDeliveryNotes, true),
       can_view_payment_alerts: s.caps.canViewPaymentAlerts && portalBoolFlag(req.body.canViewPaymentAlerts) ? 1 : 0,
@@ -490,26 +480,26 @@ module.exports = function createPortalRouter(deps) {
         UPDATE portal_users SET
           name=COALESCE(?,name),email=COALESCE(?,email),role=?,active=1,default_site_id=?,
           can_manage_users=?,can_create_sites=?,can_assign_site_users=?,can_create_orders=?,can_approve_orders=?,
-          can_view_prices=?,can_view_budget=?,can_set_budget=?,can_view_invoices=?,can_view_delivery_notes=?,
+          can_view_prices=?,can_view_budget=?,can_set_budget=?,can_approve_budget_overrun=?,can_view_invoices=?,can_view_delivery_notes=?,
           can_view_payment_alerts=?,updated_at=CURRENT_TIMESTAMP
         WHERE id=? AND customer_id=?
-      `).run(
+        `).run(
         name,email,role,defaultSiteId,
         flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
-        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_view_invoices,flags.can_view_delivery_notes,
+        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
         flags.can_view_payment_alerts,userId,s.customer.id
       );
     } else {
       const r = db.prepare(`
         INSERT INTO portal_users
           (customer_id,phone,name,email,role,default_site_id,can_manage_users,can_create_sites,can_assign_site_users,
-           can_create_orders,can_approve_orders,can_view_prices,can_view_budget,can_set_budget,can_view_invoices,
+           can_create_orders,can_approve_orders,can_view_prices,can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,
            can_view_delivery_notes,can_view_payment_alerts)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `).run(
         s.customer.id,phone,name,email,role,defaultSiteId,
         flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
-        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_view_invoices,flags.can_view_delivery_notes,
+        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
         flags.can_view_payment_alerts
       );
       userId = r.lastInsertRowid;
@@ -657,7 +647,7 @@ module.exports = function createPortalRouter(deps) {
   router.post('/c/sites', customerPortalActionLimiter, (req, res) => {
     const s = session(req.body.token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
-    if (!s.caps.canCreateSites && !s.caps.canManageUsers) {
+    if (!s.caps.canCreateSites) {
       return res.status(403).json({ error: 'אין הרשאה לפתוח אתר' });
     }
     const f = req.body || {};
@@ -675,8 +665,8 @@ module.exports = function createPortalRouter(deps) {
       'active',
       f.managerName || s.user?.name || null,
       f.managerPhone || s.user?.phone || null,
-      s.caps.canSetBudget || s.caps.canViewBudget ? Number(f.budgetAmount || 0) : 0,
-      s.caps.canSetBudget || s.caps.canViewBudget ? Number(f.budgetKg || 0) : 0,
+      s.caps.canSetBudget ? Number(f.budgetAmount || 0) : 0,
+      s.caps.canSetBudget ? Number(f.budgetKg || 0) : 0,
       80,
       0
     );
@@ -773,11 +763,14 @@ module.exports = function createPortalRouter(deps) {
       dueAlertsCount: alerts.length,
       overBudgetSites,
       canSeeMoney: Boolean(s.caps.seePrice || s.caps.canViewBudget || s.caps.canViewInvoices),
+      source: 'recorded_invoices',
+      scope: 'authorized_sites',
     };
     if (summary.canSeeMoney) {
       summary.orderedAmount = Number(totals.ordered_amount || 0);
       summary.approvedAmount = Number(totals.approved_amount || 0);
-      summary.openExposure = Number(totals.ordered_amount || 0);
+      summary.openDebt = portalInvoices(db, { customerId: s.customer.id, siteIds: s.portal.sites.map(site => site.id), siteId: resolvedSite.siteId }).reduce((sum, invoice) => sum + invoice.amount, 0);
+      summary.openExposure = summary.openDebt;
       summary.dueNow = dueNow;
       summary.dueSoon = dueSoon;
     }
@@ -844,16 +837,26 @@ module.exports = function createPortalRouter(deps) {
     const resolvedSite = resolveFinanceSiteId(s, req.query.siteId);
     if (!resolvedSite.ok) return res.status(resolvedSite.status).json({ error: resolvedSite.error });
     const access = orderAccessWhere(s, 'o', resolvedSite.siteId);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25));
+    const offset = Math.min(100000, Math.max(0, Number(req.query.offset) || 0));
+    const status = String(req.query.status || '').trim();
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const extra = [];
+    const paramsExtra = [];
+    if (status) { extra.push('o.status=?'); paramsExtra.push(status); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { extra.push('DATE(o.created_at)>=?'); paramsExtra.push(from); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { extra.push('DATE(o.created_at)<=?'); paramsExtra.push(to); }
     const rows = db.prepare(`
       SELECT o.id,o.order_num,o.status,o.created_at,o.delivery_date,o.delivery_time,o.total_weight,o.billing_weight,
              o.portal_price,o.site_id,cs.name AS site_name
       FROM orders o
       LEFT JOIN customer_sites cs ON cs.id=o.site_id
-      WHERE ${access.where}
+      WHERE ${access.where}${extra.length ? ' AND ' + extra.join(' AND ') : ''}
       ORDER BY o.created_at DESC
-      LIMIT 100
-    `).all(...access.params);
-    res.json({ orders: projectOrdersForPortal(rows, s), caps: s.caps });
+      LIMIT ? OFFSET ?
+    `).all(...access.params, ...paramsExtra, limit, offset);
+    res.json({ orders: projectOrdersForPortal(rows, s), caps: s.caps, limit, offset, hasMore: rows.length === limit });
 
   });
 
@@ -902,13 +905,7 @@ module.exports = function createPortalRouter(deps) {
     const { token } = req.query;
     const s = session(token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
-    const rows = db.prepare(`
-      SELECT id, original_name, mime_type, size_bytes, status, notes, uploaded_at, reviewed_at
-      FROM customer_guarantee_documents
-      WHERE customer_id=?
-      ORDER BY uploaded_at DESC, id DESC
-    `).all(s.customer.id);
-    res.json({ documents: rows });
+    res.json({ documents: portalGuarantees.list(db, { customerId: s.customer.id }) });
   });
 
   router.post('/c/guarantee-documents', customerPortalActionLimiter, upload.single('file'), (req, res) => {
@@ -946,6 +943,56 @@ module.exports = function createPortalRouter(deps) {
     res.json({ success: true, id: r.lastInsertRowid, status: 'uploaded_pending_review' });
   });
 
+  // Customer order source documents are stored as bytes, not merely copied into notes.
+  router.post('/c/orders/:orderId/source-documents', customerPortalActionLimiter, upload.single('file'), (req, res) => {
+    const s = session(req.body.token || req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!req.file) return res.status(400).json({ error: 'חסר קובץ להעלאה' });
+    const allowedSourceTypes = new Set(['application/pdf','image/jpeg','image/png','text/csv','text/tab-separated-values','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    if (!allowedSourceTypes.has(req.file.mimetype) || req.file.size > 15 * 1024 * 1024) return res.status(400).json({ error: 'סוג או גודל קובץ מקור אינו נתמך' });
+    if (!s.caps.canOrder) return res.status(403).json({ error: 'אין הרשאה לצרף מסמכים להזמנה' });
+    const access = orderAccessWhere(s);
+    const order = db.prepare(`SELECT o.id FROM orders o WHERE o.id=? AND ${access.where}`).get(req.params.orderId, ...access.params);
+    if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
+    const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const result = db.prepare(`INSERT INTO customer_portal_order_documents
+      (order_id,customer_id,portal_user_id,original_name,mime_type,data_url,size_bytes)
+      VALUES (?,?,?,?,?,?,?)`).run(order.id, s.customer.id, s.user?.id || null,
+      req.file.originalname, req.file.mimetype || 'application/octet-stream', dataUrl,
+      req.file.size || req.file.buffer.length || 0);
+    auditSupportAction(s, 'order_source_document_uploaded', 'order', order.id, { documentId: result.lastInsertRowid, fileName: req.file.originalname });
+    res.status(201).json({ success: true, documentId: result.lastInsertRowid, originalName: req.file.originalname, sizeBytes: req.file.size || req.file.buffer.length || 0 });
+  });
+
+  router.get('/c/orders/:orderId/source-documents', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const access = orderAccessWhere(s);
+    const order = db.prepare(`SELECT o.id FROM orders o WHERE o.id=? AND ${access.where}`).get(req.params.orderId, ...access.params);
+    if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
+    const documents = db.prepare(`SELECT id,original_name,mime_type,size_bytes,uploaded_at
+      FROM customer_portal_order_documents WHERE order_id=? AND customer_id=? ORDER BY id DESC`).all(order.id, s.customer.id)
+      .map(doc => ({ ...doc, downloadUrl: `/api/c/orders/${order.id}/source-documents/${doc.id}/download?token=${encodeURIComponent(req.query.token)}` }));
+    res.json({ documents });
+  });
+
+  router.get('/c/orders/:orderId/source-documents/:documentId/download', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const doc = db.prepare(`SELECT * FROM customer_portal_order_documents
+      WHERE id=? AND order_id=? AND customer_id=?`).get(req.params.documentId, req.params.orderId, s.customer.id);
+    if (!doc) return res.status(404).send('לא נמצא');
+    const access = orderAccessWhere(s);
+    if (!db.prepare(`SELECT o.id FROM orders o WHERE o.id=? AND ${access.where}`).get(doc.order_id, ...access.params)) return res.status(404).send('לא נמצא');
+    const match = /^data:([^;]+);base64,(.*)$/s.exec(doc.data_url || '');
+    if (!match) return res.status(410).send('הקובץ אינו זמין');
+    res.type(doc.mime_type || match[1]);
+    res.set('Cache-Control', 'no-store');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(doc.original_name)}`);
+    res.send(Buffer.from(match[2], 'base64'));
+  });
+
   // Quote — calculate price for items before ordering
   router.post('/c/quote', customerPortalActionLimiter, (req, res) => {
     const { token, items } = req.body; // items: [{diameter, sides[], qty}]
@@ -974,6 +1021,20 @@ module.exports = function createPortalRouter(deps) {
     const c = s.customer;
     if (!s.caps.canOrder) return res.status(403).json({ error: 'Portal user cannot create orders' });
     if (!items?.length) return res.status(400).json({ error: 'חסרים פריטים' });
+    const idempotencyKey = portalIdempotencyKey(req.body.idempotency_key ?? req.body.idempotencyKey);
+    const idempotencyPayload = { items, deliveryDate, deliveryTime, deliveryAddress, notes, siteId };
+    const payloadFingerprint = portalPayloadFingerprint(idempotencyPayload);
+    const replaySite = resolveAuthorizedSite(c.id, s.user, siteId);
+    if (!replaySite.ok) return res.status(replaySite.status).json({ error: replaySite.error });
+    if (idempotencyKey) {
+      const replay = db.prepare(`SELECT payload_fingerprint,response_json FROM customer_portal_order_idempotency
+        WHERE customer_id=? AND portal_user_id IS ? AND idempotency_key=?`).get(s.customer.id, s.user?.id ?? null, idempotencyKey);
+      if (replay) {
+        if (replay.payload_fingerprint !== payloadFingerprint) return res.status(409).json({ error: 'idempotency_key_conflict', code: 'idempotency_key_conflict' });
+        const saved = JSON.parse(replay.response_json);
+        return res.json({ ...saved, token, ...(s.caps.seePrice ? {} : { summary: { totalWeight: saved.summary.totalWeight, billingWeight: saved.summary.billingWeight } }), replay: true });
+      }
+    }
 
     let portalItems;
     try {
@@ -1004,6 +1065,11 @@ module.exports = function createPortalRouter(deps) {
     const orderNum = generateOrderNum();
     const confirmToken = crypto.randomBytes(16).toString('hex');
 
+    let responsePayload;
+    let sideEffects;
+    const createOrderTransaction = db.transaction(() => {
+    const budget = evaluatePortalBudget({ db, customerId:c.id, siteId:orderSite?.id || null, amount:pricing.billingPrice, kg:totalWeight * (1 + wastePct / 100), exposeFinancialDetails:Boolean(s.caps.seePrice || s.caps.canViewBudget) });
+    if (!budget.ok) { const error = new Error(budget.error); error.budgetResult = budget; throw error; }
     const orderRow = db.prepare(`
       INSERT INTO orders (order_num,customer_id,channel,delivery_date,delivery_time,delivery_address,
         priority,general_notes,total_weight,waste_pct_charged,billing_weight,portal_order,status,confirm_token)
@@ -1034,9 +1100,9 @@ module.exports = function createPortalRouter(deps) {
     const portalPrice   = pricing.billingPrice;
     db.prepare('UPDATE orders SET total_weight=?,billing_weight=?,portal_price=? WHERE id=?')
       .run(totalWeight, billingWeight, portalPrice, orderId);
+    db.prepare('UPDATE orders SET created_by_portal_user_id=?, pricing_snapshot_json=? WHERE id=?')
+      .run(s.user?.id || null, JSON.stringify({ wastePct, ...pricing }), orderId);
     db.prepare('UPDATE pallets SET total_weight=? WHERE id=?').run(totalWeight, palletId);
-
-    wsBroadcast('new_order', { orderNum, orderId, channel: 'פורטל לקוח', status: 'ממתינה לאישור לקוח' });
 
     // Send WhatsApp confirmation with approve link (non-blocking)
     const approveLink = `${portalAccess.configuredBaseUrl(requestPublicBaseUrl(req))}/api/c/approve/${encodeURIComponent(confirmToken)}`;
@@ -1044,11 +1110,9 @@ module.exports = function createPortalRouter(deps) {
     const addrInfo  = deliveryAddress ? `📍 ${deliveryAddress}` : '';
     const waMsg = `📋 *הזמנה ${orderNum} – ממתינה לאישורך*\n\nשלום ${c.name},\nקיבלנו את הזמנתך:\n\n${itemLines.join('\n')}\n\n⚖️ משקל לחיוב: ${billingWeight.toFixed(2)} ק"ג\n💰 סה"כ: ₪${portalPrice.toFixed(2)}\n${delivInfo}\n${addrInfo}\n\n*לאישור פרטי ההזמנה ושליחה לבדיקה – לחץ כאן:*\n${approveLink}\n\n_⚠️ ייצור יתחיל רק לאחר בדיקה ואישור פנימי של טנא_`;
 
-    if (c.phone) intake.sendWhatsApp(c.phone, waMsg).catch(e => console.warn('[Order confirm WA]', e));
+    sideEffects = { orderNum, orderId, waMsg, siteId: orderSite?.id || null, itemCount: portalItems.length, totalWeight, portalPrice };
 
-    auditSupportAction(s, 'order_created', 'order', orderId, { orderNum, siteId: orderSite?.id || null, itemCount: portalItems.length, totalWeight, portalPrice });
-
-    res.json({
+    responsePayload = {
       success: true, orderNum, orderId,
       summary: {
         totalWeight: +totalWeight.toFixed(2),
@@ -1057,7 +1121,31 @@ module.exports = function createPortalRouter(deps) {
       },
       token,
       awaitingApproval: true
+    };
+    if (idempotencyKey) {
+      const persistedResponse = { ...responsePayload }; delete persistedResponse.token;
+      db.prepare(`INSERT INTO customer_portal_order_idempotency
+        (customer_id,portal_user_id,idempotency_key,payload_fingerprint,order_id,response_json)
+        VALUES (?,?,?,?,?,?)`).run(c.id, s.user?.id ?? null, idempotencyKey, payloadFingerprint, orderId, JSON.stringify(persistedResponse));
+    }
+    return responsePayload;
     });
+    try {
+      createOrderTransaction();
+    } catch (err) {
+      if (err.budgetResult) return res.status(err.budgetResult.status || 409).json(err.budgetResult);
+      if (idempotencyKey && /UNIQUE|constraint/i.test(String(err.message || ''))) {
+        const replay = db.prepare(`SELECT payload_fingerprint,response_json FROM customer_portal_order_idempotency
+          WHERE customer_id=? AND portal_user_id IS ? AND idempotency_key=?`).get(c.id, s.user?.id ?? null, idempotencyKey);
+        if (replay?.payload_fingerprint !== payloadFingerprint) return res.status(409).json({ error: 'idempotency_key_conflict', code: 'idempotency_key_conflict' });
+        if (replay) return res.json({ ...JSON.parse(replay.response_json), token, replay: true });
+      }
+      throw err;
+    }
+    wsBroadcast('new_order', { orderNum: sideEffects.orderNum, orderId: sideEffects.orderId, channel: 'פורטל לקוח', status: 'ממתינה לאישור לקוח' });
+    if (c.phone) intake.sendWhatsApp(c.phone, sideEffects.waMsg).catch(e => console.warn('[Order confirm WA]', e));
+    auditSupportAction(s, 'order_created', 'order', sideEffects.orderId, { orderNum: sideEffects.orderNum, siteId: sideEffects.siteId, itemCount: sideEffects.itemCount, totalWeight: sideEffects.totalWeight, portalPrice: sideEffects.portalPrice });
+    res.json(responsePayload);
   });
 
   // Customer order approval (link from WhatsApp)
@@ -1087,6 +1175,8 @@ module.exports = function createPortalRouter(deps) {
     const c = s.customer;
     const order = db.prepare('SELECT * FROM orders WHERE id=? AND customer_id=? AND status=?').get(orderId, c.id, 'ממתינה לאישור לקוח');
     if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה או כבר אושרה' });
+    const authorizedSite = resolveAuthorizedSite(c.id, s.user, order.site_id);
+    if (!authorizedSite.ok) return res.status(authorizedSite.status).json({ error: authorizedSite.error });
     db.prepare('UPDATE orders SET status=?, confirm_token=NULL WHERE id=?').run(ORDER_STATUS.PENDING_APPROVAL, orderId);
     wsBroadcast('order_status', { id: orderId, status: ORDER_STATUS.PENDING_APPROVAL, orderNum: order.order_num });
     const notifyPhone = db.prepare("SELECT value FROM settings WHERE key='WHATSAPP_NOTIFY_PHONE'").get()?.value;
@@ -1200,14 +1290,8 @@ module.exports = function createPortalRouter(deps) {
              o.general_notes AS notes,o.total_weight,o.billing_weight,o.portal_price,o.site_id,cs.name AS site_name
       FROM orders o
       LEFT JOIN customer_sites cs ON cs.id=o.site_id
-      WHERE o.id=? AND o.customer_id=?
-        AND (
-          ?=0
-          OR o.site_id IS NULL
-          OR o.site_id IN (SELECT site_id FROM customer_site_users WHERE portal_user_id=?)
-          OR o.site_id=?
-        )
-    `).get(req.params.orderId, c.id, s.user ? 1 : 0, s.user?.id || 0, s.user?.default_site_id || 0);
+      WHERE o.id=? AND ${orderAccessWhere(s, 'o').where}
+    `).get(req.params.orderId, ...orderAccessWhere(s, 'o').params);
     if (!order) return res.status(404).json({ error: 'לא נמצא' });
     const pallets = db.prepare("SELECT id,pallet_num,'' AS notes FROM pallets WHERE order_id=?").all(order.id);
     pallets.forEach(p => {
