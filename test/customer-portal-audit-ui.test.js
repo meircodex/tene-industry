@@ -69,6 +69,11 @@ test('factory and customer adapters consume one canonical order-line renderer', 
   for (const label of ['מס׳','אלמנט','צורה ומידות','קוטר','כמות','אורך','סה״כ','משקל','הוסף פריט']) assert.match(table, new RegExp(label));
 });
 
+test('factory order editor cache version is bumped with the shared table integration', () => {
+  const factory = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
+  assert.match(factory, /new-order-editor\.js\?v=5/);
+});
+
 test('order submission contracts preserve idempotency and retryable source files/history', () => {
   assert.match(html, /idempotency_key: portalDraftIdempotencyKey/);
   assert.match(html, /source-documents/);
