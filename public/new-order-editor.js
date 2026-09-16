@@ -196,6 +196,13 @@
     if (!Array.isArray(pallets)) pallets = [];
     if (!pallets.length) pallets.push({ id: Date.now(), maxWeight: 500, items: [] });
     const pallet = pallets[0];
+    // Remove only untouched startup placeholders once a real item exists.
+    // This also repairs drafts created by the previous behavior, without
+    // discarding a row where the user already typed any meaningful value.
+    if (pallet && Array.isArray(pallet.items) && typeof window.isPristineOrderItemPlaceholder === 'function') {
+      const hasConfiguredItem = pallet.items.some(item => !window.isPristineOrderItemPlaceholder(item));
+      if (hasConfiguredItem) pallet.items = pallet.items.filter(item => !window.isPristineOrderItemPlaceholder(item));
+    }
     if (pallet && !pallet.items.length) {
       pallet.items.push({ id: Date.now(), shapeId: null, shapeEmoji: null, shapeName: '', shapeSides: [], shapeAngles: [], diameter: 0, length: 0, qty: 0, note: '', raw_material_id: 'auto' });
     }

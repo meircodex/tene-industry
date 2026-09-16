@@ -3302,6 +3302,28 @@ function addShapeNow(family = 'bar') {
 }
 function addBarFromToolbar() { addShapeNow('bar'); }
 
+function isPristineOrderItemPlaceholder(item) {
+  if (!item) return false;
+  const contract = itemShapeContract(item) || null;
+  const hasShape = Boolean(
+    item.shapeId ||
+    item.shapeName ||
+    contract?.shapeId ||
+    contract?.shapeType ||
+    contract?.family ||
+    itemShapeSides(item).some(value => Number(value) > 0) ||
+    Number(item.length || item.totalLengthMm || 0) > 0 ||
+    isRoundPileCageItem(item) ||
+    isSpiralOrderItem(item)
+  );
+  const elementName = String(item.structElement || item.struct_element || item.elementName || '').trim();
+  return !hasShape &&
+    !elementName &&
+    !String(item.note || '').trim() &&
+    Number(item.qty || item.quantity || 0) <= 0 &&
+    Number(item.diameter || 0) <= 0;
+}
+
 function openShapeEditor(palletId, itemId) {
   _shapeTarget = { palletId, itemId, isNew: false };
   const pallet = pallets.find(p => p.id === palletId);
@@ -3478,6 +3500,13 @@ async function loadInventoryBatches() {
 function addItem(palletId) {
   const pallet = pallets.find(p => p.id === palletId);
   if (!pallet) return;
+  // The initial empty row is only an entry point. Reuse it for the first
+  // shape instead of leaving a permanent blank row above the real items.
+  const placeholder = (pallet.items || []).find(isPristineOrderItemPlaceholder);
+  if (placeholder) {
+    openShapeEditor(palletId, placeholder.id);
+    return;
+  }
   // New item: diameter and quantity start empty (0) so the editor requires them.
   const pendingItem = { id: Date.now(), shapeId: null, shapeEmoji: null, shapeName: '', shapeSides: [], shapeAngles: [], diameter: 0, length: 0, qty: 0, note: '', raw_material_id: 'auto' };
   _shapeTarget = { palletId, itemId: pendingItem.id, isNew: true, pendingItem };
@@ -4258,6 +4287,6 @@ document.getElementById('imgAnalyzeOverlay').addEventListener('click', function(
 });
 </script>
 <script src="/order-line-renderer.js?v=2"></script>
-<script src="/new-order-editor.js?v=6"></script>
+<script src="/new-order-editor.js?v=7"></script>
 </body>
 </html>

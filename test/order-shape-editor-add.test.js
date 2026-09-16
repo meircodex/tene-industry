@@ -4,8 +4,10 @@ const path = require('node:path');
 const test = require('node:test');
 
 const ordersPath = path.join(__dirname, '..', 'public', 'orders.html');
+const newOrderPath = path.join(__dirname, '..', 'public', 'index.html');
 const newOrderEditorPath = path.join(__dirname, '..', 'public', 'new-order-editor.js');
 const orders = () => fs.readFileSync(ordersPath, 'utf8');
+const newOrder = () => fs.readFileSync(newOrderPath, 'utf8');
 const newOrderEditor = () => fs.readFileSync(newOrderEditorPath, 'utf8');
 
 test('orders manual add uses the shared shape editor, not the legacy manual form', () => {
@@ -62,6 +64,16 @@ test('new order CSV import maps location aliases to struct element state', () =>
   }
   assert.match(js, /structElement: elementName/);
   assert.match(js, /struct_element: elementName/);
+});
+
+test('new order first shape consumes the temporary startup row', () => {
+  const html = newOrder();
+  const js = newOrderEditor();
+  assert.match(html, /function isPristineOrderItemPlaceholder\(item\)/);
+  assert.match(html, /const placeholder = \(pallet\.items \|\| \[\]\)\.find\(isPristineOrderItemPlaceholder\)/);
+  assert.match(html, /if \(placeholder\) \{[\s\S]*openShapeEditor\(palletId, placeholder\.id\);[\s\S]*return;[\s\S]*\}/);
+  assert.match(js, /const hasConfiguredItem = pallet\.items\.some\(item => !window\.isPristineOrderItemPlaceholder\(item\)\)/);
+  assert.match(js, /pallet\.items = pallet\.items\.filter\(item => !window\.isPristineOrderItemPlaceholder\(item\)\)/);
 });
 
 test('new order local multi-drafts stay client-side and expose compact draft actions', () => {
