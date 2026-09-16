@@ -108,6 +108,9 @@
     .site-summary-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:13px;text-align:right;font-family:inherit;color:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(18,35,63,.05)}
     .site-summary-card:hover{border-color:var(--orange);transform:translateY(-1px)}
     .site-summary-card .site-address{display:block;color:var(--dim);font-size:12px;margin-top:3px}
+    .site-management-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:10px;align-items:end;margin:12px 0}
+    .site-management-toolbar .field{margin:0}
+    .site-management-toolbar .btn{width:auto;margin:0;white-space:nowrap}
     .site-summary-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
     .site-summary-metrics span{background:#f6f9fc;border-radius:8px;padding:7px;font-size:11px;color:var(--dim)}
     .site-summary-metrics b{display:block;color:var(--dark);font-size:13px;margin-top:2px}
@@ -274,7 +277,7 @@
     .loader{text-align:center;padding:40px;color:var(--dim);font-size:14px}
 
     @media(min-width:600px){.shapes-grid{grid-template-columns:repeat(4,1fr)}}
-    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-management-toolbar{grid-template-columns:1fr 1fr}.site-management-toolbar .field{grid-column:1/-1}.site-management-toolbar .btn{width:100%}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:430px){.portal-action-grid{grid-template-columns:1fr}.portal-stepper{grid-template-columns:1fr}.screen{padding:14px}.portal-home-tabs{gap:6px}.support-preview-banner{position:relative;top:auto}.support-preview-description{display:none}}
   </style>
 <link rel="stylesheet" href="/theme.css">
@@ -359,7 +362,7 @@
     <p id="welcomeSub"><span id="portalRoleLabel">פורטל לקוח</span> · <span id="tierLabel">מחירון</span></p>
     <div class="welcome-actions">
       <button class="btn btn-secondary btn-sm" onclick="changePortalPin()">שינוי PIN</button>
-      <button class="btn btn-secondary btn-sm" id="manageSitesBtn" onclick="openProjectPanel()" style="display:none">פרויקטים</button>
+      <button class="btn btn-secondary btn-sm" id="manageSitesBtn" onclick="openProjectPanel(false)" style="display:none">אתרים ומנהלי עבודה</button>
       <button class="btn btn-secondary btn-sm" onclick="logoutPortal()">התנתק</button>
     </div>
   </div>
@@ -367,13 +370,13 @@
   <div class="portal-action-grid">
     <button class="new-order-btn" id="newOrderAction" onclick="startNewOrder()">+ הזמנה חדשה</button>
     <button type="button" class="portal-action-card" id="quoteAction" onclick="showQuoteScreen()"><strong>הצעת מחיר</strong><span>בחר צורות וכמויות וקבל מחיר לפני שליחה</span></button>
-    <button type="button" class="portal-action-card" id="projectAction" onclick="openProjectPanel()"><strong id="projectActionTitle">פרויקט חדש</strong><span>פתח אתר, כתובת ואיש קשר בשטח</span></button>
+    <button type="button" class="portal-action-card" id="projectAction" onclick="openProjectPanel(false)"><strong id="projectActionTitle">אתרים ומנהלי עבודה</strong><span>בחר אתר, הוסף אתר ושייך אליו מנהל עבודה</span></button>
     <button type="button" class="portal-action-card" onclick="setHomeSection('profile')"><strong>פרטי לקוח</strong><span>עדכון שם, כתובת ואימייל לקבלת מסמכים</span></button>
   </div>
   <nav class="portal-home-tabs" id="portalHomeTabs" role="tablist" aria-label="ניווט פורטל לקוח">
     <button type="button" role="tab" aria-selected="true" aria-controls="homeSectionOrders" class="portal-home-tab active" id="homeTabOrders" onclick="setHomeSection('orders')">הזמנות</button>
     <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionProfile" class="portal-home-tab" id="homeTabProfile" onclick="setHomeSection('profile')">פרטי לקוח</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden>פרויקטים</button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden>אתרים ומנהלים</button>
     <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionFinance" class="portal-home-tab" id="homeTabFinance" onclick="setHomeSection('finance')" hidden>כספים</button>
     <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionPriceList" class="portal-home-tab" id="homeTabPriceList" onclick="setHomeSection('priceList')" hidden>מחירון</button>
     <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionDocs" class="portal-home-tab" id="homeTabDocs" onclick="setHomeSection('docs')">מסמכים</button>
@@ -528,6 +531,7 @@ let PORTAL_SITES = [];
 let PORTAL_DEFAULT_SITE_ID = null;
 let PORTAL_CAN_CHOOSE_SITE = false;
 let PORTAL_USER = null;
+let PORTAL_ROLE = 'both';
 let PORTAL_CAPS = {};
 let PORTAL_FINANCE = null;
 let PORTAL_USERS = [];
@@ -638,6 +642,7 @@ function setPortalContext(data) {
   PORTAL_DEFAULT_SITE_ID = data.defaultSiteId || data.default_site_id || PORTAL_DEFAULT_SITE_ID || null;
   PORTAL_CAN_CHOOSE_SITE = Boolean(data.canChooseSite || data.can_choose_site);
   PORTAL_USER = data.portalUser || data.portal_user || PORTAL_USER;
+  PORTAL_ROLE = data.role || PORTAL_USER?.role || PORTAL_ROLE;
   PORTAL_CAPS = data.caps || PORTAL_CAPS || {};
   if (Object.prototype.hasOwnProperty.call(data, 'supportPreview')) SUPPORT_PREVIEW = Boolean(data.supportPreview);
   if (Object.prototype.hasOwnProperty.call(data, 'supportPreviewExpiresAt')) SUPPORT_PREVIEW_EXPIRES_AT = data.supportPreviewExpiresAt || null;
@@ -665,7 +670,7 @@ function configurePortalActions() {
   if (quote) quote.hidden = !canQuote;
   if (project) project.hidden = !canOpenProjects;
   const title = document.getElementById('projectActionTitle');
-  if (title) title.textContent = PORTAL_SITES.length ? 'פרויקטים ואתרים' : 'פרויקט חדש';
+  if (title) title.textContent = 'אתרים ומנהלי עבודה';
 }
 
 function selectedPortalSiteId() {
@@ -759,8 +764,9 @@ function renderCustomerSitesPanel() {
   const formDisplay = PORTAL_SITES.length ? 'none' : 'grid';
   const canManageUsers = Boolean(PORTAL_CAPS.canManageUsers);
   const canAssignUsers = Boolean(PORTAL_CAPS.canAssignSiteUsers || PORTAL_CAPS.canManageUsers);
+  const siteOptions = PORTAL_SITES.map(site => `<option value="${site.id}">${escapeHtml(site.name)}${site.city ? ' - ' + escapeHtml(site.city) : ''}</option>`).join('');
   const list = PORTAL_SITES.length
-    ? `<div class="site-summary-grid">${PORTAL_SITES.map(site => {
+    ? `<div class="section-heading"><h3>בחר אתר לצפייה</h3><span>${PORTAL_SITES.length} אתרים</span></div><div class="site-summary-grid">${PORTAL_SITES.map(site => {
       const summary = PORTAL_SITE_SUMMARIES[Number(site.id)] || {};
       return `
       <button type="button" class="site-summary-card" onclick="openSiteDetail(${site.id})">
@@ -775,8 +781,7 @@ function renderCustomerSitesPanel() {
         </span>
       </button>`;
     }).join('')}</div>`
-    : '<div class="loader" style="padding:12px">אין פרויקטים עדיין. לחץ על פרויקט חדש כדי לפתוח אתר עבודה.</div>';
-  const siteOptions = PORTAL_SITES.map(site => `<option value="${site.id}">${escapeHtml(site.name)}${site.city ? ' - ' + escapeHtml(site.city) : ''}</option>`).join('');
+    : '<div class="empty-state"><strong>עדיין אין אתרים ללקוח</strong><span>הוסף אתר ראשון, ולאחר מכן ניתן להזמין מנהל עבודה ולשייך אותו לאתר.</span></div>';
   const usersBySite = new Map();
   PORTAL_USER_ASSIGNMENTS.forEach(row => {
     const key = Number(row.portal_user_id);
@@ -821,7 +826,6 @@ function renderCustomerSitesPanel() {
         <textarea id="portalInviteMessage" rows="5" readonly style="margin-top:8px"></textarea>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-secondary btn-sm" type="button" onclick="copyPortalInviteMessage()">העתק הודעה</button><button class="btn btn-secondary btn-sm" type="button" onclick="openPortalInviteWhatsApp()">פתח ב-WhatsApp</button></div>
       </div>
-      <button class="btn btn-primary" type="button" onclick="togglePortalUserForm(true)" style="margin-top:12px">+ הזמן מנהל עבודה</button>
       <div id="newPortalUserForm" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <input id="portalUserName" placeholder="שם משתמש" />
         <input id="portalUserPhone" placeholder="טלפון לכניסה" />
@@ -847,7 +851,6 @@ function renderCustomerSitesPanel() {
     </div>
   ` : '';
   const form = canManagePortalSites() ? `
-    ${PORTAL_SITES.length ? `<button class="btn btn-secondary btn-sm" type="button" onclick="toggleNewSiteForm()" style="margin-top:12px">פרויקט חדש</button>` : ''}
     <div id="newSiteForm" style="display:${formDisplay};grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
       <div class="field" style="margin:0"><label for="newSiteName">שם פרויקט / אתר *</label><input id="newSiteName" autocomplete="organization" /><div class="field-error" id="newSiteNameError">יש להזין שם לפרויקט</div></div>
       <div class="field" style="margin:0"><label for="newSiteCity">עיר</label><input id="newSiteCity" autocomplete="address-level2" /></div>
@@ -861,10 +864,16 @@ function renderCustomerSitesPanel() {
   panel.innerHTML = `
     <div class="guarantee-head">
       <div>
-        <div class="card-title">פרויקטים ואתרים</div>
+        <div class="card-title">אתרים ומנהלי עבודה</div>
+        <p>בחר אתר לצפייה, הוסף אתר חדש או הזמן מנהל עבודה עם הרשאה לאתר מסוים.</p>
       </div>
       <span class="guarantee-status">${PORTAL_SITES.length}</span>
     </div>
+    ${canManagePortalSites() ? `<div class="site-management-toolbar">
+      <div class="field"><label for="portalSiteChooser">בחירת אתר</label><select id="portalSiteChooser" onchange="if(this.value) openSiteDetail(Number(this.value))"><option value="">${PORTAL_SITES.length ? 'בחר אתר לצפייה' : 'אין עדיין אתרים'}</option>${siteOptions}</select></div>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="toggleNewSiteForm(true)">+ הוסף אתר</button>
+      <button class="btn btn-primary btn-sm" type="button" onclick="togglePortalUserForm(true)" ${PORTAL_SITES.length ? '' : 'disabled title="יש להוסיף אתר לפני הזמנת מנהל עבודה"'}>+ הוסף מנהל עבודה</button>
+    </div>` : ''}
     <div class="guarantee-list">${list}</div>
     ${form}
     ${userForm}
@@ -1062,6 +1071,7 @@ async function createPortalUser(event) {
   const role = document.getElementById('portalUserRole')?.value || 'field_manager';
   const siteId = Number(document.getElementById('portalUserSiteId')?.value || 0);
   if (!name || !phone) { toast('שם וטלפון חובה', true); return; }
+  if (role === 'field_manager' && !siteId) { toast('יש לבחור אתר למנהל העבודה', true); return; }
   setButtonBusy(btn, true, 'מוסיף...');
   const body = {
     token: TOKEN,
@@ -1185,6 +1195,7 @@ async function createPortalSite(event) {
     managerPhone: document.getElementById('newSiteManagerPhone')?.value.trim() || null,
     budgetKg: Number(document.getElementById('newSiteBudgetKg')?.value || 0),
   };
+  const managerDraft = { name:body.managerName || '', phone:body.managerPhone || '' };
   const res = await fetch('/api/c/sites', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -1192,7 +1203,6 @@ async function createPortalSite(event) {
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { setButtonBusy(btn, false); toast('שגיאה בחיבור לשרת', true); return; }
   if (!res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res.data?.error || 'לא ניתן לפתוח פרויקט', true); return; }
-  toast(`הפרויקט "${name}" נפתח בהצלחה`);
   const sitesData = await fetch(`/api/c/sites?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
   setPortalContext(sitesData);
   await loadSiteSummaries();
@@ -1200,6 +1210,12 @@ async function createPortalSite(event) {
   renderPortalDashboard(PORTAL_ORDERS);
   toggleNewSiteForm(false);
   renderOrderSitePicker();
+  togglePortalUserForm(true, res.data.id);
+  const managerNameInput = document.getElementById('portalUserName');
+  const managerPhoneInput = document.getElementById('portalUserPhone');
+  if (managerNameInput) managerNameInput.value = managerDraft.name;
+  if (managerPhoneInput) managerPhoneInput.value = managerDraft.phone;
+  toast(`האתר "${name}" נפתח. אפשר כעת להוסיף מנהל עבודה.`);
 }
 
 // ──────────────────────────────────────────────────────
@@ -1483,7 +1499,7 @@ async function showHome(preloaded) {
   document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}! 👋`;
   const tierTxt = ME?.price_tier === 'customer' ? 'לקוח קבוע' : 'מחירון';
   document.getElementById('tierLabel').textContent = tierTxt;
-  document.getElementById('portalRoleLabel').textContent = portalRoleLabel(PORTAL_USER?.role || 'both');
+  document.getElementById('portalRoleLabel').textContent = portalRoleLabel(PORTAL_ROLE);
   showScreen('screenHome');
 
   let orders = preloaded ?? [];

@@ -119,6 +119,14 @@ module.exports = function createPortalRouter(deps) {
     const s = resolvePortalSession(token);
     if (s) {
       const ctx = portalContext(s.customer, s.user, s.supportPreview && !s.user ? 'customer_admin' : null);
+      if (s.supportPreview && !s.user) {
+        ctx.caps = {
+          ...ctx.caps,
+          canManageUsers: true,
+          canCreateSites: true,
+          canAssignSiteUsers: true,
+        };
+      }
       return {
         customer: s.customer,
         user: s.user,

@@ -895,6 +895,32 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal(emptyMe.portalUser, null);
     assert.deepEqual(emptyMe.sites, []);
     assert.equal(emptyMe.caps.canOrder, true);
+    assert.equal(emptyMe.caps.canManageUsers, true);
+    assert.equal(emptyMe.caps.canCreateSites, true);
+    assert.equal(emptyMe.caps.canAssignSiteUsers, true);
+    const emptySiteResponse = await request('/api/c/sites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: emptyPreviewToken, name: 'First support site', city: 'Ashdod' }),
+    });
+    assert.equal(emptySiteResponse.status, 200);
+    const emptySite = await emptySiteResponse.json();
+    const emptyManagerResponse = await request('/api/c/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: emptyPreviewToken,
+        name: 'First site manager',
+        phone: '0500000196',
+        role: 'field_manager',
+        siteIds: [emptySite.id],
+        defaultSiteId: emptySite.id,
+        canCreateOrders: true,
+      }),
+    });
+    assert.equal(emptyManagerResponse.status, 200);
+    const emptyManager = await emptyManagerResponse.json();
+    assert.equal(db.prepare('SELECT site_id FROM customer_site_users WHERE customer_id=? AND portal_user_id=?').get(emptyCustomerId, emptyManager.id).site_id, emptySite.id);
 
     const customerId = seedPortalCustomer('Portal Support Customer', '0500000199', 'legacy-support-token');
     const customerToken = seedPortalUser(customerId, '0500000199', 'both', 'active-customer-session');

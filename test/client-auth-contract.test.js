@@ -255,11 +255,11 @@ test('customer profile changes lock after first edit and route to internal appro
   assert.match(customersPage, /approveProfileChange/);
 });
 
-test('customer portal has a project-first home and editable profile', () => {
+test('customer portal has a site-and-manager-first home and editable profile', () => {
   const portalRoute = read('routes/portal.js');
   const customerPage = read('public/customer.html');
 
-  assert.match(customerPage, /פרויקט חדש/);
+  assert.match(customerPage, /אתרים ומנהלי עבודה/);
   assert.match(customerPage, /id="homeTabProfile"/);
   assert.match(customerPage, /id="homeSectionProfile"/);
   assert.match(customerPage, /id="customerProfilePanel"/);
