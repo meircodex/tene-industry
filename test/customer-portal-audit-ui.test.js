@@ -55,6 +55,9 @@ test('project portal exposes site filtering, approval center, manager invitation
   assert.match(html, /function openSiteContacts/);
   assert.match(html, /בחר את כולם/);
   assert.match(html, /portalUserIds/);
+  assert.match(html, /שיוך לפרויקט/);
+  assert.match(html, /function assignOrderToSite/);
+  assert.match(html, /\/api\/c\/orders\/\$\{orderId\}\/site/);
 });
 
 test('mobile login sizing and price-list rendering cover the audited viewport/data gaps', () => {

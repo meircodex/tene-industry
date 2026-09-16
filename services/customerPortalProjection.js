@@ -60,6 +60,8 @@ function projectPortalOrder(order = {}, ctx = {}) {
     customer_next_action: status.customer_next_action,
     siteName,
     site_name: siteName,
+    siteId: numberOrNull(order.siteId ?? order.site_id),
+    site_id: numberOrNull(order.site_id ?? order.siteId),
     deliveryDate: order.deliveryDate || order.delivery_date || null,
     delivery_date: order.delivery_date || order.deliveryDate || null,
     deliveryWindow: order.deliveryWindow || order.delivery_time || null,

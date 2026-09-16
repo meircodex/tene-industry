@@ -26,7 +26,7 @@ test('customer portal maps internal statuses to customer-facing labels', () => {
 });
 
 test('customer portal projection hides prices unless explicitly allowed', () => {
-  const order = { id: 2, order_num: 'HZ-2', status: 'ממתינה לאישור לקוח', portal_price: 1234, total_weight: 500 };
+  const order = { id: 2, order_num: 'HZ-2', status: 'ממתינה לאישור לקוח', portal_price: 1234, total_weight: 500, site_id: 17, site_name: 'מגדל א' };
   const hidden = projectPortalOrder(order, { caps: { seePrice: false } });
   assert.equal(hidden.customerCanViewPrice, false);
   assert.equal('portal_price' in hidden, false);
@@ -36,6 +36,8 @@ test('customer portal projection hides prices unless explicitly allowed', () => 
   assert.equal(visible.customerCanViewPrice, true);
   assert.equal(visible.portal_price, 1234);
   assert.equal(visible.totalPrice, 1234);
+  assert.equal(visible.site_id, 17);
+  assert.equal(visible.site_name, 'מגדל א');
 });
 
 test('customer portal item projection does not expose production-only fields', () => {

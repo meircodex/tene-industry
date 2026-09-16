@@ -221,6 +221,15 @@ test('HTTP portal enforces delegated flags and cross-site order access', async (
   assert.ok(archive.body.sites.some(site => Number(site.id) === Number(siteA) && site.status === 'completed'));
   const restored = await call(`/api/c/sites/${siteA}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'active' }) });
   assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
+  const scopedCannotAssign = await call(`/api/c/orders/${orderId}/site`, { method: 'POST', headers, body: JSON.stringify({ token: 'other-token', siteId: siteA }) });
+  assert.equal(scopedCannotAssign.response.status, 403);
+  const assignedToA = await call(`/api/c/orders/${orderId}/site`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, siteId: siteA }) });
+  assert.equal(assignedToA.response.status, 200, JSON.stringify(assignedToA.body));
+  assert.equal(Number(db.prepare('SELECT site_id FROM orders WHERE id=?').get(orderId).site_id), Number(siteA));
+  const invalidSite = await call(`/api/c/orders/${orderId}/site`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, siteId: 999999 }) });
+  assert.equal(invalidSite.response.status, 400);
+  const reassignedToB = await call(`/api/c/orders/${orderId}/site`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, siteId: siteB }) });
+  assert.equal(reassignedToB.response.status, 200, JSON.stringify(reassignedToB.body));
   const cannotDeleteUsed = await call(`/api/c/sites/${siteB}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'deleted' }) });
   assert.equal(cannotDeleteUsed.response.status, 409);
   const emptySite = db.prepare("INSERT INTO customer_sites(customer_id,name,status) VALUES (?, 'Empty','active')").run(customerId).lastInsertRowid;

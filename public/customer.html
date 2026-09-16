@@ -142,6 +142,11 @@
     .site-report-toolbar .field{margin:0;min-width:150px;flex:1}
 
     .order-card{background:#fff;border:0;border-radius:14px;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:10px;cursor:pointer;border-right:4px solid transparent}
+    .order-card-shell{margin-bottom:10px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.06);overflow:hidden;background:#fff}
+    .order-card-shell .order-card{margin-bottom:0;box-shadow:none;border-radius:0}
+    .order-project-assignment{display:grid;grid-template-columns:auto minmax(160px,1fr);gap:8px;align-items:center;padding:8px 12px;background:#f8fafc;border-top:1px solid var(--border)}
+    .order-project-assignment label{font-size:12px;font-weight:800;color:var(--dim)}
+    .order-project-assignment select{padding:8px 10px;font-size:13px}
     .order-card.status-pending{border-right-color:#f39c12}
     .order-card.status-prod{border-right-color:var(--blue)}
     .order-card.status-done{border-right-color:var(--green)}
@@ -2023,6 +2028,50 @@ function renderPortalApprovalCenter(orders) {
   ` : '';
 }
 
+function canAssignOrdersToProjects() {
+  return Boolean(SUPPORT_PREVIEW || PORTAL_ROLE === 'customer_admin' || PORTAL_CAPS.canCreateSites);
+}
+
+function portalOrderSiteOptions(order = {}) {
+  const currentId = Number(order.site_id || order.siteId || 0);
+  const currentIsActive = PORTAL_SITES.some(site => Number(site.id) === currentId);
+  const archivedCurrent = currentId && !currentIsActive
+    ? `<option value="${currentId}" selected disabled>${escapeHtml(order.site_name || order.siteName || 'פרויקט בארכיון')} — בארכיון</option>`
+    : '';
+  return `<option value="" ${currentId ? '' : 'selected'}>ללא פרויקט</option>${archivedCurrent}`
+    + PORTAL_SITES.map(site => `<option value="${site.id}" ${Number(site.id) === currentId ? 'selected' : ''}>${escapeHtml(site.name)}</option>`).join('');
+}
+
+async function assignOrderToSite(orderId, rawSiteId, event) {
+  const select = event?.currentTarget || event?.target;
+  const siteId = Number(rawSiteId || 0) || null;
+  if (select) select.disabled = true;
+  const response = await fetch(`/api/c/orders/${orderId}/site`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token:TOKEN, siteId }),
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
+  if (!response || !response.ok || !response.data?.success) {
+    if (select) select.disabled = false;
+    toast(response?.data?.error || 'לא ניתן לשייך את ההזמנה לפרויקט', true);
+    return;
+  }
+  const wasDetailOpen = document.getElementById('screenDetail')?.classList.contains('active');
+  const wasSiteDetailOpen = document.getElementById('screenSiteDetail')?.classList.contains('active');
+  const openSiteId = PORTAL_ACTIVE_SITE_ID;
+  const data = await fetch(`/api/c/me?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()).catch(() => null);
+  if (data?.customer) {
+    setPortalContext(data);
+    PORTAL_ORDERS = Array.isArray(data.orders) ? data.orders : PORTAL_ORDERS;
+  }
+  await Promise.all([loadSiteSummaries().catch(() => {}), loadCustomerFinanceDashboard().catch(() => {})]);
+  renderOrdersList(PORTAL_ORDERS);
+  renderPortalDashboard(PORTAL_ORDERS);
+  toast(siteId ? `ההזמנה שויכה לפרויקט ${response.data.siteName || ''}` : 'שיוך ההזמנה לפרויקט הוסר');
+  if (wasDetailOpen) await openOrder(orderId);
+  else if (wasSiteDetailOpen && openSiteId) await openSiteDetail(openSiteId);
+}
+
 function portalOrderCardsHtml(orders) {
   return (orders || []).map(o => {
     const cls = statusClass(o.status);
@@ -2032,19 +2081,22 @@ function portalOrderCardsHtml(orders) {
     const site = o.site_name ? `אתר: ${o.site_name}` : '';
     const needsApproval = o.customerCanApprove === true;
     return `
-    <button type="button" class="order-card ${cls}" onclick="openOrder(${o.id})" aria-label="פתיחת הזמנה ${escapeHtml(o.order_num)} — ${escapeHtml(o.status)}" style="width:100%;text-align:right;font-family:inherit;color:inherit;${needsApproval?'border:2px solid #f39c12;background:#fffdf5':''}">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div class="order-num">${o.order_num}</div>
-        <span class="status-badge ${badgeCls(o.status)}">${needsApproval?'⏳ '+o.status:o.status}</span>
-      </div>
-      <div class="order-meta">
-        ${date ? `<span>📅 ${date}</span>` : ''}
-        ${site ? `<span>🏗️ ${escapeHtml(site)}</span>` : ''}
-        ${weight ? `<span>⚖️ ${weight}</span>` : ''}
-        ${price  ? `<span style="font-weight:700;color:var(--orange)">💰 ${price}</span>` : ''}
-      </div>
-      ${needsApproval ? `<div style="margin-top:10px;font-size:12px;color:#e07b39;font-weight:700">👆 לחץ לאישור פרטי ההזמנה ושליחה לבדיקה</div>` : ''}
-    </button>`;
+    <div class="order-card-shell">
+      <button type="button" class="order-card ${cls}" onclick="openOrder(${o.id})" aria-label="פתיחת הזמנה ${escapeHtml(o.order_num)} — ${escapeHtml(o.status)}" style="width:100%;text-align:right;font-family:inherit;color:inherit;${needsApproval?'border:2px solid #f39c12;background:#fffdf5':''}">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="order-num">${o.order_num}</div>
+          <span class="status-badge ${badgeCls(o.status)}">${needsApproval?'⏳ '+o.status:o.status}</span>
+        </div>
+        <div class="order-meta">
+          ${date ? `<span>📅 ${date}</span>` : ''}
+          ${site ? `<span>🏗️ ${escapeHtml(site)}</span>` : '<span>🏗️ ללא פרויקט</span>'}
+          ${weight ? `<span>⚖️ ${weight}</span>` : ''}
+          ${price  ? `<span style="font-weight:700;color:var(--orange)">💰 ${price}</span>` : ''}
+        </div>
+        ${needsApproval ? `<div style="margin-top:10px;font-size:12px;color:#e07b39;font-weight:700">👆 לחץ לאישור פרטי ההזמנה ושליחה לבדיקה</div>` : ''}
+      </button>
+      ${canAssignOrdersToProjects() ? `<div class="order-project-assignment"><label>שיוך לפרויקט</label><select aria-label="שיוך הזמנה ${escapeHtml(o.order_num)} לפרויקט" onchange="assignOrderToSite(${o.id},this.value,event)">${portalOrderSiteOptions(o)}</select></div>` : ''}
+    </div>`;
   }).join('');
 }
 
@@ -2318,6 +2370,7 @@ function renderDetail(order) {
         <div class="order-detail-kpi"><span>כמות כוללת</span><strong>${totalQty}</strong></div>
         <div class="order-detail-kpi"><span>משקל</span><strong>${totalWeight ? totalWeight.toFixed(1) + ' ק"ג' : '-'}</strong></div>
       </div>
+      ${canAssignOrdersToProjects() ? `<div class="field" style="margin:12px 0 0"><label for="detailOrderSiteAssign">שיוך ההזמנה לפרויקט</label><select id="detailOrderSiteAssign" onchange="assignOrderToSite(${order.id},this.value,event)">${portalOrderSiteOptions(order)}</select></div>` : (order.site_name ? `<div style="font-size:13px;margin-top:10px">🏗️ פרויקט: ${escapeHtml(order.site_name)}</div>` : '')}
     </div>
 
     <div style="margin:12px 0"><button type="button" class="btn btn-secondary btn-sm" onclick="openPortalOrderPdf(${order.id})">PDF / הדפסת הזמנה</button></div>

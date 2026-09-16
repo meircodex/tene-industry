@@ -1507,6 +1507,37 @@ module.exports = function createPortalRouter(deps) {
     res.json({ success: true, status: projected.status, customerStatus: projected.customerStatus, customerStatusLabel: projected.customerStatusLabel, productionApproved: false });
   });
 
+  router.post('/c/orders/:orderId/site', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.body.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const canAssignOrderSite = Boolean(s.supportPreview || s.role === 'customer_admin' || s.caps.canCreateSites);
+    if (!canAssignOrderSite) return res.status(403).json({ error: 'רק מנהל לקוח יכול לשייך הזמנות לפרויקטים' });
+    const orderId = Number(req.params.orderId || 0);
+    const order = db.prepare('SELECT id,order_num,site_id FROM orders WHERE id=? AND customer_id=?').get(orderId, s.customer.id);
+    if (!order) return res.status(404).json({ error: 'ההזמנה לא נמצאה' });
+    const requestedSiteId = Number(req.body.siteId || 0);
+    let site = null;
+    if (requestedSiteId) {
+      site = db.prepare("SELECT id,name FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')='active'")
+        .get(requestedSiteId, s.customer.id);
+      if (!site) return res.status(400).json({ error: 'הפרויקט אינו פעיל או אינו שייך ללקוח' });
+    }
+    db.prepare('UPDATE orders SET site_id=? WHERE id=? AND customer_id=?').run(site?.id || null, orderId, s.customer.id);
+    db.prepare(`
+      INSERT INTO customer_portal_permission_audit (customer_id,actor_portal_user_id,action,before_json,after_json)
+      VALUES (?,?,?,?,?)
+    `).run(
+      s.customer.id,
+      s.user?.id || null,
+      'customer_order_site_changed',
+      JSON.stringify({ orderId, siteId: order.site_id || null }),
+      JSON.stringify({ orderId, siteId: site?.id || null })
+    );
+    auditSupportAction(s, 'order_site_changed', 'order', orderId, { orderNum: order.order_num, beforeSiteId: order.site_id || null, siteId: site?.id || null });
+    wsBroadcast('order_site_changed', { orderId, orderNum: order.order_num, customerId: s.customer.id, siteId: site?.id || null, siteName: site?.name || null });
+    res.json({ success: true, orderId, siteId: site?.id || null, siteName: site?.name || null });
+  });
+
   function approvalPage(title, msg, success) {
     const color = success ? '#27ae60' : '#e74c3c';
     const icon  = success ? '✅' : '❌';
@@ -1649,6 +1680,7 @@ module.exports.manifest = {
   produces: [
     { event: 'new_order' },
     { event: 'order_status' },
+    { event: 'order_site_changed' },
     { event: 'portal_guarantee_uploaded' },
   ],
 };
