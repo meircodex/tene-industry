@@ -62,6 +62,26 @@ test('support preview fails closed after selected portal user is deactivated', (
   db.close();
 });
 
+test('portal links prefer the active request host over stale deployment settings', () => {
+  const previousBaseUrl = process.env.BASE_URL;
+  process.env.BASE_URL = 'https://old-deployment.example';
+  const { db, access } = fixture();
+  try {
+    assert.equal(
+      access.portalLink('abc 123', { baseUrl: 'https://active-deployment.example/' }),
+      'https://active-deployment.example/customer.html?token=abc%20123'
+    );
+    assert.equal(
+      access.configuredBaseUrl('https://active-deployment.example/'),
+      'https://active-deployment.example'
+    );
+  } finally {
+    if (previousBaseUrl === undefined) delete process.env.BASE_URL;
+    else process.env.BASE_URL = previousBaseUrl;
+    db.close();
+  }
+});
+
 test('blocked site budget rejects projected overrun and view-only cannot write budget', () => {
   const { db } = fixture();
   db.prepare("INSERT INTO customer_sites (id,customer_id,name,status,budget_amount,budget_kg,block_over_budget) VALUES (20,1,'Budget','active',10,1,1)").run();

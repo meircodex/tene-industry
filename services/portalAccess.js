@@ -15,8 +15,11 @@ function createPortalAccessService(deps) {
   // BUG-41: limited projection - never return sensitive fields via portal resolver.
   const CUSTOMER_PORTAL_COLS = 'id,name,phone,email,address,tax_id,payment_terms,contact_name,contact_phone,portal_price_list_visibility,portal_can_manage_users,portal_can_create_sites,portal_can_set_budgets,portal_can_expose_prices,portal_token,portal_token_expires_at,portal_token_revoked_at,price_tier,discount_pct,price_approved_at,portal_profile_locked_at';
 
-  function configuredBaseUrl(fallback = '') {
-    const raw = String(process.env.BASE_URL || settingsService.get('BASE_URL', '') || fallback || '').trim();
+  function configuredBaseUrl(requestBaseUrl = '') {
+    // When a link is generated from an HTTP request, keep it on the same public
+    // host that the manager is currently using. This prevents a stale BASE_URL
+    // setting from sending customers to an older deployment.
+    const raw = String(requestBaseUrl || process.env.BASE_URL || settingsService.get('BASE_URL', '') || '').trim();
     return raw.replace(/\/+$/, '');
   }
 
