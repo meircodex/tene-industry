@@ -174,7 +174,7 @@ function createPortalAccessService(deps) {
       rows = db.prepare(`
         SELECT id,customer_id,name,address,city,status,manager_name,manager_phone,budget_amount,budget_kg,alert_pct,block_over_budget
         FROM customer_sites
-        WHERE customer_id=? AND COALESCE(status,'active')<>'inactive'
+        WHERE customer_id=? AND COALESCE(status,'active')='active'
         ORDER BY name
       `).all(customerId);
     } else {
@@ -183,13 +183,13 @@ function createPortalAccessService(deps) {
                s.budget_amount,s.budget_kg,s.alert_pct,s.block_over_budget,su.is_default
         FROM customer_sites s
         JOIN customer_site_users su ON su.site_id=s.id AND su.portal_user_id=?
-        WHERE s.customer_id=? AND COALESCE(s.status,'active')<>'inactive'
+        WHERE s.customer_id=? AND COALESCE(s.status,'active')='active'
         ORDER BY su.is_default DESC, s.name
       `).all(portalUser.id, customerId);
       if (!rows.length && (portalUser.default_site_id || 0)) {
         const row = db.prepare(`
           SELECT id,customer_id,name,address,city,status,manager_name,manager_phone,budget_amount,budget_kg,alert_pct,block_over_budget
-          FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')<>'inactive'
+          FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')='active'
         `).get(portalUser.default_site_id, customerId);
         rows = row ? [row] : [];
       }

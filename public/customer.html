@@ -105,9 +105,25 @@
     .orders-toolbar label{font-size:12px;font-weight:800;color:var(--dim)}
     .orders-toolbar select{width:auto;min-width:190px;padding:8px 10px;font-size:13px}
     .site-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
-    .site-summary-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:13px;text-align:right;font-family:inherit;color:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(18,35,63,.05)}
+    .site-card-shell{background:#fff;border:1.5px solid var(--border);border-radius:14px;box-shadow:0 3px 12px rgba(18,35,63,.05);overflow:hidden}
+    .site-summary-card{background:#fff;border:0;border-radius:0;padding:13px;text-align:right;font-family:inherit;color:inherit;cursor:pointer;width:100%}
     .site-summary-card:hover{border-color:var(--orange);transform:translateY(-1px)}
     .site-summary-card .site-address{display:block;color:var(--dim);font-size:12px;margin-top:3px}
+    .site-card-actions{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--border);background:#fafbfd}
+    .site-card-actions .btn{width:auto;margin:0;min-height:34px;padding:6px 10px}
+    .site-archive{margin-top:16px;border-top:1px solid var(--border);padding-top:14px}
+    .site-archive summary{cursor:pointer;font-weight:800;color:var(--dark);padding:8px 0}
+    .site-archive-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--border)}
+    .site-archive-row small{display:block;color:var(--dim);margin-top:3px}
+    .site-status-badge{display:inline-flex;padding:3px 8px;border-radius:99px;background:#eef2f6;color:var(--dim);font-size:11px;font-weight:800;margin-inline-start:6px}
+    .site-status-badge.deleted{background:#fdecea;color:var(--red)}
+    .site-contacts-dialog{border:0;border-radius:18px;padding:0;width:min(620px,calc(100vw - 28px));max-height:85vh;box-shadow:0 24px 70px rgba(18,35,63,.28);margin:auto}
+    .site-contacts-dialog::backdrop{background:rgba(18,35,63,.48)}
+    .site-contacts-content{padding:20px;direction:rtl}
+    .site-contact-list{display:grid;gap:8px;max-height:44vh;overflow:auto;margin:12px 0;padding:2px}
+    .site-contact-option{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;border:1px solid var(--border);border-radius:11px;padding:10px;background:#fff;cursor:pointer}
+    .site-contact-option input{width:18px;height:18px}
+    .site-contact-option small{display:block;color:var(--dim);margin-top:2px}
     .site-management-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:10px;align-items:end;margin:12px 0}
     .site-management-toolbar .field{margin:0}
     .site-management-toolbar .btn{width:auto;margin:0;white-space:nowrap}
@@ -528,6 +544,7 @@ let SHAPES = [];
 let PRICE_LIST = {};  // {diameter: price_per_kg}
 let PRICE_LIST_DOCUMENT = null;
 let PORTAL_SITES = [];
+let PORTAL_SITE_ARCHIVE = [];
 let PORTAL_DEFAULT_SITE_ID = null;
 let PORTAL_CAN_CHOOSE_SITE = false;
 let PORTAL_USER = null;
@@ -769,19 +786,36 @@ function renderCustomerSitesPanel() {
     ? `<div class="section-heading"><h3>בחר אתר לצפייה</h3><span>${PORTAL_SITES.length} אתרים</span></div><div class="site-summary-grid">${PORTAL_SITES.map(site => {
       const summary = PORTAL_SITE_SUMMARIES[Number(site.id)] || {};
       return `
-      <button type="button" class="site-summary-card" onclick="openSiteDetail(${site.id})">
-        <b>${escapeHtml(site.name)}</b>
-        <span class="site-address">${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')}</span>
-        <span class="site-address">${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</span>
-        <span class="site-summary-metrics">
-          <span>הזמנות<b>${Number(summary.order_count || 0)}</b></span>
-          <span>הוזמן<b>${formatKg(summary.ordered_kg || 0)}</b></span>
-          <span>לחיוב<b>${formatKg(summary.billing_kg || 0)}</b></span>
-          <span class="${summary.pending_approval_count ? 'attention' : ''}">ממתין לאישור<b>${Number(summary.pending_approval_count || 0)}</b></span>
-        </span>
-      </button>`;
+      <div class="site-card-shell">
+        <button type="button" class="site-summary-card" onclick="openSiteDetail(${site.id})">
+          <b>${escapeHtml(site.name)}</b>
+          <span class="site-address">${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')}</span>
+          <span class="site-address">${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</span>
+          <span class="site-summary-metrics">
+            <span>הזמנות<b>${Number(summary.order_count || 0)}</b></span>
+            <span>הוזמן<b>${formatKg(summary.ordered_kg || 0)}</b></span>
+            <span>לחיוב<b>${formatKg(summary.billing_kg || 0)}</b></span>
+            <span class="${summary.pending_approval_count ? 'attention' : ''}">ממתין לאישור<b>${Number(summary.pending_approval_count || 0)}</b></span>
+          </span>
+        </button>
+        ${(PORTAL_CAPS.canCreateSites || canAssignUsers) ? `<div class="site-card-actions">
+          ${canAssignUsers ? `<button class="btn btn-secondary btn-sm" type="button" onclick="openSiteContacts(${site.id})">אנשי קשר</button>` : ''}
+          ${PORTAL_CAPS.canCreateSites ? `<button class="btn btn-secondary btn-sm" type="button" onclick="setPortalSiteStatus(${site.id},'completed')">סיים אתר</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="setPortalSiteStatus(${site.id},'deleted')">מחק</button>` : ''}
+        </div>` : ''}
+      </div>`;
     }).join('')}</div>`
     : '<div class="empty-state"><strong>עדיין אין אתרים ללקוח</strong><span>הוסף אתר ראשון, ולאחר מכן ניתן להזמין מנהל עבודה ולשייך אותו לאתר.</span></div>';
+  const archive = PORTAL_SITE_ARCHIVE.length ? `
+    <details class="site-archive">
+      <summary>ארכיון אתרים (${PORTAL_SITE_ARCHIVE.length})</summary>
+      ${PORTAL_SITE_ARCHIVE.map(site => `<div class="site-archive-row">
+        <div><b>${escapeHtml(site.name)}</b><span class="site-status-badge ${site.status === 'deleted' ? 'deleted' : ''}">${site.status === 'deleted' ? 'נמחק' : 'הסתיים'}</span>
+          <small>${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')} · ${Number(site.order_count || 0)} הזמנות · ${Number(site.contact_count || 0)} אנשי קשר</small>
+        </div>
+        ${PORTAL_CAPS.canCreateSites ? `<button class="btn btn-secondary btn-sm" type="button" onclick="setPortalSiteStatus(${site.id},'active')">שחזר אתר</button>` : '<span class="site-status-badge">לצפייה בלבד</span>'}
+      </div>`).join('')}
+    </details>` : '';
   const usersBySite = new Map();
   PORTAL_USER_ASSIGNMENTS.forEach(row => {
     const key = Number(row.portal_user_id);
@@ -875,6 +909,7 @@ function renderCustomerSitesPanel() {
       <button class="btn btn-primary btn-sm" type="button" onclick="togglePortalUserForm(true)" ${PORTAL_SITES.length ? '' : 'disabled title="יש להוסיף אתר לפני הזמנת מנהל עבודה"'}>+ הוסף מנהל עבודה</button>
     </div>` : ''}
     <div class="guarantee-list">${list}</div>
+    ${archive}
     ${form}
     ${userForm}
   `;
@@ -985,6 +1020,89 @@ async function loadPortalUsers() {
   PORTAL_DEVICES = Array.isArray(deviceData?.devices) ? deviceData.devices : [];
 }
 
+async function loadSiteArchive() {
+  if ((!PORTAL_CAPS.canCreateSites && !PORTAL_CAPS.canManageUsers) || !TOKEN) {
+    PORTAL_SITE_ARCHIVE = [];
+    return;
+  }
+  const data = await fetch(`/api/c/sites-archive?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()).catch(() => null);
+  PORTAL_SITE_ARCHIVE = Array.isArray(data?.sites) ? data.sites : [];
+}
+
+async function setPortalSiteStatus(siteId, status) {
+  const messages = {
+    completed: 'לסיים את האתר ולהעביר אותו לארכיון? ההזמנות והנתונים יישמרו.',
+    deleted: 'למחוק את האתר? המחיקה בטוחה והפיכה, והיא אפשרית רק אם אין באתר הזמנות.',
+    active: 'לשחזר את האתר ולהחזיר אותו לרשימת האתרים הפעילים?',
+  };
+  if (!confirm(messages[status] || 'לעדכן את מצב האתר?')) return;
+  const response = await fetch(`/api/c/sites/${siteId}/status`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token:TOKEN, status }),
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
+  if (!response || !response.ok || !response.data?.success) {
+    toast(response?.data?.error || 'לא ניתן לעדכן את האתר', true);
+    return;
+  }
+  toast(status === 'active' ? 'האתר שוחזר' : (status === 'completed' ? 'האתר הועבר לארכיון' : 'האתר נמחק והועבר לארכיון'));
+  await showHome();
+  setHomeSection('sites');
+}
+
+function closeSiteContacts() {
+  document.getElementById('siteContactsDialog')?.close();
+}
+
+function toggleAllSiteContacts(checked) {
+  document.querySelectorAll('#siteContactsDialog input[name="siteContactUser"]').forEach(input => { input.checked = Boolean(checked); });
+}
+
+async function openSiteContacts(siteId) {
+  const data = await fetch(`/api/c/sites/${siteId}/contacts?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()).catch(() => null);
+  if (!data || data.error) { toast(data?.error || 'לא ניתן לטעון אנשי קשר', true); return; }
+  let dialog = document.getElementById('siteContactsDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'siteContactsDialog';
+    dialog.className = 'site-contacts-dialog';
+    document.body.appendChild(dialog);
+  }
+  const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+  const selectedCount = contacts.filter(contact => contact.selected).length;
+  dialog.innerHTML = `<div class="site-contacts-content">
+    <div class="site-detail-head"><div><h2>אנשי קשר — ${escapeHtml(data.site?.name || 'אתר')}</h2><p>סמן כל איש קשר שצריך גישה לאתר, או בחר את כולם.</p></div><button class="btn btn-secondary btn-sm" type="button" onclick="closeSiteContacts()">סגור</button></div>
+    ${contacts.length ? `<label class="site-contact-option"><input type="checkbox" ${selectedCount === contacts.length ? 'checked' : ''} onchange="toggleAllSiteContacts(this.checked)"><span><b>בחר את כולם</b><small>${contacts.length} אנשי קשר פעילים במערכת</small></span></label>
+      <div class="site-contact-list">${contacts.map(contact => `<label class="site-contact-option"><input type="checkbox" name="siteContactUser" value="${contact.id}" ${contact.selected ? 'checked' : ''}><span><b>${escapeHtml(contact.name || contact.phone)}</b><small>${escapeHtml(contact.phone || '')} · ${escapeHtml(portalRoleLabel(contact.role))}</small></span></label>`).join('')}</div>`
+      : '<div class="empty-state"><strong>עדיין אין אנשי קשר במערכת</strong><span>הוסף איש קשר חדש והוא ישויך אוטומטית לאתר.</span></div>'}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <button class="btn btn-primary btn-sm" style="width:auto;margin:0" type="button" onclick="saveSiteContacts(${siteId},event)">שמור אנשי קשר</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="closeSiteContacts();inviteManagerForSite(${siteId})">+ איש קשר חדש</button>
+    </div>
+  </div>`;
+  dialog.showModal();
+}
+
+async function saveSiteContacts(siteId, event) {
+  const btn = event?.currentTarget;
+  const portalUserIds = [...document.querySelectorAll('#siteContactsDialog input[name="siteContactUser"]:checked')].map(input => Number(input.value));
+  setButtonBusy(btn, true, 'שומר...');
+  const response = await fetch(`/api/c/sites/${siteId}/contacts`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token:TOKEN, portalUserIds }),
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
+  if (!response || !response.ok || !response.data?.success) {
+    setButtonBusy(btn, false);
+    toast(response?.data?.error || 'לא ניתן לשמור אנשי קשר', true);
+    return;
+  }
+  closeSiteContacts();
+  await loadPortalUsers();
+  renderCustomerSitesPanel();
+  toast('אנשי הקשר באתר נשמרו');
+}
+
 async function loadSiteSummaries() {
   if (!PORTAL_SITES.length || !TOKEN) { PORTAL_SITE_SUMMARIES = {}; return; }
   const entries = await Promise.all(PORTAL_SITES.map(async site => {
@@ -1019,7 +1137,7 @@ function renderSiteDetail(data) {
   host.innerHTML = `
     <div class="site-detail-head">
       <div><h2>${escapeHtml(site.name || 'אתר')}</h2><p>${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')} · ${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</p></div>
-      ${PORTAL_CAPS.canManageUsers ? `<button type="button" class="btn btn-primary btn-sm" style="width:auto;margin:0" onclick="inviteManagerForSite(${site.id})">+ הזמן מנהל עבודה</button>` : ''}
+      ${PORTAL_CAPS.canManageUsers ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-secondary btn-sm" style="width:auto;margin:0" onclick="openSiteContacts(${site.id})">נהל אנשי קשר</button><button type="button" class="btn btn-primary btn-sm" style="width:auto;margin:0" onclick="inviteManagerForSite(${site.id})">+ הזמן מנהל עבודה / איש קשר</button></div>` : ''}
     </div>
     <div class="site-detail-kpis">
       <div class="site-detail-kpi"><span>מספר הזמנות</span><strong>${Number(data.order_count || 0)}</strong></div>
@@ -1512,6 +1630,7 @@ async function showHome(preloaded) {
   }
   await Promise.all([
     loadPortalUsers().catch(() => {}),
+    loadSiteArchive().catch(() => {}),
     loadSiteSummaries().catch(() => {}),
   ]);
   syncCustomerSitesPanel();

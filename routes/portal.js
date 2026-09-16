@@ -782,6 +782,30 @@ module.exports = function createPortalRouter(deps) {
     });
   });
 
+  router.get('/c/sites-archive', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!s.caps.canCreateSites && !s.caps.canManageUsers) {
+      return res.status(403).json({ error: 'אין הרשאה לצפות בארכיון האתרים' });
+    }
+    const sites = db.prepare(`
+      SELECT cs.id,cs.customer_id,cs.name,cs.address,cs.city,cs.status,cs.manager_name,cs.manager_phone,
+             cs.updated_at,COUNT(DISTINCT o.id) AS order_count,COUNT(DISTINCT su.portal_user_id) AS contact_count
+      FROM customer_sites cs
+      LEFT JOIN orders o ON o.site_id=cs.id AND o.customer_id=cs.customer_id
+      LEFT JOIN customer_site_users su ON su.site_id=cs.id AND su.customer_id=cs.customer_id
+      WHERE cs.customer_id=? AND COALESCE(cs.status,'active')<>'active'
+      GROUP BY cs.id
+      ORDER BY cs.updated_at DESC,cs.id DESC
+    `).all(s.customer.id).map(site => ({
+      ...site,
+      status: site.status === 'deleted' ? 'deleted' : 'completed',
+      order_count: Number(site.order_count || 0),
+      contact_count: Number(site.contact_count || 0),
+    }));
+    res.json({ sites });
+  });
+
   router.post('/c/sites', customerPortalActionLimiter, (req, res) => {
     const s = session(req.body.token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
@@ -825,6 +849,107 @@ module.exports = function createPortalRouter(deps) {
     `).run(s.customer.id, s.user?.id || null, 'customer_created_site', JSON.stringify({ siteId, name }));
     auditSupportAction(s, 'site_created', 'customer_site', siteId, { name, city: f.city || null, address: f.address || null });
     res.json({ success: true, id: siteId });
+  });
+
+  router.post('/c/sites/:siteId/status', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.body.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!s.caps.canCreateSites) return res.status(403).json({ error: 'אין הרשאה לנהל את מחזור חיי האתר' });
+    const siteId = Number(req.params.siteId || 0);
+    const site = db.prepare('SELECT * FROM customer_sites WHERE id=? AND customer_id=?').get(siteId, s.customer.id);
+    if (!site) return res.status(404).json({ error: 'האתר לא נמצא' });
+    const status = String(req.body.status || '').trim();
+    if (!['active', 'completed', 'deleted'].includes(status)) {
+      return res.status(400).json({ error: 'סטטוס אתר לא תקין' });
+    }
+    const orderCount = Number(db.prepare('SELECT COUNT(*) AS c FROM orders WHERE customer_id=? AND site_id=?').get(s.customer.id, siteId)?.c || 0);
+    if (status === 'deleted' && orderCount > 0) {
+      return res.status(409).json({ error: 'לא ניתן למחוק אתר שיש בו הזמנות. אפשר לסיים אותו ולהעביר לארכיון.' });
+    }
+    db.prepare('UPDATE customer_sites SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND customer_id=?')
+      .run(status, siteId, s.customer.id);
+    db.prepare(`
+      INSERT INTO customer_portal_permission_audit (customer_id,actor_portal_user_id,action,before_json,after_json)
+      VALUES (?,?,?,?,?)
+    `).run(s.customer.id, s.user?.id || null, 'customer_site_status_changed', JSON.stringify({ status: site.status || 'active' }), JSON.stringify({ status, orderCount }));
+    auditSupportAction(s, 'site_status_changed', 'customer_site', siteId, { before: site.status || 'active', status, orderCount });
+    res.json({ success: true, id: siteId, status, orderCount });
+  });
+
+  router.get('/c/sites/:siteId/contacts', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!s.caps.canManageUsers && !s.caps.canAssignSiteUsers) {
+      return res.status(403).json({ error: 'אין הרשאה לנהל אנשי קשר באתר' });
+    }
+    const siteId = Number(req.params.siteId || 0);
+    const site = db.prepare("SELECT id,name,status FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')='active'")
+      .get(siteId, s.customer.id);
+    if (!site) return res.status(404).json({ error: 'האתר הפעיל לא נמצא' });
+    const contacts = db.prepare(`
+      SELECT pu.id,pu.name,pu.phone,pu.email,pu.role,pu.active,
+             CASE WHEN su.id IS NULL THEN 0 ELSE 1 END AS selected,
+             COALESCE(su.is_default,0) AS is_default
+      FROM portal_users pu
+      LEFT JOIN customer_site_users su ON su.portal_user_id=pu.id AND su.site_id=? AND su.customer_id=pu.customer_id
+      WHERE pu.customer_id=? AND pu.active=1
+      ORDER BY selected DESC,pu.name,pu.phone
+    `).all(siteId, s.customer.id).map(row => ({ ...portalSafeUserRow(row), selected: Boolean(row.selected), is_default: Boolean(row.is_default) }));
+    res.json({ site, contacts });
+  });
+
+  router.put('/c/sites/:siteId/contacts', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.body.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!s.caps.canManageUsers && !s.caps.canAssignSiteUsers) {
+      return res.status(403).json({ error: 'אין הרשאה לנהל אנשי קשר באתר' });
+    }
+    const siteId = Number(req.params.siteId || 0);
+    const site = db.prepare("SELECT id,name FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')='active'")
+      .get(siteId, s.customer.id);
+    if (!site) return res.status(404).json({ error: 'האתר הפעיל לא נמצא' });
+    const rawIds = Array.isArray(req.body.portalUserIds) ? req.body.portalUserIds : [];
+    const portalUserIds = [...new Set(rawIds.map(Number).filter(id => Number.isInteger(id) && id > 0))];
+    const users = portalUserIds.length ? db.prepare(`
+      SELECT id,default_site_id FROM portal_users
+      WHERE customer_id=? AND active=1 AND id IN (${portalUserIds.map(() => '?').join(',')})
+    `).all(s.customer.id, ...portalUserIds) : [];
+    if (users.length !== portalUserIds.length) {
+      return res.status(400).json({ error: 'אחד מאנשי הקשר אינו פעיל או אינו שייך ללקוח' });
+    }
+    const beforeIds = db.prepare('SELECT portal_user_id FROM customer_site_users WHERE customer_id=? AND site_id=?')
+      .all(s.customer.id, siteId).map(row => Number(row.portal_user_id));
+    const saveContacts = db.transaction(() => {
+      db.prepare('DELETE FROM customer_site_users WHERE customer_id=? AND site_id=?').run(s.customer.id, siteId);
+      const insert = db.prepare('INSERT INTO customer_site_users (customer_id,site_id,portal_user_id,is_default) VALUES (?,?,?,?)');
+      users.forEach(user => {
+        const hasActiveDefault = user.default_site_id ? db.prepare("SELECT 1 FROM customer_sites WHERE id=? AND customer_id=? AND COALESCE(status,'active')='active'")
+          .get(user.default_site_id, s.customer.id) : null;
+        const makeDefault = !hasActiveDefault || Number(user.default_site_id) === siteId ? 1 : 0;
+        insert.run(s.customer.id, siteId, user.id, makeDefault);
+        if (makeDefault) db.prepare('UPDATE portal_users SET default_site_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND customer_id=?').run(siteId, user.id, s.customer.id);
+      });
+      const removedIds = beforeIds.filter(id => !portalUserIds.includes(id));
+      removedIds.forEach(userId => {
+        const user = db.prepare('SELECT default_site_id FROM portal_users WHERE id=? AND customer_id=?').get(userId, s.customer.id);
+        if (Number(user?.default_site_id) !== siteId) return;
+        const fallback = db.prepare(`
+          SELECT su.site_id FROM customer_site_users su
+          JOIN customer_sites cs ON cs.id=su.site_id
+          WHERE su.customer_id=? AND su.portal_user_id=? AND COALESCE(cs.status,'active')='active'
+          ORDER BY su.is_default DESC,cs.name LIMIT 1
+        `).get(s.customer.id, userId);
+        db.prepare('UPDATE portal_users SET default_site_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND customer_id=?')
+          .run(fallback?.site_id || null, userId, s.customer.id);
+      });
+    });
+    saveContacts();
+    db.prepare(`
+      INSERT INTO customer_portal_permission_audit (customer_id,actor_portal_user_id,action,before_json,after_json)
+      VALUES (?,?,?,?,?)
+    `).run(s.customer.id, s.user?.id || null, 'customer_site_contacts_changed', JSON.stringify({ siteId, portalUserIds: beforeIds }), JSON.stringify({ siteId, portalUserIds }));
+    auditSupportAction(s, 'site_contacts_changed', 'customer_site', siteId, { beforeIds, portalUserIds });
+    res.json({ success: true, siteId, portalUserIds });
   });
 
   router.get('/c/sites/:siteId/summary', customerPortalActionLimiter, (req, res) => {

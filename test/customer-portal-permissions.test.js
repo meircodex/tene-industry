@@ -55,7 +55,7 @@ test('authorized-site resolution rejects no-site and cross-site access', () => {
 
 test('customer admin always receives every customer site while field users remain assigned-site scoped', () => {
   const { db, access } = fixture();
-  db.prepare("INSERT INTO customer_sites (id,customer_id,name,status) VALUES (10,1,'A','active'),(11,1,'B','active')").run();
+  db.prepare("INSERT INTO customer_sites (id,customer_id,name,status) VALUES (10,1,'A','active'),(11,1,'B','active'),(12,1,'Archived','completed')").run();
   const adminId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'05031','Admin','customer_admin',1)").run().lastInsertRowid;
   const managerId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'05032','Manager','field_manager',1)").run().lastInsertRowid;
   db.prepare('INSERT INTO customer_site_users (customer_id,site_id,portal_user_id,is_default) VALUES (1,10,?,1)').run(managerId);
@@ -207,6 +207,25 @@ test('HTTP portal enforces delegated flags and cross-site order access', async (
   assert.equal(reportResponse.status, 200);
   assert.match(reportResponse.headers.get('content-type') || '', /text\/csv/);
   assert.match(await reportResponse.text(), /HTTP-1/);
+  const savedContacts = await call(`/api/c/sites/${siteA}/contacts`, { method: 'PUT', headers, body: JSON.stringify({ token: signedIn.body.token, portalUserIds: [delegated.id, otherId] }) });
+  assert.equal(savedContacts.response.status, 200, JSON.stringify(savedContacts.body));
+  assert.deepEqual(savedContacts.body.portalUserIds.sort((a, b) => a - b), [Number(delegated.id), Number(otherId)].sort((a, b) => a - b));
+  const contacts = await call(`/api/c/sites/${siteA}/contacts?token=${encodeURIComponent(signedIn.body.token)}`);
+  assert.equal(contacts.response.status, 200, JSON.stringify(contacts.body));
+  assert.equal(contacts.body.contacts.filter(row => row.selected).length, 2);
+  const completed = await call(`/api/c/sites/${siteA}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'completed' }) });
+  assert.equal(completed.response.status, 200, JSON.stringify(completed.body));
+  const activeSites = await call(`/api/c/sites?token=${encodeURIComponent(signedIn.body.token)}`);
+  assert.ok(!activeSites.body.sites.some(site => Number(site.id) === Number(siteA)));
+  const archive = await call(`/api/c/sites-archive?token=${encodeURIComponent(signedIn.body.token)}`);
+  assert.ok(archive.body.sites.some(site => Number(site.id) === Number(siteA) && site.status === 'completed'));
+  const restored = await call(`/api/c/sites/${siteA}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'active' }) });
+  assert.equal(restored.response.status, 200, JSON.stringify(restored.body));
+  const cannotDeleteUsed = await call(`/api/c/sites/${siteB}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'deleted' }) });
+  assert.equal(cannotDeleteUsed.response.status, 409);
+  const emptySite = db.prepare("INSERT INTO customer_sites(customer_id,name,status) VALUES (?, 'Empty','active')").run(customerId).lastInsertRowid;
+  const deletedEmpty = await call(`/api/c/sites/${emptySite}/status`, { method: 'POST', headers, body: JSON.stringify({ token: signedIn.body.token, status: 'deleted' }) });
+  assert.equal(deletedEmpty.response.status, 200, JSON.stringify(deletedEmpty.body));
   const bcrypt = require('bcryptjs');
   db.prepare('UPDATE portal_users SET password_hash=? WHERE id=?').run(bcrypt.hashSync('Initial-password-42', 4), delegated.id);
   const passwordStart = await call('/api/c/auth/password', { method: 'POST', headers, body: JSON.stringify({ phone: '0512', password: 'Initial-password-42' }) });
