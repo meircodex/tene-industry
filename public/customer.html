@@ -97,6 +97,30 @@
     .section-heading span{font-size:12px;color:var(--dim)}
     .empty-state{background:#fff;border:1px dashed #bdc8d4;border-radius:14px;padding:26px;text-align:center;color:var(--dim)}
     .empty-state strong{display:block;color:var(--dark);margin-bottom:5px}
+    .approval-center{display:none;background:#fffaf0;border:2px solid #efc277;border-radius:16px;padding:14px;margin-bottom:14px;box-shadow:0 5px 16px rgba(168,90,0,.08)}
+    .approval-center.show{display:block}
+    .approval-center-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px}
+    .approval-center-head strong{font-size:16px;color:#8a4b00}
+    .orders-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .orders-toolbar label{font-size:12px;font-weight:800;color:var(--dim)}
+    .orders-toolbar select{width:auto;min-width:190px;padding:8px 10px;font-size:13px}
+    .site-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}
+    .site-summary-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:13px;text-align:right;font-family:inherit;color:inherit;cursor:pointer;box-shadow:0 3px 12px rgba(18,35,63,.05)}
+    .site-summary-card:hover{border-color:var(--orange);transform:translateY(-1px)}
+    .site-summary-card .site-address{display:block;color:var(--dim);font-size:12px;margin-top:3px}
+    .site-summary-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
+    .site-summary-metrics span{background:#f6f9fc;border-radius:8px;padding:7px;font-size:11px;color:var(--dim)}
+    .site-summary-metrics b{display:block;color:var(--dark);font-size:13px;margin-top:2px}
+    .site-summary-metrics .attention{background:#fff4e8;color:#9b5500}
+    #screenSiteDetail{max-width:900px}
+    .site-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px}
+    .site-detail-head p{font-size:13px;color:var(--dim);margin-top:4px}
+    .site-detail-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+    .site-detail-kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:11px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+    .site-detail-kpi span{display:block;color:var(--dim);font-size:11px;font-weight:800}
+    .site-detail-kpi strong{display:block;font-size:17px;margin-top:4px}
+    .site-report-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:14px}
+    .site-report-toolbar .field{margin:0;min-width:150px;flex:1}
 
     .order-card{background:#fff;border:0;border-radius:14px;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:10px;cursor:pointer;border-right:4px solid transparent}
     .order-card.status-pending{border-right-color:#f39c12}
@@ -250,7 +274,7 @@
     .loader{text-align:center;padding:40px;color:var(--dim);font-size:14px}
 
     @media(min-width:600px){.shapes-grid{grid-template-columns:repeat(4,1fr)}}
-    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}}
+    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:430px){.portal-action-grid{grid-template-columns:1fr}.portal-stepper{grid-template-columns:1fr}.screen{padding:14px}.portal-home-tabs{gap:6px}.support-preview-banner{position:relative;top:auto}.support-preview-description{display:none}}
   </style>
 <link rel="stylesheet" href="/theme.css">
@@ -356,7 +380,12 @@
   </nav>
 
   <section class="portal-home-section active" role="tabpanel" id="homeSectionOrders">
+    <div id="portalApprovalCenter" class="approval-center"></div>
     <div class="section-heading"><h3>הזמנות אחרונות</h3><span id="ordersCount"></span></div>
+    <div class="orders-toolbar">
+      <label for="portalOrdersSiteFilter">סינון לפי אתר</label>
+      <select id="portalOrdersSiteFilter" onchange="applyPortalOrderSiteFilter()"><option value="">כל האתרים</option></select>
+    </div>
     <div id="ordersList"><div class="loader">טוען...</div></div>
   </section>
 
@@ -474,6 +503,12 @@
   <div id="detailContent"><div class="loader">טוען...</div></div>
 </div>
 
+<!-- ══ SITE DETAIL SCREEN ══ -->
+<div class="screen" id="screenSiteDetail">
+  <button class="back-btn" onclick="showHome(PORTAL_ORDERS)">← חזרה לפרויקטים</button>
+  <div id="siteDetailContent"><div class="loader">טוען אתר...</div></div>
+</div>
+
 <script src="/rebar-weights.js"></script>
 <script src="/display-units.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
@@ -499,6 +534,10 @@ let PORTAL_USERS = [];
 let PORTAL_USER_ASSIGNMENTS = [];
 let PORTAL_DEVICES = [];
 let PORTAL_ORDERS = [];
+let PORTAL_SITE_SUMMARIES = {};
+let PORTAL_ORDER_SITE_FILTER = '';
+let PORTAL_ACTIVE_SITE_ID = null;
+let PORTAL_INVITE_MESSAGE = '';
 let SUPPORT_PREVIEW = false;
 let SUPPORT_PREVIEW_EXPIRES_AT = null;
 let SUPPORT_ACTOR_USER_ID = null;
@@ -721,12 +760,21 @@ function renderCustomerSitesPanel() {
   const canManageUsers = Boolean(PORTAL_CAPS.canManageUsers);
   const canAssignUsers = Boolean(PORTAL_CAPS.canAssignSiteUsers || PORTAL_CAPS.canManageUsers);
   const list = PORTAL_SITES.length
-    ? PORTAL_SITES.map(site => `
-      <div class="guarantee-row">
-        <div><b>${escapeHtml(site.name)}</b><br><span>${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')}</span></div>
-        <span>${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</span>
-      </div>
-    `).join('')
+    ? `<div class="site-summary-grid">${PORTAL_SITES.map(site => {
+      const summary = PORTAL_SITE_SUMMARIES[Number(site.id)] || {};
+      return `
+      <button type="button" class="site-summary-card" onclick="openSiteDetail(${site.id})">
+        <b>${escapeHtml(site.name)}</b>
+        <span class="site-address">${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')}</span>
+        <span class="site-address">${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</span>
+        <span class="site-summary-metrics">
+          <span>הזמנות<b>${Number(summary.order_count || 0)}</b></span>
+          <span>הוזמן<b>${formatKg(summary.ordered_kg || 0)}</b></span>
+          <span>לחיוב<b>${formatKg(summary.billing_kg || 0)}</b></span>
+          <span class="${summary.pending_approval_count ? 'attention' : ''}">ממתין לאישור<b>${Number(summary.pending_approval_count || 0)}</b></span>
+        </span>
+      </button>`;
+    }).join('')}</div>`
     : '<div class="loader" style="padding:12px">אין פרויקטים עדיין. לחץ על פרויקט חדש כדי לפתוח אתר עבודה.</div>';
   const siteOptions = PORTAL_SITES.map(site => `<option value="${site.id}">${escapeHtml(site.name)}${site.city ? ' - ' + escapeHtml(site.city) : ''}</option>`).join('');
   const usersBySite = new Map();
@@ -770,8 +818,11 @@ function renderCustomerSitesPanel() {
       <div id="portalInviteResult" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#f7fafc">
         <b>קישור הפעלה חד-פעמי — תקף ל-5 דקות</b>
         <div class="portal-code-row" style="margin-top:8px"><input id="portalInviteLink" readonly><button class="btn btn-secondary btn-sm" type="button" onclick="copyPortalInvite()">העתק</button></div>
+        <textarea id="portalInviteMessage" rows="5" readonly style="margin-top:8px"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-secondary btn-sm" type="button" onclick="copyPortalInviteMessage()">העתק הודעה</button><button class="btn btn-secondary btn-sm" type="button" onclick="openPortalInviteWhatsApp()">פתח ב-WhatsApp</button></div>
       </div>
-      <div id="newPortalUserForm" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" type="button" onclick="togglePortalUserForm(true)" style="margin-top:12px">+ הזמן מנהל עבודה</button>
+      <div id="newPortalUserForm" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <input id="portalUserName" placeholder="שם משתמש" />
         <input id="portalUserPhone" placeholder="טלפון לכניסה" />
         <select id="portalUserRole" onchange="syncPortalUserRoleDefaults()">
@@ -803,6 +854,7 @@ function renderCustomerSitesPanel() {
       <div class="field" style="grid-column:1/-1;margin:0"><label for="newSiteAddress">כתובת אתר</label><input id="newSiteAddress" autocomplete="street-address" /></div>
       <div class="field" style="margin:0"><label for="newSiteManagerName">איש קשר באתר</label><input id="newSiteManagerName" autocomplete="name" /></div>
       <div class="field" style="margin:0"><label for="newSiteManagerPhone">טלפון איש קשר</label><input id="newSiteManagerPhone" inputmode="tel" autocomplete="tel" /></div>
+      ${PORTAL_CAPS.canSetBudget ? '<div class="field" style="grid-column:1/-1;margin:0"><label for="newSiteBudgetKg">תקציב משקל (ק״ג)</label><input id="newSiteBudgetKg" type="number" min="0" step="1" inputmode="decimal" placeholder="לדוגמה 50000" /></div>' : ''}
       <button class="btn btn-primary" id="createSiteBtn" style="grid-column:1/-1;margin-top:0" onclick="createPortalSite(event)">פתח פרויקט</button>
     </div>
   ` : '';
@@ -824,6 +876,18 @@ function toggleNewSiteForm(forceOpen) {
   if (!form) return;
   const open = typeof forceOpen === 'boolean' ? forceOpen : form.style.display === 'none';
   form.style.display = open ? 'grid' : 'none';
+}
+
+function togglePortalUserForm(forceOpen, siteId = null) {
+  const form = document.getElementById('newPortalUserForm');
+  if (!form) return;
+  const open = typeof forceOpen === 'boolean' ? forceOpen : form.style.display === 'none';
+  form.style.display = open ? 'grid' : 'none';
+  if (siteId) {
+    const siteSelect = document.getElementById('portalUserSiteId');
+    if (siteSelect) siteSelect.value = String(siteId);
+  }
+  if (open) setTimeout(() => document.getElementById('portalUserName')?.focus(), 0);
 }
 
 function syncCustomerSitesPanel() {
@@ -912,6 +976,85 @@ async function loadPortalUsers() {
   PORTAL_DEVICES = Array.isArray(deviceData?.devices) ? deviceData.devices : [];
 }
 
+async function loadSiteSummaries() {
+  if (!PORTAL_SITES.length || !TOKEN) { PORTAL_SITE_SUMMARIES = {}; return; }
+  const entries = await Promise.all(PORTAL_SITES.map(async site => {
+    const data = await fetch(`/api/c/sites/${site.id}/summary?token=${encodeURIComponent(TOKEN)}`).then(r=>r.json()).catch(()=>null);
+    return [Number(site.id), data && !data.error ? data : {}];
+  }));
+  PORTAL_SITE_SUMMARIES = Object.fromEntries(entries);
+}
+
+async function openSiteDetail(siteId, from = '', to = '') {
+  PORTAL_ACTIVE_SITE_ID = Number(siteId);
+  showScreen('screenSiteDetail');
+  const host = document.getElementById('siteDetailContent');
+  if (host) host.innerHTML = '<div class="loader">טוען נתוני אתר...</div>';
+  const query = new URLSearchParams({ token:TOKEN });
+  if (from) query.set('from', from);
+  if (to) query.set('to', to);
+  const data = await fetch(`/api/c/sites/${siteId}/summary?${query.toString()}`).then(r=>r.json()).catch(()=>null);
+  if (!data || data.error) {
+    if (host) host.innerHTML = `<div class="empty-state"><strong>לא ניתן לטעון את האתר</strong><span>${escapeHtml(data?.error || 'שגיאת תקשורת')}</span></div>`;
+    return;
+  }
+  PORTAL_SITE_SUMMARIES[Number(siteId)] = data;
+  renderSiteDetail(data);
+}
+
+function renderSiteDetail(data) {
+  const host = document.getElementById('siteDetailContent');
+  if (!host) return;
+  const site = data.site || {};
+  const orders = Array.isArray(data.orders) ? data.orders : [];
+  host.innerHTML = `
+    <div class="site-detail-head">
+      <div><h2>${escapeHtml(site.name || 'אתר')}</h2><p>${escapeHtml([site.address, site.city].filter(Boolean).join(', ') || 'ללא כתובת')} · ${escapeHtml([site.manager_name, site.manager_phone].filter(Boolean).join(' · ') || 'לא הוגדר מנהל עבודה')}</p></div>
+      ${PORTAL_CAPS.canManageUsers ? `<button type="button" class="btn btn-primary btn-sm" style="width:auto;margin:0" onclick="inviteManagerForSite(${site.id})">+ הזמן מנהל עבודה</button>` : ''}
+    </div>
+    <div class="site-detail-kpis">
+      <div class="site-detail-kpi"><span>מספר הזמנות</span><strong>${Number(data.order_count || 0)}</strong></div>
+      <div class="site-detail-kpi"><span>משקל שהוזמן</span><strong>${formatKg(data.ordered_kg || 0)}</strong></div>
+      <div class="site-detail-kpi"><span>משקל לחיוב</span><strong>${formatKg(data.billing_kg || 0)}</strong></div>
+      <div class="site-detail-kpi"><span>משקל שסופק</span><strong>${formatKg(data.delivered_kg || 0)}</strong></div>
+      <div class="site-detail-kpi"><span>ממתין לאישור</span><strong>${Number(data.pending_approval_count || 0)}</strong></div>
+    </div>
+    <div class="site-report-toolbar">
+      <div class="field"><label for="siteReportFrom">מתאריך</label><input id="siteReportFrom" type="date" value="${escapeHtml(data.from || '')}"></div>
+      <div class="field"><label for="siteReportTo">עד תאריך</label><input id="siteReportTo" type="date" value="${escapeHtml(data.to || '')}"></div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="applySiteReportPeriod()">הצג תקופה</button>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSiteReport(${site.id})">הורד דוח CSV</button>
+    </div>
+    <div class="section-heading"><h3>הזמנות באתר</h3><span>${orders.length} מוצגות</span></div>
+    <div>${orders.length ? portalOrderCardsHtml(orders) : '<div class="empty-state"><strong>אין הזמנות בתקופה שנבחרה</strong></div>'}</div>
+  `;
+}
+
+function applySiteReportPeriod() {
+  if (!PORTAL_ACTIVE_SITE_ID) return;
+  openSiteDetail(PORTAL_ACTIVE_SITE_ID, document.getElementById('siteReportFrom')?.value || '', document.getElementById('siteReportTo')?.value || '');
+}
+
+function downloadSiteReport(siteId) {
+  const query = new URLSearchParams({ token:TOKEN });
+  const from = document.getElementById('siteReportFrom')?.value || '';
+  const to = document.getElementById('siteReportTo')?.value || '';
+  if (from) query.set('from', from);
+  if (to) query.set('to', to);
+  const link = document.createElement('a');
+  link.href = `/api/c/sites/${siteId}/report.csv?${query.toString()}`;
+  link.download = '';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+async function inviteManagerForSite(siteId) {
+  await showHome(PORTAL_ORDERS);
+  setHomeSection('sites');
+  togglePortalUserForm(true, siteId);
+}
+
 async function createPortalUser(event) {
   const btn = event?.currentTarget;
   const name = document.getElementById('portalUserName')?.value.trim();
@@ -945,25 +1088,49 @@ async function createPortalUser(event) {
   toast('המשתמש נוסף');
   await loadPortalUsers();
   renderCustomerSitesPanel();
-  if (res.data.activationLink) showPortalInvite(res.data.activationLink);
+  if (res.data.activationLink) showPortalInvite(res.data.activationLink, { id:res.data.id, name, phone, siteId });
 }
 
-function showPortalInvite(link) {
+function showPortalInvite(link, user = {}) {
   const host = document.getElementById('portalInviteResult');
   const input = document.getElementById('portalInviteLink');
+  const messageBox = document.getElementById('portalInviteMessage');
   if (!host || !input) return;
+  const site = PORTAL_SITES.find(row => Number(row.id) === Number(user.siteId || user.default_site_id));
+  PORTAL_INVITE_MESSAGE = link ? `שלום ${user.name || 'מנהל העבודה'},\nהוזמנת לפורטל הלקוח של ${ME?.name || 'טנא'}`
+    + `${site?.name ? ` עבור אתר ${site.name}` : ''}.\nהקישור חד-פעמי ותקף ל-5 דקות. לאחר פתיחתו יש לבחור PIN בן 6 ספרות למחשב זה:\n${link}` : '';
   input.value = link || '';
+  if (messageBox) messageBox.value = PORTAL_INVITE_MESSAGE;
+  host.dataset.phone = String(user.phone || '').replace(/\D/g, '');
   host.style.display = link ? '' : 'none';
   if (link) input.select();
 }
 
 async function requestPortalInvite(userId) {
+  const user = PORTAL_USERS.find(row => Number(row.id) === Number(userId)) || {};
+  const assignment = PORTAL_USER_ASSIGNMENTS.find(row => Number(row.portal_user_id) === Number(userId) && Number(row.is_default) === 1)
+    || PORTAL_USER_ASSIGNMENTS.find(row => Number(row.portal_user_id) === Number(userId));
   const res = await fetch(`/api/c/users/${userId}/invite`, {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:TOKEN })
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
   if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן ליצור קישור', true); return; }
-  showPortalInvite(res.data.activationLink);
+  showPortalInvite(res.data.activationLink, { ...user, siteId:assignment?.site_id || user.default_site_id });
   toast('נוצר קישור חדש שתקף ל-5 דקות');
+}
+
+async function copyPortalInviteMessage() {
+  if (!PORTAL_INVITE_MESSAGE) return;
+  const box = document.getElementById('portalInviteMessage');
+  try { await navigator.clipboard.writeText(PORTAL_INVITE_MESSAGE); toast('הודעת ההזמנה הועתקה'); }
+  catch { box?.select(); document.execCommand('copy'); toast('הודעת ההזמנה הועתקה'); }
+}
+
+function openPortalInviteWhatsApp() {
+  if (!PORTAL_INVITE_MESSAGE) return;
+  const raw = document.getElementById('portalInviteResult')?.dataset.phone || '';
+  const phone = raw.startsWith('0') ? `972${raw.slice(1)}` : raw;
+  const url = `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(PORTAL_INVITE_MESSAGE)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 async function copyPortalInvite() {
@@ -1016,6 +1183,7 @@ async function createPortalSite(event) {
     address: document.getElementById('newSiteAddress')?.value.trim() || null,
     managerName: document.getElementById('newSiteManagerName')?.value.trim() || null,
     managerPhone: document.getElementById('newSiteManagerPhone')?.value.trim() || null,
+    budgetKg: Number(document.getElementById('newSiteBudgetKg')?.value || 0),
   };
   const res = await fetch('/api/c/sites', {
     method: 'POST',
@@ -1027,6 +1195,7 @@ async function createPortalSite(event) {
   toast(`הפרויקט "${name}" נפתח בהצלחה`);
   const sitesData = await fetch(`/api/c/sites?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
   setPortalContext(sitesData);
+  await loadSiteSummaries();
   syncCustomerSitesPanel();
   renderPortalDashboard(PORTAL_ORDERS);
   toggleNewSiteForm(false);
@@ -1325,7 +1494,10 @@ async function showHome(preloaded) {
       orders = d.orders ?? [];
     } catch { toast('שגיאה בטעינת הזמנות', true); }
   }
-  await loadPortalUsers().catch(() => {});
+  await Promise.all([
+    loadPortalUsers().catch(() => {}),
+    loadSiteSummaries().catch(() => {}),
+  ]);
   syncCustomerSitesPanel();
   await loadCustomerFinanceDashboard().catch(() => {});
   await loadGuaranteeDocuments().catch(() => {});
@@ -1674,14 +1846,50 @@ async function uploadGuaranteeDocument(event) {
 
 function renderOrdersList(orders) {
   const el = document.getElementById('ordersList');
-  PORTAL_ORDERS = Array.isArray(orders) ? orders : [];
+  if (Array.isArray(orders)) PORTAL_ORDERS = orders;
+  renderPortalOrderSiteFilter();
+  renderPortalApprovalCenter(PORTAL_ORDERS);
+  const rows = PORTAL_ORDER_SITE_FILTER
+    ? PORTAL_ORDERS.filter(order => Number(order.site_id) === Number(PORTAL_ORDER_SITE_FILTER))
+    : PORTAL_ORDERS;
   const count = document.getElementById('ordersCount');
-  if (count) count.textContent = `${orders?.length || 0} הזמנות`;
-  if (!orders?.length) {
-    el.innerHTML = `<div class="empty-state"><strong>עדיין אין הזמנות</strong><span>ההזמנה הראשונה תופיע כאן מיד לאחר השליחה.</span>${PORTAL_CAPS.canOrder ? '<button type="button" class="btn btn-primary" style="max-width:240px;margin:14px auto 0" onclick="startNewOrder()">פתיחת הזמנה ראשונה</button>' : ''}</div>`;
+  if (count) count.textContent = PORTAL_ORDER_SITE_FILTER ? `${rows.length} מתוך ${PORTAL_ORDERS.length} הזמנות` : `${rows.length} הזמנות`;
+  if (!rows.length) {
+    const filtered = Boolean(PORTAL_ORDER_SITE_FILTER);
+    el.innerHTML = `<div class="empty-state"><strong>${filtered ? 'אין הזמנות באתר שנבחר' : 'עדיין אין הזמנות'}</strong><span>${filtered ? 'אפשר לבחור אתר אחר או להציג את כל האתרים.' : 'ההזמנה הראשונה תופיע כאן מיד לאחר השליחה.'}</span>${!filtered && PORTAL_CAPS.canOrder ? '<button type="button" class="btn btn-primary" style="max-width:240px;margin:14px auto 0" onclick="startNewOrder()">פתיחת הזמנה ראשונה</button>' : ''}</div>`;
     return;
   }
-  el.innerHTML = orders.map(o => {
+  el.innerHTML = portalOrderCardsHtml(rows);
+}
+
+function renderPortalOrderSiteFilter() {
+  const select = document.getElementById('portalOrdersSiteFilter');
+  if (!select) return;
+  const current = PORTAL_ORDER_SITE_FILTER;
+  select.innerHTML = '<option value="">כל האתרים</option>' + PORTAL_SITES.map(site => `<option value="${site.id}">${escapeHtml(site.name)}</option>`).join('');
+  select.value = PORTAL_SITES.some(site => String(site.id) === String(current)) ? String(current) : '';
+  PORTAL_ORDER_SITE_FILTER = select.value;
+  select.parentElement.style.display = PORTAL_SITES.length > 1 ? '' : 'none';
+}
+
+function applyPortalOrderSiteFilter() {
+  PORTAL_ORDER_SITE_FILTER = document.getElementById('portalOrdersSiteFilter')?.value || '';
+  renderOrdersList(null);
+}
+
+function renderPortalApprovalCenter(orders) {
+  const host = document.getElementById('portalApprovalCenter');
+  if (!host) return;
+  const pending = (orders || []).filter(order => order.customerCanApprove === true);
+  host.classList.toggle('show', pending.length > 0);
+  host.innerHTML = pending.length ? `
+    <div class="approval-center-head"><strong>דורש את אישורך</strong><span class="guarantee-status">${pending.length} הזמנות</span></div>
+    <div>${portalOrderCardsHtml(pending)}</div>
+  ` : '';
+}
+
+function portalOrderCardsHtml(orders) {
+  return (orders || []).map(o => {
     const cls = statusClass(o.status);
     const date = o.delivery_date ? `אספקה: ${o.delivery_date}` : '';
     const weight = o.billing_weight ? `${(+o.billing_weight).toFixed(1)} ק"ג` : '';

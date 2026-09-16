@@ -288,7 +288,7 @@ module.exports = function createPortalRouter(deps) {
     if (siteId) {
       where.push(`${alias}.site_id=?`);
       params.push(Number(siteId));
-    } else if (s.user) {
+    } else if (s.user && s.user.role !== 'customer_admin') {
       where.push(`(
         ${alias}.site_id IN (SELECT site_id FROM customer_site_users WHERE portal_user_id=? AND customer_id=?)
         OR ${alias}.site_id=?
@@ -296,6 +296,22 @@ module.exports = function createPortalRouter(deps) {
       params.push(s.user.id, s.customer.id, s.user.default_site_id || 0);
     }
     return { where: where.join(' AND '), params };
+  }
+
+  function portalPeriodFilters(query = {}, alias = 'o') {
+    const clauses = [];
+    const params = [];
+    const from = String(query.from || '').trim();
+    const to = String(query.to || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { clauses.push(`DATE(${alias}.created_at)>=?`); params.push(from); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { clauses.push(`DATE(${alias}.created_at)<=?`); params.push(to); }
+    return { clauses, params, from: /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : '', to: /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : '' };
+  }
+
+  function csvCell(value) {
+    let text = String(value ?? '');
+    if (/^[=+\-@]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
   }
 
   function resolveFinanceSiteId(s, rawSiteId) {
@@ -653,20 +669,15 @@ module.exports = function createPortalRouter(deps) {
     const s = session(token) || upgradeLegacyCustomerToken(token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
     const c = s.customer;
+    const access = orderAccessWhere(s, 'o');
     let orders = db.prepare(`
       SELECT o.id, o.order_num, o.status, o.created_at, o.total_weight, o.billing_weight,
              o.delivery_date, o.portal_price, o.site_id, cs.name AS site_name
       FROM orders o
       LEFT JOIN customer_sites cs ON cs.id=o.site_id
-      WHERE o.customer_id=?
-        AND (
-          ?=0
-          OR o.site_id IS NULL
-          OR o.site_id IN (SELECT site_id FROM customer_site_users WHERE portal_user_id=?)
-          OR o.site_id=?
-        )
-      ORDER BY o.created_at DESC LIMIT 20
-    `).all(c.id, s.user ? 1 : 0, s.user?.id || 0, s.user?.default_site_id || 0);
+      WHERE ${access.where}
+      ORDER BY o.created_at DESC LIMIT 100
+    `).all(...access.params);
     const pendingProfileChangeRequest = db.prepare(`
       SELECT id,status,requested_json,created_at,updated_at
       FROM customer_profile_change_requests
@@ -814,19 +825,36 @@ module.exports = function createPortalRouter(deps) {
     const resolved = resolveAuthorizedSite(s.customer.id, s.user, req.params.siteId);
     if (!resolved.ok) return res.status(resolved.status).json({ error: resolved.error });
     if (!resolved.site) return res.status(404).json({ error: 'לא נמצא אתר ללקוח' });
+    const period = portalPeriodFilters(req.query, 'o');
+    const periodSql = period.clauses.length ? ` AND ${period.clauses.join(' AND ')}` : '';
     const totals = db.prepare(`
       SELECT COUNT(*) AS order_count,
-             COALESCE(SUM(total_weight),0) AS ordered_kg,
-             COALESCE(SUM(billing_weight),0) AS billing_kg,
-             COALESCE(SUM(portal_price),0) AS spend
-      FROM orders
-      WHERE customer_id=? AND site_id=?
-    `).get(s.customer.id, resolved.site.id);
+             COALESCE(SUM(o.total_weight),0) AS ordered_kg,
+             COALESCE(SUM(o.billing_weight),0) AS billing_kg,
+             COALESCE(SUM(CASE WHEN o.status=? THEN o.billing_weight ELSE 0 END),0) AS delivered_kg,
+             COALESCE(SUM(CASE WHEN o.status=? THEN 1 ELSE 0 END),0) AS pending_approval_count,
+             COALESCE(SUM(o.portal_price),0) AS spend
+      FROM orders o
+      WHERE o.customer_id=? AND o.site_id=?${periodSql}
+    `).get(ORDER_STATUS.DELIVERED_CONFIRMED, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL, s.customer.id, resolved.site.id, ...period.params);
+    const orderRows = db.prepare(`
+      SELECT o.id,o.order_num,o.status,o.created_at,o.delivery_date,o.total_weight,o.billing_weight,o.portal_price,o.site_id,cs.name AS site_name
+      FROM orders o
+      LEFT JOIN customer_sites cs ON cs.id=o.site_id
+      WHERE o.customer_id=? AND o.site_id=?${periodSql}
+      ORDER BY o.created_at DESC
+      LIMIT 100
+    `).all(s.customer.id, resolved.site.id, ...period.params);
     const summary = {
       site: resolved.site,
       order_count: totals.order_count || 0,
       ordered_kg: Number(totals.ordered_kg || 0),
       billing_kg: Number(totals.billing_kg || 0),
+      delivered_kg: Number(totals.delivered_kg || 0),
+      pending_approval_count: Number(totals.pending_approval_count || 0),
+      from: period.from || null,
+      to: period.to || null,
+      orders: projectOrdersForPortal(orderRows, s),
     };
     if (s.caps.seePrice || s.caps.canViewBudget) {
       summary.spend = Number(totals.spend || 0);
@@ -836,6 +864,45 @@ module.exports = function createPortalRouter(deps) {
       summary.kg_usage_pct = summary.budget_kg ? Math.round(summary.billing_kg / summary.budget_kg * 100) : 0;
     }
     res.json(summary);
+  });
+
+  router.get('/c/sites/:siteId/report.csv', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const resolved = resolveAuthorizedSite(s.customer.id, s.user, req.params.siteId);
+    if (!resolved.ok) return res.status(resolved.status).json({ error: resolved.error });
+    if (!resolved.site) return res.status(404).json({ error: 'לא נמצא אתר ללקוח' });
+    const period = portalPeriodFilters(req.query, 'o');
+    const periodSql = period.clauses.length ? ` AND ${period.clauses.join(' AND ')}` : '';
+    const rows = db.prepare(`
+      SELECT o.order_num,o.created_at,o.status,o.total_weight,o.billing_weight,o.portal_price,
+             o.delivery_date,cs.name AS site_name
+      FROM orders o
+      LEFT JOIN customer_sites cs ON cs.id=o.site_id
+      WHERE o.customer_id=? AND o.site_id=?${periodSql}
+      ORDER BY o.created_at DESC
+    `).all(s.customer.id, resolved.site.id, ...period.params);
+    const canSeeMoney = Boolean(s.caps.seePrice || s.caps.canViewBudget || s.caps.canViewInvoices);
+    const headers = ['אתר','מספר הזמנה','תאריך הזמנה','סטטוס','משקל שהוזמן ק״ג','משקל לחיוב ק״ג','תאריך אספקה'];
+    if (canSeeMoney) headers.push('סכום');
+    const lines = [headers.map(csvCell).join(',')];
+    rows.forEach(row => {
+      const values = [
+        row.site_name || resolved.site.name,
+        row.order_num,
+        String(row.created_at || '').slice(0, 10),
+        row.status,
+        Number(row.total_weight || 0).toFixed(2),
+        Number(row.billing_weight || 0).toFixed(2),
+        row.delivery_date || '',
+      ];
+      if (canSeeMoney) values.push(Number(row.portal_price || 0).toFixed(2));
+      lines.push(values.map(csvCell).join(','));
+    });
+    const filename = `site-report-${Number(resolved.site.id)}-${period.from || 'all'}-${period.to || 'today'}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(`\uFEFF${lines.join('\r\n')}`);
   });
 
   router.get('/c/finance/summary', customerPortalActionLimiter, (req, res) => {

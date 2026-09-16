@@ -53,6 +53,22 @@ test('authorized-site resolution rejects no-site and cross-site access', () => {
   db.close();
 });
 
+test('customer admin always receives every customer site while field users remain assigned-site scoped', () => {
+  const { db, access } = fixture();
+  db.prepare("INSERT INTO customer_sites (id,customer_id,name,status) VALUES (10,1,'A','active'),(11,1,'B','active')").run();
+  const adminId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'05031','Admin','customer_admin',1)").run().lastInsertRowid;
+  const managerId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'05032','Manager','field_manager',1)").run().lastInsertRowid;
+  db.prepare('INSERT INTO customer_site_users (customer_id,site_id,portal_user_id,is_default) VALUES (1,10,?,1)').run(managerId);
+  const customer = db.prepare('SELECT * FROM customers WHERE id=1').get();
+  const admin = db.prepare('SELECT * FROM portal_users WHERE id=?').get(adminId);
+  const manager = db.prepare('SELECT * FROM portal_users WHERE id=?').get(managerId);
+  assert.deepEqual(access.listAuthorizedSites(1, admin, access.roleCaps(admin, customer)).map(row => row.id), [10, 11]);
+  assert.deepEqual(access.listAuthorizedSites(1, manager, access.roleCaps(manager, customer)).map(row => row.id), [10]);
+  assert.equal(access.resolveAuthorizedSite(1, admin, 11).ok, true);
+  assert.equal(access.resolveAuthorizedSite(1, manager, 11).ok, false);
+  db.close();
+});
+
 test('support preview fails closed after selected portal user is deactivated', () => {
   const { db, access } = fixture();
   const id = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'0504','Support target','both',1)").run().lastInsertRowid;
@@ -179,6 +195,18 @@ test('HTTP portal enforces delegated flags and cross-site order access', async (
   assert.equal(signedIn.response.status, 200, JSON.stringify(signedIn.body));
   assert.equal(signedIn.body.trustedDevice, true);
   const delegated = db.prepare('SELECT * FROM portal_users WHERE phone=\'0512\'').get();
+  const adminView = await call(`/api/c/me?token=${signedIn.body.token}`);
+  assert.equal(adminView.response.status, 200, JSON.stringify(adminView.body));
+  assert.ok(adminView.body.sites.some(site => Number(site.id) === Number(siteB)), 'customer admin must see an unassigned site');
+  assert.ok(adminView.body.orders.some(order => Number(order.id) === Number(orderId)), 'customer admin must see orders from every customer site');
+  const siteSummary = await call(`/api/c/sites/${siteB}/summary?token=${signedIn.body.token}`);
+  assert.equal(siteSummary.response.status, 200, JSON.stringify(siteSummary.body));
+  assert.equal(siteSummary.body.order_count, 1);
+  assert.equal(siteSummary.body.pending_approval_count, 1);
+  const reportResponse = await fetch(`${base}/api/c/sites/${siteB}/report.csv?token=${encodeURIComponent(signedIn.body.token)}`);
+  assert.equal(reportResponse.status, 200);
+  assert.match(reportResponse.headers.get('content-type') || '', /text\/csv/);
+  assert.match(await reportResponse.text(), /HTTP-1/);
   const bcrypt = require('bcryptjs');
   db.prepare('UPDATE portal_users SET password_hash=? WHERE id=?').run(bcrypt.hashSync('Initial-password-42', 4), delegated.id);
   const passwordStart = await call('/api/c/auth/password', { method: 'POST', headers, body: JSON.stringify({ phone: '0512', password: 'Initial-password-42' }) });

@@ -124,25 +124,25 @@ function createPortalAccessService(deps) {
     const customerAdmin = r === 'customer_admin';
     const userCan = name => isUser ? bool(portalUserOrRole[name]) : false;
     const priceExposureAllowed = customerCaps.canExposePrices || customer.portal_price_list_visibility !== 'none';
-    const canViewPrices = priceExposureAllowed && (isUser ? userCan('can_view_prices') : (oldApprover || finance || customerAdmin));
-    const canViewInvoices = isUser ? userCan('can_view_invoices') : (finance || customerAdmin);
-    const canViewPaymentAlerts = isUser ? userCan('can_view_payment_alerts') : (finance || customerAdmin);
-    const canOrder = !isUser ? true : userCan('can_create_orders');
-    const canApprove = !isUser ? oldApprover : userCan('can_approve_orders');
+    const canViewPrices = priceExposureAllowed && (isUser ? userCan('can_view_prices') : (customerAdmin || oldApprover || finance));
+    const canViewInvoices = customerAdmin || (isUser ? userCan('can_view_invoices') : finance);
+    const canViewPaymentAlerts = customerAdmin || (isUser ? userCan('can_view_payment_alerts') : finance);
+    const canOrder = customerAdmin || (!isUser ? true : userCan('can_create_orders'));
+    const canApprove = customerAdmin || (!isUser ? oldApprover : userCan('can_approve_orders'));
     return {
       role: r,
       canOrder,
       seePrice: canViewPrices,
       canApprove,
-      canManageUsers: customerCaps.canManageUsers && (!isUser ? (customerAdmin || oldApprover) : userCan('can_manage_users')),
-      canCreateSites: customerCaps.canCreateSites && (!isUser ? (customerAdmin || r === 'both') : userCan('can_create_sites')),
-      canAssignSiteUsers: customerCaps.canManageUsers && (!isUser ? customerAdmin : userCan('can_assign_site_users')),
-      canViewBudget: (isUser ? userCan('can_view_budget') : (customerAdmin || finance)) && (customerCaps.canSetBudgets || (isUser && userCan('can_view_budget'))),
-      canSetBudget: customerCaps.canSetBudgets && (isUser ? userCan('can_set_budget') : (customerAdmin || finance)),
-      canApproveBudgetOverrun: customerCaps.canSetBudgets && (isUser ? userCan('can_approve_budget_overrun') : (customerAdmin || finance)),
+      canManageUsers: customerCaps.canManageUsers && (customerAdmin || (!isUser ? oldApprover : userCan('can_manage_users'))),
+      canCreateSites: customerCaps.canCreateSites && (customerAdmin || (!isUser ? r === 'both' : userCan('can_create_sites'))),
+      canAssignSiteUsers: customerCaps.canManageUsers && (customerAdmin || (isUser && userCan('can_assign_site_users'))),
+      canViewBudget: customerAdmin ? customerCaps.canSetBudgets : ((isUser ? userCan('can_view_budget') : finance) && (customerCaps.canSetBudgets || (isUser && userCan('can_view_budget')))),
+      canSetBudget: customerCaps.canSetBudgets && (customerAdmin || (isUser ? userCan('can_set_budget') : finance)),
+      canApproveBudgetOverrun: customerCaps.canSetBudgets && (customerAdmin || (isUser ? userCan('can_approve_budget_overrun') : finance)),
       canViewInvoices,
       canViewPaymentAlerts,
-      canViewDeliveryNotes: !isUser || userCan('can_view_delivery_notes'),
+      canViewDeliveryNotes: customerAdmin || !isUser || userCan('can_view_delivery_notes'),
     };
   }
 
@@ -170,7 +170,7 @@ function createPortalAccessService(deps) {
   function listAuthorizedSites(customerId, portalUser = null, caps = null) {
     const effectiveCaps = caps || roleCaps(portalUser, {});
     let rows;
-    if (!portalUser) {
+    if (!portalUser || portalUser.role === 'customer_admin') {
       rows = db.prepare(`
         SELECT id,customer_id,name,address,city,status,manager_name,manager_phone,budget_amount,budget_kg,alert_pct,block_over_budget
         FROM customer_sites

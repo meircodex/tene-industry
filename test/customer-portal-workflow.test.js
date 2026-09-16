@@ -43,7 +43,7 @@ test('customer portal order lifecycle is idempotent and records actor/pricing sn
   const otherSite = db.prepare("INSERT INTO customer_sites(customer_id,name,status) VALUES (?,'Other Site','active')").run(customerId).lastInsertRowid;
   const otherOrder = db.prepare("INSERT INTO orders(order_num,customer_id,site_id,status) VALUES ('DOC-OTHER',?,?,'ממתינה לאישור לקוח')").run(customerId,otherSite).lastInsertRowid;
   const otherForm = new FormData(); otherForm.append('token',token); otherForm.append('file',new Blob([bytes],{type:'application/pdf'}),'other.pdf');
-  assert.ok([403,404].includes((await fetch(`${base}/api/c/orders/${otherOrder}/source-documents`,{method:'POST',body:otherForm})).status));
+  assert.equal((await fetch(`${base}/api/c/orders/${otherOrder}/source-documents`,{method:'POST',body:otherForm})).status,201);
   const history = await fetch(`${base}/api/c/orders/history?token=${token}&from=2000-01-01&to=2099-01-01&status=%D7%9E%D7%9E%D7%AA%D7%99%D7%A0%D7%94%20%D7%9C%D7%90%D7%99%D7%A9%D7%95%D7%A8%20%D7%9C%D7%A7%D7%95%D7%97&limit=1&offset=0`); assert.equal(history.status,200); const historyBody=await history.json(); assert.equal(historyBody.limit,1); assert.equal(historyBody.offset,0); assert.equal(historyBody.orders.length,1); assert.equal(historyBody.hasMore,true);
 });
 

@@ -31,6 +31,20 @@ test('trusted-device access uses a one-use five-minute enrollment and session-on
   assert.match(html, /revokePortalDeviceAccess/);
 });
 
+test('project portal exposes site filtering, approval center, manager invitation and period report UI', () => {
+  for (const id of ['portalApprovalCenter', 'portalOrdersSiteFilter', 'screenSiteDetail', 'siteDetailContent']) {
+    assert.match(html, new RegExp(`id="${id}"`), `missing ${id}`);
+  }
+  assert.match(html, /\+ הזמן מנהל עבודה/);
+  assert.match(html, /copyPortalInviteMessage/);
+  assert.match(html, /openPortalInviteWhatsApp/);
+  assert.match(html, /function openSiteDetail/);
+  assert.match(html, /function downloadSiteReport/);
+  assert.match(html, /report\.csv/);
+  assert.match(html, /משקל שסופק/);
+  assert.match(html, /דורש את אישורך/);
+});
+
 test('mobile login sizing and price-list rendering cover the audited viewport/data gaps', () => {
   assert.match(html, /@media\(max-height:680px\) and \(max-width:600px\)/);
   assert.match(html, /\.auth-logo img\{width:190px\}/);
