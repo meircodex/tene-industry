@@ -23,11 +23,15 @@
   function formatCm(value) { const n = numeric(value, 0); return n > 0 ? (n / 10).toLocaleString('he-IL', { maximumFractionDigits: 3 }) + ' \u05e1\u05f4\u05de' : '-'; }
   function formatMeters(value) { const n = numeric(value, 0); return n > 0 ? (n / 1000).toLocaleString('he-IL', { maximumFractionDigits: 3 }) + ' \u05de\u05f3' : '-'; }
   function jsArg(value) { const n = Number(value); return Number.isFinite(n) && String(value).trim() !== '' ? String(n) : JSON.stringify(String(value)); }
-  function orderLinesGridGuidesHtml() { return '<div class="order-lines-grid-guides" aria-hidden="true">' + '<span></span>'.repeat(9) + '</div>'; }
+  function orderLinesGridGuidesHtml() { return window.IronBendOrderLineRenderer?.gridGuides?.() || '<div class="order-lines-grid-guides" aria-hidden="true">' + '<span></span>'.repeat(9) + '</div>'; }
 
   function setupOrderLinesTable() {
     const container = document.getElementById('palletsContainer');
     if (!container) return;
+    if (window.IronBendOrderLineRenderer?.enhanceContainer) {
+      window.IronBendOrderLineRenderer.enhanceContainer(container);
+      return;
+    }
     container.classList.add('order-lines-body');
     if (container.closest('.order-lines-table')) return;
     const table = document.createElement('div');
@@ -986,7 +990,7 @@
     // Adding an item opens the shape editor directly \u2014 the whole item (sides,
     // diameter, quantity) is entered there with the keyboard.
     const addCall = (typeof window.addItem === 'function' ? 'window.addItem(' : 'window.addEmptyRow(') + palletId + ')';
-    return '<div class="order-line-add-row"><button type="button" class="line-add-btn" onclick="' + addCall + '" title="\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d9\u05d8">+ \u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d9\u05d8</button></div>';
+    return window.IronBendOrderLineRenderer?.addRow?.({ addCall, addLabel:'הוסף פריט' }) || '<div class="order-line-add-row"><button type="button" class="line-add-btn" onclick="' + addCall + '" title="\u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d9\u05d8">+ \u05d4\u05d5\u05e1\u05e3 \u05e4\u05e8\u05d9\u05d8</button></div>';
   }
 
   function lineContract(item = {}) { return typeof window.itemShapeContract === 'function' ? window.itemShapeContract(item) : null; }

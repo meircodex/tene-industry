@@ -3,8 +3,46 @@
 // Canonical order-line DOM shared by the factory and customer editors. Each
 // caller supplies already-formatted values and its existing callback strings.
 (function (root) {
+  const COLUMN_COUNT = 9;
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+  }
+  function header() {
+    return '<div class="order-lines-head" role="row">' +
+      '<span role="columnheader">מס׳</span>' +
+      '<span role="columnheader">אלמנט</span>' +
+      '<span role="columnheader">צורה ומידות</span>' +
+      '<span role="columnheader">קוטר <small>מ״מ</small></span>' +
+      '<span role="columnheader">כמות</span>' +
+      '<span role="columnheader" class="desktop-only-cell">אורך <small>ס״מ</small></span>' +
+      '<span role="columnheader" class="desktop-only-cell">סה״כ <small>מ׳</small></span>' +
+      '<span role="columnheader">משקל</span><span aria-hidden="true"></span></div>';
+  }
+  function gridGuides() {
+    return '<div class="order-lines-grid-guides" aria-hidden="true">' + '<span></span>'.repeat(COLUMN_COUNT) + '</div>';
+  }
+  function addRow(options) {
+    const o = options || {};
+    return `<div class="order-line-add-row"><button type="button" class="line-add-btn" onclick="${o.addCall || ''}" title="${esc(o.addLabel || 'הוסף פריט')}">+ ${esc(o.addLabel || 'הוסף פריט')}</button></div>`;
+  }
+  function table(options) {
+    const o = options || {};
+    return `<div class="order-lines-table ib-order-lines" role="table" aria-label="${esc(o.ariaLabel || 'פריטי הזמנה')}"><div class="order-lines-body">${header()}${gridGuides()}${o.rowsHtml || ''}${addRow(o)}</div></div>`;
+  }
+  function enhanceContainer(container) {
+    if (!container) return null;
+    container.classList.add('order-lines-body');
+    const existing = container.closest('.ib-order-lines');
+    if (existing) return existing;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'order-lines-table ib-order-lines';
+    wrapper.setAttribute('role', 'table');
+    wrapper.setAttribute('aria-label', 'פריטי הזמנה');
+    container.parentNode.insertBefore(wrapper, container);
+    wrapper.append(container);
+    container.insertAdjacentHTML('afterbegin', header());
+    container.insertAdjacentHTML('beforeend', gridGuides());
+    return wrapper;
   }
   function render(options) {
     const o = options || {};
@@ -26,5 +64,5 @@
       <div class="line-mobile-meta"><span>${o.isPileCage ? 'PILE CAGE' : esc(o.elementName || 'ללא אלמנט')}</span><span>Ø${esc(Number(o.diameter).toLocaleString('he-IL', { maximumFractionDigits: 1 }))}</span><span>${hasShape ? esc(o.totalLength) : '—'}</span><span>${hasShape ? esc(o.weight) : '—'}</span></div>
     </article>`;
   }
-  root.IronBendOrderLineRenderer = { render };
+  root.IronBendOrderLineRenderer = { render, header, gridGuides, addRow, table, enhanceContainer };
 })(typeof window === 'undefined' ? globalThis : window);

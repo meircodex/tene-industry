@@ -8,6 +8,7 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '../public/customer.html'), 'utf8');
 const renderer = fs.readFileSync(path.join(__dirname, '../public/order-line-renderer.js'), 'utf8');
+const rendererCss = fs.readFileSync(path.join(__dirname, '../public/order-line-renderer.css'), 'utf8');
 const editor = fs.readFileSync(path.join(__dirname, '../public/new-order-editor.js'), 'utf8');
 
 test('customer portal has linked delivery/auth labels and honest step state', () => {
@@ -49,6 +50,9 @@ test('customer-facing prices use the shared two-decimal formatter', () => {
 test('factory and customer adapters consume one canonical order-line renderer', () => {
   assert.match(html, /IronBendOrderLineRenderer\.render/);
   assert.match(editor, /IronBendOrderLineRenderer\.render/);
+  assert.match(html, /order-line-renderer\.css\?v=2/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8'), /order-line-renderer\.css\?v=2/);
+  assert.match(rendererCss, /\.ib-order-lines \.order-lines-head/);
   const context = vm.createContext({ window: {} });
   vm.runInContext(renderer, context);
   const markup = context.window.IronBendOrderLineRenderer.render({
@@ -60,6 +64,9 @@ test('factory and customer adapters consume one canonical order-line renderer', 
   });
   for (const cls of ['order-line-row', 'line-element', 'line-shape', 'line-diameter-select', 'line-qty', 'line-weight', 'line-delete', 'line-mobile-meta']) assert.match(markup, new RegExp(`class="[^"]*${cls}`));
  assert.match(markup, /data-item-id="4"/);
+  const table = context.window.IronBendOrderLineRenderer.table({ rowsHtml: markup, addCall:'addItem()' });
+  assert.match(table, /class="order-lines-table ib-order-lines"/);
+  for (const label of ['מס׳','אלמנט','צורה ומידות','קוטר','כמות','אורך','סה״כ','משקל','הוסף פריט']) assert.match(table, new RegExp(label));
 });
 
 test('order submission contracts preserve idempotency and retryable source files/history', () => {

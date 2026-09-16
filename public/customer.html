@@ -255,6 +255,7 @@
   </style>
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/order-item-row.css?v=1">
+<link rel="stylesheet" href="/order-line-renderer.css?v=2">
 </head>
 <body>
 
@@ -404,8 +405,6 @@
 
   <div id="itemsList"></div>
 
-  <button class="btn btn-secondary btn-sm" onclick="addItem()" style="margin-bottom:20px">➕ הוסף פריט</button>
-
   <div class="step-title"><span class="step-num">2</span> פרטי אספקה</div>
   <div class="section-card">
     <div class="field" id="orderSiteWrap" style="display:none">
@@ -464,7 +463,7 @@
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
 <script src="/shape-editor.js?v=77"></script>
-<script src="/order-line-renderer.js?v=1"></script>
+<script src="/order-line-renderer.js?v=2"></script>
 <script>
 // ──────────────────────────────────────────────────────
 // State
@@ -1934,7 +1933,10 @@ function removeItem(id) {
 function renderItems() {
   document.getElementById('priceBox').style.display = 'none';
   const el = document.getElementById('itemsList');
-  el.innerHTML = orderItems.map((item,idx) => renderPortalOrderItemCard(item, idx+1)).join('');
+  const rowsHtml = orderItems.map((item,idx) => renderPortalOrderItemCard(item, idx+1)).join('');
+  el.innerHTML = window.IronBendOrderLineRenderer
+    ? window.IronBendOrderLineRenderer.table({ rowsHtml, addCall:'addItem()', addLabel:'הוסף פריט', ariaLabel:'פריטי הזמנת לקוח' })
+    : rowsHtml;
 }
 
 function renderPortalOrderItemCard(item, num) {

@@ -129,6 +129,9 @@ body[data-page="new"] .order-min-items .secondary-import-shape:focus-visible{out
 body[data-page="new"] .order-min-items .secondary-import-shape,
 body[data-page="new"] .order-min-items .secondary-import{display:inline-flex!important;align-items:center!important;justify-content:center!important}
 
+/* Legacy fallback retained for old cached pages. Disabled: the live table CSS
+   is owned by order-line-renderer.css and is shared with the customer portal. */
+@media not all {
 /* ===== ORDER LINES TABLE ===== */
 body[data-page="new"] .order-lines-table{margin:12px 14px 14px!important;border:2px solid #879db6!important;border-radius:12px!important;background:#fff!important;overflow:hidden!important}
 
@@ -254,4 +257,5 @@ body[data-page="new"] .line-add-btn:hover{background:#eef4ff!important;color:#17
   body[data-page="new"] .line-mobile-meta{grid-area:meta!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px!important;font-size:11px!important;color:var(--text-dim,#64748b)!important;font-weight:850!important}
   body[data-page="new"] .line-mobile-meta span{padding:3px 5px!important;border-radius:6px!important;background:#f4f7fb!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
   body[data-page="new"] .order-line-add-row{grid-template-columns:32px minmax(0,1fr) 50px 50px 28px!important}
+}
 }
