@@ -236,7 +236,7 @@
     body.support-preview .support-preview-banner{display:flex}
     .support-preview-banner strong{display:block;font-size:14px;color:#4e3600}
     .support-preview-meta{font-size:12px;color:#735a20}
-    body.support-preview button[onclick="changePortalPassword()"]{display:none!important}
+    body.support-preview button[onclick="changePortalPin()"]{display:none!important}
     .support-exit{width:auto!important;margin:0!important;white-space:nowrap;background:#5f4300;color:#fff}
 
     .field-error{display:none;color:var(--red);font-size:12px;font-weight:700;margin-top:5px}
@@ -273,6 +273,21 @@
     <div class="auth-logo"><img src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל"></div>
     <h2>ברוכים הבאים</h2>
     <p>הכנסו פרטים כדי לבצע הזמנה ולעקוב אחרי הזמנות קיימות</p>
+    <div id="deviceEnrollPanel" style="display:none">
+      <div class="card-title">הפעלת המחשב לפורטל</div>
+      <p>האישור הראשוני תקף לחמש דקות ולשימוש אחד. בחר PIN בן 6 ספרות לכניסות הבאות במחשב הזה.</p>
+      <div class="field"><label for="deviceEnrollPin">PIN חדש</label><input type="password" id="deviceEnrollPin" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="6 ספרות"></div>
+      <div class="field"><label for="deviceEnrollPinConfirm">אימות PIN</label><input type="password" id="deviceEnrollPinConfirm" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="הקלד שוב"></div>
+      <button class="btn btn-primary" type="button" onclick="activateTrustedDevice()">אשר מחשב ושמור PIN</button>
+    </div>
+    <div id="trustedDeviceLogin" style="display:none">
+      <div class="card-title">כניסה מהמחשב המאושר</div>
+      <p id="trustedDeviceLabel"></p>
+      <div class="field"><label for="trustedDevicePin">PIN</label><input type="password" id="trustedDevicePin" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="6 ספרות" onkeydown="if(event.key==='Enter')loginWithTrustedDevicePin()"></div>
+      <button class="btn btn-primary" type="button" onclick="loginWithTrustedDevicePin()">כניסה</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="showStandardPortalLogin()" style="margin-top:8px">כניסה ממחשב אחר</button>
+    </div>
+    <div id="standardAuthOptions">
     <div class="field">
       <label for="portalAccessCode">קוד גישה שקיבלת מטנא</label>
       <div class="portal-code-row">
@@ -301,6 +316,7 @@
       <input type="text" id="authOtp" placeholder="6 ספרות" inputmode="numeric" maxlength="6"/>
     </div>
     <button class="btn btn-primary" onclick="doAuth()">כניסה ←</button>
+    </div>
   </div>
 </div>
 
@@ -318,7 +334,7 @@
     <h2 id="welcomeName">שלום 👋</h2>
     <p id="welcomeSub"><span id="portalRoleLabel">פורטל לקוח</span> · <span id="tierLabel">מחירון</span></p>
     <div class="welcome-actions">
-      <button class="btn btn-secondary btn-sm" onclick="changePortalPassword()">שינוי סיסמה</button>
+      <button class="btn btn-secondary btn-sm" onclick="changePortalPin()">שינוי PIN</button>
       <button class="btn btn-secondary btn-sm" id="manageSitesBtn" onclick="openProjectPanel()" style="display:none">פרויקטים</button>
       <button class="btn btn-secondary btn-sm" onclick="logoutPortal()">התנתק</button>
     </div>
@@ -481,6 +497,7 @@ let PORTAL_CAPS = {};
 let PORTAL_FINANCE = null;
 let PORTAL_USERS = [];
 let PORTAL_USER_ASSIGNMENTS = [];
+let PORTAL_DEVICES = [];
 let PORTAL_ORDERS = [];
 let SUPPORT_PREVIEW = false;
 let SUPPORT_PREVIEW_EXPIRES_AT = null;
@@ -495,6 +512,7 @@ let itemIdSeq   = 0;
 let portalShapeEditor = null;
 let portalShapeTargetId = null;
 let portalItemThumb3D = true;
+let PENDING_ENROLLMENT_TOKEN = '';
 
 async function apiFetch(url, opts = {}, timeoutMs = 20000) {
   const ctrl = new AbortController();
@@ -513,10 +531,18 @@ const WEIGHTS   = {6:0.222,8:0.395,10:0.617,12:0.888,14:1.21,16:1.58,18:2.00,20:
 // Boot
 // ──────────────────────────────────────────────────────
 (async function init() {
-  // Token from URL or localStorage
   const params = new URLSearchParams(location.search);
+  PENDING_ENROLLMENT_TOKEN = params.get('enroll') || '';
+  if (PENDING_ENROLLMENT_TOKEN) {
+    showDeviceEnrollment();
+    showScreen('screenAuth');
+    return;
+  }
+  // Trusted-device sessions live only for the current browser session. The
+  // long-lived device credential itself remains in an HttpOnly cookie.
   const tokenFromUrl = params.get('token');
-  TOKEN = tokenFromUrl || localStorage.getItem('ib_token');
+  const trustedSessionToken = globalThis.sessionStorage?.getItem('ib_portal_session');
+  TOKEN = tokenFromUrl || trustedSessionToken || localStorage.getItem('ib_token');
 
   if (TOKEN) {
     try {
@@ -529,7 +555,10 @@ const WEIGHTS   = {6:0.222,8:0.395,10:0.617,12:0.888,14:1.21,16:1.58,18:2.00,20:
           history.replaceState({}, '', url);
         }
         setPortalContext(me);
-        if (!me.supportPreview) localStorage.setItem('ib_token', TOKEN);
+        if (!me.supportPreview) {
+          if (trustedSessionToken) globalThis.sessionStorage?.setItem('ib_portal_session', TOKEN);
+          else localStorage.setItem('ib_token', TOKEN);
+        }
         await loadShapes();
         await loadPriceList();
         showHome(me.orders);
@@ -538,7 +567,9 @@ const WEIGHTS   = {6:0.222,8:0.395,10:0.617,12:0.888,14:1.21,16:1.58,18:2.00,20:
     } catch {}
     TOKEN = null;
     localStorage.removeItem('ib_token');
+    globalThis.sessionStorage?.removeItem('ib_portal_session');
   }
+  await loadTrustedDeviceStatus();
   showScreen('screenAuth');
 })();
 
@@ -705,14 +736,29 @@ function renderCustomerSitesPanel() {
     names.push(row.site_name || 'אתר');
     usersBySite.set(key, names);
   });
+  const devicesByUser = new Map();
+  PORTAL_DEVICES.filter(device => Number(device.active) === 1).forEach(device => {
+    const key = Number(device.portal_user_id);
+    const rows = devicesByUser.get(key) || [];
+    rows.push(device);
+    devicesByUser.set(key, rows);
+  });
   const userRows = PORTAL_USERS.length
-    ? PORTAL_USERS.map(user => `
+    ? PORTAL_USERS.map(user => {
+      const devices = devicesByUser.get(Number(user.id)) || [];
+      const deviceMarkup = devices.length ? `
+        <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${devices.map(device => `<button class="btn btn-secondary btn-sm" type="button" onclick="revokePortalDeviceAccess(${device.id})" title="ביטול הגישה ממחשב זה">בטל ${escapeHtml(device.device_name || 'מחשב')}</button>`).join('')}
+        </span>
+      ` : '<small style="color:var(--dim)">אין מחשב מאושר</small>';
+      return `
       <div class="guarantee-row">
         <b>${escapeHtml(user.name || user.phone)} <small style="color:var(--dim);font-weight:700">· ${escapeHtml(portalRoleLabel(user.role))}</small></b>
         <span>${escapeHtml(user.phone || '')}${usersBySite.get(Number(user.id))?.length ? ' · ' + escapeHtml(usersBySite.get(Number(user.id)).join(', ')) : ''}</span>
-        ${user.active ? `<button class="btn btn-secondary btn-sm" type="button" onclick="deactivatePortalUser(${user.id})">בטל</button>` : '<span class="guarantee-status">לא פעיל</span>'}
+        ${deviceMarkup}
+        ${user.active ? `<span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-secondary btn-sm" type="button" onclick="requestPortalInvite(${user.id})">קישור ל-5 דקות</button><button class="btn btn-secondary btn-sm" type="button" onclick="deactivatePortalUser(${user.id})">בטל</button></span>` : '<span class="guarantee-status">לא פעיל</span>'}
       </div>
-    `).join('')
+    `}).join('')
     : '<div class="loader" style="padding:12px">אין משתמשים נוספים עדיין</div>';
   const userForm = canManageUsers ? `
     <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
@@ -721,6 +767,10 @@ function renderCustomerSitesPanel() {
         <span class="guarantee-status">${PORTAL_USERS.length}</span>
       </div>
       <div class="guarantee-list">${userRows}</div>
+      <div id="portalInviteResult" style="display:none;margin-top:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:#f7fafc">
+        <b>קישור הפעלה חד-פעמי — תקף ל-5 דקות</b>
+        <div class="portal-code-row" style="margin-top:8px"><input id="portalInviteLink" readonly><button class="btn btn-secondary btn-sm" type="button" onclick="copyPortalInvite()">העתק</button></div>
+      </div>
       <div id="newPortalUserForm" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
         <input id="portalUserName" placeholder="שם משתמש" />
         <input id="portalUserPhone" placeholder="טלפון לכניסה" />
@@ -850,11 +900,16 @@ async function loadPortalUsers() {
   if (!PORTAL_CAPS.canManageUsers) {
     PORTAL_USERS = [];
     PORTAL_USER_ASSIGNMENTS = [];
+    PORTAL_DEVICES = [];
     return;
   }
-  const data = await fetch(`/api/c/users?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
+  const [data, deviceData] = await Promise.all([
+    fetch(`/api/c/users?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
+    fetch(`/api/c/devices?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
+  ]);
   PORTAL_USERS = Array.isArray(data?.users) ? data.users : [];
   PORTAL_USER_ASSIGNMENTS = Array.isArray(data?.assignments) ? data.assignments : [];
+  PORTAL_DEVICES = Array.isArray(deviceData?.devices) ? deviceData.devices : [];
 }
 
 async function createPortalUser(event) {
@@ -890,6 +945,43 @@ async function createPortalUser(event) {
   toast('המשתמש נוסף');
   await loadPortalUsers();
   renderCustomerSitesPanel();
+  if (res.data.activationLink) showPortalInvite(res.data.activationLink);
+}
+
+function showPortalInvite(link) {
+  const host = document.getElementById('portalInviteResult');
+  const input = document.getElementById('portalInviteLink');
+  if (!host || !input) return;
+  input.value = link || '';
+  host.style.display = link ? '' : 'none';
+  if (link) input.select();
+}
+
+async function requestPortalInvite(userId) {
+  const res = await fetch(`/api/c/users/${userId}/invite`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:TOKEN })
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן ליצור קישור', true); return; }
+  showPortalInvite(res.data.activationLink);
+  toast('נוצר קישור חדש שתקף ל-5 דקות');
+}
+
+async function copyPortalInvite() {
+  const input = document.getElementById('portalInviteLink');
+  if (!input?.value) return;
+  try { await navigator.clipboard.writeText(input.value); toast('הקישור הועתק'); }
+  catch { input.select(); document.execCommand('copy'); toast('הקישור הועתק'); }
+}
+
+async function revokePortalDeviceAccess(deviceId) {
+  if (!confirm('לבטל את הגישה מהמחשב המאושר הזה? כדי לחבר אותו שוב יהיה צורך בקישור חדש.')) return;
+  const res = await fetch(`/api/c/devices/${deviceId}/revoke`, {
+    method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:TOKEN })
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן לבטל את המחשב', true); return; }
+  await loadPortalUsers();
+  renderCustomerSitesPanel();
+  toast('הגישה מהמחשב בוטלה');
 }
 
 async function deactivatePortalUser(id) {
@@ -948,6 +1040,56 @@ let _needName = false;
 let _otpRequested = false;
 let _pendingOtpPhone = '';
 
+function showDeviceEnrollment() {
+  document.getElementById('deviceEnrollPanel').style.display = '';
+  document.getElementById('trustedDeviceLogin').style.display = 'none';
+  document.getElementById('standardAuthOptions').style.display = 'none';
+  setTimeout(() => document.getElementById('deviceEnrollPin')?.focus(), 0);
+}
+
+function showStandardPortalLogin() {
+  document.getElementById('deviceEnrollPanel').style.display = 'none';
+  document.getElementById('trustedDeviceLogin').style.display = 'none';
+  document.getElementById('standardAuthOptions').style.display = '';
+  setTimeout(() => document.getElementById('authPhone')?.focus(), 0);
+}
+
+async function loadTrustedDeviceStatus() {
+  const data = await fetch('/api/c/auth/device-status', { credentials:'same-origin' }).then(r=>r.json()).catch(()=>null);
+  if (!data?.trusted) { showStandardPortalLogin(); return; }
+  document.getElementById('deviceEnrollPanel').style.display = 'none';
+  document.getElementById('standardAuthOptions').style.display = 'none';
+  document.getElementById('trustedDeviceLogin').style.display = '';
+  document.getElementById('trustedDeviceLabel').textContent = `${data.user?.name || 'משתמש'} · ${portalRoleLabel(data.user?.role)}`;
+  setTimeout(() => document.getElementById('trustedDevicePin')?.focus(), 0);
+}
+
+async function activateTrustedDevice() {
+  const pin = document.getElementById('deviceEnrollPin')?.value.replace(/\D/g, '') || '';
+  const confirmPin = document.getElementById('deviceEnrollPinConfirm')?.value.replace(/\D/g, '') || '';
+  if (pin.length !== 6) { toast('יש לבחור PIN בן 6 ספרות', true); return; }
+  if (pin !== confirmPin) { toast('ה-PIN והאימות אינם זהים', true); return; }
+  const res = await fetch('/api/c/device/activate', {
+    method: 'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ enrollmentToken:PENDING_ENROLLMENT_TOKEN, pin, deviceName:navigator.platform || 'דפדפן מאושר' })
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן להפעיל את המחשב', true); return; }
+  PENDING_ENROLLMENT_TOKEN = '';
+  await completeAuth(res.data);
+  toast('המחשב אושר. מעכשיו נכנסים באמצעות ה-PIN בלבד.');
+}
+
+async function loginWithTrustedDevicePin() {
+  const pin = document.getElementById('trustedDevicePin')?.value.replace(/\D/g, '') || '';
+  if (pin.length !== 6) { toast('יש להזין PIN בן 6 ספרות', true); return; }
+  const res = await fetch('/api/c/auth/device-pin', {
+    method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ pin })
+  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן להיכנס', true); return; }
+  document.getElementById('trustedDevicePin').value = '';
+  await completeAuth(res.data);
+}
+
 function normalizePortalAccessCode(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -982,7 +1124,10 @@ async function loginWithPassword() {
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
   if (!res.ok) { toast(res.data?.error || 'טלפון או סיסמה שגויים', true); return; }
-  await completeAuth(res.data);
+  if (!res.data?.enrollmentToken) { toast('לא ניתן לאשר את המחשב', true); return; }
+  PENDING_ENROLLMENT_TOKEN = res.data.enrollmentToken;
+  showDeviceEnrollment();
+  toast('הסיסמה אומתה. עכשיו בחר PIN קבוע למחשב הזה.');
 }
 
 function forgotPortalPassword() {
@@ -1042,11 +1187,19 @@ async function doAuth() {
 async function completeAuth(data) {
   TOKEN = data.token;
   setPortalContext(data);
-  localStorage.setItem('ib_token', TOKEN);
+  if (data.trustedDevice) {
+    globalThis.sessionStorage?.setItem('ib_portal_session', TOKEN);
+    localStorage.removeItem('ib_token');
+  } else {
+    localStorage.setItem('ib_token', TOKEN);
+    globalThis.sessionStorage?.removeItem('ib_portal_session');
+  }
 
   // Update URL without reload
   const url = new URL(location.href);
-  url.searchParams.set('token', TOKEN);
+  url.searchParams.delete('enroll');
+  if (data.trustedDevice) url.searchParams.delete('token');
+  else url.searchParams.set('token', TOKEN);
   history.replaceState({}, '', url);
 
   await loadShapes();
@@ -1054,19 +1207,21 @@ async function completeAuth(data) {
   showHome(null);
 }
 
-async function changePortalPassword() {
+async function changePortalPin() {
   if (!TOKEN) return;
-  const oldPassword = prompt('הכנס סיסמה נוכחית. אם זו סיסמה זמנית ראשונה, אפשר להשאיר ריק:') || '';
-  const newPassword = prompt('בחר סיסמה / PIN חדש. לפחות 4 תווים:') || '';
+  const oldPassword = (prompt('הכנס את ה-PIN הנוכחי של המחשב הזה:') || '').replace(/\D/g, '');
+  if (!oldPassword) return;
+  const newPassword = (prompt('בחר PIN חדש בן 6 ספרות למחשב הזה:') || '').replace(/\D/g, '');
   if (!newPassword) return;
+  if (newPassword.length !== 6) { toast('ה-PIN חייב להכיל 6 ספרות', true); return; }
   const res = await fetch('/api/c/password/change', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ token:TOKEN, oldPassword, newPassword })
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok) { toast(res.data?.error || 'לא ניתן לשנות סיסמה', true); return; }
-  toast('הסיסמה עודכנה');
+  if (!res.ok) { toast(res.data?.error || 'לא ניתן לשנות PIN', true); return; }
+  toast('ה-PIN עודכן');
 }
 
 function logoutPortal() {
@@ -1075,6 +1230,7 @@ function logoutPortal() {
     return;
   }
   if (!SUPPORT_PREVIEW) localStorage.removeItem('ib_token');
+  globalThis.sessionStorage?.removeItem('ib_portal_session');
   TOKEN = null;
   ME = null;
   SUPPORT_PREVIEW = false;
@@ -1082,7 +1238,7 @@ function logoutPortal() {
   const url = new URL(location.href);
   url.searchParams.delete('token');
   history.replaceState({}, '', url);
-  showScreen('screenAuth');
+  loadTrustedDeviceStatus().finally(() => showScreen('screenAuth'));
 }
 
 function exitSupportMode() {

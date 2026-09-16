@@ -82,6 +82,52 @@ test('portal links prefer the active request host over stale deployment settings
   }
 });
 
+test('five-minute enrollment creates a single-use trusted device with a device-bound PIN', () => {
+  const { db, access } = fixture();
+  const userId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'0508','Site manager','field_manager',1)").run().lastInsertRowid;
+  const user = db.prepare('SELECT * FROM portal_users WHERE id=?').get(userId);
+  const before = Date.now();
+  const invite = access.issuePortalEnrollment(user, { baseUrl: 'https://portal.example' });
+  assert.equal(invite.ok, true);
+  assert.match(invite.activationLink, /^https:\/\/portal\.example\/customer\.html\?enroll=/);
+  const ttl = new Date(invite.expiresAt).getTime() - before;
+  assert.ok(ttl > 4 * 60 * 1000 && ttl <= 5 * 60 * 1000 + 1000);
+  const stored = db.prepare('SELECT * FROM customer_portal_enrollments WHERE portal_user_id=?').get(userId);
+  assert.notEqual(stored.token_hash, invite.token);
+
+  const weak = access.activatePortalDevice(invite.token, '123456', 'Office PC');
+  assert.equal(weak.ok, false);
+  const activation = access.activatePortalDevice(invite.token, '482913', 'Office PC');
+  assert.equal(activation.ok, true);
+  assert.notEqual(db.prepare('SELECT pin_hash FROM customer_portal_devices WHERE id=?').get(activation.deviceId).pin_hash, '482913');
+  assert.equal(access.activatePortalDevice(invite.token, '482913', 'Second PC').ok, false, 'enrollment must be single use');
+  assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '482913').ok, true);
+  assert.equal(access.authenticatePortalDevicePin('', '482913').ok, false, 'PIN alone must not work without the trusted-device credential');
+
+  const changed = access.changePortalDevicePin(activation.deviceToken, userId, '482913', '739251');
+  assert.equal(changed.ok, true);
+  assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '482913').ok, false);
+  assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '739251').ok, true);
+  assert.equal(access.listPortalDevices(1, userId).length, 1);
+  assert.equal(access.revokePortalDevice(1, activation.deviceId), true);
+  assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '739251').ok, false);
+  db.close();
+});
+
+test('trusted device locks for fifteen minutes after five incorrect PIN attempts', () => {
+  const { db, access } = fixture();
+  const userId = db.prepare("INSERT INTO portal_users (customer_id,phone,name,role,active) VALUES (1,'0507','Locked','field_manager',1)").run().lastInsertRowid;
+  const user = db.prepare('SELECT * FROM portal_users WHERE id=?').get(userId);
+  const invite = access.issuePortalEnrollment(user);
+  const activation = access.activatePortalDevice(invite.token, '482913', 'Tablet');
+  for (let i = 0; i < 4; i += 1) assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '111112').status, 401);
+  const locked = access.authenticatePortalDevicePin(activation.deviceToken, '111112');
+  assert.equal(locked.status, 429);
+  assert.match(locked.error, /15 דקות/);
+  assert.equal(access.authenticatePortalDevicePin(activation.deviceToken, '482913').status, 429);
+  db.close();
+});
+
 test('blocked site budget rejects projected overrun and view-only cannot write budget', () => {
   const { db } = fixture();
   db.prepare("INSERT INTO customer_sites (id,customer_id,name,status,budget_amount,budget_kg,block_over_budget) VALUES (20,1,'Budget','active',10,1,1)").run();
@@ -118,7 +164,31 @@ test('HTTP portal enforces delegated flags and cross-site order access', async (
   const headers = { 'Content-Type': 'application/json' };
   const denied = await call('/api/c/users', { method: 'POST', headers, body: JSON.stringify({ token, phone: '0512', role: 'customer_admin', canManageUsers: true, canCreateSites: true, canCreateOrders: true, canApproveOrders: true, canViewPrices: true, canViewBudget: true, canSetBudget: true, canViewInvoices: true, canViewPaymentAlerts: true, siteIds: [siteA] }) });
   assert.equal(denied.response.status, 200, JSON.stringify(denied.body));
+  const activationUrl = new URL(denied.body.activationLink);
+  assert.equal(activationUrl.host, new URL(base).host);
+  const enrollmentToken = activationUrl.searchParams.get('enroll');
+  assert.ok(enrollmentToken);
+  const activated = await call('/api/c/device/activate', { method: 'POST', headers, body: JSON.stringify({ enrollmentToken, pin: '482913', deviceName: 'Test browser' }) });
+  assert.equal(activated.response.status, 200, JSON.stringify(activated.body));
+  assert.equal(activated.body.trustedDevice, true);
+  const cookie = activated.response.headers.get('set-cookie');
+  assert.match(cookie, /ib_portal_device=/);
+  assert.match(cookie, /HttpOnly/i);
+  assert.match(cookie, /SameSite=Strict/i);
+  const signedIn = await call('/api/c/auth/device-pin', { method: 'POST', headers: { ...headers, Cookie: cookie.split(';')[0] }, body: JSON.stringify({ pin: '482913' }) });
+  assert.equal(signedIn.response.status, 200, JSON.stringify(signedIn.body));
+  assert.equal(signedIn.body.trustedDevice, true);
   const delegated = db.prepare('SELECT * FROM portal_users WHERE phone=\'0512\'').get();
+  const bcrypt = require('bcryptjs');
+  db.prepare('UPDATE portal_users SET password_hash=? WHERE id=?').run(bcrypt.hashSync('Initial-password-42', 4), delegated.id);
+  const passwordStart = await call('/api/c/auth/password', { method: 'POST', headers, body: JSON.stringify({ phone: '0512', password: 'Initial-password-42' }) });
+  assert.equal(passwordStart.response.status, 200, JSON.stringify(passwordStart.body));
+  assert.equal(passwordStart.body.passwordVerified, true);
+  assert.ok(passwordStart.body.enrollmentToken);
+  assert.equal(passwordStart.body.token, undefined, 'password login must finish trusted-device activation before issuing a session');
+  const passwordDevice = await call('/api/c/device/activate', { method: 'POST', headers, body: JSON.stringify({ enrollmentToken: passwordStart.body.enrollmentToken, pin: '739251', deviceName: 'Password setup' }) });
+  assert.equal(passwordDevice.response.status, 200, JSON.stringify(passwordDevice.body));
+  assert.equal(passwordDevice.body.trustedDevice, true);
   assert.equal(delegated.role, 'customer_admin');
   assert.equal(delegated.can_create_orders, 1);
   assert.equal(delegated.can_approve_orders, 1);

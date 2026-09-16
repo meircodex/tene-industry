@@ -60,6 +60,36 @@ function createPortalAccessService(deps) {
   try { db.exec(`ALTER TABLE portal_users ADD COLUMN default_site_id INTEGER`); } catch {}
   try { db.exec(`ALTER TABLE portal_users ADD COLUMN updated_at TEXT`); } catch {}
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customer_portal_enrollments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      portal_user_id INTEGER NOT NULL REFERENCES portal_users(id),
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      consumed_at TEXT,
+      created_by_portal_user_id INTEGER,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS customer_portal_devices (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL REFERENCES customers(id),
+      portal_user_id INTEGER NOT NULL REFERENCES portal_users(id),
+      device_token_hash TEXT NOT NULL UNIQUE,
+      pin_hash TEXT NOT NULL,
+      device_name TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT,
+      last_used_at TEXT,
+      revoked_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_portal_enrollment_user ON customer_portal_enrollments(portal_user_id,expires_at);
+    CREATE INDEX IF NOT EXISTS idx_portal_device_user ON customer_portal_devices(portal_user_id,active);
+  `);
+  try { db.exec(`ALTER TABLE customer_portal_devices ADD COLUMN pin_hash TEXT`); } catch {}
+
   // Backfill חד-פעמי: כל לקוח קיים עם טלפון → משתמש פורטל role=both (שומר התנהגות קיימת)
   try {
     if (db.prepare('SELECT COUNT(*) c FROM portal_users').get().c === 0) {
@@ -312,6 +342,149 @@ function createPortalAccessService(deps) {
     return String(crypto.randomInt(100000, 1000000));
   }
 
+  function normalizePortalPin(pin) {
+    return String(pin || '').replace(/\D/g, '');
+  }
+
+  function validatePortalPin(pin) {
+    const clean = normalizePortalPin(pin);
+    if (!/^\d{6}$/.test(clean)) return { ok: false, error: 'ה-PIN חייב להכיל 6 ספרות' };
+    const weak = new Set(['000000','111111','222222','333333','444444','555555','666666','777777','888888','999999','123456','654321']);
+    if (weak.has(clean)) return { ok: false, error: 'יש לבחור PIN שאינו רצף פשוט או ספרות זהות' };
+    return { ok: true, pin: clean };
+  }
+
+  function hashOpaqueToken(value) {
+    return crypto.createHash('sha256')
+      .update(`${process.env.JWT_SECRET || process.env.SESSION_SECRET || 'dev-secret'}:${String(value || '')}`)
+      .digest('hex');
+  }
+
+  function issuePortalEnrollment(portalUser, options = {}) {
+    if (!portalUser?.id || Number(portalUser.active) !== 1) return { ok: false, error: 'משתמש הפורטל אינו פעיל' };
+    const token = crypto.randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    db.prepare('UPDATE customer_portal_enrollments SET consumed_at=CURRENT_TIMESTAMP WHERE portal_user_id=? AND consumed_at IS NULL')
+      .run(portalUser.id);
+    db.prepare(`
+      INSERT INTO customer_portal_enrollments
+        (customer_id,portal_user_id,token_hash,expires_at,created_by_portal_user_id)
+      VALUES (?,?,?,?,?)
+    `).run(portalUser.customer_id, portalUser.id, hashOpaqueToken(token), expiresAt, options.createdByPortalUserId || null);
+    const baseUrl = configuredBaseUrl(options.baseUrl || `http://localhost:${PORT}`);
+    return {
+      ok: true,
+      token,
+      expiresAt,
+      activationLink: `${baseUrl}/customer.html?enroll=${encodeURIComponent(token)}`,
+    };
+  }
+
+  function activatePortalDevice(enrollmentToken, pin, deviceName = '') {
+    const pinResult = validatePortalPin(pin);
+    if (!pinResult.ok) return { ...pinResult, status: 400 };
+    const enrollment = db.prepare(`
+      SELECT e.*,u.active AS user_active,u.customer_id AS user_customer_id
+      FROM customer_portal_enrollments e
+      JOIN portal_users u ON u.id=e.portal_user_id
+      WHERE e.token_hash=? AND e.consumed_at IS NULL
+      ORDER BY e.id DESC LIMIT 1
+    `).get(hashOpaqueToken(enrollmentToken));
+    if (!enrollment) return { ok: false, status: 401, error: 'קישור ההפעלה אינו תקין או שכבר נוצל' };
+    if (new Date(enrollment.expires_at).getTime() <= Date.now()) {
+      db.prepare('UPDATE customer_portal_enrollments SET consumed_at=CURRENT_TIMESTAMP WHERE id=?').run(enrollment.id);
+      return { ok: false, status: 401, error: 'קישור ההפעלה פג תוקף. בקש קישור חדש.' };
+    }
+    if (Number(enrollment.user_active) !== 1 || Number(enrollment.customer_id) !== Number(enrollment.user_customer_id)) {
+      return { ok: false, status: 403, error: 'משתמש הפורטל אינו פעיל' };
+    }
+    const deviceToken = crypto.randomBytes(32).toString('base64url');
+    const deviceLabel = String(deviceName || '').trim().slice(0, 100) || 'דפדפן מאושר';
+    const transaction = db.transaction(() => {
+      const hash = bcrypt.hashSync(pinResult.pin, 10);
+      const created = db.prepare(`
+        INSERT INTO customer_portal_devices
+          (customer_id,portal_user_id,device_token_hash,pin_hash,device_name,last_used_at)
+        VALUES (?,?,?,?,?,CURRENT_TIMESTAMP)
+      `).run(enrollment.customer_id, enrollment.portal_user_id, hashOpaqueToken(deviceToken), hash, deviceLabel);
+      db.prepare('UPDATE customer_portal_enrollments SET consumed_at=CURRENT_TIMESTAMP WHERE id=?').run(enrollment.id);
+      return created.lastInsertRowid;
+    });
+    const deviceId = transaction();
+    const user = db.prepare('SELECT * FROM portal_users WHERE id=? AND active=1').get(enrollment.portal_user_id);
+    return { ok: true, deviceToken, deviceId, user };
+  }
+
+  function resolvePortalDevice(deviceToken) {
+    if (!deviceToken) return null;
+    return db.prepare(`
+      SELECT d.*,u.phone,u.name,u.role,u.active AS user_active
+      FROM customer_portal_devices d
+      JOIN portal_users u ON u.id=d.portal_user_id AND u.customer_id=d.customer_id
+      WHERE d.device_token_hash=? AND d.active=1 AND u.active=1
+      LIMIT 1
+    `).get(hashOpaqueToken(deviceToken)) || null;
+  }
+
+  function authenticatePortalDevicePin(deviceToken, pin) {
+    const device = resolvePortalDevice(deviceToken);
+    if (!device) return { ok: false, status: 401, error: 'המכשיר אינו מאושר. יש להשתמש בקישור הפעלה חדש.' };
+    if (device.locked_until && new Date(device.locked_until).getTime() > Date.now()) {
+      return { ok: false, status: 429, error: 'המכשיר נעול זמנית לאחר מספר ניסיונות שגויים' };
+    }
+    const clean = normalizePortalPin(pin);
+    const valid = /^\d{6}$/.test(clean) && device.pin_hash && bcrypt.compareSync(clean, device.pin_hash);
+    if (!valid) {
+      const attempts = Number(device.failed_attempts || 0) + 1;
+      const lockedUntil = attempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null;
+      db.prepare('UPDATE customer_portal_devices SET failed_attempts=?,locked_until=? WHERE id=?')
+        .run(lockedUntil ? 0 : attempts, lockedUntil, device.id);
+      return { ok: false, status: lockedUntil ? 429 : 401, error: lockedUntil ? 'המכשיר ננעל ל-15 דקות' : 'PIN שגוי' };
+    }
+    db.prepare('UPDATE customer_portal_devices SET failed_attempts=0,locked_until=NULL,last_used_at=CURRENT_TIMESTAMP WHERE id=?')
+      .run(device.id);
+    const user = db.prepare('SELECT * FROM portal_users WHERE id=? AND active=1').get(device.portal_user_id);
+    return { ok: true, user, deviceId: device.id };
+  }
+
+  function changePortalDevicePin(deviceToken, portalUserId, oldPin, newPin) {
+    const device = resolvePortalDevice(deviceToken);
+    if (!device || Number(device.portal_user_id) !== Number(portalUserId)) {
+      return { ok: false, status: 401, error: 'המחשב אינו מאושר למשתמש זה' };
+    }
+    const next = validatePortalPin(newPin);
+    if (!next.ok) return { ...next, status: 400 };
+    const current = normalizePortalPin(oldPin);
+    if (!/^\d{6}$/.test(current) || !device.pin_hash || !bcrypt.compareSync(current, device.pin_hash)) {
+      return { ok: false, status: 401, error: 'ה-PIN הנוכחי שגוי' };
+    }
+    db.prepare('UPDATE customer_portal_devices SET pin_hash=?,failed_attempts=0,locked_until=NULL WHERE id=?')
+      .run(bcrypt.hashSync(next.pin, 10), device.id);
+    return { ok: true, deviceId: device.id };
+  }
+
+  function listPortalDevices(customerId, portalUserId = null) {
+    const where = ['d.customer_id=?'];
+    const params = [Number(customerId)];
+    if (portalUserId) { where.push('d.portal_user_id=?'); params.push(Number(portalUserId)); }
+    return db.prepare(`
+      SELECT d.id,d.portal_user_id,d.device_name,d.active,d.last_used_at,d.revoked_at,d.created_at,u.name AS user_name,u.phone
+      FROM customer_portal_devices d
+      JOIN portal_users u ON u.id=d.portal_user_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY d.active DESC,COALESCE(d.last_used_at,d.created_at) DESC
+    `).all(...params);
+  }
+
+  function revokePortalDevice(customerId, deviceId) {
+    const result = db.prepare(`
+      UPDATE customer_portal_devices
+      SET active=0,revoked_at=CURRENT_TIMESTAMP
+      WHERE id=? AND customer_id=? AND active=1
+    `).run(Number(deviceId), Number(customerId));
+    return result.changes > 0;
+  }
+
   // טוקן פר-משתמש → {customer, user, role}. נופל ל-null אם לא קיים/פג.
   function resolvePortalSession(token) {
     if (!token) return null;
@@ -450,6 +623,14 @@ function createPortalAccessService(deps) {
     setPortalPassword,
     verifyPortalPassword,
     generatePortalPassword,
+    validatePortalPin,
+    issuePortalEnrollment,
+    activatePortalDevice,
+    resolvePortalDevice,
+    authenticatePortalDevicePin,
+    changePortalDevicePin,
+    listPortalDevices,
+    revokePortalDevice,
     resolvePortalSession,
     roleCaps,
     customerPortalCaps,

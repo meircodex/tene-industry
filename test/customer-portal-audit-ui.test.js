@@ -12,12 +12,23 @@ const rendererCss = fs.readFileSync(path.join(__dirname, '../public/order-line-r
 const editor = fs.readFileSync(path.join(__dirname, '../public/new-order-editor.js'), 'utf8');
 
 test('customer portal has linked delivery/auth labels and honest step state', () => {
-  for (const id of ['portalAccessCode', 'authPhone', 'authPassword', 'authName', 'authOtp', 'orderSiteId', 'delivDate', 'delivTime', 'delivMode', 'delivAddr', 'orderNotes']) {
+  for (const id of ['deviceEnrollPin', 'deviceEnrollPinConfirm', 'trustedDevicePin', 'portalAccessCode', 'authPhone', 'authPassword', 'authName', 'authOtp', 'orderSiteId', 'delivDate', 'delivTime', 'delivMode', 'delivAddr', 'orderNotes']) {
     assert.match(html, new RegExp(`<label[^>]*for="${id}"`), `missing label for ${id}`);
   }
   assert.match(html, /class="active" aria-current="step">1\. פריטים וצורות/);
   assert.match(html, /הקובץ יועלה עם ההזמנה/);
   assert.doesNotMatch(html, /OCR מלא לפורטל יחובר כ-endpoint נפרד/);
+});
+
+test('trusted-device access uses a one-use five-minute enrollment and session-only portal token', () => {
+  assert.match(html, /האישור הראשוני תקף לחמש דקות ולשימוש אחד/);
+  assert.match(html, /\/api\/c\/device\/activate/);
+  assert.match(html, /\/api\/c\/auth\/device-pin/);
+  assert.match(html, /sessionStorage\?\.setItem\('ib_portal_session'/);
+  assert.match(html, /credentials:'same-origin'/);
+  assert.match(html, /קישור ל-5 דקות/);
+  assert.match(html, /res\.data\?\.enrollmentToken/);
+  assert.match(html, /revokePortalDeviceAccess/);
 });
 
 test('mobile login sizing and price-list rendering cover the audited viewport/data gaps', () => {

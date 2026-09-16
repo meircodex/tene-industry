@@ -80,7 +80,6 @@ module.exports = function createPortalRouter(deps) {
     resolveCustomer,
     findOrCreatePortalUser,
     issueUserToken,
-    setPortalPassword,
     verifyPortalPassword,
     resolvePortalSession,
     roleCaps,
@@ -89,7 +88,31 @@ module.exports = function createPortalRouter(deps) {
     issuePortalOtp,
     verifyPortalOtp,
     portalAuthResponse,
+    issuePortalEnrollment,
+    activatePortalDevice,
+    resolvePortalDevice,
+    authenticatePortalDevicePin,
+    changePortalDevicePin,
+    listPortalDevices,
+    revokePortalDevice,
   } = portalAccess;
+
+  const PORTAL_DEVICE_COOKIE = 'ib_portal_device';
+  function readCookie(req, name) {
+    const header = String(req.headers?.cookie || '');
+    for (const part of header.split(';')) {
+      const separator = part.indexOf('=');
+      if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+      try { return decodeURIComponent(part.slice(separator + 1).trim()); } catch { return ''; }
+    }
+    return '';
+  }
+  function portalDeviceCookie(value, maxAge = 180 * 24 * 60 * 60) {
+    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    return `${PORTAL_DEVICE_COOKIE}=${encodeURIComponent(value || '')}; HttpOnly; SameSite=Strict; Path=/api/c; Max-Age=${maxAge}${secure}`;
+  }
+  function setPortalDeviceCookie(res, value) { res.append('Set-Cookie', portalDeviceCookie(value)); }
+  function clearPortalDeviceCookie(res) { res.append('Set-Cookie', portalDeviceCookie('', 0)); }
 
   // session(token) -> {customer, user, role}. Only per-user portal tokens are active sessions.
   function session(token) {
@@ -159,6 +182,37 @@ module.exports = function createPortalRouter(deps) {
       email: user.email,
       role: user.role,
       default_site_id: portal.defaultSiteId,
+    };
+  }
+
+  function portalLoginResponse(req, customer, user, extra = {}) {
+    const { token, expiresAt } = issueUserToken(user);
+    const portal = portalContext(customer, user);
+    const caps = portal.caps;
+    return {
+      token,
+      link: portalAccess.portalLink(token, { baseUrl: requestPublicBaseUrl(req) }),
+      expiresAt,
+      role: portal.role,
+      caps,
+      portalUser: publicPortalUser(user, portal),
+      sites: portal.sites,
+      defaultSiteId: portal.defaultSiteId,
+      canChooseSite: portal.canChooseSite,
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email,
+        address: customer.address,
+        contact_name: customer.contact_name,
+        contact_phone: customer.contact_phone,
+        tax_id: customer.tax_id,
+        payment_terms: customer.payment_terms,
+        portal_price_list_visibility: customer.portal_price_list_visibility,
+        price_tier: caps.seePrice ? customer.price_tier : undefined,
+      },
+      ...extra,
     };
   }
 
@@ -295,6 +349,39 @@ module.exports = function createPortalRouter(deps) {
     }).filter(row => row.status !== 'not_due');
   }
 
+  // Trusted browser enrollment: a five-minute, one-use link installs a
+  // server-verifiable device secret. Later logins require that secret + PIN.
+  router.get('/c/auth/device-status', customerPortalAuthLimiter, (req, res) => {
+    const device = resolvePortalDevice(readCookie(req, PORTAL_DEVICE_COOKIE));
+    if (!device) return res.json({ trusted: false });
+    res.json({
+      trusted: true,
+      deviceId: device.id,
+      deviceName: device.device_name,
+      user: { name: device.name, phone: device.phone, role: device.role },
+    });
+  });
+
+  router.post('/c/auth/device-pin', customerPortalAuthLimiter, (req, res) => {
+    const result = authenticatePortalDevicePin(readCookie(req, PORTAL_DEVICE_COOKIE), req.body.pin);
+    if (!result.ok) {
+      if (result.status === 401 && /אינו מאושר/.test(result.error || '')) clearPortalDeviceCookie(res);
+      return res.status(result.status || 401).json({ error: result.error });
+    }
+    const customer = db.prepare('SELECT * FROM customers WHERE id=?').get(result.user.customer_id);
+    if (!customer) return res.status(401).json({ error: 'לקוח לא פעיל' });
+    res.json(portalLoginResponse(req, customer, result.user, { trustedDevice: true, deviceId: result.deviceId }));
+  });
+
+  router.post('/c/device/activate', customerPortalAuthLimiter, (req, res) => {
+    const result = activatePortalDevice(req.body.enrollmentToken, req.body.pin, req.body.deviceName);
+    if (!result.ok) return res.status(result.status || 400).json({ error: result.error });
+    const customer = db.prepare('SELECT * FROM customers WHERE id=?').get(result.user.customer_id);
+    if (!customer) return res.status(401).json({ error: 'לקוח לא פעיל' });
+    setPortalDeviceCookie(res, result.deviceToken);
+    res.json(portalLoginResponse(req, customer, result.user, { trustedDevice: true, deviceId: result.deviceId }));
+  });
+
   // Auth: get/create customer by phone (walk-in) or by token
   router.post('/c/auth', customerPortalAuthLimiter, (req, res) => {
     const { name } = req.body;
@@ -372,32 +459,12 @@ module.exports = function createPortalRouter(deps) {
     }
     const customer = db.prepare('SELECT * FROM customers WHERE id=?').get(user.customer_id);
     if (!customer) return res.status(401).json({ error: 'לקוח לא פעיל' });
-    const { token, expiresAt } = issueUserToken(user);
-    const portal = portalContext(customer, user);
-    const caps = portal.caps;
+    const enrollment = issuePortalEnrollment(user, { baseUrl: requestPublicBaseUrl(req) });
+    if (!enrollment.ok) return res.status(400).json({ error: enrollment.error });
     res.json({
-      token,
-      link: portalAccess.portalLink(token, { baseUrl: requestPublicBaseUrl(req) }),
-      expiresAt,
-      role: portal.role,
-      caps,
-      portalUser: publicPortalUser(user, portal),
-      sites: portal.sites,
-      defaultSiteId: portal.defaultSiteId,
-      canChooseSite: portal.canChooseSite,
-      customer: {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone,
-        email: customer.email,
-        address: customer.address,
-        contact_name: customer.contact_name,
-        contact_phone: customer.contact_phone,
-        tax_id: customer.tax_id,
-        payment_terms: customer.payment_terms,
-        portal_price_list_visibility: customer.portal_price_list_visibility,
-        price_tier: caps.seePrice ? customer.price_tier : undefined
-      }
+      passwordVerified: true,
+      enrollmentToken: enrollment.token,
+      enrollmentExpiresAt: enrollment.expiresAt,
     });
   });
 
@@ -405,14 +472,14 @@ module.exports = function createPortalRouter(deps) {
     const s = session(req.body.token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
     if (s.supportPreview) return res.status(403).json({ error: 'במצב סיוע לא משנים את סיסמת הלקוח' });
-    const oldPassword = String(req.body.oldPassword || '');
-    const newPassword = String(req.body.newPassword || '');
-    if (s.user.password_hash && !verifyPortalPassword(s.user, oldPassword)) {
-      return res.status(401).json({ error: 'הסיסמה הנוכחית שגויה' });
-    }
-    const result = setPortalPassword(s.user.id, newPassword);
-    if (!result.ok) return res.status(400).json({ error: result.error });
-    res.json({ success: true });
+    const result = changePortalDevicePin(
+      readCookie(req, PORTAL_DEVICE_COOKIE),
+      s.user.id,
+      req.body.oldPassword,
+      req.body.newPassword
+    );
+    if (!result.ok) return res.status(result.status || 400).json({ error: result.error });
+    res.json({ success: true, deviceId: result.deviceId });
   });
 
   // Portal user and field-manager delegation
@@ -513,7 +580,57 @@ module.exports = function createPortalRouter(deps) {
       VALUES (?,?,?,?,?)
     `).run(s.customer.id, s.user?.id || null, userId, existing ? 'portal_user_updated_by_customer' : 'portal_user_created_by_customer', JSON.stringify({ role, defaultSiteId, siteIds, flags }));
     auditSupportAction(s, existing ? 'portal_user_updated' : 'portal_user_created', 'customer', s.customer.id, { portalUserId: userId, role, siteIds, flags });
-    res.json({ success: true, id: userId, updated: Boolean(existing) });
+    const freshUser = db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=?').get(userId, s.customer.id);
+    const enrollment = issuePortalEnrollment(freshUser, {
+      createdByPortalUserId: s.user?.id || null,
+      baseUrl: requestPublicBaseUrl(req),
+    });
+    res.json({
+      success: true,
+      id: userId,
+      updated: Boolean(existing),
+      activationLink: enrollment.ok ? enrollment.activationLink : null,
+      activationExpiresAt: enrollment.ok ? enrollment.expiresAt : null,
+    });
+  });
+
+  router.post('/c/users/:id/invite', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.body.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    if (!s.caps.canManageUsers) return res.status(403).json({ error: 'אין הרשאה לנהל משתמשים' });
+    const user = db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=? AND active=1')
+      .get(req.params.id, s.customer.id);
+    if (!user) return res.status(404).json({ error: 'משתמש לא נמצא' });
+    const enrollment = issuePortalEnrollment(user, {
+      createdByPortalUserId: s.user?.id || null,
+      baseUrl: requestPublicBaseUrl(req),
+    });
+    if (!enrollment.ok) return res.status(400).json({ error: enrollment.error });
+    res.json({ success: true, activationLink: enrollment.activationLink, activationExpiresAt: enrollment.expiresAt });
+  });
+
+  router.get('/c/devices', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.query.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const requestedUserId = Number(req.query.portalUserId || 0);
+    if (requestedUserId && !s.caps.canManageUsers && Number(s.user?.id) !== requestedUserId) {
+      return res.status(403).json({ error: 'אין הרשאה לצפות במכשירים האלה' });
+    }
+    const portalUserId = s.caps.canManageUsers ? (requestedUserId || null) : s.user?.id;
+    res.json({ devices: listPortalDevices(s.customer.id, portalUserId) });
+  });
+
+  router.post('/c/devices/:id/revoke', customerPortalActionLimiter, (req, res) => {
+    const s = session(req.body.token);
+    if (!s) return res.status(401).json({ error: 'לא מורשה' });
+    const device = listPortalDevices(s.customer.id).find(row => Number(row.id) === Number(req.params.id));
+    if (!device) return res.status(404).json({ error: 'מכשיר לא נמצא' });
+    if (!s.caps.canManageUsers && Number(device.portal_user_id) !== Number(s.user?.id)) {
+      return res.status(403).json({ error: 'אין הרשאה לבטל את המכשיר הזה' });
+    }
+    revokePortalDevice(s.customer.id, device.id);
+    if (Number(device.portal_user_id) === Number(s.user?.id)) clearPortalDeviceCookie(res);
+    res.json({ success: true });
   });
 
   router.post('/c/users/:id/deactivate', customerPortalActionLimiter, (req, res) => {
@@ -524,6 +641,8 @@ module.exports = function createPortalRouter(deps) {
     if (!u) return res.status(404).json({ error: 'לא נמצא' });
     if (s.user && Number(u.id) === Number(s.user.id)) return res.status(400).json({ error: 'אי אפשר לבטל את המשתמש הנוכחי' });
     db.prepare('UPDATE portal_users SET active=0,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(u.id);
+    db.prepare('UPDATE customer_portal_devices SET active=0,revoked_at=CURRENT_TIMESTAMP WHERE customer_id=? AND portal_user_id=? AND active=1')
+      .run(s.customer.id, u.id);
     auditSupportAction(s, 'portal_user_deactivated', 'customer', s.customer.id, { portalUserId: u.id, phone: u.phone });
     res.json({ success: true });
   });
