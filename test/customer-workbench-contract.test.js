@@ -33,6 +33,9 @@ test('customer workbench exposes an admin-only active portal support session', (
   const portal = read('public/customer.html');
   assert.match(page, /function isSystemAdmin\(\)/);
   assert.match(page, /function openPortalAsCustomer\(id\)/);
+  assert.match(page, /מנהל לקוח – כל האתרים וההרשאות/);
+  assert.match(page, /if \(!users\.length\) \{\s*launchPortalSupport\(id\);/);
+  assert.doesNotMatch(page, /אין ללקוח משתמש פורטל פעיל\. יש להגדיר משתמש תחילה/);
   assert.match(page, /\/portal-preview/);
   assert.match(adminRoute, /portal-preview', requireAnyRole\(\['admin'\]\)/);
   assert.match(portal, /מצב סיוע למנהל מערכת/);

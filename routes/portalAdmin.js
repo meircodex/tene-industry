@@ -78,19 +78,10 @@ module.exports = function createPortalAdminRouter(deps) {
     }
     const portalUser = requestedUserId !== undefined
       ? db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=? AND active=1').get(Number(requestedUserId), customer.id)
-      : db.prepare(`
-      SELECT * FROM portal_users
-      WHERE customer_id=? AND active=1
-      ORDER BY CASE role
-        WHEN 'customer_admin' THEN 0
-        WHEN 'both' THEN 1
-        WHEN 'approver' THEN 2
-        WHEN 'finance' THEN 3
-        ELSE 4
-      END, id
-      LIMIT 1
-    `).get(customer.id) || null;
-    if (!portalUser) return res.status(404).json({ error: 'לא נמצא משתמש פורטל פעיל עבור הלקוח' });
+      : null;
+    if (requestedUserId !== undefined && !portalUser) {
+      return res.status(404).json({ error: 'לא נמצא משתמש פורטל פעיל עבור הלקוח' });
+    }
     const preview = portalAccess.issueSupportPreviewToken(customer.id, req.userId || null, portalUser?.id || null);
     auditLog('customer', customer.id, null, 'portal_support_session_started', null, null, null, portalUser ? `כניסה בשם משתמש פורטל #${portalUser.id}` : 'כניסה ללא משתמש פורטל פעיל', req.userId || null, req.auth?.display_name || null);
     res.json({

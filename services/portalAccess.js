@@ -197,14 +197,15 @@ function createPortalAccessService(deps) {
     return rows.map(row => normalizeSite(row, effectiveCaps));
   }
 
-  function portalContext(customer, portalUser = null) {
-    const caps = roleCaps(portalUser || 'both', customer);
+  function portalContext(customer, portalUser = null, roleOverride = null) {
+    const effectiveRole = portalUser || roleOverride || 'both';
+    const caps = roleCaps(effectiveRole, customer);
     const sites = listAuthorizedSites(customer.id, portalUser, caps);
     const defaultSiteId = portalUser?.default_site_id && sites.some(site => site.id === portalUser.default_site_id)
       ? portalUser.default_site_id
       : sites[0]?.id || null;
     return {
-      role: portalUser?.role || 'both',
+      role: portalUser?.role || roleOverride || 'both',
       caps,
       portalUser: portalUser ? {
         id: portalUser.id,

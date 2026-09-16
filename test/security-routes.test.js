@@ -882,6 +882,20 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
   });
 
   await t.test('customer portal support session is admin-only, active, audited, and does not replace the customer session', async () => {
+    const emptyCustomerId = seedPortalCustomer('Portal Support Without Users', '0500000197', 'unused-support-token');
+    const emptyPreviewResponse = await request(`/api/customers/${emptyCustomerId}/portal-preview`, { headers: authHeaders(admin) });
+    assert.equal(emptyPreviewResponse.status, 200);
+    const emptyPreview = await emptyPreviewResponse.json();
+    assert.equal(emptyPreview.portalUser, null);
+    const emptyPreviewToken = new URL(emptyPreview.link).searchParams.get('token');
+    const emptyMeResponse = await request(`/api/c/me?token=${encodeURIComponent(emptyPreviewToken)}`);
+    assert.equal(emptyMeResponse.status, 200);
+    const emptyMe = await emptyMeResponse.json();
+    assert.equal(emptyMe.role, 'customer_admin');
+    assert.equal(emptyMe.portalUser, null);
+    assert.deepEqual(emptyMe.sites, []);
+    assert.equal(emptyMe.caps.canOrder, true);
+
     const customerId = seedPortalCustomer('Portal Support Customer', '0500000199', 'legacy-support-token');
     const customerToken = seedPortalUser(customerId, '0500000199', 'both', 'active-customer-session');
     db.prepare('UPDATE customers SET portal_can_create_sites=1 WHERE id=?').run(customerId);
