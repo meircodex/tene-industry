@@ -1184,7 +1184,7 @@
     if (window.IronBendOrderLineRenderer) return window.IronBendOrderLineRenderer.render({
       id, lineLabel, elementName, qty, diameter, hasShape, isPileCage,
       shapeSketch: renderLineShapeSketch(item), diameterOptions: diaOptions,
-      unitLengthCm, totalLength, weight,
+      unitLengthCm: unitLenCm, totalLength, weight,
       openCall, updateQtyCall, updateElementCall, updateDiamCall,
       deleteCall: 'removeItem(' + palletArg + ',' + itemArg + ')'
     });

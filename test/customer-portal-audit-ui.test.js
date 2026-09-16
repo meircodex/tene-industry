@@ -72,6 +72,8 @@ test('factory and customer adapters consume one canonical order-line renderer', 
 test('factory order editor cache version is bumped with the shared table integration', () => {
   const factory = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
   assert.match(factory, /new-order-editor\.js\?v=5/);
+  assert.match(editor, /unitLengthCm:\s*unitLenCm/);
+  assert.doesNotMatch(editor, /\bunitLengthCm,\s*totalLength/);
 });
 
 test('order submission contracts preserve idempotency and retryable source files/history', () => {
