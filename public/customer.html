@@ -81,8 +81,11 @@
     .portal-profile-grid .full{grid-column:1/-1}
     .portal-readonly{background:#f6f8fb;color:#667085}
     .portal-home-tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px}
-    .portal-home-tab{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px 8px;min-height:44px;font-size:13px;font-weight:800;color:#26364a;cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.035)}
+    .portal-home-tab{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:10px;min-height:66px;color:#26364a;cursor:pointer;box-shadow:0 1px 6px rgba(0,0,0,.035);text-align:right;font-family:inherit}
+    .portal-home-tab strong{display:block;font-size:13px;font-weight:900;margin-bottom:3px}
+    .portal-home-tab small{display:block;font-size:10px;font-weight:600;line-height:1.35;color:var(--dim)}
     .portal-home-tab.active{border-color:var(--orange);background:#fff7ef;color:#c95700}
+    .portal-home-tab.active small{color:#9b5500}
     .portal-home-tab[hidden]{display:none}
     .portal-home-section{display:none}
     .portal-home-section.active{display:block}
@@ -127,6 +130,17 @@
     .site-management-toolbar{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:10px;align-items:end;margin:12px 0}
     .site-management-toolbar .field{margin:0}
     .site-management-toolbar .btn{width:auto;margin:0;white-space:nowrap}
+    .portal-user-form{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;padding:14px;border:1.5px solid var(--border);border-radius:14px;background:#f9fbfd}
+    .portal-user-form .full{grid-column:1/-1}
+    .portal-user-form .field{margin:0}
+    .portal-user-form-head{grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding-bottom:10px;border-bottom:1px solid var(--border)}
+    .portal-user-form-head p{font-size:12px;color:var(--dim);line-height:1.5;margin-top:3px}
+    .portal-role-help{grid-column:1/-1;background:#eef5fc;border:1px solid #c9dced;border-radius:11px;padding:11px 12px;color:#294664;font-size:13px;line-height:1.55}
+    .portal-role-help strong{display:block;color:var(--dark);margin-bottom:2px}
+    .portal-permissions{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .portal-permission{display:flex;gap:8px;align-items:center;padding:9px 10px;background:#fff;border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer}
+    .portal-permission input{width:18px;height:18px;flex:0 0 auto}
+    .portal-form-error{display:none;grid-column:1/-1;background:#fdecea;border:1px solid #efb3ad;border-radius:10px;padding:10px 12px;color:#9f261e;font-size:13px;font-weight:700}
     .site-summary-metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:10px}
     .site-summary-metrics span{background:#f6f9fc;border-radius:8px;padding:7px;font-size:11px;color:var(--dim)}
     .site-summary-metrics b{display:block;color:var(--dark);font-size:13px;margin-top:2px}
@@ -298,7 +312,7 @@
     .loader{text-align:center;padding:40px;color:var(--dim);font-size:14px}
 
     @media(min-width:600px){.shapes-grid{grid-template-columns:repeat(4,1fr)}}
-    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-management-toolbar{grid-template-columns:1fr 1fr}.site-management-toolbar .field{grid-column:1/-1}.site-management-toolbar .btn{width:100%}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-management-toolbar{grid-template-columns:1fr 1fr}.site-management-toolbar .field{grid-column:1/-1}.site-management-toolbar .btn{width:100%}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}.portal-user-form{grid-template-columns:1fr}.portal-user-form .full,.portal-user-form-head,.portal-role-help,.portal-permissions,.portal-form-error{grid-column:1}.portal-permissions{grid-template-columns:1fr}}
     @media(max-width:430px){.portal-action-grid{grid-template-columns:1fr}.portal-stepper{grid-template-columns:1fr}.screen{padding:14px}.portal-home-tabs{gap:6px}.support-preview-banner{position:relative;top:auto}.support-preview-description{display:none}}
   </style>
 <link rel="stylesheet" href="/theme.css">
@@ -395,12 +409,12 @@
     <button type="button" class="portal-action-card" onclick="setHomeSection('profile')"><strong>פרטי לקוח</strong><span>עדכון שם, כתובת ואימייל לקבלת מסמכים</span></button>
   </div>
   <nav class="portal-home-tabs" id="portalHomeTabs" role="tablist" aria-label="ניווט פורטל לקוח">
-    <button type="button" role="tab" aria-selected="true" aria-controls="homeSectionOrders" class="portal-home-tab active" id="homeTabOrders" onclick="setHomeSection('orders')">הזמנות</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionProfile" class="portal-home-tab" id="homeTabProfile" onclick="setHomeSection('profile')">פרטי לקוח</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden>אתרים ומנהלים</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionFinance" class="portal-home-tab" id="homeTabFinance" onclick="setHomeSection('finance')" hidden>כספים</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionPriceList" class="portal-home-tab" id="homeTabPriceList" onclick="setHomeSection('priceList')" hidden>מחירון</button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionDocs" class="portal-home-tab" id="homeTabDocs" onclick="setHomeSection('docs')">מסמכים</button>
+    <button type="button" role="tab" aria-selected="true" aria-controls="homeSectionOrders" class="portal-home-tab active" id="homeTabOrders" onclick="setHomeSection('orders')"><strong>📋 הזמנות</strong><small>מעקב, אישור ושיוך לאתר</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionProfile" class="portal-home-tab" id="homeTabProfile" onclick="setHomeSection('profile')"><strong>👤 פרטי לקוח</strong><small>פרטי חברה ואנשי קשר</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden><strong>🏗️ אתרים והרשאות</strong><small>פרויקטים, מנהלי עבודה וגישה</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionFinance" class="portal-home-tab" id="homeTabFinance" onclick="setHomeSection('finance')" hidden><strong>💳 כספים</strong><small>תקציב, משקל וחשבוניות</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionPriceList" class="portal-home-tab" id="homeTabPriceList" onclick="setHomeSection('priceList')" hidden><strong>🏷️ מחירון</strong><small>המחירים שאושרו ללקוח</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionDocs" class="portal-home-tab" id="homeTabDocs" onclick="setHomeSection('docs')"><strong>📁 מסמכים</strong><small>ערבויות וקבצים משותפים</small></button>
   </nav>
 
   <section class="portal-home-section active" role="tabpanel" id="homeSectionOrders">
@@ -865,27 +879,36 @@ function renderCustomerSitesPanel() {
         <textarea id="portalInviteMessage" rows="5" readonly style="margin-top:8px"></textarea>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn btn-secondary btn-sm" type="button" onclick="copyPortalInviteMessage()">העתק הודעה</button><button class="btn btn-secondary btn-sm" type="button" onclick="openPortalInviteWhatsApp()">פתח ב-WhatsApp</button></div>
       </div>
-      <div id="newPortalUserForm" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-        <input id="portalUserName" placeholder="שם משתמש" />
-        <input id="portalUserPhone" placeholder="טלפון לכניסה" />
-        <select id="portalUserRole" onchange="syncPortalUserRoleDefaults()">
-          <option value="field_manager">מנהל עבודה באתר</option>
-          <option value="orderer">מזמין</option>
-          <option value="approver">מאשר הזמנות</option>
-          <option value="finance">מנהל כספים</option>
-          <option value="customer_admin">מנהל לקוח</option>
-        </select>
-        <select id="portalUserSiteId" ${PORTAL_SITES.length ? '' : 'disabled'}>
+      <div id="newPortalUserForm" class="portal-user-form">
+        <div class="portal-user-form-head">
+          <div><div class="card-title">הוספת משתמש לפורטל</div><p>ממלאים פרטים, בוחרים תפקיד ואתר, ואז שולחים קישור הפעלה שתקף ל־5 דקות.</p></div>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="togglePortalUserForm(false)">סגור</button>
+        </div>
+        <div class="field"><label for="portalUserName">שם מלא *</label><input id="portalUserName" autocomplete="name" /></div>
+        <div class="field"><label for="portalUserPhone">טלפון לכניסה *</label><input id="portalUserPhone" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" /></div>
+        <div class="field"><label for="portalUserRole">מה התפקיד שלו?</label><select id="portalUserRole" onchange="syncPortalUserRoleDefaults()">
+          <option value="field_manager">מנהל עבודה — עובד באתר שנבחר</option>
+          <option value="orderer">מזמין — פותח הזמנות באתרים שהותרו</option>
+          <option value="approver">מאשר — בודק ומאשר הזמנות</option>
+          <option value="finance">כספים — תקציבים, מחירים וחשבוניות</option>
+          <option value="customer_admin">מנהל לקוח — רואה ומנהל את כל האתרים</option>
+        </select></div>
+        <div class="field"><label for="portalUserSiteId">אתר ראשי</label><select id="portalUserSiteId" ${PORTAL_SITES.length ? '' : 'disabled'}>
           <option value="">ללא אתר קבוע</option>
           ${siteOptions}
-        </select>
-        <label style="display:flex;gap:6px;align-items:center"><input id="portalPermCreateOrders" type="checkbox" checked> פתיחת הזמנות</label>
-        ${PORTAL_CAPS.canApprove ? '<label style="display:flex;gap:6px;align-items:center"><input id="portalPermApproveOrders" type="checkbox"> אישור הזמנות</label>' : ''}
-        ${PORTAL_CAPS.seePrice ? '<label style="display:flex;gap:6px;align-items:center"><input id="portalPermViewPrices" type="checkbox"> צפייה במחירים</label>' : ''}
-        ${PORTAL_CAPS.canViewBudget ? '<label style="display:flex;gap:6px;align-items:center"><input id="portalPermViewBudget" type="checkbox"> צפייה בתקציב</label>' : ''}
-        ${PORTAL_CAPS.canViewInvoices ? '<label style="display:flex;gap:6px;align-items:center"><input id="portalPermViewInvoices" type="checkbox"> חשבוניות ותשלומים</label>' : ''}
-        ${canAssignUsers ? '<label style="display:flex;gap:6px;align-items:center"><input id="portalPermAssignUsers" type="checkbox"> שיוך משתמשים לאתרים</label>' : ''}
-        <button class="btn btn-primary" style="grid-column:1/-1;margin-top:0" onclick="createPortalUser(event)">הוסף משתמש</button>
+        </select></div>
+        <div id="portalUserRoleHelp" class="portal-role-help"><strong>מנהל עבודה</strong>רואה רק את האתר שנבחר ויכול לפתוח עבורו הזמנות. חובה לבחור אתר.</div>
+        <div class="full"><b>הרשאות בפועל</b><div style="font-size:12px;color:var(--dim);margin-top:3px">הסימון מתעדכן לפי התפקיד, ואפשר לשנות אותו לפני ההוספה.</div></div>
+        <div class="portal-permissions">
+          <label class="portal-permission"><input id="portalPermCreateOrders" type="checkbox" checked> פתיחת הזמנות</label>
+          ${PORTAL_CAPS.canApprove ? '<label class="portal-permission"><input id="portalPermApproveOrders" type="checkbox"> אישור הזמנות</label>' : ''}
+          ${PORTAL_CAPS.seePrice ? '<label class="portal-permission"><input id="portalPermViewPrices" type="checkbox"> צפייה במחירים</label>' : ''}
+          ${PORTAL_CAPS.canViewBudget ? '<label class="portal-permission"><input id="portalPermViewBudget" type="checkbox"> צפייה בתקציב</label>' : ''}
+          ${PORTAL_CAPS.canViewInvoices ? '<label class="portal-permission"><input id="portalPermViewInvoices" type="checkbox"> חשבוניות ותשלומים</label>' : ''}
+          ${canAssignUsers ? '<label class="portal-permission"><input id="portalPermAssignUsers" type="checkbox"> שיוך משתמשים לאתרים</label>' : ''}
+        </div>
+        <div id="portalUserError" class="portal-form-error" role="alert"></div>
+        <button class="btn btn-primary full" style="margin-top:0" onclick="createPortalUser(event)">הוסף משתמש וצור קישור הפעלה</button>
       </div>
     </div>
   ` : '';
@@ -936,7 +959,11 @@ function togglePortalUserForm(forceOpen, siteId = null) {
     const siteSelect = document.getElementById('portalUserSiteId');
     if (siteSelect) siteSelect.value = String(siteId);
   }
-  if (open) setTimeout(() => document.getElementById('portalUserName')?.focus(), 0);
+  setPortalUserFormError('');
+  if (open) {
+    syncPortalUserRoleDefaults();
+    setTimeout(() => document.getElementById('portalUserName')?.focus(), 0);
+  }
 }
 
 function syncCustomerSitesPanel() {
@@ -973,14 +1000,42 @@ function setButtonBusy(button, busy, busyText = 'מבצע...') {
 
 function syncPortalUserRoleDefaults() {
   const role = document.getElementById('portalUserRole')?.value || 'field_manager';
+  const createOrders = document.getElementById('portalPermCreateOrders');
   const price = document.getElementById('portalPermViewPrices');
   const budget = document.getElementById('portalPermViewBudget');
   const invoices = document.getElementById('portalPermViewInvoices');
   const approve = document.getElementById('portalPermApproveOrders');
+  const assign = document.getElementById('portalPermAssignUsers');
+  const site = document.getElementById('portalUserSiteId');
+  const help = document.getElementById('portalUserRoleHelp');
+  const roleHelp = {
+    field_manager: ['מנהל עבודה', 'רואה רק את האתר שנבחר ויכול לפתוח עבורו הזמנות. חובה לבחור אתר.'],
+    orderer: ['מזמין', 'פותח הזמנות באתרים שמשויכים אליו, ללא אישור הזמנות או מידע כספי כברירת מחדל.'],
+    approver: ['מאשר הזמנות', 'רואה הזמנות שממתינות לאישור ומאשר אותן. פתיחת הזמנות כבויה כברירת מחדל.'],
+    finance: ['מנהל כספים', 'רואה מחירים, תקציבים, חשבוניות ותשלומים. אינו פותח הזמנות כברירת מחדל.'],
+    customer_admin: ['מנהל לקוח', 'רואה את כל אתרי הלקוח ויכול לנהל משתמשים, הזמנות והמידע שהלקוח מורשה לראות.'],
+  };
+  if (createOrders) createOrders.checked = ['field_manager', 'orderer', 'customer_admin'].includes(role);
   if (price) price.checked = role === 'finance' || role === 'customer_admin';
   if (budget) budget.checked = role === 'finance' || role === 'customer_admin';
   if (invoices) invoices.checked = role === 'finance' || role === 'customer_admin';
   if (approve) approve.checked = role === 'approver' || role === 'customer_admin';
+  if (assign) assign.checked = role === 'customer_admin';
+  if (site) {
+    site.required = role === 'field_manager';
+    site.setAttribute('aria-required', role === 'field_manager' ? 'true' : 'false');
+  }
+  if (help) {
+    const [title, description] = roleHelp[role] || roleHelp.field_manager;
+    help.innerHTML = `<strong>${title}</strong>${description}`;
+  }
+}
+
+function setPortalUserFormError(message = '') {
+  const box = document.getElementById('portalUserError');
+  if (!box) return;
+  box.textContent = message;
+  box.style.display = message ? 'block' : 'none';
 }
 
 async function saveCustomerProfile(event) {
@@ -1193,8 +1248,17 @@ async function createPortalUser(event) {
   const phone = document.getElementById('portalUserPhone')?.value.trim();
   const role = document.getElementById('portalUserRole')?.value || 'field_manager';
   const siteId = Number(document.getElementById('portalUserSiteId')?.value || 0);
-  if (!name || !phone) { toast('שם וטלפון חובה', true); return; }
-  if (role === 'field_manager' && !siteId) { toast('יש לבחור אתר למנהל העבודה', true); return; }
+  setPortalUserFormError('');
+  if (!name || !phone) {
+    setPortalUserFormError('יש למלא שם מלא ומספר טלפון.');
+    toast('שם וטלפון חובה', true);
+    return;
+  }
+  if (role === 'field_manager' && !siteId) {
+    setPortalUserFormError('יש לבחור אתר ראשי למנהל העבודה.');
+    toast('יש לבחור אתר למנהל העבודה', true);
+    return;
+  }
   setButtonBusy(btn, true, 'מוסיף...');
   const body = {
     token: TOKEN,
@@ -1215,9 +1279,21 @@ async function createPortalUser(event) {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
-  }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res) { setButtonBusy(btn, false); toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res.data?.error || 'לא ניתן להוסיף משתמש', true); return; }
+  }).then(async r => ({ ok:r.ok, status:r.status, data: await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res) {
+    setButtonBusy(btn, false);
+    setPortalUserFormError('אין חיבור לשרת. בדקו את החיבור ונסו שוב.');
+    toast('שגיאה בחיבור לשרת', true);
+    return;
+  }
+  if (!res.ok || !res.data?.success) {
+    const errorMessage = res.data?.error || `השרת החזיר שגיאה (${res.status || 'לא ידועה'}). נסו לרענן ולשלוח שוב.`;
+    setButtonBusy(btn, false);
+    setPortalUserFormError(errorMessage);
+    toast(errorMessage, true);
+    return;
+  }
+  setPortalUserFormError('');
   toast('המשתמש נוסף');
   await loadPortalUsers();
   renderCustomerSitesPanel();

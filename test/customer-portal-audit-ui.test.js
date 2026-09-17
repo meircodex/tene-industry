@@ -60,6 +60,26 @@ test('project portal exposes site filtering, approval center, manager invitation
   assert.match(html, /\/api\/c\/orders\/\$\{orderId\}\/site/);
 });
 
+test('portal navigation and delegated roles explain their purpose and show actionable errors', () => {
+  for (const explanation of [
+    'מעקב, אישור ושיוך לאתר',
+    'פרטי חברה ואנשי קשר',
+    'פרויקטים, מנהלי עבודה וגישה',
+    'תקציב, משקל וחשבוניות',
+    'המחירים שאושרו ללקוח',
+    'ערבויות וקבצים משותפים',
+  ]) assert.match(html, new RegExp(explanation));
+  for (const role of ['מנהל עבודה', 'מזמין', 'מאשר הזמנות', 'מנהל כספים', 'מנהל לקוח']) {
+    assert.match(html, new RegExp(role));
+  }
+  for (const id of ['portalUserName', 'portalUserPhone', 'portalUserRole', 'portalUserSiteId', 'portalUserRoleHelp', 'portalUserError']) {
+    assert.match(html, new RegExp(`id="${id}"`), `missing ${id}`);
+  }
+  assert.match(html, /function setPortalUserFormError/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../routes/portal.js'), 'utf8'), /מספר הטלפון כבר משויך לחשבון לקוח אחר/);
+  assert.match(html, /הוסף משתמש וצור קישור הפעלה/);
+});
+
 test('mobile login sizing and price-list rendering cover the audited viewport/data gaps', () => {
   assert.match(html, /@media\(max-height:680px\) and \(max-width:600px\)/);
   assert.match(html, /\.auth-logo img\{width:190px\}/);

@@ -26,6 +26,34 @@ function fixture() {
   return { db, access };
 }
 
+test('legacy portal role constraint is expanded without losing existing users', () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    PRAGMA foreign_keys=ON;
+    CREATE TABLE customers (id INTEGER PRIMARY KEY,name TEXT,phone TEXT,portal_can_manage_users INTEGER DEFAULT 0,
+      portal_can_create_sites INTEGER DEFAULT 0,portal_can_set_budgets INTEGER DEFAULT 0,
+      portal_can_expose_prices INTEGER DEFAULT 0,portal_price_list_visibility TEXT DEFAULT 'none',
+      payment_terms TEXT,portal_token TEXT,portal_token_expires_at TEXT,portal_token_revoked_at TEXT,
+      tax_id TEXT,address TEXT,email TEXT,contact_name TEXT,contact_phone TEXT,price_tier TEXT,discount_pct REAL,
+      price_approved_at TEXT,portal_profile_locked_at TEXT);
+    CREATE TABLE customer_sites (id INTEGER PRIMARY KEY,customer_id INTEGER,name TEXT);
+    CREATE TABLE portal_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,customer_id INTEGER NOT NULL REFERENCES customers(id),phone TEXT NOT NULL UNIQUE,
+      name TEXT,role TEXT NOT NULL DEFAULT 'both' CHECK (role IN ('orderer','approver','both')),active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO customers(id,name,phone) VALUES (1,'Legacy customer','0501000000');
+    INSERT INTO portal_users(customer_id,phone,name,role) VALUES (1,'0501111111','Existing user','orderer');
+  `);
+  const settingsService = { get: (_key, fallback) => fallback, getNum: (_key, fallback) => fallback };
+  createPortalAccessService({ db, crypto, settingsService, PORT: 3000 });
+  assert.equal(db.prepare("SELECT name FROM portal_users WHERE phone='0501111111'").get().name, 'Existing user');
+  assert.doesNotThrow(() => db.prepare("INSERT INTO portal_users(customer_id,phone,name,role) VALUES (1,'0501222222','Site manager','field_manager')").run());
+  assert.doesNotThrow(() => db.prepare("INSERT INTO portal_users(customer_id,phone,name,role) VALUES (1,'0501333333','Customer admin','customer_admin')").run());
+  assert.equal(db.pragma('foreign_keys', { simple:true }), 1);
+  db.close();
+});
+
 test('explicit portal denials override role defaults and delegation cannot self-escalate', () => {
   const { db, access } = fixture();
   const user = db.prepare(`INSERT INTO portal_users (customer_id,phone,name,role,active,can_create_orders,can_approve_orders,can_view_prices,can_view_invoices,can_view_payment_alerts,can_manage_users,can_create_sites,can_set_budget) VALUES (1,'0502','Denied','both',1,0,0,0,0,0,0,0,0)`).run().lastInsertRowid;
@@ -180,6 +208,12 @@ test('HTTP portal enforces delegated flags and cross-site order access', async (
   const headers = { 'Content-Type': 'application/json' };
   const denied = await call('/api/c/users', { method: 'POST', headers, body: JSON.stringify({ token, phone: '0512', role: 'customer_admin', canManageUsers: true, canCreateSites: true, canCreateOrders: true, canApproveOrders: true, canViewPrices: true, canViewBudget: true, canSetBudget: true, canViewInvoices: true, canViewPaymentAlerts: true, siteIds: [siteA] }) });
   assert.equal(denied.response.status, 200, JSON.stringify(denied.body));
+  const secondCustomerId = db.prepare("INSERT INTO customers(name,phone) VALUES ('Other account','0599')").run().lastInsertRowid;
+  db.prepare("INSERT INTO portal_users(customer_id,phone,name,role,active) VALUES (?,'0519','Other identity','orderer',1)").run(secondCustomerId);
+  const duplicateIdentity = await call('/api/c/users', { method:'POST', headers, body:JSON.stringify({ token, phone:'0519', name:'Wrong account', role:'orderer', siteIds:[siteA] }) });
+  assert.equal(duplicateIdentity.response.status, 409);
+  assert.equal(duplicateIdentity.body.code, 'phone_assigned_to_another_customer');
+  assert.match(duplicateIdentity.body.error, /חשבון לקוח אחר/);
   const activationUrl = new URL(denied.body.activationLink);
   assert.equal(activationUrl.host, new URL(base).host);
   const enrollmentToken = activationUrl.searchParams.get('enroll');

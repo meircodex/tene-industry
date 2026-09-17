@@ -60,6 +60,71 @@ function createPortalAccessService(deps) {
   try { db.exec(`ALTER TABLE portal_users ADD COLUMN default_site_id INTEGER`); } catch {}
   try { db.exec(`ALTER TABLE portal_users ADD COLUMN updated_at TEXT`); } catch {}
 
+  // Older production databases were created with a CHECK constraint that only
+  // allowed orderer/approver/both. CREATE TABLE IF NOT EXISTS cannot widen an
+  // existing CHECK, so rebuild the table once while preserving every user and
+  // id. Dependent tables keep referring to the final portal_users table name.
+  const portalUsersSql = String(db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='portal_users'").get()?.sql || '');
+  const hasPortalRoleCheck = /CHECK\s*\(\s*role\s+IN/i.test(portalUsersSql);
+  if (hasPortalRoleCheck && !portalUsersSql.includes("'field_manager'") ) {
+    const foreignKeysEnabled = Number(db.pragma('foreign_keys', { simple: true })) === 1;
+    if (foreignKeysEnabled) db.pragma('foreign_keys = OFF');
+    try {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE portal_users_migrated (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          customer_id INTEGER NOT NULL REFERENCES customers(id),
+          phone TEXT NOT NULL UNIQUE,
+          name TEXT,
+          email TEXT,
+          role TEXT NOT NULL DEFAULT 'both' CHECK (role IN ('orderer','approver','both','finance','field_manager','customer_admin')),
+          active INTEGER NOT NULL DEFAULT 1,
+          token TEXT,
+          token_expires_at TEXT,
+          password_hash TEXT,
+          password_changed_at TEXT,
+          can_manage_users INTEGER DEFAULT 0,
+          can_create_sites INTEGER DEFAULT 0,
+          can_assign_site_users INTEGER DEFAULT 0,
+          can_create_orders INTEGER DEFAULT 1,
+          can_approve_orders INTEGER DEFAULT 0,
+          can_view_prices INTEGER DEFAULT 0,
+          can_view_budget INTEGER DEFAULT 0,
+          can_set_budget INTEGER DEFAULT 0,
+          can_approve_budget_overrun INTEGER DEFAULT 0,
+          can_view_invoices INTEGER DEFAULT 0,
+          can_view_delivery_notes INTEGER DEFAULT 1,
+          can_view_payment_alerts INTEGER DEFAULT 0,
+          default_site_id INTEGER REFERENCES customer_sites(id),
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT
+        );
+        INSERT INTO portal_users_migrated (
+          id,customer_id,phone,name,email,role,active,token,token_expires_at,password_hash,password_changed_at,
+          can_manage_users,can_create_sites,can_assign_site_users,can_create_orders,can_approve_orders,can_view_prices,
+          can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,can_view_delivery_notes,
+          can_view_payment_alerts,default_site_id,created_at,updated_at
+        )
+        SELECT
+          id,customer_id,phone,name,email,role,active,token,token_expires_at,password_hash,password_changed_at,
+          can_manage_users,can_create_sites,can_assign_site_users,can_create_orders,can_approve_orders,can_view_prices,
+          can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,can_view_delivery_notes,
+          can_view_payment_alerts,default_site_id,created_at,updated_at
+        FROM portal_users;
+        DROP TABLE portal_users;
+        ALTER TABLE portal_users_migrated RENAME TO portal_users;
+        COMMIT;
+      `);
+      console.info('[portal_users] expanded legacy role constraint');
+    } catch (error) {
+      try { db.exec('ROLLBACK'); } catch {}
+      throw error;
+    } finally {
+      if (foreignKeysEnabled) db.pragma('foreign_keys = ON');
+    }
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_enrollments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

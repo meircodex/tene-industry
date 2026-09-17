@@ -561,61 +561,75 @@ module.exports = function createPortalRouter(deps) {
       can_view_payment_alerts: s.caps.canViewPaymentAlerts && portalBoolFlag(req.body.canViewPaymentAlerts) ? 1 : 0,
     };
 
-    const existing = db.prepare('SELECT * FROM portal_users WHERE phone=?').get(phone);
-    let userId = existing?.id || null;
-    if (existing && existing.customer_id !== s.customer.id) {
-      return res.status(409).json({ error: 'הטלפון משויך ללקוח אחר' });
-    }
-    if (existing) {
-      db.prepare(`
-        UPDATE portal_users SET
-          name=COALESCE(?,name),email=COALESCE(?,email),role=?,active=1,default_site_id=?,
-          can_manage_users=?,can_create_sites=?,can_assign_site_users=?,can_create_orders=?,can_approve_orders=?,
-          can_view_prices=?,can_view_budget=?,can_set_budget=?,can_approve_budget_overrun=?,can_view_invoices=?,can_view_delivery_notes=?,
-          can_view_payment_alerts=?,updated_at=CURRENT_TIMESTAMP
-        WHERE id=? AND customer_id=?
+    try {
+      const existing = db.prepare('SELECT * FROM portal_users WHERE phone=?').get(phone);
+      let userId = existing?.id || null;
+      if (existing && existing.customer_id !== s.customer.id) {
+        return res.status(409).json({
+          error: 'מספר הטלפון כבר משויך לחשבון לקוח אחר. כדי להעביר אותו יש לפנות למנהל המערכת של טנא.',
+          code: 'phone_assigned_to_another_customer',
+        });
+      }
+      if (existing) {
+        db.prepare(`
+          UPDATE portal_users SET
+            name=COALESCE(?,name),email=COALESCE(?,email),role=?,active=1,default_site_id=?,
+            can_manage_users=?,can_create_sites=?,can_assign_site_users=?,can_create_orders=?,can_approve_orders=?,
+            can_view_prices=?,can_view_budget=?,can_set_budget=?,can_approve_budget_overrun=?,can_view_invoices=?,can_view_delivery_notes=?,
+            can_view_payment_alerts=?,updated_at=CURRENT_TIMESTAMP
+          WHERE id=? AND customer_id=?
+          `).run(
+          name,email,role,defaultSiteId,
+          flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
+          flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
+          flags.can_view_payment_alerts,userId,s.customer.id
+        );
+      } else {
+        const r = db.prepare(`
+          INSERT INTO portal_users
+            (customer_id,phone,name,email,role,default_site_id,can_manage_users,can_create_sites,can_assign_site_users,
+             can_create_orders,can_approve_orders,can_view_prices,can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,
+             can_view_delivery_notes,can_view_payment_alerts)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `).run(
-        name,email,role,defaultSiteId,
-        flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
-        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
-        flags.can_view_payment_alerts,userId,s.customer.id
-      );
-    } else {
-      const r = db.prepare(`
-        INSERT INTO portal_users
-          (customer_id,phone,name,email,role,default_site_id,can_manage_users,can_create_sites,can_assign_site_users,
-           can_create_orders,can_approve_orders,can_view_prices,can_view_budget,can_set_budget,can_approve_budget_overrun,can_view_invoices,
-           can_view_delivery_notes,can_view_payment_alerts)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-      `).run(
-        s.customer.id,phone,name,email,role,defaultSiteId,
-        flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
-        flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
-        flags.can_view_payment_alerts
-      );
-      userId = r.lastInsertRowid;
-    }
+          s.customer.id,phone,name,email,role,defaultSiteId,
+          flags.can_manage_users,flags.can_create_sites,flags.can_assign_site_users,flags.can_create_orders,flags.can_approve_orders,
+          flags.can_view_prices,flags.can_view_budget,flags.can_set_budget,flags.can_approve_budget_overrun,flags.can_view_invoices,flags.can_view_delivery_notes,
+          flags.can_view_payment_alerts
+        );
+        userId = r.lastInsertRowid;
+      }
 
-    db.prepare('DELETE FROM customer_site_users WHERE customer_id=? AND portal_user_id=?').run(s.customer.id, userId);
-    const addSite = db.prepare('INSERT OR IGNORE INTO customer_site_users (customer_id,site_id,portal_user_id,is_default) VALUES (?,?,?,?)');
-    siteIds.forEach(siteId => addSite.run(s.customer.id, siteId, userId, siteId === defaultSiteId ? 1 : 0));
-    db.prepare(`
-      INSERT INTO customer_portal_permission_audit (customer_id,actor_portal_user_id,target_portal_user_id,action,after_json)
-      VALUES (?,?,?,?,?)
-    `).run(s.customer.id, s.user?.id || null, userId, existing ? 'portal_user_updated_by_customer' : 'portal_user_created_by_customer', JSON.stringify({ role, defaultSiteId, siteIds, flags }));
-    auditSupportAction(s, existing ? 'portal_user_updated' : 'portal_user_created', 'customer', s.customer.id, { portalUserId: userId, role, siteIds, flags });
-    const freshUser = db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=?').get(userId, s.customer.id);
-    const enrollment = issuePortalEnrollment(freshUser, {
-      createdByPortalUserId: s.user?.id || null,
-      baseUrl: requestPublicBaseUrl(req),
-    });
-    res.json({
-      success: true,
-      id: userId,
-      updated: Boolean(existing),
-      activationLink: enrollment.ok ? enrollment.activationLink : null,
-      activationExpiresAt: enrollment.ok ? enrollment.expiresAt : null,
-    });
+      db.prepare('DELETE FROM customer_site_users WHERE customer_id=? AND portal_user_id=?').run(s.customer.id, userId);
+      const addSite = db.prepare('INSERT OR IGNORE INTO customer_site_users (customer_id,site_id,portal_user_id,is_default) VALUES (?,?,?,?)');
+      siteIds.forEach(siteId => addSite.run(s.customer.id, siteId, userId, siteId === defaultSiteId ? 1 : 0));
+      db.prepare(`
+        INSERT INTO customer_portal_permission_audit (customer_id,actor_portal_user_id,target_portal_user_id,action,after_json)
+        VALUES (?,?,?,?,?)
+      `).run(s.customer.id, s.user?.id || null, userId, existing ? 'portal_user_updated_by_customer' : 'portal_user_created_by_customer', JSON.stringify({ role, defaultSiteId, siteIds, flags }));
+      auditSupportAction(s, existing ? 'portal_user_updated' : 'portal_user_created', 'customer', s.customer.id, { portalUserId: userId, role, siteIds, flags });
+      const freshUser = db.prepare('SELECT * FROM portal_users WHERE id=? AND customer_id=?').get(userId, s.customer.id);
+      const enrollment = issuePortalEnrollment(freshUser, {
+        createdByPortalUserId: s.user?.id || null,
+        baseUrl: requestPublicBaseUrl(req),
+      });
+      return res.json({
+        success: true,
+        id: userId,
+        updated: Boolean(existing),
+        activationLink: enrollment.ok ? enrollment.activationLink : null,
+        activationExpiresAt: enrollment.ok ? enrollment.expiresAt : null,
+      });
+    } catch (error) {
+      console.error('[portal user create]', error);
+      const legacyRoleConstraint = /CHECK constraint failed: role/i.test(String(error?.message || ''));
+      return res.status(500).json({
+        error: legacyRoleConstraint
+          ? 'עדכון התפקידים בפורטל טרם הושלם. יש לרענן בעוד דקה ולנסות שוב.'
+          : 'לא ניתן להוסיף את המשתמש כרגע. נסו שוב, ואם התקלה חוזרת פנו למנהל המערכת של טנא.',
+        code: legacyRoleConstraint ? 'portal_roles_migration_required' : 'portal_user_create_failed',
+      });
+    }
   });
 
   router.post('/c/users/:id/invite', customerPortalActionLimiter, (req, res) => {
