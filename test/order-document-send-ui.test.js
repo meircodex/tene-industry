@@ -29,6 +29,28 @@ test('each order document has a neighbouring PDF send action with email and What
   assert.match(route, /c\.email as customer_email/);
 });
 
+test('production cards open on the visible card sheet instead of an empty picker dialog', () => {
+  const orders = read('public/orders.html');
+  const printPage = read('services/productionCardPrintPage.js');
+  const cards = read('services/productionCards.js');
+
+  assert.match(
+    orders,
+    /class="print-btn cards" href="\/order-print\.html\?id=\$\{o\.id\}&kind=print-cards" target="_blank"/,
+    'the production-card action should open the real card sheet directly'
+  );
+  assert.doesNotMatch(
+    orders,
+    /class="print-btn cards"[^>]*openProductionCardPrintDialog\(\$\{o\.id\}\)/,
+    'the visible action must not send operators to the placeholder picker'
+  );
+  assert.match(cards, /class="pc-pick"/);
+  assert.match(cards, /data-picked="1"/);
+  assert.match(printPage, /function togglePickedCard\(/);
+  assert.match(printPage, /function refreshPickedCards\(/);
+  assert.match(printPage, /\.prod-card\[data-picked="0"\]\{display:none!important;\}/);
+});
+
 // Exercise the real rendered button handlers without opening external messaging apps.
 function loadDocumentSending() {
   const html = read('public/orders.html');

@@ -2333,7 +2333,7 @@ function buildDetailHTML(o, pkgs) {
 
   // ── Print buttons
   const prints = `<div class="print-btns">
-    <div class="print-action-pair"><button type="button" class="print-btn cards" onclick="openProductionCardPrintDialog(${o.id})">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</button><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">&#128203; &#1514;&#1506;&#1493;&#1491;&#1514; &#1502;&#1513;&#1500;&#1493;&#1495;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
   </div>`;
