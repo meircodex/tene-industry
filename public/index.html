@@ -3791,6 +3791,9 @@ function buildOrderPayload() {
         structElement: item.structElement || '',
         structFloor: item.structFloor || '',
         sheetNum: item.sheetNum || '',
+        sourceItemNumber: item.sourceItemNumber ?? item.source_item_number ?? item.itemNumber ?? item.item_number ?? null,
+        sourceRowNumber: item.sourceRowNumber ?? item.source_row_number ?? item.sourceRow ?? item.source_row ?? null,
+        sortOrder: item.sortOrder ?? item.sort_order ?? null,
       }))
     }))
   };
@@ -4246,6 +4249,8 @@ function confirmImgItems() {
       spiral_diameter_mm: isSpiral ? spiralDiameter : null,
       spiral_turns: isSpiral ? spiralTurns : null,
       structElement: String(it.structElement || it.struct_element || it.element_name || it.elementName || it.element || it.member_name || it.memberName || '').trim(),
+      sourceItemNumber: it.sourceItemNumber ?? it.source_item_number ?? it.itemNumber ?? it.item_number ?? it.original_row_number ?? null,
+      sourceRowNumber: it.sourceRowNumber ?? it.source_row_number ?? it.sourceRow ?? it.source_row ?? it.original_source_row ?? null,
       note:        it.note || it.notes || it.shape_description || it.shapeDescription || ''
     });
   });

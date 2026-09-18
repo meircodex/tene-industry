@@ -210,6 +210,8 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .item-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .item-diameter{font-size:24px;font-weight:900;color:var(--accent);line-height:1;}
 .item-shape{font-size:15px;font-weight:900;color:var(--text);}
+.item-element{width:100%;font-size:16px;font-weight:900;color:var(--navy);line-height:1.45;white-space:pre-line;}
+.item-source-seq{font-size:11px;font-weight:800;color:#526070;background:#f8fafc;border:1px solid #dce4ee;padding:2px 8px;border-radius:6px;white-space:nowrap;}
 .item-kpis{display:grid;grid-template-columns:repeat(4,minmax(90px,1fr));gap:8px;}
 .item-kpi{background:#f4f7fb;border-radius:10px;padding:8px 10px;}
 .item-kpi-label{font-size:10px;font-weight:800;color:var(--muted);margin-bottom:2px;}
@@ -2397,6 +2399,9 @@ function buildDetailHTML(o, pkgs) {
       const openUWarning = openULegWarning(item, sides);
       const review = needsItemReview(item, sides);
       const displayNote = visibleItemNote(item.note);
+      const elementName = String(item.struct_element || item.element_name || item.elementName || '').trim();
+      const sourceItemNumber = String(item.source_item_number || '').trim();
+      const sourceRowNumber = Number(item.source_row_number || 0) || null;
       const measuredWeight = actualWeight(item);
       const deviationPct = weightDeviationPct(item);
       const canonicalShapeSvg = encodeURIComponent(item.shape_svg || '');
@@ -2416,11 +2421,13 @@ function buildDetailHTML(o, pkgs) {
         ${visualHtml}
         <div class="item-main">
           <div class="item-head">
-            <span style="background:#eef2f7;color:#1a2533;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap">פריט ${item._lineNo}/${_totalLines}</span>
+            <span style="background:#eef2f7;color:#1a2533;font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap">${sourceItemNumber ? `מס׳ מקור ${escHtml(sourceItemNumber)}` : `פריט ${item._lineNo}`}</span>
+            <span class="item-source-seq">שורה ${item._lineNo}/${_totalLines}${sourceRowNumber ? ` · מקור ${sourceRowNumber}` : ''}</span>
             ${isRoundPileCageItem(item) ? '<span class="pile-cage-badge">PILE CAGE</span>' : `<span class="item-diameter">⌀${escHtml(item.diameter)}</span>`}
             <span class="item-shape">${escHtml(shapeLabel(item.shape_name, sides, item))}</span>
             ${item.is_3d ? ' <span style="background:#7c3aed;color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px">3D</span>' : ''}
             ${review || isReviewApproved(item) ? reviewStatusHtml(item) : ''}
+            ${elementName ? `<div class="item-element"><span style="font-size:11px;color:var(--muted);font-weight:800">אלמנט</span><br>${escHtml(elementName)}</div>` : ''}
           </div>
           <div class="item-kpis">
             <div class="item-kpi"><div class="item-kpi-label">כמות</div><div class="item-kpi-value" id="qtyVal-${item.id}" onclick="startQtyEdit(event, ${o.id}, ${item.id}, ${qty})" style="cursor:pointer" title="לחץ לשינוי כמות">${qty} יח' <span style="font-size:11px;opacity:0.55">✎</span></div></div>

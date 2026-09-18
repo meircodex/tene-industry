@@ -198,11 +198,13 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
     const inventoryShortages = [];
     const reservationItems = [];
 
+    let globalItemSequence = 0;
     (pallets || []).forEach((pallet, idx) => {
       const pr = db.prepare('INSERT INTO pallets (order_id,pallet_num,max_weight,total_weight) VALUES (?,?,?,?)')
         .run(orderId, idx + 1, pallet.maxWeight || 500, pallet.totalWeight || 0);
 
       (pallet.items || []).forEach(rawItem => {
+        globalItemSequence += 1;
         const item = withShapeContractLegacyFields(rawItem);
         const pileCageMetrics = roundPileCageOrderMetrics(rawItem);
         // A lift carries no bends and no cut list - it is a bought bundle, so it
@@ -257,6 +259,11 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
         const structElement = item.structElement || item.struct_element || item.element_name || item.elementName || item.element || item.member_name || item.memberName || null;
         const structFloor = item.structFloor || item.struct_floor || item.floor || null;
         const sheetNum = item.sheetNum || item.sheet_num || item.sheet || null;
+        const sourceItemNumber = item.sourceItemNumber ?? item.source_item_number ?? item.itemNumber ?? item.item_number ?? item.originalRowNumber ?? item.original_row_number ?? null;
+        const sourceRowNumberRaw = item.sourceRowNumber ?? item.source_row_number ?? item.sourceRow ?? item.source_row ?? null;
+        const sourceRowNumber = Number.isFinite(Number(sourceRowNumberRaw)) && Number(sourceRowNumberRaw) > 0 ? Math.trunc(Number(sourceRowNumberRaw)) : null;
+        const requestedSortOrder = Number(item.sortOrder ?? item.sort_order);
+        const sortOrder = Number.isFinite(requestedSortOrder) && requestedSortOrder > 0 ? Math.trunc(requestedSortOrder) : globalItemSequence;
         const shapeSnapshot = shapeSnapshotJson({
           ...item,
           shapeId: item.shapeId,
@@ -272,14 +279,16 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
           structFloor,
           sheetNum,
         });
-        const itemResult = db.prepare(`INSERT INTO items (pallet_id,order_id,shape_snapshot_json,shape_id,shape_name,diameter,spiral_diameter_mm,spiral_turns,segments,total_length_mm,quantity,production_qty,weight_per_unit,total_weight,note,review_status,review_notes,struct_element,struct_floor,sheet_num,machine,is_3d)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        const itemResult = db.prepare(`INSERT INTO items (pallet_id,order_id,shape_snapshot_json,shape_id,shape_name,diameter,spiral_diameter_mm,spiral_turns,segments,total_length_mm,quantity,production_qty,weight_per_unit,total_weight,note,review_status,review_notes,struct_element,struct_floor,sheet_num,source_item_number,source_row_number,sort_order,machine,is_3d)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
           .run(pr.lastInsertRowid, orderId, shapeSnapshot, item.shapeId, persistedShapeName, item.diameter,
             isSpiralLike ? (spiral.spiralDiameterMm || null) : null,
             isSpiralLike ? (spiral.turns || null) : null,
             segments, totalLengthMm, item.qty || 1, productionQty,
             weightPerUnit, totalWeight,
-            itemNote, reviewStatus, reviewNotesJson, structElement, structFloor, sheetNum, machine,
+            itemNote, reviewStatus, reviewNotesJson, structElement, structFloor, sheetNum,
+            sourceItemNumber === null || sourceItemNumber === undefined ? null : String(sourceItemNumber).trim() || null,
+            sourceRowNumber, sortOrder, machine,
             item.is_3d ? 1 : 0);
         db.prepare('UPDATE items SET item_uid=? WHERE id=?').run(buildOrderItemUid(orderId, itemResult.lastInsertRowid), itemResult.lastInsertRowid);
         reservationItems.push({

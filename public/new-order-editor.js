@@ -792,9 +792,20 @@
     'itemLabel',
   ];
 
+  const SOURCE_ITEM_NUMBER_ALIASES = [
+    'מספר פריט', 'מס פריט', "מס' פריט", 'מס׳ פריט', 'מספר סידורי', 'serial no.',
+    'source_item_number', 'sourceItemNumber', 'item_number', 'itemNumber', 'original_row_number',
+  ];
+
+  const SOURCE_ROW_NUMBER_ALIASES = [
+    'שורת מקור', 'source_row_number', 'sourceRowNumber', 'source_row', 'sourceRow', 'original_source_row',
+  ];
+
   function normalizeIntakeRow(row = {}) {
     return {
       elementName: String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim(),
+      sourceItemNumber: String(rowValue(row, SOURCE_ITEM_NUMBER_ALIASES)).trim(),
+      sourceRowNumber: numeric(rowValue(row, SOURCE_ROW_NUMBER_ALIASES), 0) || null,
       shape: String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר',
       diameter: numeric(row.diameter ?? row['קוטר'] ?? row.barDiameter ?? row.barDiameterMm, 0),
       quantity: numeric(row.quantity ?? row.qty ?? row['כמות'], 0),
@@ -961,6 +972,10 @@
       structElement: elementName,
       struct_element: elementName,
       elementName,
+      sourceItemNumber: item.sourceItemNumber || null,
+      source_item_number: item.sourceItemNumber || null,
+      sourceRowNumber: item.sourceRowNumber || null,
+      source_row_number: item.sourceRowNumber || null,
       shapeSnapshot: buildIntakeStraightSnapshot({ length, diameter, quantity }),
     };
   }

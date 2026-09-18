@@ -1059,6 +1059,9 @@ function ensureCoreSchema(db) {
       struct_element TEXT,
       struct_floor TEXT,
       sheet_num TEXT,
+      source_item_number TEXT,
+      source_row_number INTEGER,
+      sort_order INTEGER,
       machine TEXT,
       status TEXT DEFAULT 'ממתין',
       started_at DATETIME,
@@ -1959,6 +1962,17 @@ function ensureCoreSchema(db) {
   // 'bent'              = has bends (material + cutting + bending)
   // 'per_unit'          = stirrups, chairs, birds — charged per piece
   ensureColumn(db, 'items', 'price_category', "TEXT DEFAULT 'auto'");
+  // Preserve the identity and physical order of rows imported from customer
+  // documents.  A source item number is a label (it may contain text or be
+  // duplicated), while sort_order is the stable order in which cards appear.
+  ensureColumn(db, 'items', 'source_item_number', 'TEXT');
+  ensureColumn(db, 'items', 'source_row_number', 'INTEGER');
+  ensureColumn(db, 'items', 'sort_order', 'INTEGER');
+  const itemColumns = new Set(tableColumns(db, 'items'));
+  if (itemColumns.has('pallet_id') && itemColumns.has('sort_order') && itemColumns.has('id')) {
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_items_pallet_sort
+      ON items(pallet_id, sort_order, id)`);
+  }
 
   ensureFinanceSchema(db);
 }
