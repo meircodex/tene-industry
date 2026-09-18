@@ -344,9 +344,12 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 .pc-screen-tools button:hover{background:#c9621a;}
 .pc-split-state{display:inline-flex;align-items:center;border-radius:5px;background:#fff3d7;border:1px solid #ffd6a0;color:#8a4b00;padding:3px 6px;font-size:10px;font-weight:900;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.12);}
 .pc-print-face{display:grid;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
-.pc-print-main{display:grid;grid-template-rows:11mm 7mm minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
-.pc-print-head{display:flex;align-items:center;justify-content:space-between;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:12px;font-weight:900;line-height:1;background:#1a2332;color:#fff;}
-.pc-print-ref{padding:1.5mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:11px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:right;}
+.pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
+.pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:13.5px;font-weight:900;line-height:1;background:#1a2332;color:#fff;}
+.pc-print-head-meta{display:flex;align-items:center;justify-content:flex-end;gap:2.5mm;min-width:0;flex:1;}
+.pc-print-customer{min-width:0;font-size:12px;font-weight:900;line-height:1.1;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pc-print-diameter{font-size:13.5px;font-weight:900;white-space:nowrap;}
+.pc-print-ref{min-height:11mm;padding:1.25mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:12.5px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;}
 .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
 .pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
 .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;border-top:0.25mm solid #1a2332;font-size:11px;font-weight:900;text-align:center;}
@@ -443,10 +446,11 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .pc-screen-tools{display:none!important;}
   .prod-card>:not(.pc-print-face){display:none!important;}
   .pc-print-face{display:grid!important;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
-  .pc-print-main{display:grid;grid-template-rows:11mm 7mm minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
-  .pc-print-head{display:flex;align-items:center;justify-content:space-between;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:13.5px;font-weight:900;line-height:1;background:#1a2332!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .pc-print-head span span{font-size:10.5px!important;}
-  .pc-print-ref{padding:1.5mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:right;}
+  .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
+  .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:14px;font-weight:900;line-height:1;background:#1a2332!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .pc-print-customer{font-size:12.5px!important;}
+  .pc-print-diameter{font-size:14px!important;}
+  .pc-print-ref{min-height:11mm;padding:1.25mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:13px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;}
   .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
   .pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
   .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;border-top:0.25mm solid #1a2332;font-size:13px;font-weight:900;text-align:center;}
@@ -1170,7 +1174,7 @@ function buildCard(item, subQty, totalCards, cardIdx) {
   var orderShort = (ORDER_NUM.match(/[0-9]/g) || []).join('').slice(-3);
   var orderLabel = orderShort ? '#' + orderShort : ORDER_NUM;
   // Header leads with the order number; the item number moves to the line below.
-  h += '<div class="pc-print-head"><b style="white-space:nowrap">'+escapeHtml(orderLabel)+badge+'</b><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font-size:9px;font-weight:700;opacity:0.85;letter-spacing:0.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escapeHtml(CUSTOMER)+'</span><b style="white-space:nowrap">Ø '+escapeHtml(diameterLabel)+'</b></span></div>';
+  h += '<div class="pc-print-head"><b style="white-space:nowrap">'+escapeHtml(orderLabel)+badge+'</b><span class="pc-print-head-meta"><span class="pc-print-customer">'+escapeHtml(CUSTOMER)+'</span><b class="pc-print-diameter">Ø '+escapeHtml(diameterLabel)+'</b></span></div>';
   h += '<div class="pc-print-ref">'+printRef+'</div>';
   h += '<div class="pc-print-shape">'+shapeSvg+'</div>';
   h += isPileAssembly
