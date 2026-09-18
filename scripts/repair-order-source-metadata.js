@@ -49,12 +49,14 @@ try {
     const sourceRow = sourceRowFromNote(item.note);
     const sourceItemNumber = SOURCE_ROWS.get(sourceRow);
     if (!sourceItemNumber) throw new Error(`item ${item.id} has no recognized source row in its note`);
-    const fallbackElement = sourceRow === 407
+    const correctedElement = sourceRow === 407
       ? 'טיפוס E 1217/913/60 / חישוק חיצוני Φ8@20'
       : sourceRow === 412
         ? 'טיפוס E 1217/913/60 / חישוק פנימי 2Φ8@20'
         : null;
-    const element = String(item.struct_element || '').trim() || fallbackElement;
+    // These two workbook rows have a blank item name.  Keep their reviewed
+    // names deterministic even if an earlier import guessed the wrong ring.
+    const element = correctedElement || String(item.struct_element || '').trim();
     if (!element) throw new Error(`item ${item.id}, source row ${sourceRow}, has no element name`);
     return { id: item.id, sourceRow, sourceItemNumber: String(sourceItemNumber), sortOrder: index + 1, element };
   });
