@@ -50,4 +50,5 @@ test('order detail visibly renders the element and original source number', () =
   assert.match(html, /מס׳ מקור/);
   assert.match(html, /item\.struct_element/);
   assert.match(html, /source_item_number/);
+  assert.match(html, />שם פריט</);
 });

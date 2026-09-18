@@ -2348,7 +2348,7 @@ function buildDetailHTML(o, pkgs) {
       <div><div class="info-label">משקל כולל</div><div class="info-value" style="color:var(--accent)">${(o.total_weight||0).toFixed(1)} ק"ג</div></div>
       ${o.delivery_address?`<div style="grid-column:span 2"><div class="info-label">כתובת</div><div class="info-value">${escHtml(o.delivery_address)}</div></div>`:''}
       ${driverNotes?`<div style="grid-column:span 2"><div class="info-label">הערות לנהג</div><div class="info-value">${escHtml(driverNotes)}</div></div>`:''}
-      ${o.struct_element?`<div><div class="info-label">אלמנט</div><div class="info-value">${escHtml(o.struct_element)}</div></div>`:''}
+      ${o.struct_element?`<div><div class="info-label">שם פריט</div><div class="info-value">${escHtml(o.struct_element)}</div></div>`:''}
       ${o.struct_floor?`<div><div class="info-label">קומה</div><div class="info-value">${escHtml(o.struct_floor)}</div></div>`:''}
       ${o.sheet_num?`<div><div class="info-label">גיליון</div><div class="info-value">${escHtml(o.sheet_num)}</div></div>`:''}
     </div>
@@ -2427,7 +2427,7 @@ function buildDetailHTML(o, pkgs) {
             <span class="item-shape">${escHtml(shapeLabel(item.shape_name, sides, item))}</span>
             ${item.is_3d ? ' <span style="background:#7c3aed;color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px">3D</span>' : ''}
             ${review || isReviewApproved(item) ? reviewStatusHtml(item) : ''}
-            ${elementName ? `<div class="item-element"><span style="font-size:11px;color:var(--muted);font-weight:800">אלמנט</span><br>${escHtml(elementName)}</div>` : ''}
+            ${elementName ? `<div class="item-element"><span style="font-size:11px;color:var(--muted);font-weight:800">שם פריט</span><br>${escHtml(elementName)}</div>` : ''}
           </div>
           <div class="item-kpis">
             <div class="item-kpi"><div class="item-kpi-label">כמות</div><div class="item-kpi-value" id="qtyVal-${item.id}" onclick="startQtyEdit(event, ${o.id}, ${item.id}, ${qty})" style="cursor:pointer" title="לחץ לשינוי כמות">${qty} יח' <span style="font-size:11px;opacity:0.55">✎</span></div></div>
