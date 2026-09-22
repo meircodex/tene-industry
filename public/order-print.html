@@ -79,9 +79,15 @@
     const renderedHtml = autoAction
       ? html.replace(/<\/body>\s*<\/html>\s*$/i, autoAction + '</body></html>')
       : html;
-    document.open();
-    document.write(renderedHtml);
-    document.close();
+    // Do not use document.open()/write() here: when called after the async
+    // request completes Chromium tears down the current script immediately.
+    // Parse the returned page into inert DOM instead, then activate scripts
+    // explicitly below.
+    const parsed = new DOMParser().parseFromString(renderedHtml, 'text/html');
+    Array.from(parsed.documentElement.attributes).forEach(attribute => {
+      document.documentElement.setAttribute(attribute.name, attribute.value);
+    });
+    document.documentElement.innerHTML = parsed.documentElement.innerHTML;
 
     // The print HTML arrives asynchronously after this loader has already
     // loaded.  Scripts inserted by document.write at that point are parsed
