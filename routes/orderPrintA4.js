@@ -124,7 +124,11 @@ function buildA4ProductionSummary({ order, allItems, tryParseJSON, language = 'h
     bucketRows,
     commercialSummary,
     notes: escapeHtml(notes || '-'),
-    project: escapeHtml(order.project_name || order.project || '-'),
+    // The production form is used on the shop floor, so its project line must
+    // identify the current delivery site.  Legacy project records can retain
+    // an old label (for example "רכבת לוד") after an order is moved to a new
+    // site (for example "כרמי גת").
+    project: escapeHtml(order.site_name || order.project_name || order.project || '-'),
     site: escapeHtml(order.site_name || order.building || order.delivery_address || '-'),
   };
 }
