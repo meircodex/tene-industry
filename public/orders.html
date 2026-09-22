@@ -484,12 +484,12 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
       </div>
       <div class="send-file-actions">
         <button type="button" class="send-file-action pdf" onclick="openPdfForSending()">📄 פתח שמירה כ‑PDF</button>
-        <button type="button" class="send-file-action" onclick="openWhatsAppForSending()">💬 פתח WhatsApp</button>
+        <button type="button" class="send-file-action" onclick="openWhatsAppForSending()">📎 שלח PDF ב‑WhatsApp</button>
         <button type="button" class="send-file-action" onclick="openEmailForSending()">✉️ פתח מייל</button>
         <button type="button" class="send-file-action" onclick="copyDocumentName()">📋 העתק שם קובץ</button>
       </div>
       <div class="send-file-status" id="sendFileStatus" aria-live="polite"></div>
-      <div class="send-file-hint">הפעולה פותחת את המסמך בחלון נפרד. בחר/י שם <b>שמירה כ‑PDF</b>; לאחר השמירה צרף/י את הקובץ בהודעת WhatsApp או במייל שנפתחו כאן.</div>
+      <div class="send-file-hint">במכשיר נייד תיפתח אפשרות שיתוף עם הקובץ המצורף. במחשב Chrome הקובץ יורד אוטומטית; לאחר מכן צרף/י אותו בשיחת WhatsApp.</div>
     </div>
   </section>
 </div>
@@ -1611,6 +1611,7 @@ function printDocumentUrl(orderId, documentKey, options = {}) {
     if (normalized.length) params.set('itemIds', normalized.join(','));
   }
   if (options.autoPrint) params.set('auto_print', '1');
+  if (options.autoSend) params.set('auto_send', '1');
   return '/order-print.html?' + params.toString();
 }
 
@@ -1686,8 +1687,9 @@ function openWhatsAppForSending() {
     document.getElementById('sendFilePhone').focus();
     return;
   }
-  window.open('https://wa.me/' + encodeURIComponent(phone) + '?text=' + encodeURIComponent(sendFileMessage()), '_blank', 'noopener');
-  setSendFileStatus('WhatsApp נפתח. לאחר שמירת ה‑PDF צרף/י את הקובץ לשיחה.');
+  const target = printDocumentUrl(currentSendFile.order.id, currentSendFile.documentKey, { autoSend: true });
+  window.open(target, '_blank', 'noopener');
+  setSendFileStatus('נפתח מסך שיתוף PDF. במובייל בחר/י WhatsApp; במחשב הקובץ יורד ואז יש לצרף אותו לשיחה.');
 }
 
 function openEmailForSending() {

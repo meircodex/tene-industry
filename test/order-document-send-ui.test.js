@@ -21,10 +21,13 @@ test('each order document has a neighbouring PDF send action with email and What
   assert.match(orders, /id="sendFileOverlay"/);
   assert.match(orders, /openPdfForSending\(\)/);
   assert.match(orders, /openWhatsAppForSending\(\)/);
+  assert.match(orders, /שלח PDF ב‑WhatsApp/);
   assert.match(orders, /openEmailForSending\(\)/);
   assert.match(orders, /שמירה כ‑PDF/);
   assert.match(orders, /autoPrint: true/);
   assert.match(printLoader, /const autoPrint = params\.get\('auto_print'\) === '1';/);
+  assert.match(printLoader, /const autoSend = params\.get\('auto_send'\) === '1';/);
+  assert.match(printLoader, /IronBendDocExport\.send/);
   assert.match(printLoader, /window\.setTimeout\(function\(\)\{window\.print\(\);\},350\)/);
   assert.match(route, /c\.email as customer_email/);
 });
@@ -140,17 +143,18 @@ for (const language of ['he', 'th']) {
     assert.deepEqual(client.opened[0].slice(1), ['_blank', 'noopener']);
 
     client.run('openWhatsAppForSending()');
-    const whatsappUrl = new URL(client.opened[1][0]);
-    assert.equal(whatsappUrl.origin, 'https://wa.me');
-    assert.equal(whatsappUrl.pathname, '/972500000000');
-    assert.equal(whatsappUrl.searchParams.get('text'), `שלום, מצורף קובץ PDF: ${label} עבור הזמנה TEST-41.`);
+    const whatsappUrl = new URL(client.opened[1][0], 'http://localhost');
+    assert.equal(whatsappUrl.pathname, '/order-print.html');
+    assert.equal(whatsappUrl.searchParams.get('id'), '41');
+    assert.equal(whatsappUrl.searchParams.get('kind'), 'print-a4');
+    assert.equal(whatsappUrl.searchParams.get('auto_send'), '1');
 
     client.run('openEmailForSending()');
     const emailUrl = new URL(client.context.window.location.href);
     assert.equal(emailUrl.protocol, 'mailto:');
     assert.equal(decodeURIComponent(emailUrl.pathname), 'test@example.invalid');
     assert.equal(emailUrl.searchParams.get('subject'), `${label} – הזמנה TEST-41`);
-    assert.equal(emailUrl.searchParams.get('body'), whatsappUrl.searchParams.get('text'));
+    assert.equal(emailUrl.searchParams.get('body'), `שלום, מצורף קובץ PDF: ${label} עבור הזמנה TEST-41.`);
     await client.run('copyDocumentName()');
     assert.deepEqual(client.copied, [filename]);
   });

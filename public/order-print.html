@@ -24,6 +24,7 @@
   const id = params.get('id');
   const kind = params.get('kind');
   const autoPrint = params.get('auto_print') === '1';
+  const autoSend = params.get('auto_send') === '1';
   const status = document.getElementById('status');
 
   function fail(message, options = {}){
@@ -70,8 +71,13 @@
       return;
     }
     const html = await response.text();
-    const renderedHtml = autoPrint
-      ? html.replace(/<\/body>\s*<\/html>\s*$/i, '<script>window.setTimeout(function(){window.print();},350);<\\/script></body></html>')
+    const autoAction = autoSend
+      ? '<script>window.setTimeout(function(){var button=document.querySelector(\'button[onclick*="IronBendDocExport.send"]\');if(button)button.click();},450);<\\/script>'
+      : autoPrint
+        ? '<script>window.setTimeout(function(){window.print();},350);<\\/script>'
+        : '';
+    const renderedHtml = autoAction
+      ? html.replace(/<\/body>\s*<\/html>\s*$/i, autoAction + '</body></html>')
       : html;
     document.open();
     document.write(renderedHtml);
