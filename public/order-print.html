@@ -82,6 +82,29 @@
     document.open();
     document.write(renderedHtml);
     document.close();
+
+    // The print HTML arrives asynchronously after this loader has already
+    // loaded.  Scripts inserted by document.write at that point are parsed
+    // into the new document but are not reliably executed by Chromium.  Clone
+    // them in source order so QR/PDF libraries and the export API all run.
+    const scripts = Array.from(document.scripts);
+    function activateScript(index) {
+      if (index >= scripts.length) return;
+      const original = scripts[index];
+      const script = document.createElement('script');
+      Array.from(original.attributes).forEach(attribute => script.setAttribute(attribute.name, attribute.value));
+      script.async = false;
+      if (original.src) {
+        script.onload = () => activateScript(index + 1);
+        script.onerror = () => activateScript(index + 1);
+        original.replaceWith(script);
+      } else {
+        script.textContent = original.textContent || '';
+        original.replaceWith(script);
+        activateScript(index + 1);
+      }
+    }
+    activateScript(0);
   }
 
   load();
