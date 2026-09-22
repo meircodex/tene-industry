@@ -536,7 +536,10 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 var ORDER_ID      = ${Number(order.id) || 0};
 var ORDER_NUM     = ${JSON.stringify(order.order_num || '')};
 var CUSTOMER      = ${JSON.stringify(order.customer_name || '')};
-var SHORT_REF     = ${JSON.stringify([order.customer_name, order.project_name || order.site_name].filter(Boolean).join(' / '))};
+// Production cards identify the physical destination first.  A legacy project
+// label can differ from the customer's current site name (for example when a
+// project was reused), so showing the site prevents a misleading header.
+var SHORT_REF     = ${JSON.stringify([order.customer_name, order.site_name || order.project_name].filter(Boolean).join(' / '))};
 var PRINT_DATE    = ${JSON.stringify(printDate)};
 var DELIV_DATE    = ${JSON.stringify(delivDate)};
 var ORDER_STATUS  = ${JSON.stringify(order.status || '')};
