@@ -100,6 +100,13 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   const pallets = db.prepare('SELECT * FROM pallets WHERE order_id=? ORDER BY pallet_num').all(order.id);
   pallets.forEach(p => { p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY id').all(p.id); });
   const allItems = pallets.flatMap(p => p.items);
+  const requestedItemStatus = String(req.query.item_status || '').trim();
+  const selectedItems = requestedItemStatus
+    ? allItems.filter(item => String(item.status || '').trim() === requestedItemStatus)
+    : allItems;
+  if (requestedItemStatus && !selectedItems.length) {
+    return res.status(409).send(`אין פריטים בסטטוס ${requestedItemStatus} לתעודת משלוח`);
+  }
 
   const fmtDate = d => {
     const dt = d ? new Date(d) : new Date();
@@ -109,7 +116,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   const delivDate = order.delivery_date ? fmtDate(order.delivery_date) : '—';
 
   const calcItemWeight = it => effectiveItemWeight(it, roundPileCageDeliveryMetrics(it)).weightKg;
-  const commercialSummary = buildOrderCommercialSummary(allItems);
+  const commercialSummary = buildOrderCommercialSummary(selectedItems);
   const wTotal = commercialSummary.material_weight_kg;
   // 3% weight-gap addition — same factor as orders.billing_weight (routes/orders.js).
   // Optional: ?waste3=0 renders the certificate without the addition rows.
@@ -121,8 +128,10 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   const fmtTon = v => (Number(v || 0) / 1000).toFixed(2);
 
   // Position range label
-  const posLabel = allItems.length > 0
-    ? 'תעודת משלוח לפי פריטים שסופקו וסיכום סעיפי עבודה'
+  const posLabel = requestedItemStatus === 'הועמס'
+    ? 'תעודת משלוח חלקית לפי פריטים שהועמסו'
+    : selectedItems.length > 0
+      ? 'תעודת משלוח לפי פריטים שסופקו וסיכום סעיפי עבודה'
     : 'תעודת משלוח';
 
   const workSummaryRowsHtml = commercialSummary.sections.map(section => {
@@ -158,7 +167,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
         <td colspan="4" style="text-align:right;background:#eef3f8;color:#1a2332;">סה"כ משקל תיאורטי:</td>
         <td class="total-val" style="background:#eef3f8;color:#1a2332;">${fmt2(wTotal)}</td>
         <td style="background:#eef3f8;"></td>
-        <td style="background:#eef3f8;color:#1a2332;">סה"כ כללי קומפלט · ${allItems.length} פריטים</td>
+        <td style="background:#eef3f8;color:#1a2332;">סה"כ פריטים בתעודה · ${selectedItems.length}</td>
       </tr>
       <tr>
         <td colspan="4" style="text-align:right;background:#fff;color:#c0392b;">תוספת 3% פערי משקלים:</td>
@@ -176,12 +185,12 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
         <td colspan="4" style="text-align:right;">סה"כ משקל</td>
         <td class="total-val">${fmt2(wTotal)}</td>
         <td></td>
-        <td>סה"כ כללי קומפלט · ${allItems.length} פריטים</td>
+        <td>סה"כ פריטים בתעודה · ${selectedItems.length}</td>
       </tr>`;
 
   // Build table rows
   let rows = '';
-  allItems.forEach((item, idx) => {
+  selectedItems.forEach((item, idx) => {
     const itemMetrics = deliveryItemMetrics(item, industry);
     const posNum = idx + 1;
     const pileCageMetrics = roundPileCageDeliveryMetrics(item);

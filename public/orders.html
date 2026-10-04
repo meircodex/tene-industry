@@ -953,6 +953,21 @@ async function setStatus(id, status) {
   return true;
 }
 
+async function setItemStatusFromOrder(orderId, itemId, status) {
+  const response = await fetch(`/api/items/${itemId}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result.ok === false) {
+    alert(result.error || 'עדכון סטטוס הפריט נכשל');
+    await openDetail(orderId);
+    return false;
+  }
+  await fetchOrders();
+  await openDetail(orderId);
+  return true;
+}
+
 function newCancellationIdempotencyKey() {
   return window.crypto?.randomUUID?.()
     || `cancel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -2334,10 +2349,12 @@ function buildDetailHTML(o, pkgs) {
   </div>`;
 
   // ── Print buttons
+  const loadedItemCount = (o.pallets || []).flatMap(p => p.items || []).filter(item => item.status === ITEM_STATUS.LOADED).length;
   const prints = `<div class="print-btns">
     <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">&#128203; &#1514;&#1506;&#1493;&#1491;&#1514; &#1502;&#1513;&#1500;&#1493;&#1495;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">&#128203; תעודה חלקית — הועמסו (${loadedItemCount})</a></div>
   </div>`;
 
   // ── Info
@@ -2448,6 +2465,13 @@ function buildDetailHTML(o, pkgs) {
             ${item.status === ITEM_STATUS.CANCELLED ? '' : `<button class="review-btn danger" onclick="openCancellationReview(event, ${o.id}, ${item.id})">בטל פריט + החלטת תוצרת</button>`}
             ${historicalItemEligibleForReconciliation(o, item) ? `<button class="review-btn primary" onclick="openHistoricalReconciliation(event, ${o.id}, ${item.id})">תיקון ביצוע היסטורי</button>` : ''}
             <button class="review-btn danger" ${itemStarted ? 'disabled title="לא מוחקים כרטיסייה שכבר התחילה ייצור"' : ''} onclick="deleteOrderItem(event, ${o.id}, ${item.id})">מחק פריט</button>
+          </div>
+          <div class="review-actions" style="align-items:center;gap:8px">
+            <label style="font-size:11px;color:var(--muted);font-weight:800">סטטוס פריט
+              <select onchange="setItemStatusFromOrder(${o.id},${item.id},this.value)" style="min-width:120px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-weight:800">
+                ${[ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.DELIVERED, ITEM_STATUS.ON_HOLD].filter(Boolean).map(status => `<option value="${escHtml(status)}"${item.status===status?' selected':''}>${escHtml(status)}</option>`).join('')}
+              </select>
+            </label>
           </div>
           ${review ? `<div class="review-actions">
             <button class="review-btn" onclick="openOrderIntakeSource(event, ${o.id})">פתח מקור להשוואה</button>

@@ -19,7 +19,7 @@ const LINE_DEFINITIONS = Object.freeze([
   { key: 'chairs_units', section: 'processing', label: 'כסאות', unit: 'unit' },
   { key: 'rings_units', section: 'processing', label: 'עיבוד טבעות', unit: 'unit' },
   { key: 'hoops_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
-  { key: 'column_penetration_units', section: 'processing', label: 'פרטי חדירה לעמודים', unit: 'unit' },
+  { key: 'column_penetration_units', section: 'processing', label: 'פריט חדירה לעמודים', unit: 'unit' },
   { key: 'lifting_units', section: 'processing', label: 'ציפורים/אזני הרמה/קרומים', unit: 'unit' },
   { key: 'mesh_kg', section: 'finished_products', label: 'רשת לבניין סטנדרט בחבילות', unit: 'kg' },
   { key: 'pile_cages_kg', section: 'finished_products', label: 'כלונסאות / כלובי זיון', unit: 'kg' },

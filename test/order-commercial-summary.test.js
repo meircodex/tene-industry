@@ -136,7 +136,7 @@ test('column penetration details are a separate per-unit add-on with cutting and
   assert.equal(line(summary, 'cutting_kg').value, 188.7);
   assert.equal(line(summary, 'bending_kg').value, 188.7);
   assert.equal(line(summary, 'column_penetration_units').value, 30);
-  assert.equal(line(summary, 'column_penetration_units').label, 'פרטי חדירה לעמודים');
+  assert.equal(line(summary, 'column_penetration_units').label, 'פריט חדירה לעמודים');
   assert.equal(summaryLine(summary, 'rings_units'), null);
   assert.equal(summaryLine(summary, 'hoops_units'), null);
 });

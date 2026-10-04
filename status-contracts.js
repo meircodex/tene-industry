@@ -86,6 +86,7 @@ const ITEM_STATUS = Object.freeze({
   WAITING: 'ממתין',
   IN_PRODUCTION: 'בייצור',
   DONE: 'הושלם',
+  LOADED: 'הועמס',
   DELIVERED: 'סופק',
   ON_HOLD: 'בהמתנה',
   CANCELLED: 'בוטל'
