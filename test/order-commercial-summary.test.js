@@ -141,6 +141,16 @@ test('column penetration details are a separate per-unit add-on with cutting and
   assert.equal(summaryLine(summary, 'hoops_units'), null);
 });
 
+test('imported two-direction inclined details classify as column penetration units', () => {
+  const summary = buildOrderCommercialSummary([
+    item({ id: 19, shape_name: 'טיפוס B 250/250/80 / מוטה Φ16@20 ב-2 כיוונים', quantity: 208, total_weight: 1193 }),
+    item({ id: 24, shape_name: 'טיפוס C 280/280/90 / מוטה Φ16@20 ב-2 כיוונים', quantity: 30, total_weight: 188.7 }),
+  ]);
+  assert.equal(line(summary, 'column_penetration_units').value, 238);
+  assert.equal(line(summary, 'bending_kg').value, 1381.7);
+  assert.equal(line(summary, 'cutting_kg').value, 1381.7);
+});
+
 test('mesh and pile cages are independent finished-product kg rows without material double counting', () => {
   const cage = cageSnapshot();
   const summary = buildOrderCommercialSummary([
