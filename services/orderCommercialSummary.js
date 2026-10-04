@@ -17,7 +17,8 @@ const LINE_DEFINITIONS = Object.freeze([
   { key: 'bending_kg', section: 'processing', label: 'כיפוף', unit: 'kg' },
   { key: 'spiral_processing_kg', section: 'processing', label: 'עיבוד ספירלות עד קוטר 12 כולל', unit: 'kg' },
   { key: 'chairs_units', section: 'processing', label: 'כסאות', unit: 'unit' },
-  { key: 'rings_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
+  { key: 'rings_units', section: 'processing', label: 'עיבוד טבעות', unit: 'unit' },
+  { key: 'hoops_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
   { key: 'lifting_units', section: 'processing', label: 'ציפורים/אזני הרמה/קרומים', unit: 'unit' },
   { key: 'mesh_kg', section: 'finished_products', label: 'רשת לבניין סטנדרט בחבילות', unit: 'kg' },
   { key: 'pile_cages_kg', section: 'finished_products', label: 'כלונסאות / כלובי זיון', unit: 'kg' },
@@ -194,9 +195,16 @@ function classifyOrderItem(item = {}) {
     shape.family === 'spirals' && spiralTurns > 1.5
     || /spiral|helix|spring|coil|ספיר|סליל|קפיץ/i.test(shape.text)
   );
-  const isRing = !isSpiral && !isPileCage && !isMesh && (
+  // A ring (טבעת) and a hoop/stirrup (חישוק) are different products and must
+  // remain separate in the commercial summary. Prefer the explicit shape type
+  // and then the product wording when legacy rows do not have a type.
+  const isHoop = !isSpiral && !isPileCage && !isMesh && (
+    ['closed_stirrup', 'stirrup', 'hoop'].includes(shape.shapeType)
+      || /(^|\W)(hoop|חישוק)(\W|$)/i.test(shape.text)
+  );
+  const isRing = !isHoop && !isSpiral && !isPileCage && !isMesh && (
     shape.shapeType === 'ring'
-      || /(^|\W)(ring|hoop|חישוק|טבעת)(\W|$)/i.test(shape.text)
+      || /(^|\W)(ring|טבעת)(\W|$)/i.test(shape.text)
   );
   const isLifting = !isPileCage && !isMesh && /ציפור|ציפורים|אוזן|אזני|הרמה|קרום|קרומים|bird|lifting|insert/i.test(shape.text);
   const bent = isChair || isRing || isLifting || (!isSpiral && isBentItem(item));
@@ -211,17 +219,17 @@ function classifyOrderItem(item = {}) {
     lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'spiral_processing_kg'],
   };
 
-  if (isRing) return {
-    kind: 'ring',
+  if (isRing || isHoop) return {
+    kind: isHoop ? 'hoop' : 'ring',
     weightKg,
     weightSource,
     materialSource: material.source,
     materialSourceBasis: material.basis,
     quantity,
     lengthMm,
-    // A hoop is a bent product: keep the unit-count processing line, and also
-    // charge/show its weight in the common bending line.
-    lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'bending_kg', 'rings_units'],
+    // Both products are bent: keep their own unit-count line, and also
+    // charge/show their weight in the common bending line.
+    lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'bending_kg', isHoop ? 'hoops_units' : 'rings_units'],
   };
 
   const lines = [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg'];

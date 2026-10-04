@@ -95,7 +95,7 @@ test('an explicitly sourced coil spiral is round-wire material plus cutting and 
   assert.equal(summaryLine(summary, 'bending_kg'), null);
 });
 
-test('hoops are priced as iron plus cutting, bending and hoop processing per unit', () => {
+test('rings are priced as iron plus cutting, bending and ring processing per unit', () => {
   const summary = buildOrderCommercialSummary([
     item({ id: 1, shape_id: 's15', shape_name: 'ספסל', quantity: 4, total_weight: 10, segments: JSON.stringify([{ length_mm: 500, angle_deg: 90 }, { length_mm: 1000, angle_deg: 90 }, { length_mm: 500, angle_deg: null }]) }),
     item({ id: 2, shape_name: 'טבעת', quantity: 5, total_weight: 13.19, spiral_diameter_mm: 420, spiral_turns: 1, shape_snapshot_json: JSON.stringify({ family: 'spirals', shapeType: 'ring', data: { ringDiameterMm: 420 } }) }),
@@ -109,7 +109,21 @@ test('hoops are priced as iron plus cutting, bending and hoop processing per uni
   assert.equal(line(summary, 'chairs_units').unit, 'unit');
   assert.equal(line(summary, 'rings_units').value, 5);
   assert.equal(line(summary, 'rings_units').unit, 'unit');
-  assert.equal(line(summary, 'rings_units').label, 'עיבוד חישוקים');
+  assert.equal(line(summary, 'rings_units').label, 'עיבוד טבעות');
+});
+
+test('hoops are kept distinct from rings and are priced as bent hoop processing', () => {
+  const summary = buildOrderCommercialSummary([item({
+    id: 3,
+    shape_name: 'חישוק',
+    quantity: 7,
+    total_weight: 21,
+    shape_snapshot_json: JSON.stringify({ shapeType: 'closed_stirrup', data: {} }),
+  })]);
+  assert.equal(line(summary, 'bending_kg').value, 21);
+  assert.equal(summaryLine(summary, 'rings_units'), null);
+  assert.equal(line(summary, 'hoops_units').value, 7);
+  assert.equal(line(summary, 'hoops_units').label, 'עיבוד חישוקים');
 });
 
 test('mesh and pile cages are independent finished-product kg rows without material double counting', () => {
