@@ -2469,7 +2469,7 @@ function buildDetailHTML(o, pkgs) {
           <div class="review-actions" style="align-items:center;gap:8px">
             <label style="font-size:11px;color:var(--muted);font-weight:800">סטטוס פריט
               <select onchange="setItemStatusFromOrder(${o.id},${item.id},this.value)" style="min-width:120px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:#fff;font-weight:800">
-                ${[ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.DELIVERED, ITEM_STATUS.ON_HOLD].filter(Boolean).map(status => `<option value="${escHtml(status)}"${item.status===status?' selected':''}>${escHtml(status)}</option>`).join('')}
+                ${[ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED, ITEM_STATUS.ON_HOLD].filter(Boolean).map(status => `<option value="${escHtml(status)}"${item.status===status?' selected':''}>${escHtml(status)}</option>`).join('')}
               </select>
             </label>
           </div>

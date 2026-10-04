@@ -8,7 +8,7 @@
 <style>
   body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#142033;display:grid;place-items:center;min-height:100vh}
   .box{width:min(520px,calc(100vw - 32px));background:white;border:1px solid #d7e0ea;border-radius:14px;box-shadow:0 18px 50px rgba(15,35,60,.12);padding:28px;text-align:center}
-  .mark{font-size:34px;margin-bottom:10px}.title{font-weight:800;font-size:22px;margin-bottom:8px}.msg{color:#64748b;line-height:1.6}.err{color:#b42318;font-weight:800;margin-top:14px;white-space:pre-wrap}.actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-block;padding:12px 18px;border-radius:10px;background:#e05a00;color:#fff;text-decoration:none;font-weight:800}.btn.secondary{background:#142033}
+  .mark{font-size:34px;margin-bottom:10px}.title{font-weight:800;font-size:22px;margin-bottom:8px}.msg{color:#64748b;line-height:1.6}.err{color:#b42318;font-weight:800;margin-top:14px;white-space:pre-wrap}.actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-block;padding:12px 18px;border-radius:10px;background:#e05a00;color:#fff;text-decoration:none;font-weight:800}.btn.secondary{background:#142033}.choice{display:grid;gap:10px;margin-top:18px;text-align:right}.choice .btn{display:block;text-align:center}.warning{background:#fff7df;border:1px solid #e4b64a;border-radius:10px;padding:12px;color:#6b4b00;line-height:1.55;font-weight:700}
 </style>
 </head>
 <body>
@@ -36,9 +36,24 @@
     status.querySelector('.err').textContent = message;
   }
 
+  function chooseCertificateMode(){
+    const draft = new URL(location.href);
+    draft.searchParams.set('certificate_mode', 'draft');
+    const source = new URL(location.href);
+    source.searchParams.set('certificate_mode', 'source');
+    status.innerHTML = '<div class="mark">🚚</div><div class="title">איזו תעודה להפיק?</div>'
+      + '<div class="warning">טיוטה רק מציגה את הפריטים ואינה משנה סטטוסים.<br>מקור מסמן את הפריטים שהועמסו כ״נשלח״, כדי שלא יופיעו בתעודה נוספת.</div>'
+      + '<div class="choice"><a class="btn secondary" href="' + draft.href + '">הפק טיוטה</a>'
+      + '<a class="btn" href="' + source.href + '">הפק מקור וסמן כנשלח</a></div>';
+  }
+
   async function load(){
     if (!id || !/^\d+$/.test(id) || !kinds.has(kind)) {
       fail('Invalid print request.');
+      return;
+    }
+    if (kind === 'delivery-certificate' && !params.has('certificate_mode')) {
+      chooseCertificateMode();
       return;
     }
     const extra = new URLSearchParams();

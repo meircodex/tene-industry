@@ -100,10 +100,13 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   const pallets = db.prepare('SELECT * FROM pallets WHERE order_id=? ORDER BY pallet_num').all(order.id);
   pallets.forEach(p => { p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY id').all(p.id); });
   const allItems = pallets.flatMap(p => p.items);
-  const requestedItemStatus = String(req.query.item_status || '').trim();
+  const certificateMode = String(req.query.certificate_mode || 'draft').trim().toLowerCase() === 'source' ? 'source' : 'draft';
+  // A source certificate is always based on the loading confirmation. Items
+  // already sent are intentionally excluded so the same item cannot be sent twice.
+  const requestedItemStatus = String(req.query.item_status || (certificateMode === 'source' ? 'הועמס' : '')).trim();
   const selectedItems = requestedItemStatus
     ? allItems.filter(item => String(item.status || '').trim() === requestedItemStatus)
-    : allItems;
+    : allItems.filter(item => String(item.status || '').trim() !== 'נשלח');
   if (requestedItemStatus && !selectedItems.length) {
     return res.status(409).send(`אין פריטים בסטטוס ${requestedItemStatus} לתעודת משלוח`);
   }
@@ -129,9 +132,9 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
 
   // Position range label
   const posLabel = requestedItemStatus === 'הועמס'
-    ? 'תעודת משלוח חלקית לפי פריטים שהועמסו'
+    ? `תעודת משלוח ${certificateMode === 'source' ? 'מקור' : 'טיוטה'} לפי פריטים שהועמסו`
     : selectedItems.length > 0
-      ? 'תעודת משלוח לפי פריטים שסופקו וסיכום סעיפי עבודה'
+      ? `תעודת משלוח ${certificateMode === 'source' ? 'מקור' : 'טיוטה'} לפי פריטים שסופקו וסיכום סעיפי עבודה`
     : 'תעודת משלוח';
 
   const workSummaryRowsHtml = commercialSummary.sections.map(section => {
@@ -216,6 +219,16 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
       </tr>`;
   });
 
+  // Only a confirmed source certificate closes the shipment items. Drafts are
+  // read-only and can be regenerated or corrected without changing history.
+  if (certificateMode === 'source') {
+    const markSent = db.transaction(() => {
+      selectedItems.forEach(item => db.prepare("UPDATE items SET status='נשלח' WHERE id=? AND status='הועמס'").run(item.id));
+      const remaining = db.prepare("SELECT COUNT(*) AS count FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? AND i.status <> 'נשלח'").get(order.id)?.count || 0;
+      db.prepare("UPDATE orders SET status=? WHERE id=? AND status NOT IN ('סופק – אושר','בוטלה')").run(remaining ? 'אספקה חלקית' : 'נשלחה', order.id);
+    });
+    markSent();
+  }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="he" dir="rtl">

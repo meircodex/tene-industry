@@ -40,6 +40,7 @@ module.exports = function createProductionRouter(deps) {
     ITEM_STATUS.IN_PRODUCTION,
     ITEM_STATUS.DONE,
     ITEM_STATUS.LOADED,
+    ITEM_STATUS.SENT,
     ITEM_STATUS.DELIVERED,
     ITEM_STATUS.ON_HOLD,
     ITEM_STATUS.CANCELLED,
@@ -389,7 +390,7 @@ module.exports = function createProductionRouter(deps) {
   router.patch('/worker-card/:id/status', requireQrPermission('production'), (req, res) => {
     const status = req.body?.status;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
-    if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.DELIVERED].includes(status)) {
+    if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(status)) {
       return res.status(400).json({ error: 'invalid public production status' });
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
@@ -594,7 +595,7 @@ module.exports = function createProductionRouter(deps) {
   router.patch('/items/:id/status', requireAnyRole(['production', 'kiosk', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
     const { status } = req.body;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
-    const allowed = ['ממתין','בייצור','הושלם','הועמס','סופק','בהמתנה','בוטל'];
+    const allowed = ['ממתין','בייצור','הושלם','הועמס','נשלח','סופק','בהמתנה','בוטל'];
     if (!allowed.includes(status)) return res.status(400).json({ error: 'invalid status' });
     if (status === ITEM_STATUS.CANCELLED) {
       return res.status(409).json({ error: 'cancellation_review_required' });

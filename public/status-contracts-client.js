@@ -72,6 +72,7 @@
     IN_PRODUCTION: 'בייצור',
     DONE: 'הושלם',
     LOADED: 'הועמס',
+    SENT: 'נשלח',
     DELIVERED: 'סופק',
     ON_HOLD: 'בהמתנה',
     CANCELLED: 'בוטל',
