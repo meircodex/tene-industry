@@ -17,7 +17,7 @@ const LINE_DEFINITIONS = Object.freeze([
   { key: 'bending_kg', section: 'processing', label: 'כיפוף', unit: 'kg' },
   { key: 'spiral_processing_kg', section: 'processing', label: 'עיבוד ספירלות עד קוטר 12 כולל', unit: 'kg' },
   { key: 'chairs_units', section: 'processing', label: 'כסאות', unit: 'unit' },
-  { key: 'rings_units', section: 'processing', label: 'עיבוד טבעות', unit: 'unit' },
+  { key: 'rings_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
   { key: 'lifting_units', section: 'processing', label: 'ציפורים/אזני הרמה/קרומים', unit: 'unit' },
   { key: 'mesh_kg', section: 'finished_products', label: 'רשת לבניין סטנדרט בחבילות', unit: 'kg' },
   { key: 'pile_cages_kg', section: 'finished_products', label: 'כלונסאות / כלובי זיון', unit: 'kg' },
@@ -219,7 +219,9 @@ function classifyOrderItem(item = {}) {
     materialSourceBasis: material.basis,
     quantity,
     lengthMm,
-    lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'rings_units'],
+    // A hoop is a bent product: keep the unit-count processing line, and also
+    // charge/show its weight in the common bending line.
+    lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'bending_kg', 'rings_units'],
   };
 
   const lines = [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg'];
