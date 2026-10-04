@@ -126,6 +126,21 @@ test('hoops are kept distinct from rings and are priced as bent hoop processing'
   assert.equal(line(summary, 'hoops_units').label, 'עיבוד חישוקים');
 });
 
+test('column penetration details are a separate per-unit add-on with cutting and bending', () => {
+  const summary = buildOrderCommercialSummary([item({
+    id: 4,
+    shape_name: 'פרט חדירה לעמודים',
+    quantity: 30,
+    total_weight: 188.7,
+  })]);
+  assert.equal(line(summary, 'cutting_kg').value, 188.7);
+  assert.equal(line(summary, 'bending_kg').value, 188.7);
+  assert.equal(line(summary, 'column_penetration_units').value, 30);
+  assert.equal(line(summary, 'column_penetration_units').label, 'פרטי חדירה לעמודים');
+  assert.equal(summaryLine(summary, 'rings_units'), null);
+  assert.equal(summaryLine(summary, 'hoops_units'), null);
+});
+
 test('mesh and pile cages are independent finished-product kg rows without material double counting', () => {
   const cage = cageSnapshot();
   const summary = buildOrderCommercialSummary([

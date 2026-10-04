@@ -19,6 +19,7 @@ const LINE_DEFINITIONS = Object.freeze([
   { key: 'chairs_units', section: 'processing', label: 'כסאות', unit: 'unit' },
   { key: 'rings_units', section: 'processing', label: 'עיבוד טבעות', unit: 'unit' },
   { key: 'hoops_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
+  { key: 'column_penetration_units', section: 'processing', label: 'פרטי חדירה לעמודים', unit: 'unit' },
   { key: 'lifting_units', section: 'processing', label: 'ציפורים/אזני הרמה/קרומים', unit: 'unit' },
   { key: 'mesh_kg', section: 'finished_products', label: 'רשת לבניין סטנדרט בחבילות', unit: 'kg' },
   { key: 'pile_cages_kg', section: 'finished_products', label: 'כלונסאות / כלובי זיון', unit: 'kg' },
@@ -190,6 +191,7 @@ function classifyOrderItem(item = {}) {
   const isLiftPackage = shape.family === 'lifts' || shape.shapeType === 'lift_package';
   const isPileCage = !isLiftPackage && Boolean(pileBreakdown || productionCards.isRoundPileCageItem(item));
   const isMesh = shape.family === 'mesh' || /(^|\W)(mesh|wire mesh|רשת)(\W|$)/i.test(shape.text);
+  const isColumnPenetration = !isPileCage && !isMesh && /חדירה\s*לעמודים?|עמודים?\s*חדירה|column\s*penetration|penetration\s*column/i.test(shape.text);
   const isChair = shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text);
   const isSpiral = !isPileCage && !isMesh && shape.shapeType !== 'ring' && (
     shape.family === 'spirals' && spiralTurns > 1.5
@@ -213,6 +215,18 @@ function classifyOrderItem(item = {}) {
   if (isLiftPackage) return { kind: 'lift_package', weightKg, weightSource, quantity, lengthMm, lines: ['lift_packages_units', 'lift_packages_kg'] };
   if (isPileCage) return { kind: 'pile_cage', weightKg, weightSource, quantity, lengthMm, pileBreakdown, lines: ['pile_cages_kg'] };
   if (isMesh) return { kind: 'mesh', weightKg, weightSource, quantity, lengthMm, lines: ['mesh_kg'] };
+  if (isColumnPenetration) return {
+    kind: 'column_penetration',
+    weightKg,
+    weightSource,
+    materialSource: material.source,
+    materialSourceBasis: material.basis,
+    quantity,
+    lengthMm,
+    // This is its own per-unit add-on while sharing the ordinary cutting and
+    // bending kg services with other bent products.
+    lines: [material.source === 'coil' ? 'round_wire_coil_kg' : 'processed_rebar_kg', 'cutting_kg', 'bending_kg', 'column_penetration_units'],
+  };
   if (isSpiral) return {
     kind: 'spiral', weightKg, weightSource, quantity, lengthMm,
     materialSource: material.source, materialSourceBasis: material.basis,

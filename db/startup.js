@@ -436,7 +436,7 @@ function runCoreMigrations(db) {
   `);
 
   try {
-    db.prepare("UPDATE pricing_price_items SET description='עיבוד טבעות', unit='unit' WHERE description='חישוקים'").run();
+    db.prepare("UPDATE pricing_price_items SET description='עיבוד חישוקים', unit='unit' WHERE description='חישוקים'").run();
     db.prepare("UPDATE pricing_price_items SET description='עיבוד ספירלות עד קוטר 12 כולל' WHERE description='עיבוד ספירלות טבעות עד קוטר 12 כולל'").run();
   } catch (error) {
     console.warn('[DB] Migration warning: ring price-list terminology was not updated:', error.message);
