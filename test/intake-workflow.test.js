@@ -166,6 +166,10 @@ test('technical OCR notes stay out of operational order notes', () => {
   assert.equal(isTechnicalRecognitionNote(technicalNote), true);
   assert.equal(operationalOrderNote(technicalNote), '');
 
+  const shapeReviewNote = 'Visible shape side does not explain total length; shape requires review.';
+  assert.equal(isTechnicalRecognitionNote(shapeReviewNote), true);
+  assert.equal(operationalOrderNote(shapeReviewNote), '');
+
   const payload = buildIntakeOrderPayload({
     customer_name: 'לקוח',
     delivery_date: '2026-06-03',

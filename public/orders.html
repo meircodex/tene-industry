@@ -2215,7 +2215,7 @@ function isTechnicalRecognitionNote(value) {
   const note = String(value || '').trim();
   if (!note) return false;
   if (note.length > 220) return true;
-  return /cover page|row\s+\d+|interpreted|sketch|review required|reported total|segment sum|length surplus|unclear|uncertain|conservatively|tassa|pdf/i.test(note);
+  return /cover page|row\s+\d+|interpreted|sketch|review required|shape requires review|visible shape side|reported total|segment sum|length surplus|unclear|uncertain|conservatively|tassa|pdf/i.test(note);
 }
 
 function visibleItemNote(note) {
