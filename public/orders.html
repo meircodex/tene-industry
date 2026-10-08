@@ -2561,9 +2561,10 @@ function isSpiralOrRingName(shapeName) {
 // still contain a cached generic-bar SVG, which can have the tails and body
 // sides in the wrong visual positions. Treat the geometry as authoritative.
 function isClosedHoopItem(item = {}) {
-  const name = String(item?.shape_name || item?.shapeName || item?.shape || '').toLowerCase();
+  const name = String(item?.shape_name || item?.shapeName || item?.shape || item?.struct_element || item?.element_name || item?.elementName || '').toLowerCase();
+  const element = String(item?.struct_element || item?.element_name || item?.elementName || '').toLowerCase();
   const type = String(item?.shapeType || item?.shape_type || '').toLowerCase();
-  return /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(`${name} ${type}`);
+  return /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(`${name} ${element} ${type}`);
 }
 
 function isRealSpiralItem(item) {
