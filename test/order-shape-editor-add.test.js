@@ -12,7 +12,7 @@ const newOrderEditor = () => fs.readFileSync(newOrderEditorPath, 'utf8');
 
 test('orders manual add uses the shared shape editor, not the legacy manual form', () => {
   const html = orders();
-  assert.match(html, /src="\/shape-editor\.js\?v=79"/);
+  assert.match(html, /src="\/shape-editor\.js\?v=80"/);
   assert.match(html, /new ShapeEditorModal\(shapeSelectedFromOrder\)/);
   assert.match(html, /function openAddManualItem\(event\) \{[\s\S]*openOrderShapeEditorForAdd\(event, orderId\);[\s\S]*?\n\}/);
   assert.doesNotMatch(html, /openManualItemAdd/);
@@ -31,6 +31,10 @@ test('orders item shape edits go through the shared shape editor', () => {
   assert.match(html, /shapeSnapshot: isShapeContractV2 \? data : null/);
   assert.match(html, /structElement:\s*String\(data\?\.structElement \|\| ''\)\.trim\(\)/);
   assert.match(html, /structElement:\s*String\(item\?\.struct_element \|\| item\?\.structElement/);
+  assert.match(html, /const snapshot = orderShapeSnapshot\(item\) \|\| \{\}/);
+  assert.match(html, /snapshotData\.is3d \?\? snapshotData\.is_3d \?\? snapshot\.is3d/);
+  assert.match(html, /shapeType: snapshot\.shapeType/);
+  assert.match(html, /roundedBends: snapshotData\.roundedBends === true \|\| snapshot\.shapeType === 'rounded_end_bar'/);
 });
 
 test('orders missing intake source add flow offers a manual shape editor fallback', () => {

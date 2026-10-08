@@ -20,7 +20,7 @@
 <script src="/rebar-weights.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=79"></script>
+<script src="/shape-editor.js?v=80"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -2670,14 +2670,32 @@ function orderShapeSegmentsFromEditor(data) {
 }
 
 function orderShapeDataFromItem(item) {
+  const snapshot = orderShapeSnapshot(item) || {};
+  const snapshotData = snapshot.data && typeof snapshot.data === 'object' ? snapshot.data : {};
   const segments = rawItemSegments(item);
+  const snapshotSides = Array.isArray(snapshotData.sides) ? snapshotData.sides.map(Number).filter(value => Number.isFinite(value) && value > 0) : [];
+  const snapshotAngles = Array.isArray(snapshotData.angles) ? snapshotData.angles.map(Number).filter(Number.isFinite) : [];
+  const sides = snapshotSides.length
+    ? snapshotSides
+    : (segments.length ? segments.map(segment => Math.round(segment.length_mm)) : [1000]);
+  const angles = snapshotSides.length
+    ? snapshotAngles
+    : (segments.length ? segments.slice(0, -1).map(segment => Number(segment.angle_deg ?? 180) || 180) : []);
+  const is3d = snapshotData.is3d ?? snapshotData.is_3d ?? snapshot.is3d ?? snapshot.is_3d ?? item?.is_3d ?? 0;
   return {
-    sides: segments.length ? segments.map(segment => Math.round(segment.length_mm)) : [1000],
-    angles: segments.length ? segments.slice(0, -1).map(segment => Number(segment.angle_deg ?? 180) || 180) : [],
-    shapeName: item?.shape_name || '\u05d9\u05e9\u05e8',
-    presetName: item?.shape_name || '\u05d9\u05e9\u05e8',
-    diameter: Number(item?.diameter) || 12,
-    is3d: item?.is_3d ? 1 : 0,
+    sides,
+    angles,
+    shapeName: snapshot.displayName || snapshot.shapeName || item?.shape_name || '\u05d9\u05e9\u05e8',
+    presetName: snapshot.displayName || snapshot.shapeName || item?.shape_name || '\u05d9\u05e9\u05e8',
+    presetId: snapshot.shapeId || snapshot.shape_id || item?.shape_id || null,
+    shapeType: snapshot.shapeType || snapshot.shape_type || item?.shape_type || null,
+    family: snapshot.family || 'bars',
+    diameter: Number(snapshotData.diameter ?? item?.diameter) || 12,
+    is3d: is3d ? 1 : 0,
+    azAngles: is3d && Array.isArray(snapshotData.azAngles) ? snapshotData.azAngles.map(Number) : null,
+    elAngles: is3d && Array.isArray(snapshotData.elAngles) ? snapshotData.elAngles.map(Number) : null,
+    roundedBends: snapshotData.roundedBends === true || snapshot.shapeType === 'rounded_end_bar',
+    radiusMm: snapshotData.radiusMm ?? null,
     structElement: String(item?.struct_element || item?.structElement || item?.element_name || item?.elementName || '').trim(),
   };
 }
