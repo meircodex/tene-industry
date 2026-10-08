@@ -33,6 +33,9 @@ test('cutting bars show only lengths inside colored segments and place shapes si
   assert.doesNotMatch(ordersHtml, /class="cut-piece[^\n]*data-cut-shape-item/);
   assert.match(ordersHtml, /class="cut-shape-strip">\$\{shapeStrip\}/);
   assert.match(ordersHtml, /class="cut-shape-thumb-preview" data-cut-shape-item/);
+  assert.match(ordersHtml, /\.cut-bar-track\{[^}]*direction:rtl/);
+  assert.match(ordersHtml, /patternColorByItem\.set\(key, straightStockPatternColor\(patternColorByItem\.size\)\)/);
+  assert.match(ordersHtml, /data-cut-shape-color="\$\{pieceColor\}"/);
   assert.match(ordersHtml, /קוטר ⌀\$\{escHtml\(group\.diameter\)\}/);
   assert.match(ordersHtml, /data-cut-shape-item/);
   assert.match(ordersHtml, /renderStraightStockShapePreviews/);
@@ -45,7 +48,7 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /return `\$\{Number\.isInteger\(centimeters\)[\s\S]*\} CM`/);
   assert.match(ordersHtml, /\$\{plan\.bars\.length\} PCS/);
   assert.match(ordersHtml, /\$\{plan\.pieceCount\} PCS/);
-  assert.match(ordersHtml, /const isShort = width < 7/);
+  assert.match(ordersHtml, /const isShort = width < 12/);
   assert.match(ordersHtml, /const visibleLength = isShort \? fullLength\.replace\(\/\\s\*CM\$\/, ''\) : fullLength/);
   assert.match(ordersHtml, /\.cut-shape-thumb-preview svg text\{font-size:14px!important;font-weight:900!important/);
   assert.match(ordersHtml, /data-cut-shape-size="thumb"/);
