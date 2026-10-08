@@ -18,6 +18,10 @@ test('cutting dialog supports item quantities and a per-diameter 6m or 12m decis
   assert.match(ordersHtml, /רק מוט 6 מטר/);
   assert.match(ordersHtml, /רק מוט 12 מטר/);
   assert.match(ordersHtml, /אפשר לשלב 6 ו־12 מטר/);
+  assert.match(ordersHtml, /מינימום פחת הוא היעד הראשון/);
+  assert.match(ordersHtml, /אוטומטי — מינימום פחת, כולל שילוב 6 ו־12/);
+  assert.match(ordersHtml, /אורך אחד בלבד לקוטר/);
+  assert.match(ordersHtml, /else policies\[diameter\] = \{ stockLengthsMm: \[6000, 12000\], allowMixedStockLengths: true \}/);
   assert.match(ordersHtml, /groupPolicies/);
 });
 

@@ -426,7 +426,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
     <div class="straight-stock-body">
       <div class="straight-stock-toolbar">
         <div class="straight-stock-field"><label for="straightStockKerf">רוחב חיתוך / דיסק (מ״מ)</label><input id="straightStockKerf" type="number" min="0" max="20" step="0.5" value="0"></div>
-        <div class="straight-stock-hint"><b>מלאי מסחרי: 6 ו־12 מטר.</b> ברירת המחדל בוחרת אורך אחד לכל קוטר לפי הפחת הנמוך ביותר. אפשר לשנות ידנית לכל קוטר אם אורך מסוים חסר במלאי.</div>
+        <div class="straight-stock-hint"><b>מלאי מסחרי: 6 ו־12 מטר.</b> במצב אוטומטי מינימום פחת הוא היעד הראשון, ולכן התוכנית יכולה לשלב בין אורכי המוט. אפשר להגביל ידנית לכל קוטר לפי המלאי בפועל.</div>
         <div class="straight-stock-actions"><button type="button" class="straight-stock-action" onclick="setAllStraightStockItems(true)">בחר הכול</button><button type="button" class="straight-stock-action" onclick="setAllStraightStockItems(false)">נקה</button><button type="button" class="straight-stock-action primary" onclick="calculateStraightStockPlan()">חשב תוכנית</button><button type="button" class="straight-stock-action" onclick="printStraightStockPlan()">🖨️ הדפס</button></div>
       </div>
       <div class="straight-stock-table-wrap"><table class="straight-stock-table"><thead><tr><th>בחירה</th><th>פריט</th><th>שם אלמנט</th><th>קוטר</th><th>אורך חיתוך</th><th>כמות להזמנה</th><th>כמות ממוט</th></tr></thead><tbody id="straightStockItems"></tbody></table></div>
@@ -2051,7 +2051,8 @@ function renderStraightStockPolicies() {
   container.innerHTML = diameters.map(diameter => {
     const current = straightStockPolicyByDiameter[diameter] || 'auto';
     return `<div class="straight-stock-policy"><label for="straightStockPolicy-${encodeURIComponent(diameter)}">קוטר ⌀${escHtml(diameter)} — מאיזה מוט לחתוך?</label><select id="straightStockPolicy-${encodeURIComponent(diameter)}" data-cut-policy="${escHtml(diameter)}" onchange="updateStraightStockPolicy(this)">
-      <option value="auto" ${current === 'auto' ? 'selected' : ''}>אוטומטי — מינימום פחת, בלי לערבב אורכים</option>
+      <option value="auto" ${current === 'auto' ? 'selected' : ''}>אוטומטי — מינימום פחת, כולל שילוב 6 ו־12</option>
+      <option value="single" ${current === 'single' ? 'selected' : ''}>אורך אחד בלבד לקוטר — פחות התעסקות</option>
       <option value="6000" ${current === '6000' ? 'selected' : ''}>רק מוט 6 מטר</option>
       <option value="12000" ${current === '12000' ? 'selected' : ''}>רק מוט 12 מטר</option>
       <option value="mixed" ${current === 'mixed' ? 'selected' : ''}>אפשר לשלב 6 ו־12 מטר</option>
@@ -2071,7 +2072,8 @@ function straightStockGroupPolicies(selectedEntries) {
     if (choice === '6000') policies[diameter] = { stockLengthsMm: [6000], allowMixedStockLengths: false };
     else if (choice === '12000') policies[diameter] = { stockLengthsMm: [12000], allowMixedStockLengths: false };
     else if (choice === 'mixed') policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: true };
-    else policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: false };
+    else if (choice === 'single') policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: false };
+    else policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: true };
   }
   return policies;
 }
