@@ -29,7 +29,7 @@ test('cutting bars use item-only labels, colored mixed-item segments, dimensions
   assert.match(ordersHtml, /label: `פריט \$\{itemNumber\}`/);
   assert.doesNotMatch(ordersHtml, /label: sourceNumber \? `מקור/);
   assert.match(ordersHtml, /מוט משולב:/);
-  assert.match(ordersHtml, /class="cut-piece\$\{isShort \? ' is-short' : ''\}\$\{isNarrow \? ' is-narrow' : ''\}"[\s\S]*straightStockLengthText\(piece\.lengthMm\)/);
+  assert.match(ordersHtml, /class="cut-piece\$\{isShort \? ' is-short' : ''\}\$\{isNarrow \? ' is-narrow' : ''\}\$\{edgeClass\}"[\s\S]*straightStockLengthText\(piece\.lengthMm\)/);
   assert.match(ordersHtml, /קוטר ⌀\$\{escHtml\(group\.diameter\)\}/);
   assert.match(ordersHtml, /data-cut-shape-item/);
   assert.match(ordersHtml, /renderStraightStockShapePreviews/);
@@ -43,6 +43,7 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /\$\{plan\.bars\.length\} PCS/);
   assert.match(ordersHtml, /\$\{plan\.pieceCount\} PCS/);
   assert.match(ordersHtml, /const isShort = width < 6/);
+  assert.match(ordersHtml, /\.cut-piece\.is-short \.cut-piece-shape\{display:flex;position:absolute;width:88px;height:70px/);
   assert.match(ordersHtml, /const visibleLabel = isShort \? String\(piece\.itemNumber/);
   assert.match(ordersHtml, /\.cut-piece-shape svg text\{font-size:14px!important;font-weight:900!important/);
   assert.match(ordersHtml, /data-cut-shape-size="\$\{isNarrow \? 'popover' : 'inline'\}"/);
