@@ -18,6 +18,7 @@
 <script src="/nav.js" defer></script>
 <script src="/shape-renderer.js?v=4" defer></script>
 <script src="/rebar-weights.js"></script>
+<script src="/straight-stock-cutting.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
 <script src="/shape-editor.js?v=81"></script>
@@ -289,6 +290,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .print-btn.cards{background:linear-gradient(135deg,#021A48,#17356f) !important;}
 .print-btn.a4{background:linear-gradient(135deg,#1a7a42,#0f5a2f) !important;}
 .print-btn.delivery{background:linear-gradient(135deg,#6d217d,#481652) !important;}
+.print-btn.cutting{background:linear-gradient(135deg,#0f766e,#115e59) !important;cursor:pointer;width:100%;}
 .send-file-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1px solid #b9c9dd;border-radius:12px;background:#fff;color:#294764;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;transition:background .16s ease,border-color .16s ease;}
 .send-file-btn:hover{background:#eef5fb;border-color:#7294b6;}
 .send-file-overlay{position:fixed;inset:0;background:rgba(2,26,72,.55);z-index:740;display:none;padding:18px;backdrop-filter:blur(3px);}
@@ -309,6 +311,25 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .send-file-action.pdf{background:linear-gradient(135deg,#c9621a,#e07b39);border-color:#c9621a;color:#fff;}
 .send-file-hint{border-top:1px solid var(--border);padding-top:11px;color:var(--muted);font-size:12px;line-height:1.5;}
 .send-file-status{min-height:18px;color:#1a7a42;font-size:12px;font-weight:800;}
+
+.straight-stock-overlay{position:fixed;inset:0;background:rgba(2,26,72,.62);z-index:820;display:none;padding:18px;backdrop-filter:blur(4px)}
+.straight-stock-overlay.show{display:flex}
+.straight-stock-panel{width:min(1180px,100%);height:min(900px,100%);margin:auto;background:#fff;border:1px solid var(--border);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 90px rgba(2,26,72,.34)}
+.straight-stock-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f0fdfa}
+.straight-stock-body{padding:16px;overflow:auto;display:grid;gap:14px}
+.straight-stock-toolbar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;background:#f8fafc;border:1px solid #d8e1eb;border-radius:12px;padding:12px}
+.straight-stock-field{display:grid;gap:4px;min-width:150px}.straight-stock-field label{font-size:11px;font-weight:900;color:var(--dim)}
+.straight-stock-field input,.straight-stock-field select{font:inherit;border:1px solid #c9d4df;border-radius:8px;padding:8px;background:#fff;color:var(--text)}
+.straight-stock-hint{font-size:12px;line-height:1.5;color:var(--dim);flex:1;min-width:260px}
+.straight-stock-actions{display:flex;gap:7px;flex-wrap:wrap}.straight-stock-action{font:inherit;font-size:12px;font-weight:900;border:1px solid #b9c9dd;border-radius:9px;background:#fff;color:#294764;padding:8px 11px;cursor:pointer}.straight-stock-action.primary{background:#0f766e;border-color:#0f766e;color:#fff}
+.straight-stock-table-wrap{border:1px solid #d8e1eb;border-radius:12px;overflow:auto}.straight-stock-table{min-width:780px}.straight-stock-table th,.straight-stock-table td{padding:8px 10px}.straight-stock-table tr:hover td{cursor:default}.straight-stock-table input[type=number]{width:76px;font:inherit;border:1px solid #c9d4df;border-radius:7px;padding:5px;text-align:center}.straight-stock-table input[type=checkbox]{width:18px;height:18px;accent-color:#0f766e}.straight-stock-table tr.unavailable{opacity:.55;background:#fff5f5}
+.straight-stock-policy{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #cfe4e1;background:#f0fdfa;border-radius:12px;padding:10px 12px}.straight-stock-policy label{font-size:12px;font-weight:900}.straight-stock-policy select{font:inherit;border:1px solid #9dc8c2;border-radius:8px;padding:7px;background:#fff;min-width:200px}
+.straight-stock-results{display:grid;gap:12px}.cut-summary{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px}.cut-summary-card{background:#f4f7fb;border-radius:11px;padding:10px}.cut-summary-card span{display:block;font-size:10px;font-weight:900;color:var(--muted)}.cut-summary-card b{font-size:17px;color:var(--text)}
+.cut-group{border:1px solid #d8e1eb;border-radius:13px;overflow:hidden}.cut-group-head{padding:10px 12px;background:#eef5fb;font-weight:900;display:flex;justify-content:space-between;gap:10px}.cut-bars{padding:10px;display:grid;gap:9px}.cut-bar-row{display:grid;grid-template-columns:105px minmax(260px,1fr) 125px;gap:10px;align-items:center}.cut-bar-label,.cut-bar-waste{font-size:12px;font-weight:900;color:var(--dim)}.cut-bar-track{height:42px;border-radius:8px;background:#e7edf3;display:flex;overflow:hidden;direction:ltr;border:1px solid #cdd8e3}.cut-piece{height:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:900;border-right:1px solid rgba(255,255,255,.7);padding:0 3px;overflow:hidden;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.4)}.cut-empty{height:100%;background:repeating-linear-gradient(45deg,#e8edf2,#e8edf2 6px,#f7f9fb 6px,#f7f9fb 12px)}
+.cut-bar-cuts{font-size:10px;color:var(--dim);font-weight:800;line-height:1.45;margin-top:3px;direction:rtl;text-align:right}
+.straight-stock-empty{border:1px dashed #b9c9dd;border-radius:12px;padding:24px;text-align:center;color:var(--dim);font-weight:800}.cut-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:800}
+@media(max-width:700px){.straight-stock-overlay{padding:0}.straight-stock-panel{height:100%;border-radius:0}.cut-summary{grid-template-columns:repeat(2,1fr)}.cut-bar-row{grid-template-columns:82px minmax(230px,1fr) 100px}.straight-stock-body{padding:10px}}
+@media print{body.straight-stock-printing *{visibility:hidden!important}body.straight-stock-printing #straightStockOverlay,body.straight-stock-printing #straightStockOverlay *{visibility:visible!important}body.straight-stock-printing #straightStockOverlay{display:block!important;position:absolute;inset:0;background:#fff;padding:0}body.straight-stock-printing .straight-stock-panel{width:100%;height:auto;max-height:none;border:0;box-shadow:none}body.straight-stock-printing .straight-stock-toolbar,body.straight-stock-printing .straight-stock-table-wrap,body.straight-stock-printing .straight-stock-policy-list,body.straight-stock-printing .detail-close,body.straight-stock-printing .straight-stock-actions{display:none!important}body.straight-stock-printing .straight-stock-body{overflow:visible}.cut-bar-track{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
 
 @media(max-width:640px){
   .detail-overlay{inset:56px 0 0;padding:0;background:rgba(2,26,72,0.24);}
@@ -393,6 +414,26 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
     </div>
     <div class="detail-body" id="detailBody"></div>
   </div>
+</div>
+
+<!-- Straight-stock cutting plan: calculation is local to the open order and never changes order quantities. -->
+<div class="straight-stock-overlay" id="straightStockOverlay" onclick="closeStraightStockCutting(event)">
+  <section class="straight-stock-panel" aria-labelledby="straightStockTitle">
+    <div class="straight-stock-head">
+      <div><div class="edit-title" id="straightStockTitle">תוכנית חיתוך ממוטות ישרים</div><div class="detail-customer" id="straightStockMeta"></div></div>
+      <button type="button" class="detail-close" onclick="closeStraightStockCuttingPanel()">✕</button>
+    </div>
+    <div class="straight-stock-body">
+      <div class="straight-stock-toolbar">
+        <div class="straight-stock-field"><label for="straightStockKerf">רוחב חיתוך / דיסק (מ״מ)</label><input id="straightStockKerf" type="number" min="0" max="20" step="0.5" value="0"></div>
+        <div class="straight-stock-hint"><b>מלאי מסחרי: 6 ו־12 מטר.</b> ברירת המחדל בוחרת אורך אחד לכל קוטר לפי הפחת הנמוך ביותר. אפשר לשנות ידנית לכל קוטר אם אורך מסוים חסר במלאי.</div>
+        <div class="straight-stock-actions"><button type="button" class="straight-stock-action" onclick="setAllStraightStockItems(true)">בחר הכול</button><button type="button" class="straight-stock-action" onclick="setAllStraightStockItems(false)">נקה</button><button type="button" class="straight-stock-action primary" onclick="calculateStraightStockPlan()">חשב תוכנית</button><button type="button" class="straight-stock-action" onclick="printStraightStockPlan()">🖨️ הדפס</button></div>
+      </div>
+      <div class="straight-stock-table-wrap"><table class="straight-stock-table"><thead><tr><th>בחירה</th><th>פריט</th><th>שם אלמנט</th><th>קוטר</th><th>אורך חיתוך</th><th>כמות להזמנה</th><th>כמות ממוט</th></tr></thead><tbody id="straightStockItems"></tbody></table></div>
+      <div class="straight-stock-policy-list" id="straightStockPolicies"></div>
+      <div class="straight-stock-results" id="straightStockResults"><div class="straight-stock-empty">בחר פריטים ולחץ על “חשב תוכנית”.</div></div>
+    </div>
+  </section>
 </div>
 
 <!-- Cancellation is a reconciliation workflow: it never deletes production. -->
@@ -544,7 +585,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 </div>
 
 <script>
-let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null;
+let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
 let orderShapeEditor = null, pendingShapeEdit = null;
 const PRINT_DOCUMENTS = Object.freeze({
   'print-cards': { kind: 'print-cards', label: 'כרטיסיות ייצור', fileLabel: 'כרטיסיות-ייצור' },
@@ -1884,6 +1925,231 @@ function itemLength(item) {
   return normalizeDisplaySegments(item.shape_name, safeJson(item.segments)).reduce((sum, segment) => sum + segmentLength(segment), 0);
 }
 
+function straightStockLengthText(mm) {
+  const value = Number(mm) || 0;
+  if (value >= 1000 && value % 1000 === 0) return `${value / 1000} מ׳`;
+  return `${(value / 10).toLocaleString('he-IL', { maximumFractionDigits: 1 })} ס״מ`;
+}
+
+function straightStockColor(itemId) {
+  const colors = ['#0f766e','#2563eb','#7c3aed','#c2410c','#be185d','#166534','#1d4ed8','#92400e'];
+  const text = String(itemId ?? '0');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) hash = ((hash * 31) + text.charCodeAt(index)) >>> 0;
+  return colors[hash % colors.length];
+}
+
+function buildStraightStockEntries(order) {
+  const entries = [];
+  let lineNo = 0;
+  for (const pallet of order?.pallets || []) {
+    for (const item of pallet.items || []) {
+      lineNo += 1;
+      const lengthMm = Math.round(Number(itemLength(item)) || 0);
+      const quantity = Math.max(0, Math.floor(Number(item.quantity) || 0));
+      const diameter = String(item.diameter ?? '').trim();
+      const sourceNumber = String(item.source_item_number || '').trim();
+      const element = String(item.struct_element || item.element_name || item.elementName || '').trim();
+      let unavailableReason = '';
+      if (isRoundPileCageItem(item)) unavailableReason = 'כלונס הוא מכלול ואינו פריט חיתוך יחיד';
+      else if (!diameter) unavailableReason = 'חסר קוטר';
+      else if (!lengthMm) unavailableReason = 'חסר אורך פתיחה';
+      else if (lengthMm > 12000) unavailableReason = 'ארוך מ־12 מטר';
+      else if (!quantity) unavailableReason = 'הכמות היא אפס';
+      entries.push({
+        itemId: item.id,
+        lineNo: item._lineNo || lineNo,
+        sourceNumber,
+        label: sourceNumber ? `מקור ${sourceNumber}` : `פריט ${item._lineNo || lineNo}`,
+        element,
+        diameter,
+        lengthMm,
+        orderQuantity: quantity,
+        selectedQuantity: quantity,
+        selected: !unavailableReason,
+        unavailableReason,
+      });
+    }
+  }
+  return entries;
+}
+
+function openStraightStockCutting(event, orderId) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const order = currentDetailOrder && Number(currentDetailOrder.id) === Number(orderId) ? currentDetailOrder : null;
+  if (!order) { alert('יש לפתוח תחילה את ההזמנה'); return; }
+  straightStockEntries = buildStraightStockEntries(order);
+  straightStockPolicyByDiameter = {};
+  document.getElementById('straightStockMeta').textContent = `הזמנה ${order.order_num || order.id} · ${order.customer_name || ''}`;
+  document.getElementById('straightStockKerf').value = '0';
+  renderStraightStockItems();
+  renderStraightStockPolicies();
+  document.getElementById('straightStockResults').innerHTML = '<div class="straight-stock-empty">בחר פריטים ולחץ על “חשב תוכנית”.</div>';
+  document.getElementById('straightStockOverlay').classList.add('show');
+}
+
+function closeStraightStockCutting(event) {
+  if (event?.target === document.getElementById('straightStockOverlay')) closeStraightStockCuttingPanel();
+}
+
+function closeStraightStockCuttingPanel() {
+  document.body.classList.remove('straight-stock-printing');
+  document.getElementById('straightStockOverlay').classList.remove('show');
+}
+
+function renderStraightStockItems() {
+  document.getElementById('straightStockItems').innerHTML = straightStockEntries.map((entry, index) => {
+    const disabled = Boolean(entry.unavailableReason);
+    return `<tr class="${disabled ? 'unavailable' : ''}" data-straight-stock-index="${index}">
+      <td><input type="checkbox" data-cut-select ${entry.selected && !disabled ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="handleStraightStockSelectionChange()"></td>
+      <td><b>${escHtml(entry.label)}</b>${entry.unavailableReason ? `<div style="font-size:10px;color:var(--danger);font-weight:900">${escHtml(entry.unavailableReason)}</div>` : ''}</td>
+      <td>${escHtml(entry.element || '—')}</td>
+      <td><b>⌀${escHtml(entry.diameter || '—')}</b></td>
+      <td>${entry.lengthMm ? straightStockLengthText(entry.lengthMm) : '—'}</td>
+      <td>${entry.orderQuantity}</td>
+      <td><input type="number" data-cut-quantity min="1" max="${entry.orderQuantity}" step="1" value="${entry.selectedQuantity}" ${disabled ? 'disabled' : ''} onchange="handleStraightStockSelectionChange()"></td>
+    </tr>`;
+  }).join('');
+}
+
+function syncStraightStockEntriesFromTable() {
+  document.querySelectorAll('#straightStockItems tr[data-straight-stock-index]').forEach(row => {
+    const entry = straightStockEntries[Number(row.dataset.straightStockIndex)];
+    if (!entry) return;
+    entry.selected = Boolean(row.querySelector('[data-cut-select]')?.checked) && !entry.unavailableReason;
+    const requested = Math.floor(Number(row.querySelector('[data-cut-quantity]')?.value) || 0);
+    entry.selectedQuantity = Math.min(entry.orderQuantity, Math.max(1, requested));
+    const input = row.querySelector('[data-cut-quantity]');
+    if (input) input.value = String(entry.selectedQuantity);
+  });
+}
+
+function handleStraightStockSelectionChange() {
+  syncStraightStockEntriesFromTable();
+  renderStraightStockPolicies();
+  document.getElementById('straightStockResults').innerHTML = '<div class="straight-stock-empty">הבחירה השתנתה. לחץ על “חשב תוכנית” לעדכון.</div>';
+}
+
+function setAllStraightStockItems(selected) {
+  document.querySelectorAll('#straightStockItems [data-cut-select]:not(:disabled)').forEach(input => { input.checked = Boolean(selected); });
+  handleStraightStockSelectionChange();
+}
+
+function renderStraightStockPolicies() {
+  const diameters = [...new Set(straightStockEntries.filter(entry => entry.selected).map(entry => entry.diameter))]
+    .sort((a, b) => Number(a) - Number(b) || String(a).localeCompare(String(b)));
+  const container = document.getElementById('straightStockPolicies');
+  if (!diameters.length) { container.innerHTML = ''; return; }
+  container.innerHTML = diameters.map(diameter => {
+    const current = straightStockPolicyByDiameter[diameter] || 'auto';
+    return `<div class="straight-stock-policy"><label for="straightStockPolicy-${encodeURIComponent(diameter)}">קוטר ⌀${escHtml(diameter)} — מאיזה מוט לחתוך?</label><select id="straightStockPolicy-${encodeURIComponent(diameter)}" data-cut-policy="${escHtml(diameter)}" onchange="updateStraightStockPolicy(this)">
+      <option value="auto" ${current === 'auto' ? 'selected' : ''}>אוטומטי — מינימום פחת, בלי לערבב אורכים</option>
+      <option value="6000" ${current === '6000' ? 'selected' : ''}>רק מוט 6 מטר</option>
+      <option value="12000" ${current === '12000' ? 'selected' : ''}>רק מוט 12 מטר</option>
+      <option value="mixed" ${current === 'mixed' ? 'selected' : ''}>אפשר לשלב 6 ו־12 מטר</option>
+    </select></div>`;
+  }).join('');
+}
+
+function updateStraightStockPolicy(select) {
+  straightStockPolicyByDiameter[String(select.dataset.cutPolicy)] = select.value;
+  document.getElementById('straightStockResults').innerHTML = '<div class="straight-stock-empty">בחירת המוט השתנתה. לחץ על “חשב תוכנית” לעדכון.</div>';
+}
+
+function straightStockGroupPolicies(selectedEntries) {
+  const policies = {};
+  for (const diameter of new Set(selectedEntries.map(entry => entry.diameter))) {
+    const choice = straightStockPolicyByDiameter[diameter] || 'auto';
+    if (choice === '6000') policies[diameter] = { stockLengthsMm: [6000], allowMixedStockLengths: false };
+    else if (choice === '12000') policies[diameter] = { stockLengthsMm: [12000], allowMixedStockLengths: false };
+    else if (choice === 'mixed') policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: true };
+    else policies[diameter] = { stockLengthsMm: [6000, 12000], allowMixedStockLengths: false };
+  }
+  return policies;
+}
+
+function calculateStraightStockPlan() {
+  syncStraightStockEntriesFromTable();
+  const selected = straightStockEntries.filter(entry => entry.selected && entry.selectedQuantity > 0);
+  const results = document.getElementById('straightStockResults');
+  if (!selected.length) { results.innerHTML = '<div class="cut-warning">לא נבחרו פריטים לחיתוך.</div>'; return; }
+  const groupPolicies = straightStockGroupPolicies(selected);
+  const incompatible = selected.filter(entry => {
+    const allowed = groupPolicies[entry.diameter]?.stockLengthsMm || [6000, 12000];
+    return entry.lengthMm > Math.max(...allowed);
+  });
+  if (incompatible.length) {
+    results.innerHTML = `<div class="cut-warning">הבחירה “רק 6 מטר” אינה מתאימה ל־${incompatible.map(entry => escHtml(entry.label)).join(', ')}. בחר 12 מטר או אוטומטי בקוטר המתאים.</div>`;
+    return;
+  }
+  const kerfMm = Math.max(0, Number(document.getElementById('straightStockKerf').value) || 0);
+  let plan;
+  try {
+    plan = IronBendStraightStock.planCutting({
+      stockLengthsMm: [6000, 12000],
+      kerfMm,
+      groupPolicies,
+      pieces: selected.map(entry => ({
+        itemId: entry.itemId,
+        label: entry.label,
+        diameter: entry.diameter,
+        lengthMm: entry.lengthMm,
+        quantity: entry.selectedQuantity,
+      })),
+    });
+  } catch (error) {
+    results.innerHTML = `<div class="cut-warning">לא ניתן לחשב את התוכנית: ${escHtml(error.message || String(error))}</div>`;
+    return;
+  }
+  renderStraightStockPlan(plan);
+}
+
+function renderStraightStockPlan(plan) {
+  const stockCounts = new Map();
+  plan.bars.forEach(bar => stockCounts.set(bar.stockLengthMm, (stockCounts.get(bar.stockLengthMm) || 0) + 1));
+  const stockSummary = [...stockCounts.entries()].sort((a,b) => a[0]-b[0]).map(([length, count]) => `${count} × ${straightStockLengthText(length)}`).join(' · ');
+  const groupsHtml = plan.groups.map(group => {
+    const groupStocks = new Map();
+    group.bins.forEach(bar => {
+      const length = bar.stockLengthMm || group.stockLengthMm;
+      groupStocks.set(length, (groupStocks.get(length) || 0) + 1);
+    });
+    const groupStockText = [...groupStocks.entries()].sort((a,b)=>a[0]-b[0]).map(([length,count]) => `${count} מוטות של ${straightStockLengthText(length)}`).join(' + ');
+    const barsHtml = group.bins.map((bar, index) => {
+      const stockLength = bar.stockLengthMm || group.stockLengthMm;
+      const pieces = bar.pieces.map(piece => {
+        const width = Math.max(0, Math.min(100, piece.lengthMm / stockLength * 100));
+        const title = `${piece.label} · ${straightStockLengthText(piece.lengthMm)}`;
+        return `<div class="cut-piece" style="width:${width}%;background:${straightStockColor(piece.itemId)}" title="${escHtml(title)}">${escHtml(piece.label)} ${straightStockLengthText(piece.lengthMm)}</div>`;
+      }).join('');
+      const emptyWidth = Math.max(0, bar.wasteMm / stockLength * 100);
+      const cuts = bar.pieces.map(piece => `${escHtml(piece.label)} — ${straightStockLengthText(piece.lengthMm)}`).join(' · ');
+      return `<div class="cut-bar-row"><div class="cut-bar-label">מוט ${index + 1}<br>${straightStockLengthText(stockLength)}</div><div><div class="cut-bar-track">${pieces}${emptyWidth ? `<div class="cut-empty" style="width:${emptyWidth}%"></div>` : ''}</div><div class="cut-bar-cuts">${cuts}</div></div><div class="cut-bar-waste">פחת ${straightStockLengthText(bar.wasteMm)}</div></div>`;
+    }).join('');
+    const proof = group.exact ? 'מינימום מחושב' : 'תוכנית ממוטבת';
+    return `<section class="cut-group"><div class="cut-group-head"><span>קוטר ⌀${escHtml(group.diameter)} · ${groupStockText}</span><span>${proof}</span></div><div class="cut-bars">${barsHtml}</div></section>`;
+  }).join('');
+  document.getElementById('straightStockResults').innerHTML = `
+    <div class="cut-summary">
+      <div class="cut-summary-card"><span>מוטות לקחת</span><b>${plan.bars.length}</b><small>${escHtml(stockSummary)}</small></div>
+      <div class="cut-summary-card"><span>יחידות לחיתוך</span><b>${plan.pieceCount}</b></div>
+      <div class="cut-summary-card"><span>אורך נטו</span><b>${(plan.totalCutLengthMm / 1000).toLocaleString('he-IL',{maximumFractionDigits:2})} מ׳</b></div>
+      <div class="cut-summary-card"><span>פחת כולל</span><b>${(plan.totalWasteMm / 1000).toLocaleString('he-IL',{maximumFractionDigits:2})} מ׳</b><small>${plan.wastePercent.toFixed(1)}%</small></div>
+      <div class="cut-summary-card"><span>רוחב חיתוך</span><b>${plan.kerfMm} מ״מ</b><small>${plan.exact ? 'מינימום פחת מחושב' : 'תוכנית ממוטבת'}</small></div>
+    </div>${groupsHtml}`;
+}
+
+function printStraightStockPlan() {
+  if (!document.querySelector('#straightStockResults .cut-group')) { calculateStraightStockPlan(); }
+  if (!document.querySelector('#straightStockResults .cut-group')) return;
+  document.body.classList.add('straight-stock-printing');
+  const cleanup = () => document.body.classList.remove('straight-stock-printing');
+  window.addEventListener('afterprint', cleanup, { once: true });
+  window.print();
+  setTimeout(cleanup, 1500);
+}
+
 function itemWeight(item) {
   const pileSnapshot = orderShapeSnapshot(item);
   if (pileSnapshot?.family === 'piles' && pileSnapshot?.shapeType === 'round_pile_cage') {
@@ -2354,6 +2620,7 @@ function buildDetailHTML(o, pkgs) {
     <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">&#128203; &#1514;&#1506;&#1493;&#1491;&#1514; &#1502;&#1513;&#1500;&#1493;&#1495;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><button type="button" class="print-btn cutting" onclick="openStraightStockCutting(event,${o.id})">✂️ תוכנית חיתוך ממוטות</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">&#128203; תעודה חלקית — הועמסו (${loadedItemCount})</a></div>
   </div>`;
 
