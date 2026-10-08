@@ -44,6 +44,7 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /\$\{plan\.pieceCount\} PCS/);
   assert.match(ordersHtml, /const isShort = width < 6/);
   assert.match(ordersHtml, /\.cut-piece\.is-short \.cut-piece-shape\{display:flex;position:absolute;width:88px;height:70px/);
+  assert.match(ordersHtml, /\.cut-piece\.is-short\.is-narrow:is\(:hover,:focus\) \.cut-piece-shape\{display:flex;position:absolute;width:88px;height:70px/);
   assert.match(ordersHtml, /const visibleLabel = isShort \? String\(piece\.itemNumber/);
   assert.match(ordersHtml, /\.cut-piece-shape svg text\{font-size:14px!important;font-weight:900!important/);
   assert.match(ordersHtml, /data-cut-shape-size="\$\{isNarrow \? 'popover' : 'inline'\}"/);
