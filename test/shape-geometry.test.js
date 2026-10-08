@@ -239,6 +239,8 @@ test('rounded-end bar keeps optional bend radius in the contract and production 
 test('shape editor exposes the rounded-end preset and optional radius field', () => {
   const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
   assert.match(editor, /id: 's16'.*shapeType: 'rounded_end_bar'.*roundedBends: true/);
+  assert.match(editor, /data-edit-family="rounded"[^>]*_jumpToFamily\('rounded'\)[\s\S]*?<span>קצה מעוגל<\/span>/);
+  assert.match(editor, /family === 'rounded'\) return SHAPE_PRESETS\.find\(isRoundedEndBarShape\)/);
   assert.match(editor, /id="seRadiusInput"/);
   assert.match(editor, /roundedEndBarEditorSVG\(sides, 300, 260/);
 });
@@ -564,7 +566,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=78/);
+  assert.match(index, /shape-editor\.js\?v=79/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

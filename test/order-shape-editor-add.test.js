@@ -12,7 +12,7 @@ const newOrderEditor = () => fs.readFileSync(newOrderEditorPath, 'utf8');
 
 test('orders manual add uses the shared shape editor, not the legacy manual form', () => {
   const html = orders();
-  assert.match(html, /src="\/shape-editor\.js\?v=77"/);
+  assert.match(html, /src="\/shape-editor\.js\?v=79"/);
   assert.match(html, /new ShapeEditorModal\(shapeSelectedFromOrder\)/);
   assert.match(html, /function openAddManualItem\(event\) \{[\s\S]*openOrderShapeEditorForAdd\(event, orderId\);[\s\S]*?\n\}/);
   assert.doesNotMatch(html, /openManualItemAdd/);
@@ -29,6 +29,8 @@ test('orders item shape edits go through the shared shape editor', () => {
   assert.match(html, /orderItemQuantity = Math\.max\(1, Number\(data\?\.orderItemQuantity/);
   assert.match(html, /const isShapeContractV2 = Number\(data\?\.contractVersion\) === 2[\s\S]*data\?\.data && data\?\.calculated && data\?\.machineOutput/);
   assert.match(html, /shapeSnapshot: isShapeContractV2 \? data : null/);
+  assert.match(html, /structElement:\s*String\(data\?\.structElement \|\| ''\)\.trim\(\)/);
+  assert.match(html, /structElement:\s*String\(item\?\.struct_element \|\| item\?\.structElement/);
 });
 
 test('orders missing intake source add flow offers a manual shape editor fallback', () => {

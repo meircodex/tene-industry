@@ -20,7 +20,7 @@
 <script src="/rebar-weights.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=78"></script>
+<script src="/shape-editor.js?v=79"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -2678,6 +2678,7 @@ function orderShapeDataFromItem(item) {
     presetName: item?.shape_name || '\u05d9\u05e9\u05e8',
     diameter: Number(item?.diameter) || 12,
     is3d: item?.is_3d ? 1 : 0,
+    structElement: String(item?.struct_element || item?.structElement || item?.element_name || item?.elementName || '').trim(),
   };
 }
 
@@ -2722,6 +2723,7 @@ async function shapeSelectedFromOrder(data) {
   const orderItemQuantity = Math.max(1, Number(data?.orderItemQuantity || ctx.quantity || 1) || 1);
   const payload = {
     shape_name: String(data?.shapeName || data?.presetName || '\u05d9\u05e9\u05e8').trim(),
+    structElement: String(data?.structElement || '').trim(),
     diameter: Number(data?.diameter) || 12,
     quantity: orderItemQuantity,
     total_length_mm: totalLength,

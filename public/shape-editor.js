@@ -3669,6 +3669,7 @@ class ShapeEditorModal {
     <aside class="se-family-panel" aria-label="בחירת משפחת צורה">
       <div class="se-family-panel-title">סוג צורה</div>
       <button class="se-family-card" data-edit-family="bars" onclick="window._seEditor._jumpToFamily('bars')">${shapePresetIconSVG('straight')}<span>מוטות ברזל</span></button>
+      <button class="se-family-card" data-edit-family="rounded" onclick="window._seEditor._jumpToFamily('rounded')">${shapePresetIconSVG('rounded-u')}<span>קצה מעוגל</span></button>
       <button class="se-family-card" data-edit-family="mesh" onclick="window._seEditor._jumpToFamily('mesh')">${shapePresetIconSVG('mesh')}<span>רשתות</span></button>
       <button class="se-family-card" data-edit-family="piles" onclick="window._seEditor._jumpToFamily('piles')">${shapePresetIconSVG('pile')}<span>כלונסאות</span></button>
       <button class="se-family-card" data-edit-family="spirals" onclick="window._seEditor._jumpToFamily('spirals')">${shapePresetIconSVG('spiral')}<span>ספיראלות</span></button>
@@ -3955,6 +3956,7 @@ class ShapeEditorModal {
   _defaultPresetForFamily(family = 'bars') {
     if (family === 'ring') return SHAPE_PRESETS.find(isStandaloneRingShape) || SHAPE_PRESETS[0];
     if (family === 'bench') return SHAPE_PRESETS.find(isBenchBarShape) || SHAPE_PRESETS[0];
+    if (family === 'rounded') return SHAPE_PRESETS.find(isRoundedEndBarShape) || SHAPE_PRESETS[0];
     const normalizedFamily = (family === 'mesh' || family === 'piles' || family === 'spirals' || family === 'lifts') ? family : 'bars';
     const requestedSideCount = Number(this._selectedCount || this._selectedSideCount);
     const candidates = SHAPE_PRESETS.filter(shape => (shape.family || 'bars') === normalizedFamily && !shape.custom && (normalizedFamily !== 'spirals' || !isStandaloneRingShape(shape)));
@@ -4411,7 +4413,7 @@ class ShapeEditorModal {
 
   _syncEditFamilyCards() {
     const family = normalizeShapeFamily(this.current || {});
-    const editorKind = isStandaloneRingShape(this.current) ? 'ring' : (isBenchBarShape(this.current) ? 'bench' : family);
+    const editorKind = isStandaloneRingShape(this.current) ? 'ring' : (isBenchBarShape(this.current) ? 'bench' : (isRoundedEndBarShape(this.current) ? 'rounded' : family));
     document.querySelectorAll('[data-edit-family]').forEach(btn => btn.classList.toggle('active', btn.dataset.editFamily === editorKind));
     this._renderSidebarSavedShapes(family);
   }
