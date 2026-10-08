@@ -29,4 +29,7 @@ test('cutting bars use item-only labels, colored mixed-item segments, dimensions
   assert.match(ordersHtml, /קוטר ⌀\$\{escHtml\(group\.diameter\)\}/);
   assert.match(ordersHtml, /data-cut-shape-item/);
   assert.match(ordersHtml, /renderStraightStockShapePreviews/);
+  assert.match(ordersHtml, /straightStockBarPatterns/);
+  assert.match(ordersHtml, /× \$\{barPattern\.count\} מוטות/);
+  assert.match(ordersHtml, /פחת למוט/);
 });
