@@ -426,23 +426,23 @@ function detectClosedStirrupParts(sides, angles) {
   if (checkedAngles.length && !checkedAngles.every(isRightBendAngle)) return null;
 
   if (values.length >= 5) {
-    const tailStart = values[0];
-    const right = values[1];
+    const right = values[0];
+    const tailStart = values[1];
     const top = values[2];
-    const left = values[3];
+    const tailEnd = values[3] || 0;
     const bottom = values[4];
-    const tailEnd = values[5] || 0;
+    const left = values[5] || right;
     const maxBody = Math.max(right, top, left, bottom);
     if (
-      tailStart <= maxBody * 0.45 &&
-      (!tailEnd || tailEnd <= maxBody * 0.45) &&
+      tailStart <= maxBody * 0.6 &&
+      (!tailEnd || tailEnd <= maxBody * 0.6) &&
       isSimilarShapeDimension(right, left) &&
       isSimilarShapeDimension(top, bottom)
     ) {
       return {
         top, right, bottom, left, tailStart, tailEnd,
-        sideMap: [2, 1, 4, 3],
-        tailMap: [0, values.length >= 6 ? 5 : null],
+        sideMap: [2, 0, 4, values.length >= 6 ? 5 : 0],
+        tailMap: [1, values.length >= 6 ? 3 : null],
       };
     }
   }

@@ -787,15 +787,15 @@ function closedStirrupPartsClient(segments) {
   if (checkedAngles.length && !checkedAngles.every(function(s){ return isRightAngleValue(s.angle_deg); })) return null;
 
   if (values.length >= 5) {
-    var tailStart = values[0], verticalA = values[1], horizontalA = values[2], verticalB = values[3], horizontalB = values[4], tailEnd = values[5] || 0;
-    var maxBody = Math.max(verticalA, horizontalA, verticalB, horizontalB);
+    var sideA = values[0], tailStart = values[1], horizontalA = values[2], tailEnd = values[3], horizontalB = values[4], sideB = values[5] || sideA;
+    var maxBody = Math.max(sideA, horizontalA, horizontalB, sideB);
     if (
       tailStart <= maxBody * 0.6 &&
       (!tailEnd || tailEnd <= maxBody * 0.6) &&
-      isSimilarDimensionClient(verticalA, verticalB) &&
+      isSimilarDimensionClient(sideA, sideB) &&
       isSimilarDimensionClient(horizontalA, horizontalB)
     ) {
-      return { top: horizontalA, right: verticalA, bottom: horizontalB, left: verticalB, tailStart: tailStart, tailEnd: tailEnd };
+      return { top: horizontalA, right: sideA, bottom: horizontalB, left: sideB, tailStart: tailStart, tailEnd: tailEnd };
     }
   }
 

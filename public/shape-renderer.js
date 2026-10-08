@@ -77,16 +77,15 @@
     if (checkedAngles.length && !checkedAngles.every(isRightAngle)) return null;
 
     if (lengths.length >= 5) {
-      const [tailStart, verticalA, horizontalA, verticalB, horizontalB] = lengths;
-      const tailEnd = lengths[5] || 0;
-      const maxBody = Math.max(verticalA, horizontalA, verticalB, horizontalB);
+      const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
+      const maxBody = Math.max(sideA, horizontalA, horizontalB, sideB || sideA);
       if (
         tailStart <= maxBody * 0.6 &&
         (!tailEnd || tailEnd <= maxBody * 0.6) &&
-        isSimilarDimension(verticalA, verticalB) &&
+        isSimilarDimension(sideA, sideB || sideA) &&
         isSimilarDimension(horizontalA, horizontalB)
       ) {
-        return { top: horizontalA, right: verticalA, bottom: horizontalB, left: verticalB, tailStart, tailEnd };
+        return { top: horizontalA, right: sideA, bottom: horizontalB, left: sideB || sideA, tailStart, tailEnd };
       }
     }
 
