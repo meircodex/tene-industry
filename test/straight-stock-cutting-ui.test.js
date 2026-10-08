@@ -20,3 +20,13 @@ test('cutting dialog supports item quantities and a per-diameter 6m or 12m decis
   assert.match(ordersHtml, /אפשר לשלב 6 ו־12 מטר/);
   assert.match(ordersHtml, /groupPolicies/);
 });
+
+test('cutting bars use item-only labels, colored mixed-item segments, dimensions, diameter and shape previews', () => {
+  assert.match(ordersHtml, /label: `פריט \$\{itemNumber\}`/);
+  assert.doesNotMatch(ordersHtml, /label: sourceNumber \? `מקור/);
+  assert.match(ordersHtml, /מוט משולב:/);
+  assert.match(ordersHtml, /class="cut-piece"[\s\S]*straightStockLengthText\(piece\.lengthMm\)/);
+  assert.match(ordersHtml, /קוטר ⌀\$\{escHtml\(group\.diameter\)\}/);
+  assert.match(ordersHtml, /data-cut-shape-item/);
+  assert.match(ordersHtml, /renderStraightStockShapePreviews/);
+});
