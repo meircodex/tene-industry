@@ -170,7 +170,7 @@ function shapePresetIconSVG(kind) {
     straight: `<path ${stroke} d="M18 50 H82"/>`,
     l: `<path ${stroke} d="M30 20 V68 H76"/>`,
     u: `<path ${stroke} d="M24 20 V72 H76 V20"/>`,
-    'rounded-u': `<path ${stroke} d="M24 20 V58 Q24 74 40 74 H60 Q76 74 76 58 V20"/>`,
+    'rounded-u': `<path ${stroke} d="M44 24 H30 A16 16 0 0 0 30 56 H70 A16 16 0 0 0 70 24 H56"/>`,
     z: `<path ${stroke} d="M22 24 H74 L28 72 H78"/>`,
     s: `<path ${stroke} d="M74 22 H34 C18 22 18 45 35 45 H65 C82 45 82 72 62 72 H24"/>`,
     hook: `<path ${stroke} d="M22 20 V70 H68 C82 70 82 48 68 48"/>`,
@@ -377,25 +377,26 @@ function benchBarSVGPath(sides, w, h, padding = 14, opts = {}) {
 function roundedEndBarEditorSVG(sides, w = 300, h = 260, opts = {}) {
   const values = Array.isArray(sides) ? sides.map(value => Math.max(1, Number(value) || 0)) : [];
   if (values.length !== 3) return '';
-  const left = Math.max(34, w * 0.2);
-  const right = Math.min(w - 34, w * 0.8);
-  const top = Math.max(26, h * 0.14);
-  const bottom = Math.min(h - 54, h * 0.72);
-  const radiusPx = Math.max(16, Math.min(34, (right - left) * 0.12, (bottom - top) * 0.32));
-  const path = `M ${left} ${top} L ${left} ${bottom - radiusPx} Q ${left} ${bottom} ${left + radiusPx} ${bottom} L ${right - radiusPx} ${bottom} Q ${right} ${bottom} ${right} ${bottom - radiusPx} L ${right} ${top}`;
+  const top = Math.max(36, h * 0.3);
+  const bottom = Math.min(h - 54, h * 0.68);
+  const radiusPx = Math.max(18, (bottom - top) / 2);
+  const left = Math.max(radiusPx + 22, w * 0.23);
+  const right = Math.min(w - radiusPx - 22, w * 0.77);
+  const tailPx = Math.max(26, Math.min(48, (right - left) * 0.27));
+  const path = `M ${left + tailPx} ${top} H ${left} A ${radiusPx} ${radiusPx} 0 0 0 ${left} ${bottom} H ${right} A ${radiusPx} ${radiusPx} 0 0 0 ${right} ${top} H ${right - tailPx}`;
   const segments = [
-    [left, top, left, bottom - radiusPx / 2],
-    [left + radiusPx, bottom, right - radiusPx, bottom],
-    [right, bottom - radiusPx / 2, right, top],
+    [left + tailPx, top, left, top],
+    [left, bottom, right, bottom],
+    [right, top, right - tailPx, top],
   ];
-  let html = `<path d="${path}" fill="none" stroke="#3d5e78" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" data-shape-kind="rounded-end-bar"/>`;
+  let html = `<path d="${path}" fill="none" stroke="#3d5e78" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" data-shape-kind="rounded-end-bar" data-base-straight="true" data-end-tails-parallel="true"/>`;
   segments.forEach((segment, index) => {
     const [x1, y1, x2, y2] = segment;
     const mx = (x1 + x2) / 2;
     const my = (y1 + y2) / 2;
     const horizontal = Math.abs(x2 - x1) >= Math.abs(y2 - y1);
-    const x = horizontal ? mx : mx + (index === 0 ? -28 : 28);
-    const y = horizontal ? my + 27 : my;
+    const x = mx;
+    const y = index === 1 ? my + 28 : my - 18;
     html += `<g data-se-focus="bar-side-${index}" data-seg-click="${index}" style="cursor:pointer"><rect x="${(x - 22).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="44" height="20" rx="4" fill="#fff" stroke="#9aa3b2"/><text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#111827">${formatLengthCmFromMm(values[index])}</text></g>`;
   });
   const radiusMm = Number(opts.radiusMm);

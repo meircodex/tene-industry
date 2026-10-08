@@ -232,7 +232,9 @@ test('rounded-end bar keeps optional bend radius in the contract and production 
 
   assert.match(svg, /data-shape-kind="rounded-end-bar"/);
   assert.match(svg, /data-bend-radius-mm="35"/);
-  assert.match(svg, / Q /, 'expected visibly curved bends');
+  assert.match(svg, /data-base-straight="true"/);
+  assert.match(svg, /data-end-tails-parallel="true"/);
+  assert.match(svg, / H .* A .* H .* A .* H /, 'expected a straight base and parallel 8 cm return tails connected by rounded hooks');
   assert.match(svg, />R 3\.5</);
 });
 
@@ -566,7 +568,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=80/);
+  assert.match(index, /shape-editor\.js\?v=81/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

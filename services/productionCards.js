@@ -774,21 +774,22 @@ function roundedEndBarProductionSvg(segments, radiusMm = null) {
   const sides = segments.map(segment => Number(segment.length_mm || 0));
   const width = 220;
   const height = 112;
-  const left = 42;
-  const right = 178;
-  const top = 18;
-  const bottom = 82;
-  const radiusPx = 18;
-  const path = `M ${left},${top} L ${left},${bottom - radiusPx} Q ${left},${bottom} ${left + radiusPx},${bottom} L ${right - radiusPx},${bottom} Q ${right},${bottom} ${right},${bottom - radiusPx} L ${right},${top}`;
+  const left = 56;
+  const right = 164;
+  const top = 28;
+  const bottom = 74;
+  const radiusPx = (bottom - top) / 2;
+  const tailPx = 30;
+  const path = `M ${left + tailPx},${top} H ${left} A ${radiusPx},${radiusPx} 0 0 0 ${left},${bottom} H ${right} A ${radiusPx},${radiusPx} 0 0 0 ${right},${top} H ${right - tailPx}`;
   let svg = `<path d="${path}" fill="none" stroke="#1a2332" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
   svg += `<path d="${path}" fill="none" stroke="#3a5070" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
-  svg += sideDimensionSvg([left, top], [left, bottom - radiusPx / 2], sides[0], [110, 50], 22);
-  svg += sideDimensionSvg([left + radiusPx, bottom], [right - radiusPx, bottom], sides[1], [110, 50], 22);
-  svg += sideDimensionSvg([right, bottom - radiusPx / 2], [right, top], sides[2], [110, 50], 22);
+  svg += sideDimensionSvg([left + tailPx, top], [left, top], sides[0], [110, 50], 16);
+  svg += sideDimensionSvg([left, bottom], [right, bottom], sides[1], [110, 50], 18);
+  svg += sideDimensionSvg([right, top], [right - tailPx, top], sides[2], [110, 50], 16);
   if (Number.isFinite(Number(radiusMm)) && Number(radiusMm) > 0) {
     svg += `<text x="110" y="67" text-anchor="middle" font-size="9" font-family="Heebo,Arial" font-weight="900" fill="#c9621a">R ${displayLengthCm(Number(radiusMm))}</text>`;
   }
-  return `<svg data-shape-kind="rounded-end-bar" data-bend-radius-mm="${Number(radiusMm) > 0 ? Number(radiusMm) : ''}" data-scale-mode="container-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;overflow:visible">${svg}</svg>`;
+  return `<svg data-shape-kind="rounded-end-bar" data-bend-radius-mm="${Number(radiusMm) > 0 ? Number(radiusMm) : ''}" data-base-straight="true" data-end-tails-parallel="true" data-scale-mode="container-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;overflow:visible">${svg}</svg>`;
 }
 
 function benchBarProductionSvg(segments) {
