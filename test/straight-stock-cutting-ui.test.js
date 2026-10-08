@@ -57,6 +57,7 @@ test('cutting plan renders waste as rebar weight by diameter', () => {
   assert.match(ordersHtml, /IronBendRebar\?\.kgPerMeter\?\.\(diameterNumber\)/);
   assert.match(ordersHtml, /פחת למוט<br>\$\{straightStockWeightText\(straightStockWasteWeightKg\(bar\.wasteMm, group\.diameter\)\)\}/);
   assert.match(ordersHtml, /<span>פחת כולל<\/span><b>\$\{straightStockWeightText\(totalWasteKg\)\}<\/b>/);
+  assert.match(ordersHtml, /\.cut-summary-card b\{display:block;direction:ltr;text-align:right/);
 });
 
 test('cutting plan prints as compact A4 landscape without splitting a cutting pattern', () => {
