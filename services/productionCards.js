@@ -369,7 +369,9 @@ function closedStirrupParts(segments) {
     const [tailStart, verticalA, horizontalA, verticalB, horizontalB] = lengths;
     const tailEnd = lengths[5] || 0;
     const maxBody = Math.max(verticalA, horizontalA, verticalB, horizontalB);
-    const hasSmallTails = tailStart <= maxBody * 0.45 && (!tailEnd || tailEnd <= maxBody * 0.45);
+    // Closure excess can legitimately be up to roughly half of the long body
+    // side (for example 25 cm tails on a 50 cm hoop).
+    const hasSmallTails = tailStart <= maxBody * 0.6 && (!tailEnd || tailEnd <= maxBody * 0.6);
     if (
       hasSmallTails &&
       isSimilarDimension(verticalA, verticalB) &&

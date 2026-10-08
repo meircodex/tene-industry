@@ -790,8 +790,8 @@ function closedStirrupPartsClient(segments) {
     var tailStart = values[0], verticalA = values[1], horizontalA = values[2], verticalB = values[3], horizontalB = values[4], tailEnd = values[5] || 0;
     var maxBody = Math.max(verticalA, horizontalA, verticalB, horizontalB);
     if (
-      tailStart <= maxBody * 0.45 &&
-      (!tailEnd || tailEnd <= maxBody * 0.45) &&
+      tailStart <= maxBody * 0.6 &&
+      (!tailEnd || tailEnd <= maxBody * 0.6) &&
       isSimilarDimensionClient(verticalA, verticalB) &&
       isSimilarDimensionClient(horizontalA, horizontalB)
     ) {
@@ -1123,6 +1123,13 @@ function hasPrintableBends(segments) {
 function shapeSvgForCard(item, segments) {
   var cleanSegments = Array.isArray(segments) ? segments : [];
   var generated = buildShapeSVG(cleanSegments);
+  var name = String((item && (item.shape_name || item.shapeName || item.shape)) || '').toLowerCase();
+  var type = String((item && (item.shapeType || item.shape_type)) || '').toLowerCase();
+  var isHoop = /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(name + ' ' + type);
+  // Cached SVGs on older orders were generic bars and could swap the hoop's
+  // body sides with its two closure tails. Always regenerate a hoop card from
+  // the current machine sequence.
+  if (isHoop && cleanSegments.length) return generated;
   return item.shape_svg || generated;
 }
 

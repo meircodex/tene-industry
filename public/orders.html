@@ -2557,6 +2557,15 @@ function isSpiralOrRingName(shapeName) {
   return /spiral|ring|coil|ספיר|טבעת|סליל|לולאה/i.test(String(shapeName || ''));
 }
 
+// A hoop must be rendered from the saved segment sequence. Older orders may
+// still contain a cached generic-bar SVG, which can have the tails and body
+// sides in the wrong visual positions. Treat the geometry as authoritative.
+function isClosedHoopItem(item = {}) {
+  const name = String(item?.shape_name || item?.shapeName || item?.shape || '').toLowerCase();
+  const type = String(item?.shapeType || item?.shape_type || '').toLowerCase();
+  return /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(`${name} ${type}`);
+}
+
 function isRealSpiralItem(item) {
   const shape = String(item?.shape_name || item?.shapeName || item?.shape || '');
   return /spiral|ring|coil|ספיר|ספירלה|טבעת|סליל|לולאה|קפיץ/i.test(shape)
@@ -2567,6 +2576,7 @@ function isRealSpiralItem(item) {
 function shapeLabel(shapeName, sides, item = null) {
   if (item && isRoundPileCageItem(item)) return 'PILE CAGE';
   if (item && isRealSpiralItem(item)) return 'ספיראלה';
+  if (item && isClosedHoopItem(item)) return 'חישוק';
   const name = String(shapeName || '').toLowerCase();
   if (isSingleSegmentShape(sides)) return 'מוט ישר';
   if (name.includes('open u') || name.includes('open bar')) return 'צורת ח פתוחה';
@@ -2818,7 +2828,10 @@ function buildDetailHTML(o, pkgs) {
       const sourceRowNumber = Number(item.source_row_number || 0) || null;
       const measuredWeight = actualWeight(item);
       const deviationPct = weightDeviationPct(item);
-      const canonicalShapeSvg = encodeURIComponent(item.shape_svg || '');
+      // Do not reuse a legacy cached SVG for hoops. It may have been produced
+      // before the tail/body convention was corrected; render2D below rebuilds
+      // the closed hoop from the current six-segment machine sequence.
+      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) ? '' : (item.shape_svg || ''));
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`

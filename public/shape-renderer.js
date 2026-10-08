@@ -81,8 +81,8 @@
       const tailEnd = lengths[5] || 0;
       const maxBody = Math.max(verticalA, horizontalA, verticalB, horizontalB);
       if (
-        tailStart <= maxBody * 0.45 &&
-        (!tailEnd || tailEnd <= maxBody * 0.45) &&
+        tailStart <= maxBody * 0.6 &&
+        (!tailEnd || tailEnd <= maxBody * 0.6) &&
         isSimilarDimension(verticalA, verticalB) &&
         isSimilarDimension(horizontalA, horizontalB)
       ) {
