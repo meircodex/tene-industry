@@ -788,10 +788,8 @@ function closedStirrupPartsClient(segments) {
 
   if (values.length >= 5) {
     var sideA = values[0], tailStart = values[1], horizontalA = values[2], tailEnd = values[3], horizontalB = values[4], sideB = values[5] || sideA;
-    var maxBody = Math.max(sideA, horizontalA, horizontalB, sideB);
     if (
-      tailStart <= maxBody * 0.6 &&
-      (!tailEnd || tailEnd <= maxBody * 0.6) &&
+      isSimilarDimensionClient(tailStart, tailEnd || tailStart) &&
       isSimilarDimensionClient(sideA, sideB) &&
       isSimilarDimensionClient(horizontalA, horizontalB)
     ) {

@@ -432,10 +432,8 @@ function detectClosedStirrupParts(sides, angles) {
     const tailEnd = values[3] || 0;
     const bottom = values[4];
     const left = values[5] || right;
-    const maxBody = Math.max(right, top, left, bottom);
     if (
-      tailStart <= maxBody * 0.6 &&
-      (!tailEnd || tailEnd <= maxBody * 0.6) &&
+      isSimilarShapeDimension(tailStart, tailEnd || tailStart) &&
       isSimilarShapeDimension(right, left) &&
       isSimilarShapeDimension(top, bottom)
     ) {

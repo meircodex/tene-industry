@@ -370,8 +370,7 @@ function closedStirrupParts(segments) {
     // side, side. The two inner segments are the closure excesses; the first
     // and last segments are the matching body side (e.g. 25/10/50/10/50/25).
     const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
-    const maxBody = Math.max(sideA, horizontalA, horizontalB, sideB || sideA);
-    const hasSmallTails = tailStart <= maxBody * 0.6 && (!tailEnd || tailEnd <= maxBody * 0.6);
+    const hasSmallTails = isSimilarDimension(tailStart, tailEnd || tailStart);
     if (
       hasSmallTails &&
       isSimilarDimension(sideA, sideB || sideA) &&

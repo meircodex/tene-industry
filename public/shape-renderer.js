@@ -78,10 +78,8 @@
 
     if (lengths.length >= 5) {
       const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
-      const maxBody = Math.max(sideA, horizontalA, horizontalB, sideB || sideA);
       if (
-        tailStart <= maxBody * 0.6 &&
-        (!tailEnd || tailEnd <= maxBody * 0.6) &&
+        isSimilarDimension(tailStart, tailEnd || tailStart) &&
         isSimilarDimension(sideA, sideB || sideA) &&
         isSimilarDimension(horizontalA, horizontalB)
       ) {
