@@ -130,6 +130,7 @@ const SHAPE_PRESETS = [
   { id: 's1',  name: 'מוט ישר',           family: 'bars', category: 'פיגורה', icon: 'straight', bends: 0, sides: [1000],                         angles: [],                    emoji: '➖' },
   { id: 's2',  name: 'צורה 2',     family: 'bars', category: 'פיגורה', icon: 'l', bends: 1, sides: [500, 200],                     angles: [90],                  emoji: '⌐' },
   { id: 's3',  name: 'צורה 3',      family: 'bars', category: 'פיגורה', icon: 'u', bends: 2, sides: [300, 600, 300],                angles: [90, 90],              emoji: '∪' },
+  { id: 's16', name: 'קצה מעוגל',    family: 'bars', category: 'פיגורה', icon: 'rounded-u', bends: 2, sides: [80, 240, 80],          angles: [90, 90], shapeType: 'rounded_end_bar', roundedBends: true, radiusMm: null, emoji: '∪' },
   { id: 's4',  name: 'צורה 4',      family: 'bars', category: 'פיגורה', icon: 'z', bends: 2, sides: [300, 400, 300],                angles: [135, 135],            emoji: 'Z' },
   { id: 's5',  name: 'צורה 5',      family: 'bars', category: 'פיגורה', icon: 's', bends: 3, sides: [200, 300, 300, 200],           angles: [135, 135, 135],       emoji: 'S' },
   { id: 's6',  name: 'צורה 6',  family: 'bars', category: 'קלמרה', icon: 'hook', bends: 3, sides: [200, 400, 400, 200],           angles: [90, 180, 90],         emoji: '⌡' },
@@ -169,6 +170,7 @@ function shapePresetIconSVG(kind) {
     straight: `<path ${stroke} d="M18 50 H82"/>`,
     l: `<path ${stroke} d="M30 20 V68 H76"/>`,
     u: `<path ${stroke} d="M24 20 V72 H76 V20"/>`,
+    'rounded-u': `<path ${stroke} d="M24 20 V58 Q24 74 40 74 H60 Q76 74 76 58 V20"/>`,
     z: `<path ${stroke} d="M22 24 H74 L28 72 H78"/>`,
     s: `<path ${stroke} d="M74 22 H34 C18 22 18 45 35 45 H65 C82 45 82 72 62 72 H24"/>`,
     hook: `<path ${stroke} d="M22 20 V70 H68 C82 70 82 48 68 48"/>`,
@@ -206,6 +208,13 @@ function isBenchBarShape(shape = {}) {
     || shape?.presetId === 's15'
     || shape?.id === 's15'
     || /^\s*(?:ספסל|bench)\s*$/i.test(String(name));
+}
+
+function isRoundedEndBarShape(shape = {}) {
+  return shape?.shapeType === 'rounded_end_bar'
+    || shape?.roundedBends === true
+    || shape?.presetId === 's16'
+    || shape?.id === 's16';
 }
 
 function shapePreviewRotation(shape = {}) {
@@ -363,6 +372,36 @@ function benchBarSVGPath(sides, w, h, padding = 14, opts = {}) {
   ]);
   const path = 'M ' + pts.map(point => `${point[0].toFixed(1)},${point[1].toFixed(1)}`).join(' L ');
   return { path, pts };
+}
+
+function roundedEndBarEditorSVG(sides, w = 300, h = 260, opts = {}) {
+  const values = Array.isArray(sides) ? sides.map(value => Math.max(1, Number(value) || 0)) : [];
+  if (values.length !== 3) return '';
+  const left = Math.max(34, w * 0.2);
+  const right = Math.min(w - 34, w * 0.8);
+  const top = Math.max(26, h * 0.14);
+  const bottom = Math.min(h - 54, h * 0.72);
+  const radiusPx = Math.max(16, Math.min(34, (right - left) * 0.12, (bottom - top) * 0.32));
+  const path = `M ${left} ${top} L ${left} ${bottom - radiusPx} Q ${left} ${bottom} ${left + radiusPx} ${bottom} L ${right - radiusPx} ${bottom} Q ${right} ${bottom} ${right} ${bottom - radiusPx} L ${right} ${top}`;
+  const segments = [
+    [left, top, left, bottom - radiusPx / 2],
+    [left + radiusPx, bottom, right - radiusPx, bottom],
+    [right, bottom - radiusPx / 2, right, top],
+  ];
+  let html = `<path d="${path}" fill="none" stroke="#3d5e78" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" data-shape-kind="rounded-end-bar"/>`;
+  segments.forEach((segment, index) => {
+    const [x1, y1, x2, y2] = segment;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const horizontal = Math.abs(x2 - x1) >= Math.abs(y2 - y1);
+    const x = horizontal ? mx : mx + (index === 0 ? -28 : 28);
+    const y = horizontal ? my + 27 : my;
+    html += `<g data-se-focus="bar-side-${index}" data-seg-click="${index}" style="cursor:pointer"><rect x="${(x - 22).toFixed(1)}" y="${(y - 10).toFixed(1)}" width="44" height="20" rx="4" fill="#fff" stroke="#9aa3b2"/><text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#111827">${formatLengthCmFromMm(values[index])}</text></g>`;
+  });
+  const radiusMm = Number(opts.radiusMm);
+  const radiusLabel = Number.isFinite(radiusMm) && radiusMm > 0 ? `R ${formatLengthCmFromMm(radiusMm)}` : 'R אוטומטי';
+  html += `<text x="${(w / 2).toFixed(1)}" y="${(bottom - 16).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#c9621a">${radiusLabel}</text>`;
+  return html;
 }
 
 
@@ -2020,6 +2059,7 @@ function legacyApprovedShapeFields(shape, contract) {
     is3d: shape?.is3d ? 1 : 0,
     azAngles: shape?.is3d ? (shape.azAngles || []) : null,
     elAngles: shape?.is3d ? (shape.elAngles || []) : null,
+    ...(contract.data.roundedBends ? { roundedBends: true, radiusMm: contract.data.radiusMm ?? null } : {}),
   };
 }
 
@@ -3741,6 +3781,7 @@ class ShapeEditorModal {
         <div class="se-summary-item"><span>משקל מחושב</span><div><strong id="seTotalWeight">0.00</strong><small>ק״ג</small></div></div>
         <div class="se-summary-item se-quantity-item" style="display:none"><span>כמות</span><div><input id="seQuantityInput" class="se-quantity-input" type="number" min="1" step="1" value="1" onfocus="this.select()" oninput="window._seEditor?._setQuantity(this.value)"><small>יח׳</small></div></div>
         <div class="se-summary-item" id="seDiameterItem" style="display:none"><span>קוטר</span><div><select id="seDiameterSelect" class="se-quantity-input" onchange="window._seEditor?._setDiameter(this.value)"><option value="0">—</option>${[5.5,6,8,'8|smooth',10,'10|smooth',12,14,16,18,20,22,25,28,32,36,40].map(option => { const smooth = String(option).endsWith('|smooth'); const d = String(option).replace('|smooth',''); return `<option value="${option}">${d}${smooth ? ' חלק' : ''}</option>`; }).join('')}</select><small>מ״מ</small></div></div>
+        <div class="se-summary-item" id="seRadiusItem" style="display:none"><span>רדיוס כיפוף</span><div><input id="seRadiusInput" class="se-quantity-input" type="number" min="0" step="0.1" placeholder="אוטומטי" onfocus="this.select()" oninput="window._seEditor?._setBendRadius(this.value)"><small>ס״מ</small></div></div>
         <div class="se-summary-item"><span>כיפופים</span><strong id="seBends">0</strong></div>
       </div>
       <div class="se-foot-actions">
@@ -3845,6 +3886,7 @@ class ShapeEditorModal {
       const preset = SHAPE_PRESETS.find(s => s.id === presetId);
       if (!preset) return null;
       const fam = preset.family || 'bars';
+      if (isRoundedEndBarShape(preset)) return roundedEndBarEditorSVG(preset.sides || [], 200, 140, { radiusMm: preset.radiusMm });
       if (fam === 'spirals') return ShapeEngineRouter.render(preset, 200, 140);
       if (fam === 'mesh')    return MeshEngine.render(preset, 200, 140);
       if (fam === 'piles')   return PileCageEngine.render(preset, 200, 140);
@@ -4454,6 +4496,11 @@ class ShapeEditorModal {
         ? `${this.current.diameter}|smooth`
         : String(this.current.diameter || 0);
     }
+    const radiusInput = document.getElementById('seRadiusInput');
+    if (radiusInput && document.activeElement !== radiusInput) {
+      const radiusMm = Number(this.current.radiusMm);
+      radiusInput.value = Number.isFinite(radiusMm) && radiusMm > 0 ? String(radiusMm / 10) : '';
+    }
     const straightLengthInput = document.getElementById('seStraightLengthInput');
     if (straightLengthInput && document.activeElement !== straightLengthInput) {
       const value = Number(this.current.sides?.[0] || 0);
@@ -4489,6 +4536,16 @@ class ShapeEditorModal {
     const el = document.getElementById('seDiameterSelect');
     if (el) el.classList.toggle('se-invalid', !(this.current.diameter >= 5.5));
     this._updatePreview();
+  }
+
+  _setBendRadius(value) {
+    if (!this.current) return;
+    const raw = String(value ?? '').trim();
+    const cm = Number(raw);
+    this.current.roundedBends = true;
+    this.current.shapeType = 'rounded_end_bar';
+    this.current.radiusMm = raw && Number.isFinite(cm) && cm > 0 ? Math.round(cm * 10) : null;
+    this._updatePreview({ debounceMs: 120 });
   }
 
   _setStraightLength(value) {
@@ -4538,6 +4595,8 @@ class ShapeEditorModal {
     // straight or bent — is edited the same way.
     const diaItem = document.getElementById('seDiameterItem');
     if (diaItem) diaItem.style.display = isBars ? '' : 'none';
+    const radiusItem = document.getElementById('seRadiusItem');
+    if (radiusItem) radiusItem.style.display = isBars && isRoundedEndBarShape(this.current) ? '' : 'none';
     const qtyItem = document.querySelector('#seModal .se-quantity-item');
     if (qtyItem) qtyItem.style.display = showsOrderQuantity ? '' : 'none';
   }
@@ -6027,6 +6086,14 @@ class ShapeEditorModal {
     } else {
       const _activeSeg2d = this._activeSeg ?? -1;
       const isBenchProjection = isBenchBarShape(this.current) && sides.length === 5;
+      const isRoundedProjection = isRoundedEndBarShape(this.current) && sides.length === 3;
+      if (isRoundedProjection) {
+        svg.innerHTML = roundedEndBarEditorSVG(sides, 300, 260, { radiusMm: this.current.radiusMm });
+        this._applyFamilyFocus(svg);
+        this._bindSvgClicks(svg);
+        this._updateSummaryValues();
+        return;
+      }
       const stirrupParts = detectClosedStirrupParts(sides, angles);
       if (stirrupParts && !isBenchProjection) {
         svg.innerHTML = renderClosedStirrupEditor2D(stirrupParts, sides, 300, 260, {

@@ -201,6 +201,48 @@ test('production card keeps all five bench segments and the 120 cm cut length', 
   assert.equal([280, 170, 300, 170, 280].reduce((sum, side) => sum + side, 0), 1200);
 });
 
+test('rounded-end bar keeps optional bend radius in the contract and production drawing', () => {
+  const contract = steelRebarShapes.buildBarsShapeContract({
+    shapeType: 'rounded_end_bar',
+    roundedBends: true,
+    radiusMm: 35,
+    diameter: 8,
+    sides: [80, 240, 80],
+    angles: [90, 90],
+  }, { quantity: 112 });
+
+  assert.equal(contract.data.roundedBends, true);
+  assert.equal(contract.data.radiusMm, 35);
+  assert.equal(contract.generic.shapeType, 'rounded_end_bar');
+  assert.equal(contract.generic.segments[0].bendRadiusMm, 35);
+  assert.equal(contract.component.unitLengthMm, 400);
+
+  const svg = itemShapeSvg({
+    segments: JSON.stringify([
+      { length_mm: 80, angle_deg: 90 },
+      { length_mm: 240, angle_deg: 90 },
+      { length_mm: 80, angle_deg: null },
+    ]),
+    shape_snapshot_json: JSON.stringify({
+      family: 'bars',
+      shapeType: 'rounded_end_bar',
+      data: { sides: [80, 240, 80], angles: [90, 90], diameter: 8, roundedBends: true, radiusMm: 35 },
+    }),
+  });
+
+  assert.match(svg, /data-shape-kind="rounded-end-bar"/);
+  assert.match(svg, /data-bend-radius-mm="35"/);
+  assert.match(svg, / Q /, 'expected visibly curved bends');
+  assert.match(svg, />R 3\.5</);
+});
+
+test('shape editor exposes the rounded-end preset and optional radius field', () => {
+  const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
+  assert.match(editor, /id: 's16'.*shapeType: 'rounded_end_bar'.*roundedBends: true/);
+  assert.match(editor, /id="seRadiusInput"/);
+  assert.match(editor, /roundedEndBarEditorSVG\(sides, 300, 260/);
+});
+
 test('visual-only 3D preview does not use true-3D azimuth arrays', () => {
   const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
 
@@ -522,7 +564,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=77/);
+  assert.match(index, /shape-editor\.js\?v=78/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

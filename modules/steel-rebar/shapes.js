@@ -102,15 +102,19 @@ function buildBarsShapeContract(input = {}, options = {}) {
   const totalLengthMm = round(unitLengthMm * quantity, 1);
   const totalWeightKg = round(unitWeightKg * quantity, 3);
   const shapeType = normalizeBarShapeType(input, sides, angles);
+  const roundedBends = shapeType === 'rounded_end_bar' || input.roundedBends === true;
+  const radiusCandidate = Number(input.radiusMm ?? input.radius_mm ?? input.radius);
+  const radiusMm = Number.isFinite(radiusCandidate) && radiusCandidate > 0 ? radiusCandidate : null;
   const segments = sides.map((lengthMm, index) => ({
     index: index + 1,
     lengthMm,
     length_mm: lengthMm,
     bendAfterDeg: index < angles.length ? angles[index] : null,
     angle_deg: index < angles.length ? angles[index] : null,
+    ...(roundedBends && index < angles.length ? { bendRadiusMm: radiusMm, bend_radius_mm: radiusMm } : {}),
   }));
   return {
-    data: { sides, angles, diameter, ...(is3d ? { is3d: 1, azAngles, elAngles } : {}) },
+    data: { sides, angles, diameter, ...(roundedBends ? { roundedBends: true, radiusMm } : {}), ...(is3d ? { is3d: 1, azAngles, elAngles } : {}) },
     calculated: {
       totalLengthMm: unitLengthMm,
       weightKg: unitWeightKg,
@@ -121,7 +125,7 @@ function buildBarsShapeContract(input = {}, options = {}) {
       totalWeightKg,
       bendCount: angles.length,
     },
-    generic: { family: 'bars', shapeType, diameter, segments, totalLengthMm: unitLengthMm, bendCount: angles.length, ...(is3d ? { is3d: 1, azAngles, elAngles } : {}) },
+    generic: { family: 'bars', shapeType, diameter, segments, totalLengthMm: unitLengthMm, bendCount: angles.length, ...(roundedBends ? { roundedBends: true, radiusMm } : {}), ...(is3d ? { is3d: 1, azAngles, elAngles } : {}) },
     component: {
       family: 'bars',
       shapeType,
@@ -133,6 +137,7 @@ function buildBarsShapeContract(input = {}, options = {}) {
       weightKg: totalWeightKg,
       sides,
       angles,
+      ...(roundedBends ? { roundedBends: true, radiusMm } : {}),
       ...(is3d ? { is3d: 1, azAngles, elAngles } : {}),
       segments,
     },

@@ -525,6 +525,22 @@ function isBenchBarItem(item = {}) {
     || /^\s*(?:ספסל|bench)\s*$/i.test(String(name));
 }
 
+function isRoundedEndBarItem(item = {}) {
+  const snapshot = shapeSnapshotFromItem(item);
+  const data = snapshot.data || {};
+  const generic = snapshot.machineOutput?.generic || {};
+  const shapeType = item.shapeType || item.shape_type || snapshot.shapeType || data.shapeType || generic.shapeType;
+  return shapeType === 'rounded_end_bar' || data.roundedBends === true || generic.roundedBends === true;
+}
+
+function roundedEndBarRadiusMm(item = {}) {
+  const snapshot = shapeSnapshotFromItem(item);
+  const data = snapshot.data || {};
+  const generic = snapshot.machineOutput?.generic || {};
+  const value = Number(item.radiusMm ?? item.radius_mm ?? data.radiusMm ?? data.radius_mm ?? generic.radiusMm ?? generic.radius_mm);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 function normalizeSnapshotSegments(segments) {
   if (!Array.isArray(segments)) return [];
   return segments.map(segment => ({
@@ -744,12 +760,35 @@ function itemShapeSvg(item = {}) {
   if (isRoundPileCageItem(item)) return pileCageProductionSvg(item);
   const spiralSvg = spiralShapeSvg(item);
   const isBench = isBenchBarItem(item);
+  const isRoundedEnd = isRoundedEndBarItem(item);
   const segments = shapeSegmentsFromItem(item);
   if (!spiralSvg && isBench && segments.length === 5) return benchBarProductionSvg(segments);
+  if (!spiralSvg && isRoundedEnd && segments.length === 3) return roundedEndBarProductionSvg(segments, roundedEndBarRadiusMm(item));
   return spiralSvg || shapeSvg(segments, {
     rotateDegrees: isBench ? 180 : 0,
     shapeKind: isBench ? 'bench-bar' : 'generic-bar',
   });
+}
+
+function roundedEndBarProductionSvg(segments, radiusMm = null) {
+  const sides = segments.map(segment => Number(segment.length_mm || 0));
+  const width = 220;
+  const height = 112;
+  const left = 42;
+  const right = 178;
+  const top = 18;
+  const bottom = 82;
+  const radiusPx = 18;
+  const path = `M ${left},${top} L ${left},${bottom - radiusPx} Q ${left},${bottom} ${left + radiusPx},${bottom} L ${right - radiusPx},${bottom} Q ${right},${bottom} ${right},${bottom - radiusPx} L ${right},${top}`;
+  let svg = `<path d="${path}" fill="none" stroke="#1a2332" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
+  svg += `<path d="${path}" fill="none" stroke="#3a5070" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+  svg += sideDimensionSvg([left, top], [left, bottom - radiusPx / 2], sides[0], [110, 50], 22);
+  svg += sideDimensionSvg([left + radiusPx, bottom], [right - radiusPx, bottom], sides[1], [110, 50], 22);
+  svg += sideDimensionSvg([right, bottom - radiusPx / 2], [right, top], sides[2], [110, 50], 22);
+  if (Number.isFinite(Number(radiusMm)) && Number(radiusMm) > 0) {
+    svg += `<text x="110" y="67" text-anchor="middle" font-size="9" font-family="Heebo,Arial" font-weight="900" fill="#c9621a">R ${displayLengthCm(Number(radiusMm))}</text>`;
+  }
+  return `<svg data-shape-kind="rounded-end-bar" data-bend-radius-mm="${Number(radiusMm) > 0 ? Number(radiusMm) : ''}" data-scale-mode="container-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;overflow:visible">${svg}</svg>`;
 }
 
 function benchBarProductionSvg(segments) {
