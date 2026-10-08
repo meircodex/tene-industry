@@ -25,11 +25,14 @@ test('cutting dialog supports item quantities and a per-diameter 600cm or 1200cm
   assert.match(ordersHtml, /groupPolicies/);
 });
 
-test('cutting bars use item-only labels, colored mixed-item segments, dimensions, diameter and shape previews', () => {
+test('cutting bars show only lengths inside colored segments and place shapes side by side below', () => {
   assert.match(ordersHtml, /label: `פריט \$\{itemNumber\}`/);
   assert.doesNotMatch(ordersHtml, /label: sourceNumber \? `מקור/);
   assert.match(ordersHtml, /מוט משולב:/);
-  assert.match(ordersHtml, /class="cut-piece\$\{isShort \? ' is-short' : ''\}\$\{isNarrow \? ' is-narrow' : ''\}\$\{edgeClass\}"[\s\S]*straightStockLengthText\(piece\.lengthMm\)/);
+  assert.match(ordersHtml, /class="cut-piece\$\{isShort \? ' is-short' : ''\}"[\s\S]*<b>\$\{escHtml\(visibleLength\)\}<\/b>/);
+  assert.doesNotMatch(ordersHtml, /class="cut-piece[^\n]*data-cut-shape-item/);
+  assert.match(ordersHtml, /class="cut-shape-strip">\$\{shapeStrip\}/);
+  assert.match(ordersHtml, /class="cut-shape-thumb-preview" data-cut-shape-item/);
   assert.match(ordersHtml, /קוטר ⌀\$\{escHtml\(group\.diameter\)\}/);
   assert.match(ordersHtml, /data-cut-shape-item/);
   assert.match(ordersHtml, /renderStraightStockShapePreviews/);
@@ -42,13 +45,11 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /return `\$\{Number\.isInteger\(centimeters\)[\s\S]*\} CM`/);
   assert.match(ordersHtml, /\$\{plan\.bars\.length\} PCS/);
   assert.match(ordersHtml, /\$\{plan\.pieceCount\} PCS/);
-  assert.match(ordersHtml, /const isShort = width < 6/);
-  assert.match(ordersHtml, /\.cut-piece\.is-short \.cut-piece-shape\{display:flex;position:absolute;width:88px;height:70px/);
-  assert.match(ordersHtml, /\.cut-piece\.is-short\.is-narrow:is\(:hover,:focus\) \.cut-piece-shape\{display:flex;position:absolute;width:88px;height:70px/);
-  assert.match(ordersHtml, /const visibleLabel = isShort \? String\(piece\.itemNumber/);
-  assert.match(ordersHtml, /\.cut-piece-shape svg text\{font-size:14px!important;font-weight:900!important/);
-  assert.match(ordersHtml, /data-cut-shape-size="\$\{isNarrow \? 'popover' : 'inline'\}"/);
-  assert.match(ordersHtml, /height: isPopover \? 70 : 58,[\s\S]*showDimensions: true/);
+  assert.match(ordersHtml, /const isShort = width < 7/);
+  assert.match(ordersHtml, /const visibleLength = isShort \? fullLength\.replace\(\/\\s\*CM\$\/, ''\) : fullLength/);
+  assert.match(ordersHtml, /\.cut-shape-thumb-preview svg text\{font-size:14px!important;font-weight:900!important/);
+  assert.match(ordersHtml, /data-cut-shape-size="thumb"/);
+  assert.match(ordersHtml, /width: 108,[\s\S]*height: 54,[\s\S]*showDimensions: true/);
   assert.doesNotMatch(ordersHtml, /class="cut-bar-items"/);
 });
 
@@ -64,14 +65,14 @@ test('cutting plan prints as compact A4 landscape without splitting a cutting pa
   assert.match(ordersHtml, /@page\{size:A4 landscape;margin:8mm\}/);
   assert.match(ordersHtml, /body\.straight-stock-printing \.cut-quantity-table thead\{display:table-header-group\}/);
   assert.match(ordersHtml, /body\.straight-stock-printing \.cut-bar-row\{[^}]*break-inside:avoid;page-break-inside:avoid/);
-  assert.match(ordersHtml, /body\.straight-stock-printing \.cut-piece\.is-short \.cut-piece-shape\{height:62px;top:5px\}/);
-  assert.match(ordersHtml, /\.cut-bar-track,\.cut-piece,\.cut-piece-shape\{print-color-adjust:exact/);
+  assert.match(ordersHtml, /body\.straight-stock-printing \.cut-shape-thumb\{width:92px;height:64px/);
+  assert.match(ordersHtml, /\.cut-bar-track,\.cut-piece,\.cut-shape-thumb,\.cut-shape-thumb-preview\{print-color-adjust:exact/);
 });
 
-test('cutting plan totals cut units in a table by diameter and length', () => {
-  assert.match(ordersHtml, /const cutQuantities = new Map\(\)/);
-  assert.match(ordersHtml, /const key = `\$\{group\.diameter\}\|\$\{piece\.lengthMm\}`/);
+test('cutting plan totals required stock bars in a table by diameter and stock length', () => {
+  assert.match(ordersHtml, /const stockQuantities = new Map\(\)/);
+  assert.match(ordersHtml, /const key = `\$\{group\.diameter\}\|\$\{stockLengthMm\}`/);
   assert.match(ordersHtml, /class="cut-quantity-table"/);
-  assert.match(ordersHtml, /<th>קוטר<\/th><th>אורך חיתוך<\/th><th>כמות כוללת<\/th>/);
-  assert.match(ordersHtml, /\$\{straightStockLengthText\(row\.lengthMm\)\}<\/td><td class="cut-table-number">\$\{row\.count\} PCS/);
+  assert.match(ordersHtml, /<th>קוטר<\/th><th>אורך מוט<\/th><th>כמות מוטות<\/th>/);
+  assert.match(ordersHtml, /\$\{straightStockLengthText\(row\.stockLengthMm\)\}<\/td><td class="cut-table-number">\$\{row\.count\} PCS/);
 });
