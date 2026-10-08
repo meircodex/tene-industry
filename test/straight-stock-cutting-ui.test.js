@@ -44,4 +44,6 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /\$\{plan\.pieceCount\} PCS/);
   assert.match(ordersHtml, /piece\.lengthMm <= 600 \? ' is-short'/);
   assert.match(ordersHtml, /const visibleLabel = isShort \? String\(piece\.itemNumber/);
+  assert.match(ordersHtml, /\.cut-bar-item-shape svg text\{font-size:14px!important;font-weight:900!important/);
+  assert.match(ordersHtml, /width: 112,[\s\S]*height: 70,[\s\S]*showDimensions: true/);
 });
