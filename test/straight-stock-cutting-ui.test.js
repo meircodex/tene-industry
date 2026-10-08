@@ -51,3 +51,26 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
   assert.match(ordersHtml, /height: isPopover \? 70 : 58,[\s\S]*showDimensions: true/);
   assert.doesNotMatch(ordersHtml, /class="cut-bar-items"/);
 });
+
+test('cutting plan renders waste as rebar weight by diameter', () => {
+  assert.match(ordersHtml, /function straightStockWasteWeightKg\(wasteMm, diameter\)/);
+  assert.match(ordersHtml, /IronBendRebar\?\.kgPerMeter\?\.\(diameterNumber\)/);
+  assert.match(ordersHtml, /פחת למוט<br>\$\{straightStockWeightText\(straightStockWasteWeightKg\(bar\.wasteMm, group\.diameter\)\)\}/);
+  assert.match(ordersHtml, /<span>פחת כולל<\/span><b>\$\{straightStockWeightText\(totalWasteKg\)\}<\/b>/);
+});
+
+test('cutting plan prints as compact A4 landscape without splitting a cutting pattern', () => {
+  assert.match(ordersHtml, /@page\{size:A4 landscape;margin:8mm\}/);
+  assert.match(ordersHtml, /body\.straight-stock-printing \.cut-quantity-table thead\{display:table-header-group\}/);
+  assert.match(ordersHtml, /body\.straight-stock-printing \.cut-bar-row\{[^}]*break-inside:avoid;page-break-inside:avoid/);
+  assert.match(ordersHtml, /body\.straight-stock-printing \.cut-piece\.is-short \.cut-piece-shape\{height:62px;top:5px\}/);
+  assert.match(ordersHtml, /\.cut-bar-track,\.cut-piece,\.cut-piece-shape\{print-color-adjust:exact/);
+});
+
+test('cutting plan totals cut units in a table by diameter and length', () => {
+  assert.match(ordersHtml, /const cutQuantities = new Map\(\)/);
+  assert.match(ordersHtml, /const key = `\$\{group\.diameter\}\|\$\{piece\.lengthMm\}`/);
+  assert.match(ordersHtml, /class="cut-quantity-table"/);
+  assert.match(ordersHtml, /<th>קוטר<\/th><th>אורך חיתוך<\/th><th>כמות כוללת<\/th>/);
+  assert.match(ordersHtml, /\$\{straightStockLengthText\(row\.lengthMm\)\}<\/td><td class="cut-table-number">\$\{row\.count\} PCS/);
+});
