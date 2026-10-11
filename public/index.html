@@ -2093,6 +2093,7 @@ function openQuickCodePanel() {
   const panel = document.getElementById('order-import-section-anchor');
   if (!drawer || !panel) return;
   drawer.hidden = false;
+  drawer.style.setProperty('display', 'block', 'important');
   drawer.dataset.active = 'source';
   setText('setupDrawerTitle', 'קוד הזמנה מהיר');
   document.querySelectorAll('[data-setup-panel]').forEach(item => {
