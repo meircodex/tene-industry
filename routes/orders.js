@@ -703,7 +703,7 @@ module.exports = function createOrdersRouter(deps) {
         // as the N zig-zag source.  All other source fixes are orthogonal.
         if (orderNum === 'HZ-2026-094' && Number(itemPosition) === 3) {
           nextAngles = [90, 160, 200, 160, 90, 90, 0];
-        } else if (next.length === 3 && /צורת ח|open|hook/i.test(nameText)) {
+        } else if (next.length === 3 && (sourceFix || /צורת ח|open|hook/i.test(nameText))) {
           nextAngles = [90, 90, 90];
         }
       }
