@@ -646,6 +646,14 @@ module.exports = function createOrdersRouter(deps) {
     const lengthOf = value => Number(value?.length_mm ?? value?.lengthMm ?? value?.length ?? value);
     const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
     const canonicalHoop = values => {
+      // Some imports put the two equal tails at the ends and the four body
+      // sides in the middle (tail, side, side, side, side, tail).
+      if (values.length === 6 && similar(values[0], values[5])
+          && values.slice(1, 5).every(value => similar(value, values[1]))) {
+        const tail = Math.min(values[0], values[5]);
+        const body = values[1];
+        return [tail, tail, body, body, body, body];
+      }
       const groups = new Map();
       values.forEach((value, index) => { const key = String(value); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(index); });
       const pairs = [...groups.entries()].filter(([, indexes]) => indexes.length >= 2);
@@ -668,6 +676,15 @@ module.exports = function createOrdersRouter(deps) {
       if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
           && similar(values[0], values[1]) && values[2] > Math.max(values[0], values[1]) * 1.5) {
         next = [values[0], values[2], values[1]];
+      }
+      // Imported pile pins and L legs occasionally inherited the generic
+      // hoop label. Keep their three-segment geometry, but do not bill them
+      // as hoops and do not show a misleading hoop warning.
+      const staleOpenHoop = values.length < 4 && isHoop && /פינים|(^|\s)L\s*[–-]|רגל|ראש כלונס/i.test(nameText);
+      if (staleOpenHoop) {
+        item.shape_id = 'bent_bar';
+        item.shape_name = 'מוט מכופף';
+        try { db.prepare('UPDATE items SET shape_id=?, shape_name=? WHERE id=?').run('bent_bar', 'מוט מכופף', item.id); } catch {}
       }
       if (!next) return;
       const changed = JSON.stringify(next) !== JSON.stringify(values) || (values.length === 6 && !isHoop);

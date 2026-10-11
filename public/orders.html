@@ -2318,6 +2318,18 @@ function itemAngles(item) {
   });
 }
 
+// A few handwritten imports contain the dimensions in the item name but no
+// machine path.  Draw the known square/rectangle as a visual cue without
+// inventing tails or changing billing data.
+function shapeNamePreviewSides(item) {
+  const name = String(item?.shape_name || item?.struct_element || '');
+  const match = name.match(/(\d+(?:[.,]\d+)?)\s*[×x*]\s*(\d+(?:[.,]\d+)?)/i);
+  if (!match) return [];
+  const a = Number(match[1].replace(',', '.')) * 10;
+  const b = Number(match[2].replace(',', '.')) * 10;
+  return a > 0 && b > 0 ? [a, b, a, b] : [];
+}
+
 function rawItemSegments(item) {
   if (isRealSpiralItem(item)) return [];
   return safeJson(item.segments).map(segment => (
@@ -2849,6 +2861,7 @@ function buildDetailHTML(o, pkgs) {
       const length = itemLength(item);
       const weight = itemWeight(item);
       const sides = itemSegments(item);
+      const visualSides = sides.length ? sides : shapeNamePreviewSides(item);
       const angles = itemAngles(item);
       const dims = sides.length ? sides.join(' / ') : itemDimensions(item);
       const shapeMismatch = shapeMismatchWarning(item, sides);
@@ -2863,7 +2876,7 @@ function buildDetailHTML(o, pkgs) {
       // Do not reuse a legacy cached SVG for hoops. It may have been produced
       // before the tail/body convention was corrected; render2D below rebuilds
       // the closed hoop from the current six-segment machine sequence.
-      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) ? '' : (item.shape_svg || ''));
+      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) && visualSides.length === 6 ? '' : (item.shape_svg || ''));
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`
@@ -2871,9 +2884,9 @@ function buildDetailHTML(o, pkgs) {
         ? `<div class="item-visual" data-detail-shape="1" data-shape-svg="${canonicalShapeSvg}" data-spiral-shape="1" data-spiral-diameter="${escHtml(item.spiral_diameter_mm)}" data-spiral-turns="${escHtml(item.spiral_turns)}" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה"></div>`
         : `<div class="item-visual"
           data-detail-shape="1"
-          data-closed-hoop="${isClosedHoopItem(item) ? '1' : '0'}"
+          data-closed-hoop="${isClosedHoopItem(item) && visualSides.length === 6 ? '1' : '0'}"
           data-shape-svg="${canonicalShapeSvg}"
-          data-sides="${encodeURIComponent(JSON.stringify(sides))}"
+          data-sides="${encodeURIComponent(JSON.stringify(visualSides))}"
           data-angles="${encodeURIComponent(JSON.stringify(angles))}"
           onclick="openItemEdit(event, ${o.id}, ${item.id})"
           title="ערוך צורה"></div>`;
