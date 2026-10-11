@@ -91,7 +91,9 @@ function repairOpenLegHoopMisclassifications(db) {
       const elementName = String(row.struct_element || '').trim() || snapshotText;
       const explicitClosed = /חישוק|סגור|closed\s*stirrup/i.test(elementName);
       const openLeg = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(elementName);
-      if (!openLeg || explicitClosed) continue;
+      const staleHoopLabel = /חישוק|hoop|stirrup/i.test(String(row.shape_name || ''))
+        || /חישוק|hoop|stirrup/i.test(snapshotText);
+      if (!openLeg && !staleHoopLabel) continue;
 
       let segments = [];
       try {
@@ -104,7 +106,7 @@ function repairOpenLegHoopMisclassifications(db) {
         const candidate = snapshot.segments || snapshot.sides || snapshot.data?.segments || snapshot.data?.sides;
         if (Array.isArray(candidate)) segments = candidate;
       }
-      if (segments.length >= 4) continue;
+      if (segments.length >= 4 || (explicitClosed && !staleHoopLabel)) continue;
 
       if (snapshot && typeof snapshot === 'object') {
         snapshot.displayName = 'מוט מכופף';
