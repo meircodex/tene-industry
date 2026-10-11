@@ -669,6 +669,7 @@ module.exports = function createOrdersRouter(deps) {
       const values = raw.map(lengthOf);
       if (!values.length || !values.every(Number.isFinite)) return;
       let next = null;
+      let nextAngles = null;
       const snapshotText = String(item.shape_snapshot_json || '');
       const nameText = `${item.shape_name || ''} ${item.struct_element || ''} ${snapshotText}`;
       const isHoop = /חישוק|stirrup|hoop|closed/i.test(nameText);
@@ -677,6 +678,9 @@ module.exports = function createOrdersRouter(deps) {
       // restore the actual path: 30,65,105,70,105,65,30 (cm).
       if (orderNum === 'HZ-2026-097' && Number(itemPosition) === 4 && values.length === 7) {
         next = [30, 65, 105, 70, 105, 65, 30].map(value => value * 10);
+        // The two diagonals and the centre bend are not right angles.  These
+        // are the bend angles shown on the source drawing, in path order.
+        nextAngles = [90, 159, 201, 159, 90, 90, 0];
       }
       if (values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
       if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
@@ -695,7 +699,7 @@ module.exports = function createOrdersRouter(deps) {
       if (!next) return;
       const changed = JSON.stringify(next) !== JSON.stringify(values) || (values.length === 6 && !isHoop);
       if (!changed) return;
-      item.segments = JSON.stringify(next.map((length, index) => ({ length_mm: length, angle_deg: index < next.length - 1 ? 90 : 0 })));
+      item.segments = JSON.stringify(next.map((length, index) => ({ length_mm: length, angle_deg: nextAngles?.[index] ?? (index < next.length - 1 ? 90 : 0) })));
       if (next.length === 6 && (isHoop || canonicalHoop(values))) {
         item.shape_id = 'closed_stirrup';
         item.shape_name = 'חישוק';
