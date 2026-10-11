@@ -85,7 +85,10 @@ function repairOpenLegHoopMisclassifications(db) {
   let repaired = 0;
   const tx = db.transaction(() => {
     for (const row of rows) {
-      const elementName = String(row.struct_element || '').trim();
+      let snapshot = {};
+      try { snapshot = JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch {}
+      const snapshotText = JSON.stringify(snapshot);
+      const elementName = String(row.struct_element || '').trim() || snapshotText;
       const explicitClosed = /חישוק|סגור|closed\s*stirrup/i.test(elementName);
       const openLeg = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(elementName);
       if (!openLeg || explicitClosed) continue;
@@ -93,12 +96,16 @@ function repairOpenLegHoopMisclassifications(db) {
       let segments = [];
       try {
         const parsed = JSON.parse(row.segments || '[]');
-        segments = Array.isArray(parsed) ? parsed : [];
+        segments = Array.isArray(parsed)
+          ? parsed
+          : (Array.isArray(parsed?.segments) ? parsed.segments : (Array.isArray(parsed?.sides) ? parsed.sides : []));
       } catch {}
+      if (!segments.length && snapshot && typeof snapshot === 'object') {
+        const candidate = snapshot.segments || snapshot.sides || snapshot.data?.segments || snapshot.data?.sides;
+        if (Array.isArray(candidate)) segments = candidate;
+      }
       if (segments.length >= 4) continue;
 
-      let snapshot = {};
-      try { snapshot = JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch {}
       if (snapshot && typeof snapshot === 'object') {
         snapshot.displayName = 'מוט מכופף';
         snapshot.shapeType = 'bent_bar';
