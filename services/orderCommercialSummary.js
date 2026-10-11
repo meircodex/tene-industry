@@ -205,7 +205,8 @@ function classifyOrderItem(item = {}) {
   // wins over that stale label: an open L with fewer than four segments is a
   // bent bar and must never receive the per-hoop charge.
   const openLegSegments = productionCards.shapeSegmentsFromItem(item);
-  const isOpenLeg = Array.isArray(openLegSegments)
+  const explicitHoopWording = /(^|\W)(hoop|חישוק|סגור|closed\s*stirrup)(\W|$)/i.test(shape.text);
+  const isOpenLeg = !explicitHoopWording && Array.isArray(openLegSegments)
     && openLegSegments.length < 4
     && /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(shape.text);
   // A ring (טבעת) and a hoop/stirrup (חישוק) are different products and must

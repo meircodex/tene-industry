@@ -126,6 +126,74 @@ function repairOpenLegHoopMisclassifications(db) {
   }
 }
 
+// Order 096 was imported from a drawing whose 3-side item 24 dimensions were
+// read in visual order instead of path order.  Items 26-31 are closed hoops;
+// their six sides (including the 8/10 mm closing excess) must remain intact.
+function repairOrder096DrawingDetails(db) {
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT i.id, i.segments, i.shape_snapshot_json
+      FROM items i
+      JOIN pallets p ON p.id=i.pallet_id
+      JOIN orders o ON o.id=p.order_id
+      WHERE o.order_num='HZ-2026-096'
+      ORDER BY i.id
+    `).all();
+  } catch {
+    return;
+  }
+  if (rows.length < 31) return;
+  const update = db.prepare(`
+    UPDATE items
+    SET shape_id=?, shape_name=?, segments=?, shape_snapshot_json=?
+    WHERE id=?
+  `);
+  const tx = db.transaction(() => {
+    rows.forEach((row, index) => {
+      const position = index + 1;
+      if (position !== 24 && (position < 26 || position > 31)) return;
+      let parsedSegments = [];
+      try { parsedSegments = JSON.parse(row.segments || '[]'); } catch {}
+      const snapshot = (() => { try { return JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch { return {}; } })();
+      if (position === 24) {
+        const newSides = [400, 2450, 400];
+        const setSides = (value) => Array.isArray(value)
+          ? newSides.map((side, i) => {
+            const current = value[i];
+            return current && typeof current === 'object'
+              ? { ...current, length_mm: side, lengthMm: side, length: side }
+              : side;
+          })
+          : value;
+        const nextSegments = setSides(Array.isArray(parsedSegments) ? parsedSegments : snapshot.segments) || newSides;
+        snapshot.displayName = 'מוט מכופף';
+        snapshot.shapeType = 'bent_bar';
+        snapshot.shapeId = 'bent_bar';
+        snapshot.segments = nextSegments;
+        if (snapshot.data && typeof snapshot.data === 'object') {
+          snapshot.data.shapeType = 'bent_bar';
+          snapshot.data.shapeId = 'bent_bar';
+          snapshot.data.segments = setSides(snapshot.data.segments) || nextSegments;
+        }
+        update.run('bent_bar', 'custom bent shape', JSON.stringify(nextSegments), JSON.stringify(snapshot), row.id);
+      } else {
+        snapshot.displayName = 'חישוק';
+        snapshot.shapeType = 'closed_stirrup';
+        snapshot.shapeId = 'closed_stirrup';
+        if (snapshot.data && typeof snapshot.data === 'object') {
+          snapshot.data.shapeType = 'closed_stirrup';
+          snapshot.data.shapeId = 'closed_stirrup';
+          snapshot.data.displayName = 'חישוק';
+        }
+        update.run('closed_stirrup', 'חישוק', row.segments, JSON.stringify(snapshot), row.id);
+      }
+    });
+  });
+  tx();
+  console.log('[DB] Verified HZ-2026-096 item 24 path order and hoop items 26-31');
+}
+
 function runCoreMigrations(db) {
   ensureCustomerMergeSchema(db);
   // ── MIGRATIONS (safe column additions) ────────────────────────────
@@ -242,6 +310,7 @@ function runCoreMigrations(db) {
   addCol('items',      'total_weight',       'REAL DEFAULT 0');   // alias for weight column (compat)
 
   repairOpenLegHoopMisclassifications(db);
+  repairOrder096DrawingDetails(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (
