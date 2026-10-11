@@ -201,10 +201,17 @@ function classifyOrderItem(item = {}) {
     shape.family === 'spirals' && spiralTurns > 1.5
     || /spiral|helix|spring|coil|ספיר|סליל|קפיץ/i.test(shape.text)
   );
+  // Legacy imports sometimes labelled an open L/leg as "חישוק".  Geometry
+  // wins over that stale label: an open L with fewer than four segments is a
+  // bent bar and must never receive the per-hoop charge.
+  const openLegSegments = productionCards.shapeSegmentsFromItem(item);
+  const isOpenLeg = Array.isArray(openLegSegments)
+    && openLegSegments.length < 4
+    && /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(shape.text);
   // A ring (טבעת) and a hoop/stirrup (חישוק) are different products and must
   // remain separate in the commercial summary. Prefer the explicit shape type
   // and then the product wording when legacy rows do not have a type.
-  const isHoop = !isSpiral && !isPileCage && !isMesh && (
+  const isHoop = !isOpenLeg && !isSpiral && !isPileCage && !isMesh && (
     ['closed_stirrup', 'stirrup', 'hoop'].includes(shape.shapeType)
       || /(^|\W)(hoop|חישוק)(\W|$)/i.test(shape.text)
   );
