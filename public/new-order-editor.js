@@ -936,6 +936,21 @@
     return { added, invalid: rows.length - valid.length };
   }
 
+  function importQuickJsonFile(file, input) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = importQuickCodeText(reader.result || '');
+      if (result?.added > 0) showQuickImportMessage(`${result.added} שורות נוספו מקובץ JSON`);
+      if (input) input.value = '';
+    };
+    reader.onerror = () => {
+      showQuickImportMessage('לא ניתן לקרוא את קובץ ה-JSON');
+      if (input) input.value = '';
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
   async function importQuickOcrFile(file, input) {
     const documentType = document.getElementById('ocrDocumentType')?.value || 'order';
     if (typeof window.routeNonOrderOcrDocument === 'function' && window.routeNonOrderOcrDocument(documentType)) {
@@ -1499,6 +1514,7 @@
     window.openQuickOrderImport = openQuickOrderImport;
     window.handleQuickOrderImportFile = handleQuickOrderImportFile;
     window.importQuickCodeText = importQuickCodeText;
+    window.importQuickJsonFile = importQuickJsonFile;
     window.addIntakeRowsToOrder = addIntakeRowsToOrder;
     window.createOrderItemFromIntakeRow = createOrderItemFromIntakeRow;
     window.validateIntakeRow = validateIntakeRow;

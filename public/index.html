@@ -1640,6 +1640,8 @@
             <div class="intake-row-label">שורה אחת לכל פריט · אורך במ״מ</div>
             <textarea id="quickOrderCode" rows="5" dir="auto" placeholder="אלמנט|צורה|קוטר|כמות|אורך במ״מ&#10;קורה 1|מוט ישר|12|10|6000&#10;חישוק|חישוק|10|48|600"></textarea>
             <button type="button" class="btn btn-primary" onclick="importQuickCodeText(document.getElementById('quickOrderCode').value)">הוסף שורות להזמנה</button>
+            <label class="btn btn-secondary" for="quickOrderJsonFile">טען קובץ קוד JSON</label>
+            <input id="quickOrderJsonFile" type="file" accept="application/json,.json" hidden onchange="importQuickJsonFile(this.files?.[0], this)">
             <div class="import-status">אפשר גם JSON: [{"elementName":"קורה 1","shape":"מוט ישר","diameter":12,"quantity":10,"length":6000}]</div>
           </div>
         </details>
