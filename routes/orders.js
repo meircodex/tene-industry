@@ -635,9 +635,57 @@ module.exports = function createOrdersRouter(deps) {
       FROM orders o LEFT JOIN customers c ON o.customer_id=c.id WHERE o.id=?`).get(req.params.id);
     if (!order) return res.status(404).json({ error: 'לא נמצא' });
     const pallets = db.prepare('SELECT * FROM pallets WHERE order_id=? ORDER BY pallet_num').all(order.id);
+    const parseSegments = value => {
+      let parsed = value;
+      if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed || '[]'); } catch { parsed = []; } }
+      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed?.segments)) return parsed.segments;
+      if (Array.isArray(parsed?.sides)) return parsed.sides;
+      return [];
+    };
+    const lengthOf = value => Number(value?.length_mm ?? value?.lengthMm ?? value?.length ?? value);
+    const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
+    const canonicalHoop = values => {
+      const groups = new Map();
+      values.forEach((value, index) => { const key = String(value); if (!groups.has(key)) groups.set(key, []); groups.get(key).push(index); });
+      const pairs = [...groups.entries()].filter(([, indexes]) => indexes.length >= 2);
+      if (pairs.length < 3) return null;
+      const ordered = pairs.sort((a, b) => Number(a[0]) - Number(b[0]));
+      const excess = Number(ordered[0][0]);
+      const remaining = ordered.slice(1).map(pair => Number(pair[0]));
+      const side = Math.max(...remaining), width = Math.min(...remaining);
+      return [excess, excess, side, width, width, side];
+    };
+    const normalizeItemForDisplay = (item, orderNum) => {
+      const raw = parseSegments(item.segments);
+      const values = raw.map(lengthOf);
+      if (!values.length || !values.every(Number.isFinite)) return;
+      let next = null;
+      const snapshotText = String(item.shape_snapshot_json || '');
+      const nameText = `${item.shape_name || ''} ${item.struct_element || ''} ${snapshotText}`;
+      const isHoop = /חישוק|stirrup|hoop|closed/i.test(nameText);
+      if (values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
+      if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
+          && similar(values[0], values[1]) && values[2] > Math.max(values[0], values[1]) * 1.5) {
+        next = [values[0], values[2], values[1]];
+      }
+      if (!next) return;
+      const changed = JSON.stringify(next) !== JSON.stringify(values) || (values.length === 6 && !isHoop);
+      if (!changed) return;
+      item.segments = JSON.stringify(next.map((length, index) => ({ length_mm: length, angle_deg: index < next.length - 1 ? 90 : 0 })));
+      if (next.length === 6 && (isHoop || canonicalHoop(values))) {
+        item.shape_id = 'closed_stirrup';
+        item.shape_name = 'חישוק';
+      }
+      // Persist the repair so subsequent screens and exports use the same path.
+      try {
+        db.prepare('UPDATE items SET segments=?, shape_id=COALESCE(?,shape_id), shape_name=COALESCE(?,shape_name) WHERE id=?')
+          .run(item.segments, item.shape_id || null, item.shape_name || null, item.id);
+      } catch {}
+    };
     pallets.forEach(p => {
       p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY COALESCE(sort_order, id), id').all(p.id);
-      p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); });
+      p.items.forEach(item => { normalizeItemForDisplay(item, order.order_num); item.shape_svg = productionCards.itemShapeSvg(item); });
     });
     order.pallets = pallets;
     // One computed-on-read projection serves current and historical orders.

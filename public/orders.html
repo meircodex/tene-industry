@@ -1874,7 +1874,12 @@ async function saveOrderEdit(event) {
 function safeJson(value, fallback = []) {
   if (!value) return fallback;
   if (Array.isArray(value)) return value;
-  try { return JSON.parse(value); } catch(e) { return fallback; }
+  let parsed = value;
+  try { parsed = JSON.parse(value); } catch(e) { return fallback; }
+  if (Array.isArray(parsed)) return parsed;
+  if (Array.isArray(parsed?.segments)) return parsed.segments;
+  if (Array.isArray(parsed?.sides)) return parsed.sides;
+  return fallback;
 }
 
 function segmentLength(segment) {
