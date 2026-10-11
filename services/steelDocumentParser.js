@@ -108,17 +108,22 @@ function detectParsingProfile({ text = '', tokens = [] } = {}) {
 }
 
 const TASSA_COLUMNS = {
-  weight_kg: [20, 70],
-  kg_per_m: [70, 105],
-  row_total_length_m: [105, 145],
-  unit_length_m: [145, 185],
-  element_quantity: [185, 210],
-  quantity: [210, 238],
-  diameter: [238, 270],
-  bar_mark_or_shape_leg: [295, 325],
-  shape_dimension: [335, 430],
-  element_name: [490, 560],
-  item_number: [560, 590],
+  // Coordinates are PDF points for the current TASSA/Easybar export
+  // (right-to-left table; the old bands belonged to a different export
+  // scale and silently picked the wrong values for quantity/diameter).
+  weight_kg: [110, 148],
+  kg_per_m: [148, 176],
+  row_total_length_m: [176, 205],
+  unit_length_m: [205, 240],
+  element_quantity: [238, 260],
+  quantity: [260, 296],
+  diameter: [296, 316],
+  bar_mark_or_shape_leg: [316, 336],
+  // Shape dimensions are printed on several drawing rows. Include the
+  // right-hand leg as well as the centre leg; element text starts at ~485.
+  shape_dimension: [336, 480],
+  element_name: [480, 540],
+  item_number: [540, 570],
 };
 
 function inBand(token, [min, max]) {
@@ -144,7 +149,7 @@ function rowText(words) {
 
 function isDataRowItemToken(token) {
   const itemNumber = toNumber(token.text);
-  return Number.isInteger(itemNumber) && itemNumber > 0 && itemNumber < 10000 && token.x0 >= 555 && token.top > 130 && token.top < 780;
+  return Number.isInteger(itemNumber) && itemNumber > 0 && itemNumber < 10000 && token.x0 >= 535 && token.top > 160 && token.top < 780;
 }
 
 function reconstructTassaRows(tokens = []) {
@@ -185,12 +190,12 @@ function inferShape(row, values) {
   const uncertain = [];
   const totalLengthCm = values.total_length_cm;
   const longSide = values.shape_dimension_cm;
+  const drawingDimensions = (values.shape_dimensions_cm || []).filter(value => Number(value) > 0);
   const leg = values.shape_leg_cm;
   const elementWords = wordsInBand(row.words, TASSA_COLUMNS.element_name).map(word => word.text).join(' ');
 
   if (/[ח]/.test(elementWords)) {
-    const dims = numbersInBand(row.words, [300, 430]).map(word => ({ word, value: toNumber(word.text) })).filter(entry => entry.value > 0);
-    const sideValues = dims.map(entry => entry.value);
+    const sideValues = drawingDimensions;
     return {
       shape_name: 'custom bent shape',
       shape_type: 'bent',
@@ -198,6 +203,21 @@ function inferShape(row, values) {
       segments: sideValues.map((value, index) => shapeSegment(value, index === sideValues.length - 1 ? 0 : 90)),
       confidence: sideValues.length >= 2 ? 0.72 : 0.44,
       review_notes: sideValues.length >= 2 ? [] : [{ field: 'shape', code: 'shape_not_detected', message: 'Shape text indicates bent/custom geometry but dimensions are incomplete.' }],
+    };
+  }
+
+  // A drawing may contain two equal closing legs around a long centre leg
+  // (for example 40, 800, 40). Preserve all dimensions in their printed
+  // order instead of treating the first number as a bend marker.
+  if (drawingDimensions.length >= 2 && totalLengthCm > 0
+      && Math.abs(totalLengthCm - drawingDimensions.reduce((sum, value) => sum + value, 0)) <= 1) {
+    return {
+      shape_name: drawingDimensions.length >= 4 ? 'bent shape' : 'חישוק',
+      shape_type: 'bent',
+      shape_description: drawingDimensions.join(' / '),
+      segments: drawingDimensions.map((value, index) => shapeSegment(value, index === drawingDimensions.length - 1 ? 0 : 90)),
+      confidence: 0.9,
+      review_notes: [],
     };
   }
 
@@ -267,7 +287,11 @@ function parseTassaRow(row, index) {
   const rowTotalLengthWord = firstNumberInBand(row.words, TASSA_COLUMNS.row_total_length_m);
   const weightWord = firstNumberInBand(row.words, TASSA_COLUMNS.weight_kg);
   const legWord = firstNumberInBand(row.words, TASSA_COLUMNS.bar_mark_or_shape_leg);
-  const shapeWord = firstNumberInBand(row.words, TASSA_COLUMNS.shape_dimension);
+  // Drawing dimensions are printed below the numeric table row. Ignore a
+  // trailing centre-leg token from the previous row when row windows overlap.
+  const shapeWords = numbersInBand(row.words, TASSA_COLUMNS.shape_dimension)
+    .filter(word => Number(word.top) >= Number(row.itemToken.top) + 8);
+  const shapeWord = shapeWords[0] || null;
 
   const itemNumber = toNumber(itemWord?.text);
   const diameter = toNumber(diameterWord?.text);
@@ -276,10 +300,16 @@ function parseTassaRow(row, index) {
   const rowTotalLengthM = toNumber(rowTotalLengthWord?.text);
   const weightKg = toNumber(weightWord?.text);
   const shapeLegCm = toNumber(legWord?.text);
-  const shapeDimensionCm = toNumber(shapeWord?.text);
+  const shapeDimensionsCm = shapeWords.map(word => toNumber(word.text)).filter(value => value > 0);
+  const shapeDimensionCm = shapeDimensionsCm[0] || null;
   const totalLengthCm = unitLengthM ? Math.round(unitLengthM * 100) : null;
   const totalLengthMm = totalLengthCm ? totalLengthCm * 10 : null;
-  const shape = inferShape(row, { total_length_cm: totalLengthCm, shape_dimension_cm: shapeDimensionCm, shape_leg_cm: shapeLegCm });
+  const shape = inferShape(row, {
+    total_length_cm: totalLengthCm,
+    shape_dimension_cm: shapeDimensionCm,
+    shape_dimensions_cm: shapeDimensionsCm,
+    shape_leg_cm: shapeLegCm,
+  });
   const reviewNotes = [...(shape.review_notes || [])];
 
   if (!SUPPORTED_DIAMETERS.has(Number(diameter))) {
