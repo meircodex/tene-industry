@@ -206,11 +206,15 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
     const reservations = [];
 
     for (const item of rows) {
-      const diameter = normalizeDiameter(item.diameter ?? item.diameterMm ?? item.barDiameter ?? item.barDiameterMm);
-      const material_type = normalizeMaterialType(item.material_type ?? item.materialType);
       const reservedKg = reservationWeightKg(item);
 
+      // Text-only/manual lines intentionally have no diameter or physical
+      // weight. They are order notes, not stock demand, so they must not enter
+      // the inventory reservation calculation.
       if (reservedKg <= 0) continue;
+
+      const diameter = normalizeDiameter(item.diameter ?? item.diameterMm ?? item.barDiameter ?? item.barDiameterMm);
+      const material_type = normalizeMaterialType(item.material_type ?? item.materialType);
 
       const result = insertReservation.run(
         orderId,

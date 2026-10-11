@@ -312,17 +312,19 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
           shape_snapshot_json: shapeSnapshot,
         });
 
-        const allocation = allocateOrderItemStock(db, {
-          orderId,
-          itemId: itemResult.lastInsertRowid,
-          item: {
-            diameter: item.diameter,
-            material_type: item.material_type || item.materialType || null,
-          },
-          requiredWeightKg: totalWeight,
-          requestedRawMaterialId: selectedRawMaterialId(item),
-          policy: inventoryPolicy,
-        });
+        const allocation = (textOnly || totalWeight <= 0)
+          ? { allocated: true, reason: 'text_only' }
+          : allocateOrderItemStock(db, {
+              orderId,
+              itemId: itemResult.lastInsertRowid,
+              item: {
+                diameter: item.diameter,
+                material_type: item.material_type || item.materialType || null,
+              },
+              requiredWeightKg: totalWeight,
+              requestedRawMaterialId: selectedRawMaterialId(item),
+              policy: inventoryPolicy,
+            });
         if (!allocation.allocated && ['no_stock', 'insufficient_stock'].includes(allocation.reason)) {
           inventoryShortages.push({
             itemId: itemResult.lastInsertRowid,
