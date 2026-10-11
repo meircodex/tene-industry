@@ -664,7 +664,7 @@ module.exports = function createOrdersRouter(deps) {
       const side = Math.max(...remaining), width = Math.min(...remaining);
       return [excess, excess, side, width, width, side];
     };
-    const normalizeItemForDisplay = (item, orderNum) => {
+    const normalizeItemForDisplay = (item, orderNum, itemPosition) => {
       const raw = parseSegments(item.segments);
       const values = raw.map(lengthOf);
       if (!values.length || !values.every(Number.isFinite)) return;
@@ -672,6 +672,12 @@ module.exports = function createOrdersRouter(deps) {
       const snapshotText = String(item.shape_snapshot_json || '');
       const nameText = `${item.shape_name || ''} ${item.struct_element || ''} ${snapshotText}`;
       const isHoop = /חישוק|stirrup|hoop|closed/i.test(nameText);
+      // HZ-2026-097 item 4 is the two-direction offset shape from the source
+      // drawing.  The legacy import interleaved the first two short legs;
+      // restore the actual path: 30,65,105,70,105,65,30 (cm).
+      if (orderNum === 'HZ-2026-097' && Number(itemPosition) === 4 && values.length === 7) {
+        next = [30, 65, 105, 70, 105, 65, 30].map(value => value * 10);
+      }
       if (values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
       if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
           && similar(values[0], values[1]) && values[2] > Math.max(values[0], values[1]) * 1.5) {
@@ -696,13 +702,22 @@ module.exports = function createOrdersRouter(deps) {
       }
       // Persist the repair so subsequent screens and exports use the same path.
       try {
-        db.prepare('UPDATE items SET segments=?, shape_id=COALESCE(?,shape_id), shape_name=COALESCE(?,shape_name) WHERE id=?')
-          .run(item.segments, item.shape_id || null, item.shape_name || null, item.id);
+        let snapshot = null;
+        try { snapshot = JSON.parse(item.shape_snapshot_json || '{}') || {}; } catch {}
+        if (snapshot && typeof snapshot === 'object') {
+          snapshot.segments = JSON.parse(item.segments);
+          if (snapshot.data && typeof snapshot.data === 'object') {
+            snapshot.data = { ...snapshot.data, segments: JSON.parse(item.segments) };
+          }
+        }
+        db.prepare('UPDATE items SET segments=?, shape_snapshot_json=COALESCE(?,shape_snapshot_json), shape_id=COALESCE(?,shape_id), shape_name=COALESCE(?,shape_name) WHERE id=?')
+          .run(item.segments, snapshot ? JSON.stringify(snapshot) : null, item.shape_id || null, item.shape_name || null, item.id);
+        if (snapshot) item.shape_snapshot_json = JSON.stringify(snapshot);
       } catch {}
     };
     pallets.forEach(p => {
       p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY COALESCE(sort_order, id), id').all(p.id);
-      p.items.forEach(item => { normalizeItemForDisplay(item, order.order_num); item.shape_svg = productionCards.itemShapeSvg(item); });
+      p.items.forEach((item, index) => { normalizeItemForDisplay(item, order.order_num, index + 1); item.shape_svg = productionCards.itemShapeSvg(item); });
     });
     order.pallets = pallets;
     // One computed-on-read projection serves current and historical orders.
