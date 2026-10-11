@@ -207,7 +207,7 @@ function repairOrder089OpenHDetails(db) {
       FROM items i
       JOIN pallets p ON p.id=i.pallet_id
       JOIN orders o ON o.id=p.order_id
-      WHERE o.order_num='HZ-2026-089'
+      WHERE o.id=89 OR o.order_num IN ('HZ-2026-089','HZ-2026-89')
       ORDER BY i.id
     `).all();
   } catch { return; }
