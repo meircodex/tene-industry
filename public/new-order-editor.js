@@ -804,6 +804,14 @@
   ];
 
   function normalizeIntakeRow(row = {}) {
+    const rawSides = row.shapeSides ?? row.sides ?? row['צלעות'] ?? row['מידות צורה'];
+    const shapeSides = Array.isArray(rawSides)
+      ? rawSides.map(Number).filter(value => Number.isFinite(value) && value > 0)
+      : String(rawSides || '').split(/[\/,;\s]+/).map(value => Number(value)).filter(value => Number.isFinite(value) && value > 0);
+    const rawAngles = row.shapeAngles ?? row.angles ?? row['זוויות'];
+    const shapeAngles = Array.isArray(rawAngles)
+      ? rawAngles.map(Number).filter(Number.isFinite)
+      : String(rawAngles || '').split(/[\/,;\s]+/).map(value => Number(value)).filter(Number.isFinite);
     return {
       elementName: String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim(),
       sourceItemNumber: String(rowValue(row, SOURCE_ITEM_NUMBER_ALIASES)).trim(),
@@ -812,6 +820,8 @@
       diameter: numeric(row.diameter ?? row['קוטר'] ?? row.barDiameter ?? row.barDiameterMm, 0),
       quantity: numeric(row.quantity ?? row.qty ?? row['כמות'], 0),
       length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0),
+      shapeSides,
+      shapeAngles,
       note: String(row.note || row.notes || row['הערה'] || '').trim(),
     };
   }
@@ -993,14 +1003,21 @@
     const length = numeric(item.length, 0);
     const diameter = numeric(item.diameter, 12);
     const elementName = item.elementName || '';
+    const shapeSides = Array.isArray(item.shapeSides) && item.shapeSides.length
+      ? item.shapeSides.map(value => Math.round(Number(value))).filter(value => Number.isFinite(value) && value > 0)
+      : [length];
+    const shapeAngles = Array.isArray(item.shapeAngles) && item.shapeAngles.length
+      ? item.shapeAngles.map(Number).filter(Number.isFinite)
+      : shapeSides.slice(0, -1).map(() => 90);
+    const isBent = shapeSides.length > 1;
     return {
       id: Date.now() + Math.floor(Math.random() * 100000),
-      shapeId: 'straight_bar',
+      shapeId: isBent ? 'bent_bar' : 'straight_bar',
       shapeEmoji: '━',
       shapeName: item.shape || 'מוט ישר',
       family: 'bars',
-      shapeSides: [length],
-      shapeAngles: [],
+      shapeSides,
+      shapeAngles,
       diameter,
       length,
       qty: quantity,
@@ -1014,7 +1031,7 @@
       source_item_number: item.sourceItemNumber || null,
       sourceRowNumber: item.sourceRowNumber || null,
       source_row_number: item.sourceRowNumber || null,
-      shapeSnapshot: buildIntakeStraightSnapshot({ length, diameter, quantity }),
+      shapeSnapshot: isBent ? null : buildIntakeStraightSnapshot({ length: shapeSides[0], diameter, quantity }),
     };
   }
 
