@@ -60,6 +60,65 @@ function ensureRawMaterialVerificationStatusConstraint(db) {
   }
 }
 
+// Repair legacy imports that labelled an open L/leg as a hoop.  This is
+// deliberately structural and conservative: a row must have fewer than four
+// segments, its element name must describe an L/leg, and it must not explicitly
+// say hoop/closed.  Quantities, diameters, lengths and segments are preserved.
+function repairOpenLegHoopMisclassifications(db) {
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT id, shape_id, shape_name, struct_element, shape_snapshot_json, segments
+      FROM items
+      WHERE lower(COALESCE(shape_name, '')) LIKE '%חישוק%'
+         OR lower(COALESCE(shape_snapshot_json, '')) LIKE '%חישוק%'
+    `).all();
+  } catch {
+    return;
+  }
+
+  const update = db.prepare(`
+    UPDATE items
+    SET shape_id='bent_bar', shape_name='custom bent shape', shape_snapshot_json=?
+    WHERE id=?
+  `);
+  let repaired = 0;
+  const tx = db.transaction(() => {
+    for (const row of rows) {
+      const elementName = String(row.struct_element || '').trim();
+      const explicitClosed = /חישוק|סגור|closed\s*stirrup/i.test(elementName);
+      const openLeg = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(elementName);
+      if (!openLeg || explicitClosed) continue;
+
+      let segments = [];
+      try {
+        const parsed = JSON.parse(row.segments || '[]');
+        segments = Array.isArray(parsed) ? parsed : [];
+      } catch {}
+      if (segments.length >= 4) continue;
+
+      let snapshot = {};
+      try { snapshot = JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch {}
+      if (snapshot && typeof snapshot === 'object') {
+        snapshot.displayName = 'מוט מכופף';
+        snapshot.shapeType = 'bent_bar';
+        snapshot.shapeId = 'bent_bar';
+        if (snapshot.data && typeof snapshot.data === 'object') {
+          snapshot.data.shapeType = 'bent_bar';
+          snapshot.data.shapeId = 'bent_bar';
+          if (/חישוק|סגור/i.test(String(snapshot.data.displayName || ''))) snapshot.data.displayName = 'מוט מכופף';
+        }
+      }
+      update.run(JSON.stringify(snapshot), row.id);
+      repaired += 1;
+    }
+  });
+  if (repaired) {
+    tx();
+    console.log(`[DB] Reclassified ${repaired} open L/leg item(s) from hoop to bent bar`);
+  }
+}
+
 function runCoreMigrations(db) {
   ensureCustomerMergeSchema(db);
   // ── MIGRATIONS (safe column additions) ────────────────────────────
@@ -174,6 +233,8 @@ function runCoreMigrations(db) {
   addCol('items',      'qc_status',          "TEXT DEFAULT 'לא נבדק'"); // 'לא נבדק'|'עבר'|'נכשל'
   addCol('items',      'batch_id',           'INTEGER');          // raw material batch used
   addCol('items',      'total_weight',       'REAL DEFAULT 0');   // alias for weight column (compat)
+
+  repairOpenLegHoopMisclassifications(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (

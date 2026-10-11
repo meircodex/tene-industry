@@ -812,11 +812,21 @@
     const shapeAngles = Array.isArray(rawAngles)
       ? rawAngles.map(Number).filter(Number.isFinite)
       : String(rawAngles || '').split(/[\/,;\s]+/).map(value => Number(value)).filter(Number.isFinite);
+    const elementName = String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim();
+    let shape = String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר';
+    // An L/leg bar is an open bent bar, never a closed hoop.  Quick imports
+    // previously trusted the supplied label and could turn an L with 2–3
+    // segments into a billable hoop.  Preserve explicit hoop wording, but
+    // correct the common L/leg notation when the geometry is open.
+    const looksLikeOpenL = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=|רגליים/i.test(elementName);
+    if (looksLikeOpenL && String(shape).trim() === 'חישוק' && shapeSides.length < 4 && !/חישוק|סגור/i.test(elementName)) {
+      shape = 'custom bent shape';
+    }
     return {
-      elementName: String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim(),
+      elementName,
       sourceItemNumber: String(rowValue(row, SOURCE_ITEM_NUMBER_ALIASES)).trim(),
       sourceRowNumber: numeric(rowValue(row, SOURCE_ROW_NUMBER_ALIASES), 0) || null,
-      shape: String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר',
+      shape,
       diameter: numeric(row.diameter ?? row['קוטר'] ?? row.barDiameter ?? row.barDiameterMm, 0),
       quantity: numeric(row.quantity ?? row.qty ?? row['כמות'], 0),
       length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0)

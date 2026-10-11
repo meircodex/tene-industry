@@ -211,8 +211,12 @@ function inferShape(row, values) {
   // order instead of treating the first number as a bend marker.
   if (drawingDimensions.length >= 2 && totalLengthCm > 0
       && Math.abs(totalLengthCm - drawingDimensions.reduce((sum, value) => sum + value, 0)) <= 1) {
+    const openLegNotation = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(elementWords);
+    const explicitlyClosed = /חישוק|סגור|closed\s*stirrup/i.test(elementWords);
     return {
-      shape_name: drawingDimensions.length >= 4 ? 'bent shape' : 'חישוק',
+      shape_name: openLegNotation && !explicitlyClosed
+        ? 'custom bent shape'
+        : (drawingDimensions.length >= 4 ? 'bent shape' : 'חישוק'),
       shape_type: 'bent',
       shape_description: drawingDimensions.join(' / '),
       segments: drawingDimensions.map((value, index) => shapeSegment(value, index === drawingDimensions.length - 1 ? 0 : 90)),
