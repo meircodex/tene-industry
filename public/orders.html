@@ -2365,7 +2365,13 @@ function renderDetailShapes() {
     const turns = Number(el.dataset.spiralTurns || 0);
     el.innerHTML = buildSpiralSvg(diameter, turns);
   });
-  fallbackShapes.filter(el => el.hasAttribute('data-detail-shape')).forEach(el => {
+  fallbackShapes.filter(el => el.dataset.closedHoop === '1').forEach(el => {
+    try {
+      const sides = JSON.parse(decodeURIComponent(el.dataset.sides || '%5B%5D'));
+      el.innerHTML = buildClosedHoopDetailSvg(sides) || 'אין צורה';
+    } catch (e) { el.textContent = 'אין צורה'; }
+  });
+  fallbackShapes.filter(el => el.hasAttribute('data-detail-shape') && el.dataset.closedHoop !== '1').forEach(el => {
     try {
       const sides = JSON.parse(decodeURIComponent(el.dataset.sides || '%5B%5D'));
       const angles = JSON.parse(decodeURIComponent(el.dataset.angles || '%5B%5D'));
@@ -2391,6 +2397,26 @@ function buildSpiralSvg(diameter, turns) {
     <circle cx="110" cy="62" r="18" stroke="#f3b074" stroke-width="4" fill="none" opacity=".7"/>
     <text x="110" y="118" text-anchor="middle" font-size="11" fill="#1f2937">קוטר ${escHtml(IronBendDisplayUnits.formatLengthCmFromMm(diameter))} · N=${escHtml(turns)}</text>
   </svg>`;
+}
+
+function buildClosedHoopDetailSvg(sides) {
+  const v = (Array.isArray(sides) ? sides : []).map(Number).filter(n => Number.isFinite(n) && n > 0);
+  if (v.length < 6) return '';
+  const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
+  let tailA = v[0], tailB = v[1], right = v[2], top = v[3], bottom = v[4], left = v[5];
+  if (!(similar(v[0], v[1]) && similar(v[2], v[5]) && similar(v[3], v[4]))) {
+    if (similar(v[0], v[3]) && similar(v[1], v[5]) && similar(v[2], v[4])) {
+      tailA = v[0]; tailB = v[3]; right = v[1]; top = v[2]; bottom = v[4]; left = v[5];
+    } else return '';
+  }
+  const cm = n => IronBendDisplayUnits.formatLengthCmFromMm(n);
+  const ratio = Math.max(top, bottom) / Math.max(right, left);
+  const W = 250, H = 150, boxW = ratio >= 1 ? 142 : Math.max(70, 100 * ratio), boxH = ratio >= 1 ? Math.max(62, 100 / ratio) : 100;
+  const x = (W - boxW) / 2, y = 28 + (100 - boxH) / 2, r = x + boxW, b = y + boxH;
+  const marker = Math.min(30, Math.max(16, Math.min(boxW, boxH) * .28));
+  const markerX = r - marker, markerY = y + marker;
+  const label = (x1, y1, text, anchor = 'middle') => `<text x="${x1}" y="${y1}" text-anchor="${anchor}" dominant-baseline="middle" font-size="12" font-weight="900" fill="#182536">${text}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="חישוק" style="width:100%;height:100%;max-height:142px;overflow:visible"><path d="M${x},${y} H${r} V${b} H${x} Z" fill="none" stroke="#173b6b" stroke-width="5" stroke-linejoin="round"/><path d="M${markerX},${y} V${markerY} H${r}" fill="none" stroke="#173b6b" stroke-width="4" stroke-linecap="square"/>${label((x+r)/2,y-14,cm(top))}${label(r+23,(y+b)/2,cm(right))}${label((x+r)/2,b+15,cm(bottom))}${label(x-23,(y+b)/2,cm(left))}${label(markerX-4,y+marker/2,cm(tailA),'end')}${label((markerX+r)/2,markerY+13,cm(tailB))}</svg>`;
 }
 
 function orderShapeSnapshot(item) {
@@ -2840,6 +2866,7 @@ function buildDetailHTML(o, pkgs) {
         ? `<div class="item-visual" data-detail-shape="1" data-shape-svg="${canonicalShapeSvg}" data-spiral-shape="1" data-spiral-diameter="${escHtml(item.spiral_diameter_mm)}" data-spiral-turns="${escHtml(item.spiral_turns)}" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה"></div>`
         : `<div class="item-visual"
           data-detail-shape="1"
+          data-closed-hoop="${isClosedHoopItem(item) ? '1' : '0'}"
           data-shape-svg="${canonicalShapeSvg}"
           data-sides="${encodeURIComponent(JSON.stringify(sides))}"
           data-angles="${encodeURIComponent(JSON.stringify(angles))}"
