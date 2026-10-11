@@ -365,25 +365,16 @@ function closedStirrupParts(segments) {
     .every(segment => isRightAngle(segment.angle_deg));
   if (!rightAngles) return null;
 
-  if (segments.length >= 5) {
-    // Imported hoop rows use: side, closure excess, side, closure excess,
-    // side, side. The two inner segments are the closure excesses; the first
-    // and last segments are the matching body side (e.g. 25/10/50/10/50/25).
-    const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
-    const hasSmallTails = isSimilarDimension(tailStart, tailEnd || tailStart);
-    if (
-      hasSmallTails &&
-      isSimilarDimension(sideA, sideB || sideA) &&
-      isSimilarDimension(horizontalA, horizontalB)
-    ) {
-      return {
-        top: horizontalA,
-        right: sideA,
-        bottom: horizontalB,
-        left: sideB || sideA,
-        tailStart,
-        tailEnd,
-      };
+  if (segments.length >= 6) {
+    // Imported closed hoops use either:
+    //   excess, excess, side, width, width, side
+    // or side/excess/width/excess/width/side.
+    const [a, b, c, d, e, f] = lengths;
+    if (isSimilarDimension(a, b) && isSimilarDimension(c, f) && isSimilarDimension(d, e)) {
+      return { top: d, right: c, bottom: e, left: f, tailStart: a, tailEnd: b };
+    }
+    if (isSimilarDimension(a, d) && isSimilarDimension(b, f) && isSimilarDimension(c, e)) {
+      return { top: c, right: b, bottom: e, left: f, tailStart: a, tailEnd: d };
     }
   }
 
