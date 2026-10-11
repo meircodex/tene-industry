@@ -667,6 +667,9 @@ module.exports = function createOrdersRouter(deps) {
         1: [62, 225, 62],
         7: [197, 216, 197],
       },
+      'HZ-2026-096': {
+        24: [40, 245, 40],
+      },
     };
     const canonicalHoop = values => {
       // Some imports put the two equal tails at the ends and the four body
