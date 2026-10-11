@@ -697,7 +697,10 @@ module.exports = function createOrdersRouter(deps) {
         try { db.prepare('UPDATE items SET shape_id=?, shape_name=? WHERE id=?').run('bent_bar', 'מוט מכופף', item.id); } catch {}
       }
       if (!next) return;
-      const changed = JSON.stringify(next) !== JSON.stringify(values) || (values.length === 6 && !isHoop);
+      const forced97Path = orderNum === 'HZ-2026-097' && Number(itemPosition) === 4 && nextAngles;
+      const changed = forced97Path
+        || JSON.stringify(next) !== JSON.stringify(values)
+        || (values.length === 6 && !isHoop);
       if (!changed) return;
       item.segments = JSON.stringify(next.map((length, index) => ({ length_mm: length, angle_deg: nextAngles?.[index] ?? (index < next.length - 1 ? 90 : 0) })));
       if (next.length === 6 && (isHoop || canonicalHoop(values))) {
