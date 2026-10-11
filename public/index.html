@@ -2066,6 +2066,10 @@ function setupPanelTitle(type) {
 }
 
 function openSetupDrawer(type = 'customer') {
+  if (type === 'source' && typeof openQuickCodePanel === 'function') {
+    openQuickCodePanel();
+    return;
+  }
   const drawer = document.getElementById('orderSetupDrawer');
   if (!drawer) return;
   const normalized = type === 'site' ? 'delivery' : type;
@@ -2082,6 +2086,24 @@ function openSetupDrawer(type = 'customer') {
     if (details) details.open = active;
   });
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function openQuickCodePanel() {
+  const drawer = document.getElementById('orderSetupDrawer');
+  const panel = document.getElementById('order-import-section-anchor');
+  if (!drawer || !panel) return;
+  drawer.hidden = false;
+  drawer.dataset.active = 'source';
+  setText('setupDrawerTitle', 'קוד הזמנה מהיר');
+  document.querySelectorAll('[data-setup-panel]').forEach(item => {
+    const active = item === panel;
+    item.hidden = !active;
+    item.classList.toggle('is-active', active);
+    item.classList.toggle('is-open', active);
+    item.style.setProperty('display', active ? 'block' : 'none', 'important');
+  });
+  panel.querySelector('details')?.setAttribute('open', '');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function closeSetupDrawer() {
