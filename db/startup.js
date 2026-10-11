@@ -196,6 +196,57 @@ function repairOrder096DrawingDetails(db) {
   console.log('[DB] Verified HZ-2026-096 item 24 path order and hoop items 26-31');
 }
 
+// Order 089 contains open U/ח rows whose import placed the bridge after the
+// second leg (40,40,845 instead of 40,845,40).  Normalize the stored path so
+// the drawing, warnings and machine sequence all use the same geometry.
+function repairOrder089OpenHDetails(db) {
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT i.id, i.segments, i.shape_snapshot_json
+      FROM items i
+      JOIN pallets p ON p.id=i.pallet_id
+      JOIN orders o ON o.id=p.order_id
+      WHERE o.order_num='HZ-2026-089'
+      ORDER BY i.id
+    `).all();
+  } catch { return; }
+  if (rows.length < 9) return;
+  const update = db.prepare('UPDATE items SET segments=?, shape_snapshot_json=? WHERE id=?');
+  let repaired = 0;
+  const tx = db.transaction(() => {
+    rows.forEach((row, index) => {
+      const position = index + 1;
+      if (position < 4 || position > 9) return;
+      let segments = [];
+      try { segments = JSON.parse(row.segments || '[]'); } catch {}
+      if (!Array.isArray(segments) || segments.length !== 3) return;
+      const lengths = segments.map(s => Number(s?.length_mm ?? s?.lengthMm ?? s?.length ?? s));
+      if (!lengths.every(Number.isFinite) || lengths[0] <= 0 || lengths[1] <= 0 || lengths[2] <= 0) return;
+      const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
+      if (!similar(lengths[0], lengths[1]) || lengths[2] <= Math.max(lengths[0], lengths[1]) * 1.5) return;
+      const next = [segments[0], segments[2], segments[1]].map((s, i) => {
+        const value = lengths[[0, 2, 1][i]];
+        return s && typeof s === 'object' ? { ...s, length_mm: value, lengthMm: value, length: value } : value;
+      });
+      let snapshot = {};
+      try { snapshot = JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch {}
+      const rewrite = value => Array.isArray(value) && value.length === 3 ? [value[0], value[2], value[1]].map((s, i) => {
+        const v = lengths[[0, 2, 1][i]];
+        return s && typeof s === 'object' ? { ...s, length_mm: v, lengthMm: v, length: v } : v;
+      }) : value;
+      snapshot.segments = rewrite(snapshot.segments) || next;
+      if (snapshot.data && typeof snapshot.data === 'object') snapshot.data.segments = rewrite(snapshot.data.segments) || next;
+      update.run(JSON.stringify(next), JSON.stringify(snapshot), row.id);
+      repaired += 1;
+    });
+  });
+  if (repaired) {
+    tx();
+    console.log(`[DB] Reordered ${repaired} open ח item path(s) in HZ-2026-089`);
+  }
+}
+
 function runCoreMigrations(db) {
   ensureCustomerMergeSchema(db);
   // ── MIGRATIONS (safe column additions) ────────────────────────────
@@ -313,6 +364,7 @@ function runCoreMigrations(db) {
 
   repairOpenLegHoopMisclassifications(db);
   repairOrder096DrawingDetails(db);
+  repairOrder089OpenHDetails(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (
