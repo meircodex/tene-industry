@@ -1443,7 +1443,7 @@
       main.style.setProperty('direction', 'ltr', 'important');
       main.style.setProperty('overflow-x', 'hidden', 'important');
     }
-    document.querySelectorAll('.progress-bar,#orderSetupDrawer,.no-bottom-actions,.order-more-action,.summary-bar>.submit-btn,.no-internal-stat,.add-pallet-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
+    document.querySelectorAll('.progress-bar,.no-bottom-actions,.order-more-action,.summary-bar>.submit-btn,.no-internal-stat,.add-pallet-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
   }
 
   function exposeGlobals() {
