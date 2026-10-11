@@ -819,7 +819,8 @@
       shape: String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר',
       diameter: numeric(row.diameter ?? row['קוטר'] ?? row.barDiameter ?? row.barDiameterMm, 0),
       quantity: numeric(row.quantity ?? row.qty ?? row['כמות'], 0),
-      length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0),
+      length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0)
+        || shapeSides.reduce((sum, value) => sum + value, 0),
       shapeSides,
       shapeAngles,
       note: String(row.note || row.notes || row['הערה'] || '').trim(),
