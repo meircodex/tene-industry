@@ -1634,6 +1634,15 @@
             </div>
           </div>
         </details>
+        <details class="csv-import-details quick-code-import">
+          <summary>קוד הזמנה מהיר — הדבקה ללא קובץ</summary>
+          <div class="intake-row csv-import-row" style="display:block">
+            <div class="intake-row-label">שורה אחת לכל פריט · אורך במ״מ</div>
+            <textarea id="quickOrderCode" rows="5" dir="auto" placeholder="אלמנט|צורה|קוטר|כמות|אורך במ״מ&#10;קורה 1|מוט ישר|12|10|6000&#10;חישוק|חישוק|10|48|600"></textarea>
+            <button type="button" class="btn btn-primary" onclick="importQuickCodeText(document.getElementById('quickOrderCode').value)">הוסף שורות להזמנה</button>
+            <div class="import-status">אפשר גם JSON: [{"elementName":"קורה 1","shape":"מוט ישר","diameter":12,"quantity":10,"length":6000}]</div>
+          </div>
+        </details>
       </div>
       </div>
     </details>

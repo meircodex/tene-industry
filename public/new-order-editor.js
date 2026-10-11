@@ -888,6 +888,42 @@
     reader.readAsText(file, 'utf-8');
   }
 
+  // Fast, offline order entry: paste one line per item instead of uploading a PDF.
+  // Supported formats:
+  //   element|shape|diameter|quantity|length_mm
+  //   JSON array of the same fields (also accepts Hebrew aliases).
+  function importQuickCodeText(text = '') {
+    const raw = String(text || '').trim();
+    if (!raw) return { added: 0, error: 'הדבק קוד הזמנה לפני הייבוא' };
+    let rows = [];
+    try {
+      if (raw.startsWith('[') || raw.startsWith('{')) {
+        const parsed = JSON.parse(raw);
+        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.items) ? parsed.items : [parsed]);
+        rows = list.map(row => normalizeIntakeRow(row));
+      } else {
+        const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const delimiter = lines.some(line => line.includes('|')) ? '|' : detectDelimiter(lines[0]);
+        const first = parseDelimitedLine(lines[0], delimiter).map(value => value.trim().toLowerCase());
+        const hasHeader = first.some(value => ['element','elementname','אלמנט','שם פריט','שם האלמנט','shape','צורה','diameter','קוטר','quantity','כמות','length','אורך'].includes(value));
+        const headers = hasHeader ? first : ['elementName','shape','diameter','quantity','length'];
+        rows = (hasHeader ? lines.slice(1) : lines).map(line => {
+          const cells = parseDelimitedLine(line, delimiter);
+          const obj = {};
+          headers.forEach((header, index) => { obj[header] = cells[index] || ''; });
+          return normalizeIntakeRow(obj);
+        });
+      }
+    } catch (error) {
+      return { added: 0, error: 'קוד הזמנה אינו תקין: ' + (error.message || 'JSON/שורות') };
+    }
+    const valid = rows.filter(row => validateIntakeRow(row).ok);
+    const added = addIntakeRowsToOrder(valid, { silentInvalid: true });
+    if (added > 0) showQuickImportMessage(`${added} שורות נוספו להזמנה מקוד מהיר`);
+    else showQuickImportMessage('לא נמצאו שורות תקינות. הפורמט: אלמנט|צורה|קוטר|כמות|אורך במ״מ');
+    return { added, invalid: rows.length - valid.length };
+  }
+
   async function importQuickOcrFile(file, input) {
     const documentType = document.getElementById('ocrDocumentType')?.value || 'order';
     if (typeof window.routeNonOrderOcrDocument === 'function' && window.routeNonOrderOcrDocument(documentType)) {
@@ -1443,6 +1479,7 @@
     window.closeIntakePanel = closeIntakePanel;
     window.openQuickOrderImport = openQuickOrderImport;
     window.handleQuickOrderImportFile = handleQuickOrderImportFile;
+    window.importQuickCodeText = importQuickCodeText;
     window.addIntakeRowsToOrder = addIntakeRowsToOrder;
     window.createOrderItemFromIntakeRow = createOrderItemFromIntakeRow;
     window.validateIntakeRow = validateIntakeRow;
