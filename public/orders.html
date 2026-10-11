@@ -2341,13 +2341,10 @@ function rawItemSegments(item) {
 
 function isOpenUShape(item, sides) {
   const name = String(item?.shape_name || '').toLowerCase();
-  const angleList = itemAngles(item);
-  const hasTwoRightBends = angleList.length >= 2
-    && angleList.slice(0, 2).every(angle => Math.abs(Number(angle) - 90) <= 1);
   return !isRealSpiralItem(item)
     && Array.isArray(sides)
     && sides.length === 3
-    && (/open|hook|anchor|צורת ח|צורת u|פתוח|פתוחה|\bu\b/.test(name) || hasTwoRightBends);
+    && /open|hook|anchor|צורת ח|צורת u|פתוח|פתוחה|\bu\b/.test(name);
 }
 
 function openULegWarning(item, sides) {
