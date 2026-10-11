@@ -86,7 +86,8 @@
       importBtn.onclick = event => {
         event.preventDefault();
         event.stopPropagation();
-        openQuickOrderImport();
+        if (typeof window.openQuickCodePanel === 'function') window.openQuickCodePanel();
+        else openQuickOrderImport();
       };
     });
     ensureQuickOrderImportInput();
