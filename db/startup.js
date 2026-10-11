@@ -207,7 +207,7 @@ function repairOrder089OpenHDetails(db) {
       FROM items i
       JOIN pallets p ON p.id=i.pallet_id
       JOIN orders o ON o.id=p.order_id
-      WHERE o.id=89 OR o.order_num IN ('HZ-2026-089','HZ-2026-89')
+      WHERE o.order_num IN ('HZ-2026-089','HZ-2026-89')
       ORDER BY i.id
     `).all();
   } catch { return; }
@@ -251,6 +251,132 @@ function repairOrder089OpenHDetails(db) {
   if (repaired) {
     tx();
     console.log(`[DB] Reordered ${repaired} open ח item path(s) in HZ-2026-089`);
+  }
+}
+
+// Normalize imported production shapes on every boot.  Imports may be added
+// after the original one-time migration ran, so this repair intentionally
+// stays idempotent and is keyed by the displayed order number, not a local
+// database id.  In particular, a closed hoop is stored in path order as:
+// excess, excess, side, width, width, side.  Older imports sometimes wrote
+// the same six values in visual/column order, which leaves the UI without a
+// usable drawing and can produce the wrong billing classification.
+function repairImportedShapeConsistency(db) {
+  let rows = [];
+  try {
+    rows = db.prepare(`
+      SELECT i.id, i.shape_id, i.shape_name, i.struct_element, i.segments,
+             i.shape_snapshot_json, o.order_num
+      FROM items i
+      JOIN pallets p ON p.id=i.pallet_id
+      JOIN orders o ON o.id=p.order_id
+      WHERE o.order_num LIKE 'HZ-2026-%'
+      ORDER BY o.order_num, i.id
+    `).all();
+  } catch { return; }
+  const update = db.prepare(`
+    UPDATE items SET shape_id=?, shape_name=?, segments=?, shape_snapshot_json=? WHERE id=?
+  `);
+  const parseSegments = raw => {
+    try {
+      const parsed = JSON.parse(raw || '[]');
+      return Array.isArray(parsed) ? parsed
+        : (Array.isArray(parsed?.segments) ? parsed.segments
+          : (Array.isArray(parsed?.sides) ? parsed.sides : []));
+    } catch { return []; }
+  };
+  const lengthOf = value => Number(value?.length_mm ?? value?.lengthMm ?? value?.length ?? value);
+  const withLength = (value, length) => value && typeof value === 'object'
+    ? { ...value, length_mm: length, lengthMm: length, length }
+    : length;
+  const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
+  const rewriteSnapshot = (snapshot, next, shapeId, shapeName) => {
+    const out = snapshot && typeof snapshot === 'object' ? { ...snapshot } : {};
+    out.shapeId = shapeId;
+    out.shapeType = shapeId;
+    out.displayName = shapeName;
+    out.segments = next;
+    if (out.data && typeof out.data === 'object') {
+      out.data = { ...out.data, shapeId, shapeType: shapeId, displayName: shapeName, segments: next };
+    }
+    return out;
+  };
+  let repaired = 0;
+  const tx = db.transaction(() => {
+    for (const row of rows) {
+      const raw = parseSegments(row.segments);
+      if (!raw.length) continue;
+      const lengths = raw.map(lengthOf);
+      if (!lengths.every(Number.isFinite)) continue;
+      let snapshot = {};
+      try { snapshot = JSON.parse(row.shape_snapshot_json || '{}') || {}; } catch {}
+      const snapshotText = JSON.stringify(snapshot);
+      const text = `${row.struct_element || ''} ${snapshotText}`;
+      const explicitClosed = /חישוק|חישוקים|סגור|closed|stirrup/i.test(text);
+      const staleHoopLabel = /חישוק|hoop|stirrup/i.test(String(row.shape_name || ''));
+
+      // The known 089 import error is a three-side H whose bridge was placed
+      // after the second leg.  Apply only to that order to avoid changing
+      // legitimate two-segment L pieces in other historical orders.
+      const order089 = row.order_num === 'HZ-2026-089' || row.order_num === 'HZ-2026-89';
+      let next = raw;
+      if (order089 && raw.length === 3 && similar(lengths[0], lengths[1])
+          && lengths[2] > Math.max(lengths[0], lengths[1]) * 1.5) {
+        next = [raw[0], raw[2], raw[1]].map((s, i) => withLength(s, lengths[[0, 2, 1][i]]));
+      }
+
+      // Any six-side item explicitly described as a hoop is closed.  Sort
+      // the three repeated pairs into canonical path order; this fixes the
+      // order-100 item-5 import (50,10,25,10,50,25) without changing totals.
+      if (explicitClosed && raw.length === 6) {
+        const groups = new Map();
+        lengths.forEach((value, index) => {
+          const key = String(value);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(index);
+        });
+        const pairs = [...groups.entries()].filter(([, indexes]) => indexes.length >= 2);
+        if (pairs.length >= 2) {
+          const excessPair = pairs.sort((a, b) => Number(a[0]) - Number(b[0]))[0];
+          const remaining = pairs.filter(pair => pair !== excessPair);
+          if (remaining.length >= 2) {
+            const values = remaining.map(pair => Number(pair[0]));
+            const side = Math.max(...values);
+            const width = Math.min(...values);
+            const excess = Number(excessPair[0]);
+            next = [excess, excess, side, width, width, side].map((value, i) => {
+              const source = raw.find(s => lengthOf(s) === value);
+              return withLength(source || raw[i], value);
+            });
+          }
+        }
+        const normalized = rewriteSnapshot(snapshot, next, 'closed_stirrup', 'חישוק');
+        if (JSON.stringify(next) !== JSON.stringify(raw)
+            || row.shape_id !== 'closed_stirrup' || row.shape_name !== 'חישוק'
+            || !row.shape_snapshot_json) {
+          update.run('closed_stirrup', 'חישוק', JSON.stringify(next), JSON.stringify(normalized), row.id);
+          repaired += 1;
+          continue;
+        }
+      }
+
+      // Repair an open L/leg that inherited a stale hoop label.
+      if (!explicitClosed && raw.length < 4 && staleHoopLabel) {
+        const normalized = rewriteSnapshot(snapshot, next, 'bent_bar', 'custom bent shape');
+        update.run('bent_bar', 'custom bent shape', JSON.stringify(next), JSON.stringify(normalized), row.id);
+        repaired += 1;
+        continue;
+      }
+      if (JSON.stringify(next) !== JSON.stringify(raw)) {
+        const normalized = rewriteSnapshot(snapshot, next, row.shape_id || 'bent_bar', row.shape_name || 'custom bent shape');
+        update.run(row.shape_id || 'bent_bar', row.shape_name || 'custom bent shape', JSON.stringify(next), JSON.stringify(normalized), row.id);
+        repaired += 1;
+      }
+    }
+  });
+  if (repaired) {
+    tx();
+    console.log(`[DB] Normalized ${repaired} imported production shape(s)`);
   }
 }
 
@@ -372,6 +498,7 @@ function runCoreMigrations(db) {
   repairOpenLegHoopMisclassifications(db);
   repairOrder096DrawingDetails(db);
   repairOrder089OpenHDetails(db);
+  repairImportedShapeConsistency(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (
