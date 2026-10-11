@@ -218,8 +218,12 @@ function repairOrder089OpenHDetails(db) {
     rows.forEach((row, index) => {
       const position = index + 1;
       if (position < 4 || position > 9) return;
-      let segments = [];
-      try { segments = JSON.parse(row.segments || '[]'); } catch {}
+      let rawSegments = [];
+      try { rawSegments = JSON.parse(row.segments || '[]'); } catch {}
+      const segments = Array.isArray(rawSegments)
+        ? rawSegments
+        : (Array.isArray(rawSegments?.segments) ? rawSegments.segments
+          : (Array.isArray(rawSegments?.sides) ? rawSegments.sides : []));
       if (!Array.isArray(segments) || segments.length !== 3) return;
       const lengths = segments.map(s => Number(s?.length_mm ?? s?.lengthMm ?? s?.length ?? s));
       if (!lengths.every(Number.isFinite) || lengths[0] <= 0 || lengths[1] <= 0 || lengths[2] <= 0) return;
@@ -237,7 +241,10 @@ function repairOrder089OpenHDetails(db) {
       }) : value;
       snapshot.segments = rewrite(snapshot.segments) || next;
       if (snapshot.data && typeof snapshot.data === 'object') snapshot.data.segments = rewrite(snapshot.data.segments) || next;
-      update.run(JSON.stringify(next), JSON.stringify(snapshot), row.id);
+      const storedSegments = Array.isArray(rawSegments)
+        ? next
+        : { ...(rawSegments && typeof rawSegments === 'object' ? rawSegments : {}), segments: next };
+      update.run(JSON.stringify(storedSegments), JSON.stringify(snapshot), row.id);
       repaired += 1;
     });
   });
