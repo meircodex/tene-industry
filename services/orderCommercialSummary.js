@@ -212,9 +212,10 @@ function classifyOrderItem(item = {}) {
   // A ring (טבעת) and a hoop/stirrup (חישוק) are different products and must
   // remain separate in the commercial summary. Prefer the explicit shape type
   // and then the product wording when legacy rows do not have a type.
-  const isHoop = !isOpenLeg && !isSpiral && !isPileCage && !isMesh && (
+  const structurallyClosed = Array.isArray(openLegSegments) && openLegSegments.length >= 4;
+  const isHoop = structurallyClosed && !isOpenLeg && !isSpiral && !isPileCage && !isMesh && (
     ['closed_stirrup', 'stirrup', 'hoop'].includes(shape.shapeType)
-      || /(^|\W)(hoop|חישוק)(\W|$)/i.test(shape.text)
+      || explicitHoopWording
   );
   const isRing = !isHoop && !isSpiral && !isPileCage && !isMesh && (
     shape.shapeType === 'ring'
