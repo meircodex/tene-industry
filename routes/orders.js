@@ -645,6 +645,29 @@ module.exports = function createOrdersRouter(deps) {
     };
     const lengthOf = value => Number(value?.length_mm ?? value?.lengthMm ?? value?.length ?? value);
     const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
+    // Authoritative paths copied from the shop-drawing source sheets.  These
+    // are deliberately keyed by order/item position: sorting the dimensions
+    // numerically is unsafe because the same dimensions can describe a
+    // different bend path.
+    const sourcePathFixes = {
+      'HZ-2026-089': {
+        1: [40, 800, 40], 2: [40, 800, 40], 3: [40, 800, 40],
+        4: [40, 845, 40], 5: [40, 845, 40], 6: [40, 845, 40],
+        7: [40, 265, 40], 8: [40, 265, 40], 9: [50, 250, 50],
+      },
+      'HZ-2026-090': {
+        1: [62, 360, 62],
+        6: [197, 216, 197],
+      },
+      'HZ-2026-094': {
+        // B, row 3: 30 / 32 / 72 / 95 / 72 / 32 / 30 (two sloping bends).
+        3: [30, 32, 72, 95, 72, 32, 30],
+      },
+      'HZ-2026-095': {
+        1: [62, 225, 62],
+        7: [197, 216, 197],
+      },
+    };
     const canonicalHoop = values => {
       // Some imports put the two equal tails at the ends and the four body
       // sides in the middle (tail, side, side, side, side, tail).
@@ -673,6 +696,17 @@ module.exports = function createOrdersRouter(deps) {
       const snapshotText = String(item.shape_snapshot_json || '');
       const nameText = `${item.shape_name || ''} ${item.struct_element || ''} ${snapshotText}`;
       const isHoop = /חישוק|stirrup|hoop|closed/i.test(nameText);
+      const sourceFix = sourcePathFixes[orderNum]?.[Number(itemPosition)];
+      if (sourceFix && sourceFix.length === values.length || sourceFix && orderNum === 'HZ-2026-094' && Number(itemPosition) === 3) {
+        next = sourceFix.map(value => value * 10);
+        // The B row-3 diagonals are represented by the same bend convention
+        // as the N zig-zag source.  All other source fixes are orthogonal.
+        if (orderNum === 'HZ-2026-094' && Number(itemPosition) === 3) {
+          nextAngles = [90, 160, 200, 160, 90, 90, 0];
+        } else if (next.length === 3 && /צורת ח|open|hook/i.test(nameText)) {
+          nextAngles = [90, 90, 90];
+        }
+      }
       // HZ-2026-097 item 4 is the two-direction offset shape from the source
       // drawing.  The legacy import interleaved the first two short legs;
       // restore the actual path: 30,65,105,70,105,65,30 (cm).
@@ -682,10 +716,14 @@ module.exports = function createOrdersRouter(deps) {
         // are the bend angles shown on the source drawing, in path order.
         nextAngles = [90, 159, 201, 159, 90, 90, 0];
       }
-      if (values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
+      if (!sourceFix && values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
       if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
           && similar(values[0], values[1]) && values[2] > Math.max(values[0], values[1]) * 1.5) {
         next = [values[0], values[2], values[1]];
+      }
+      if (sourceFix && next?.length === 3 && Number(itemPosition) >= 1 && Number(itemPosition) <= 9) {
+        item.shape_id = 'open_h';
+        item.shape_name = 'צורת ח פתוחה';
       }
       // Imported pile pins and L legs occasionally inherited the generic
       // hoop label. Keep their three-segment geometry, but do not bill them
@@ -698,7 +736,8 @@ module.exports = function createOrdersRouter(deps) {
       }
       if (!next) return;
       const forced97Path = orderNum === 'HZ-2026-097' && Number(itemPosition) === 4 && nextAngles;
-      const changed = forced97Path
+      const forcedSourcePath = Boolean(sourceFix);
+      const changed = forced97Path || forcedSourcePath
         || JSON.stringify(next) !== JSON.stringify(values)
         || (values.length === 6 && !isHoop);
       if (!changed) return;
