@@ -3786,6 +3786,7 @@ class ShapeEditorModal {
       </div>
       <div class="se-foot-actions">
         <button class="se-cancel-btn" id="seCancel">ביטול</button>
+        <button class="se-text-only-btn" id="seTextOnly">אשר כטקסט בלבד</button>
         <button class="se-save-shape-btn" id="seSaveShapeBtn">שמור צורה</button>
         <button class="se-ok-btn" id="seOk">אשר צורה</button>
       </div>
@@ -3809,6 +3810,7 @@ class ShapeEditorModal {
   _bindEvents() {
     document.getElementById('seClose').onclick         = () => this.close();
     document.getElementById('seCancel').onclick        = () => this.close();
+    document.getElementById('seTextOnly').onclick      = () => this._confirmTextOnly();
     document.getElementById('seOk').onclick            = () => this._confirm();
     document.getElementById('seAddSide').onclick       = () => this._addSide();
     document.getElementById('seSaveShapeBtn').onclick  = () => this._showSaveBar();
@@ -6334,6 +6336,33 @@ class ShapeEditorModal {
       ...contract,
       orderItemQuantity,
       structElement: (document.getElementById('seElementName')?.value ?? this.current.structElement ?? '').trim(),
+    });
+    this.close();
+  }
+
+  _confirmTextOnly() {
+    if (!this.current || !this.onSelect) return;
+    const elementName = String(document.getElementById('seElementName')?.value || this.current.structElement || '').trim();
+    const quantity = Math.max(1, Number(document.getElementById('seQuantityInput')?.value || this.current.quantity || this.current.qty || 1) || 1);
+    if (!elementName) {
+      const input = document.getElementById('seElementName');
+      input?.classList.add('se-invalid');
+      input?.focus();
+      return;
+    }
+    this.onSelect({
+      textOnly: true,
+      presetId: null,
+      presetName: '',
+      presetEmoji: null,
+      family: 'manual',
+      shapeType: 'manual_text',
+      diameter: 0,
+      sides: [],
+      angles: [],
+      total_length_mm: 0,
+      orderItemQuantity: quantity,
+      structElement: elementName,
     });
     this.close();
   }

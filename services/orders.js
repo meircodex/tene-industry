@@ -206,6 +206,11 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
       (pallet.items || []).forEach(rawItem => {
         globalItemSequence += 1;
         const item = withShapeContractLegacyFields(rawItem);
+        // Text-only order lines are intentional manual additions (for example
+        // a lift or a hoop noted in writing without a drawing). They carry a
+        // name and quantity, but no geometry, length, weight, or production
+        // shape. Keep them in the order without forcing fake dimensions.
+        const textOnly = item.textOnly === true || item.text_only === true;
         const pileCageMetrics = roundPileCageOrderMetrics(rawItem);
         // A lift carries no bends and no cut list - it is a bought bundle, so it
         // skips the geometry checks the same way a cage does.
@@ -228,7 +233,9 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
               item.shapeName,
               sides.map((len, i) => ({ length_mm: Number(len), angle_deg: angles[i] ?? 0 }))
             );
-        const shapeName = longSimpleCoil
+        const shapeName = textOnly
+          ? String(item.structElement || item.struct_element || item.elementName || item.element_name || item.shapeName || item.shape_name || 'ללא סרטוט').trim()
+          : longSimpleCoil
           ? 'spiral'
           : isSpiralLike
           ? normalizeShapeName(item.shapeName || item.shape_name || 'spiral', segmentsArr, {
@@ -236,22 +243,25 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
               spiral_turns: spiral.turns || null,
             })
           : normalizeShapeName(item.shapeName, segmentsArr);
-        if (!isSpiralLike && !pileCageMetrics && !liftMetrics) {
+        if (!textOnly && !isSpiralLike && !pileCageMetrics && !liftMetrics) {
           const geoCheck = validateShapeGeometry(segmentsArr);
           if (!geoCheck.valid) throw Object.assign(new Error(geoCheck.error), { statusCode: 400 });
         }
         const segments = JSON.stringify(segmentsArr);
         const hasShapeV2Envelope = isShapeDataContractV2(item.shapeSnapshot ?? item.shape_snapshot ?? item.shapeData ?? item.shape_data ?? item.shapeContract ?? item.shape_contract ?? item.shape_snapshot_json);
-        const persistedShapeName = pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName);
+        const persistedShapeName = textOnly
+          ? shapeName
+          : (pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName));
         const weightPerUnit = pileCageMetrics
           ? pileCageMetrics.weightKg
           : (liftMetrics ? liftMetrics.weightPerUnit : calcWeightPerUnit(item.diameter, totalLengthMm));
+        const effectiveWeightPerUnit = textOnly ? 0 : weightPerUnit;
         // Waste is an order-level billing adjustment only. Production must use
         // the ordered item quantity without adding or rounding a percentage.
         const productionQty = item.qty || 1;
         const machine = assignResource(item.diameter);
 
-        const totalWeight = weightPerUnit * (item.qty || 1);
+        const totalWeight = effectiveWeightPerUnit * (item.qty || 1);
         const reviewNotes = Array.isArray(item.reviewNotes || item.review_notes) ? (item.reviewNotes || item.review_notes) : [];
         const reviewNotesJson = reviewNotes.length ? JSON.stringify(reviewNotes) : null;
         const reviewStatus = reviewNotes.length ? (item.reviewStatus || item.review_status || 'pending') : (item.reviewStatus || item.review_status || null);

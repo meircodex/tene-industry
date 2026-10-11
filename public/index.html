@@ -3405,6 +3405,7 @@ function shapeSelected(data) {
   item.shapeEmoji  = data.presetEmoji;
   item.family      = data.family || 'bars';
   item.shapeSnapshot = approvedShapeContract(data);
+  item.textOnly = data.textOnly === true;
   item.steelFinish = data.steelFinish || data.data?.steelFinish || 'ribbed';
   const isPileCage = item.shapeSnapshot?.family === 'piles' && item.shapeSnapshot?.shapeType === 'round_pile_cage';
   if (isPileCage) {
@@ -3434,6 +3435,7 @@ function shapeSelected(data) {
   item.azAngles   = item.is3d ? (data.azAngles || []) : null;
   item.elAngles   = item.is3d ? (data.elAngles || []) : null;
   item.diameter   = isSpiral ? (spiral.barDiameter || item.diameter || 8) : (Number(data.diameter) || item.diameter || 12);
+  if (data.textOnly) item.diameter = 0;
   item.spiral_diameter_mm = isSpiral ? (spiral.spiralDiameterMm || null) : null;
   item.spiral_turns = isSpiral ? (spiral.spiralTurns || null) : null;
   item.length      = isSpiral
@@ -3776,6 +3778,7 @@ function buildOrderPayload() {
       items: p.items.map(item => ({
         shapeId: item.shapeId,
         shapeName: item.shapeName,
+        textOnly: item.textOnly === true || (!item.shapeSnapshot && !item.length && !(item.shapeSides && item.shapeSides.length)),
         shapeSnapshot: item.shapeSnapshot || null,
         diameter: item.diameter,
         length: item.length,
