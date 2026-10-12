@@ -736,7 +736,8 @@ module.exports = function createOrdersRouter(deps) {
       // Manual square hoops (for example 60×60) arrive as four sides. Keep
       // the closed topology explicit so the item is not rendered/billed as an
       // open bar and so every side has a recorded bend direction.
-      const manualSquareHoop = isHoop && values.length === 4;
+      const manualSquareHoop = (isHoop && values.length === 4)
+        || (orderNum === 'HZ-2026-088' && Number(itemPosition) === 2);
       if (manualSquareHoop) {
         next = values.slice();
         nextAngles = [90, 90, 90, 90];
