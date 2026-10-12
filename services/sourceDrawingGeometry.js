@@ -59,11 +59,100 @@ function sourceDrawingSvg(item = {}) {
   const path = lines.length
     ? lines.map(line => 'M '+line.map(p => map(p).join(',')).join(' L ')).join(' ')
     : 'M '+points.map(p => map(p).join(',')).join(' L ');
-  const dimensions = labels.map(l => {
-    const [x,y] = map([l.x,l.y]);
-    return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Heebo" font-weight="800" font-size="11" fill="#173b6b" stroke="white" stroke-width="2" paint-order="stroke fill">${l.text}</text>`;
+  const mappedPoints = points.map(p => map(p).map(Number));
+  const segmentValue = item.segments || object(item.shape_snapshot_json ?? item.shapeSnapshot).segments;
+  const rawSegments = typeof segmentValue === 'string' ? object(segmentValue) : segmentValue;
+  const sequence = Array.isArray(rawSegments) ? rawSegments : [];
+  const edges = lines.length
+    ? lines.map((line,index)=>({a:map(line[0]).map(Number),b:map(line[1]).map(Number),index}))
+    : mappedPoints.slice(0,-1).map((a,index)=>({a,b:mappedPoints[index+1],index,
+      lengthMm:sequence.length===mappedPoints.length-1 ? Number(sequence[index]?.length_mm) : undefined}));
+  const positionedLabels = layoutSourceDimensions(labels.map(l=>({text:l.text,x:Number(map([l.x,l.y])[0]),y:Number(map([l.x,l.y])[1])})),edges,width,height);
+  const dimensions = positionedLabels.map(l => {
+    return `<text data-dimension-label="1" data-dimension-segment="${l.segmentIndex}" x="${l.x.toFixed(3)}" y="${l.y.toFixed(3)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Heebo" font-weight="800" font-size="11" fill="#173b6b" stroke="white" stroke-width="2" paint-order="stroke fill">${l.text}</text>`;
   }).join('');
   return `<svg data-source-drawing="1" data-source-order="${drawing.orderId}" data-source-row="${drawing.row}" data-shape-kind="source-drawing" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" role="img" aria-label="צורה לפי שרטוט המקור" style="width:100%;height:100%;max-height:140px;overflow:visible"><path d="${path}" fill="none" stroke="#173b6b" stroke-width="3.5" stroke-linecap="square" stroke-linejoin="miter"/>${dimensions}</svg>`;
+}
+
+function nearestOnEdge(point, edge) {
+  const dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1];
+  const t=Math.max(0,Math.min(1,((point.x-edge.a[0])*dx+(point.y-edge.a[1])*dy)/(dx*dx+dy*dy||1)));
+  return {x:edge.a[0]+dx*t,y:edge.a[1]+dy*t};
+}
+
+function dimensionBox(label) {
+  // Includes the white text halo and clearance around the rebar stroke.
+  const halfWidth=Math.max(10,label.text.length*3.6+4),halfHeight=10;
+  return {left:label.x-halfWidth,right:label.x+halfWidth,top:label.y-halfHeight,bottom:label.y+halfHeight};
+}
+
+function edgeIntersectsBox(edge,box) {
+  let start=0,end=1;
+  const dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1];
+  for (const [p,q] of [[-dx,edge.a[0]-box.left],[dx,box.right-edge.a[0]],[-dy,edge.a[1]-box.top],[dy,box.bottom-edge.a[1]]]) {
+    if (Math.abs(p)<1e-9) {if(q<0)return false;continue;}
+    const r=q/p;
+    if(p<0)start=Math.max(start,r);else end=Math.min(end,r);
+    if(start>end)return false;
+  }
+  return true;
+}
+
+function layoutSourceDimensions(labels,edges,width=280,height=140) {
+  const used=new Set(),occupied=[];
+  const assigned=labels.map(label=>{
+    const matching=edges.filter(edge=>Number.isFinite(edge.lengthMm)&&Math.abs(edge.lengthMm/10-Number(label.text))<.01);
+    const available=matching.filter(edge=>!used.has(edge.index));
+    const candidates=available.length?available:matching.length?matching:edges;
+    const edge=[...candidates].sort((a,b)=>{
+      const pa=nearestOnEdge(label,a),pb=nearestOnEdge(label,b);
+      return Math.hypot(label.x-pa.x,label.y-pa.y)-Math.hypot(label.x-pb.x,label.y-pb.y);
+    })[0];
+    if(edge)used.add(edge.index);
+    return {...label,edge,segmentIndex:edge?.index ?? -1};
+  });
+  const clear=label=>{
+    const box=dimensionBox(label);
+    return box.left>=2&&box.right<=width-2&&box.top>=2&&box.bottom<=height-2
+      && !edges.some(edge=>edgeIntersectsBox(edge,box))
+      && !occupied.some(other=>box.left<other.right&&box.right>other.left&&box.top<other.bottom&&box.bottom>other.top);
+  };
+  // Reserve already readable labels first, so fixing a closing-tail label does
+  // not displace a good body dimension. Numeric matching locates e.g. the 17cm
+  // return in K/4 even when the source printed its callout beside the far end.
+  for(const label of assigned) {
+    if(!label.edge)continue;
+    const nearest=nearestOnEdge(label,label.edge);
+    if(Math.hypot(label.x-nearest.x,label.y-nearest.y)<=20&&clear(label)) {
+      label.positioned=true;occupied.push(dimensionBox(label));
+    }
+  }
+  for(const label of assigned) {
+    if(label.positioned||!label.edge)continue;
+    const edge=label.edge,dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1],length=Math.hypot(dx,dy)||1;
+    const tx=dx/length,ty=dy/length,nx=-ty,ny=tx;
+    const mx=(edge.a[0]+edge.b[0])/2,my=(edge.a[1]+edge.b[1])/2;
+    const sign=(label.x-mx)*nx+(label.y-my)*ny>=0?1:-1;
+    const candidates=[];
+    for(const distance of [15,19,23,27,31,35,43,51])for(const side of [sign,-sign])for(const shift of [0,8,-8,16,-16,24,-24]) {
+      const candidate={...label,x:mx+nx*distance*side+tx*shift,y:my+ny*distance*side+ty*shift};
+      // Keep the dimension next to its own side; no arrows or leader lines.
+      if(clear(candidate))candidates.push({candidate,score:distance*distance+shift*shift+(side===sign?0:180)});
+    }
+    candidates.sort((a,b)=>a.score-b.score);
+    if(candidates.length)Object.assign(label,candidates[0].candidate);
+    else {
+      // Crowded drawings still get a free text box rather than hiding a bend.
+      let best=null;
+      for(let y=12;y<=height-12;y+=4)for(let x=14;x<=width-14;x+=4){
+        const candidate={...label,x,y};if(!clear(candidate))continue;
+        const score=(x-mx)**2+(y-my)**2;if(!best||score<best.score)best={candidate,score};
+      }
+      if(best)Object.assign(label,best.candidate);
+    }
+    occupied.push(dimensionBox(label));
+  }
+  return assigned.map(({edge,positioned,...label})=>label);
 }
 
 function repairedSnapshot(item, entry) {
@@ -169,4 +258,4 @@ function repairSourceLabels(db) {
   if (count) console.log('[Source label audit]',JSON.stringify({repaired:count}));
 }
 
-module.exports = { REPAIR_VERSION, reviewedDrawings, geometryKey, sourceDrawingForItem, sourceDrawingSvg, repairedSnapshot, repairSourceDrawingOrders };
+module.exports = { REPAIR_VERSION, reviewedDrawings, geometryKey, sourceDrawingForItem, sourceDrawingSvg, repairedSnapshot, repairSourceDrawingOrders,layoutSourceDimensions,dimensionBox,edgeIntersectsBox };

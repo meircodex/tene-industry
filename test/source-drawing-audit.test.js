@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const { ensureCoreSchema } = require('../db/coreSchema');
-const { reviewedDrawings,repairSourceDrawingOrders,repairedSnapshot,sourceDrawingSvg,sourceDrawingForItem } = require('../services/sourceDrawingGeometry');
+const { reviewedDrawings,repairSourceDrawingOrders,repairedSnapshot,sourceDrawingSvg,sourceDrawingForItem,dimensionBox,edgeIntersectsBox } = require('../services/sourceDrawingGeometry');
 const cards = require('../services/productionCards');
 const { classifyOrderItem } = require('../services/orderCommercialSummary');
 
@@ -111,4 +111,38 @@ test('hoops retain closing tails, are billed as hoops, and L bars never gain hoo
   }
   const l=reviewedDrawings.find(e=>e.orderId===96&&e.row===7);
   assert.equal(l.shapeId,'l_bar');
+});
+
+test('dimensions never hide the source path or one another, and 17cm labels identify the short returns without arrows',()=>{
+  for(const entry of reviewedDrawings) {
+    const item={segments:JSON.stringify(entry.segments),shape_id:entry.shapeId,shape_name:entry.shapeName};
+    item.shape_snapshot_json=JSON.stringify(repairedSnapshot(item,entry));
+    const svg=sourceDrawingSvg(item);
+    const path=svg.match(/<path d="([^"]+)"/)[1];
+    const edges=[];
+    let previous;
+    for(const token of path.matchAll(/([ML]) ([\d.]+),([\d.]+)/g)) {
+      const point=[Number(token[2]),Number(token[3])];
+      if(token[1]==='L'&&previous)edges.push({a:previous,b:point});
+      previous=point;
+    }
+    const labels=[...svg.matchAll(/data-dimension-segment="(-?\d+)" x="([\d.]+)" y="([\d.]+)"[^>]*>([\d.]+)<\/text>/g)]
+      .map(m=>({segmentIndex:Number(m[1]),x:Number(m[2]),y:Number(m[3]),text:m[4]}));
+    assert.equal(labels.length,entry.labels.length,`${entry.orderId}/${entry.row}`);
+    assert.doesNotMatch(svg,/<(?:line|polyline)|marker-end|marker-start/);
+    const boxes=labels.map(dimensionBox);
+    for(let i=0;i<labels.length;i++) {
+      const box=boxes[i],key=`${entry.orderId}/${entry.row}/${labels[i].text}`;
+      assert.ok(!edges.some(edge=>edgeIntersectsBox(edge,box)),key+' covers a bend');
+      assert.ok(box.left>=1.999&&box.right<=278.001&&box.top>=1.999&&box.bottom<=138.001,key+' clipped');
+      for(let j=0;j<i;j++)assert.ok(!(box.left<boxes[j].right&&box.right>boxes[j].left&&box.top<boxes[j].bottom&&box.bottom>boxes[j].top),key+' overlaps another dimension');
+    }
+    if(entry.orderId===95&&[3,4].includes(entry.row)) {
+      const label=labels.find(l=>l.text==='17');
+      assert.equal(label.segmentIndex,entry.row===3?1:3);
+      const edge=edges[label.segmentIndex];
+      assert.ok(Math.abs(label.x-(edge.a[0]+edge.b[0])/2)<25);
+      assert.ok(Math.abs(label.y-(edge.a[1]+edge.b[1])/2)<25);
+    }
+  }
 });
