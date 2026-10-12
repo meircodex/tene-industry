@@ -720,6 +720,16 @@ module.exports = function createOrdersRouter(deps) {
         nextAngles = [90, 159, 201, 159, 90, 90, 0];
       }
       if (!sourceFix && values.length === 6 && (isHoop || canonicalHoop(values))) next = canonicalHoop(values);
+      // Manual square hoops (for example 60×60) arrive as four sides. Keep
+      // the closed topology explicit so the item is not rendered/billed as an
+      // open bar and so every side has a recorded bend direction.
+      const manualSquareHoop = isHoop && values.length === 4;
+      if (manualSquareHoop) {
+        next = values.slice();
+        nextAngles = [90, 90, 90, 90];
+        item.shape_id = 'closed_stirrup';
+        item.shape_name = 'חישוק';
+      }
       if ((orderNum === 'HZ-2026-089' || orderNum === 'HZ-2026-89') && values.length === 3
           && similar(values[0], values[1]) && values[2] > Math.max(values[0], values[1]) * 1.5) {
         next = [values[0], values[2], values[1]];
@@ -740,7 +750,7 @@ module.exports = function createOrdersRouter(deps) {
       if (!next) return;
       const forced97Path = orderNum === 'HZ-2026-097' && Number(itemPosition) === 4 && nextAngles;
       const forcedSourcePath = Boolean(sourceFix);
-      const changed = forced97Path || forcedSourcePath
+      const changed = forced97Path || forcedSourcePath || manualSquareHoop
         || JSON.stringify(next) !== JSON.stringify(values)
         || (values.length === 6 && !isHoop);
       if (!changed) return;
