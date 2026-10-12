@@ -2859,7 +2859,10 @@ function buildDetailHTML(o, pkgs) {
       const weight = itemWeight(item);
       const sides = itemSegments(item);
       const visualSides = sides.length ? sides : shapeNamePreviewSides(item);
-      const angles = itemAngles(item);
+      const angles = itemAngles(item).length
+        ? itemAngles(item)
+        : (isClosedHoopItem(item) && visualSides.length === 4 ? [90, 90, 90, 90] : []);
+      const closedHoopVisual = isClosedHoopItem(item) && (visualSides.length === 4 || visualSides.length === 6);
       const dims = sides.length ? sides.join(' / ') : itemDimensions(item);
       const shapeMismatch = shapeMismatchWarning(item, sides);
       const openUWarning = openULegWarning(item, sides);
@@ -2873,7 +2876,7 @@ function buildDetailHTML(o, pkgs) {
       // Do not reuse a legacy cached SVG for hoops. It may have been produced
       // before the tail/body convention was corrected; render2D below rebuilds
       // the closed hoop from the current six-segment machine sequence.
-      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) && visualSides.length === 6 ? '' : (item.shape_svg || ''));
+      const canonicalShapeSvg = encodeURIComponent(closedHoopVisual ? '' : (item.shape_svg || ''));
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`
@@ -2881,7 +2884,7 @@ function buildDetailHTML(o, pkgs) {
         ? `<div class="item-visual" data-detail-shape="1" data-shape-svg="${canonicalShapeSvg}" data-spiral-shape="1" data-spiral-diameter="${escHtml(item.spiral_diameter_mm)}" data-spiral-turns="${escHtml(item.spiral_turns)}" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה"></div>`
         : `<div class="item-visual"
           data-detail-shape="1"
-          data-closed-hoop="${isClosedHoopItem(item) && visualSides.length === 6 ? '1' : '0'}"
+          data-closed-hoop="${closedHoopVisual ? '1' : '0'}"
           data-shape-svg="${canonicalShapeSvg}"
           data-sides="${encodeURIComponent(JSON.stringify(visualSides))}"
           data-angles="${encodeURIComponent(JSON.stringify(angles))}"
