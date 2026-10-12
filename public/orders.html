@@ -2357,7 +2357,10 @@ function openULegWarning(item, sides) {
 }
 
 function itemMachineSequence(item) {
-  const segments = rawItemSegments(item);
+  const raw = rawItemSegments(item);
+  const segments = raw.length ? raw : (isClosedHoopItem(item)
+    ? shapeNamePreviewSides(item).map(length_mm => ({ length_mm, angle_deg: 90 }))
+    : []);
   if (isRealSpiralItem(item)) {
     return `ספיראלה: קוטר ברזל ${IronBendDisplayUnits.formatSteelDiameterMm(item.diameter) || '-'}, קוטר ספיראלה ${IronBendDisplayUnits.formatLengthCmFromMm(item.spiral_diameter_mm) || '-'}, N=${item.spiral_turns || '-'}`;
   }
@@ -2415,6 +2418,16 @@ function buildSpiralSvg(diameter, turns) {
 
 function buildClosedHoopDetailSvg(sides) {
   const v = (Array.isArray(sides) ? sides : []).map(Number).filter(n => Number.isFinite(n) && n > 0);
+  if (v.length === 4) {
+    const [left, top, right, bottom] = v;
+    return `<svg viewBox="0 0 250 150" aria-label="closed hoop" style="width:100%;height:100%">
+      <rect x="58" y="28" width="134" height="86" fill="none" stroke="#1a2332" stroke-width="5" rx="1"/>
+      <text x="125" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(top)}</text>
+      <text x="125" y="137" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(bottom)}</text>
+      <text x="43" y="76" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(left)}</text>
+      <text x="207" y="76" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(right)}</text>
+    </svg>`;
+  }
   if (v.length < 6) return '';
   const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
   let tailA = v[0], tailB = v[1], right = v[2], top = v[3], bottom = v[4], left = v[5];
