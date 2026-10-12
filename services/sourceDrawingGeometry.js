@@ -3,6 +3,8 @@
 const crypto = require('node:crypto');
 const reviewedDrawings = [...require('../db/repairs/workbook87-20261012.json'), ...require('../db/repairs/source-drawings-20261012.json')];
 const REPAIR_VERSION = 'source-paths-20261012-v1';
+const reviewedLabels = require('../db/repairs/source-labels-20261012.json');
+const LABEL_VERSION = 'source-labels-20261012-v1';
 // Explicit human correction supplied on 12 Oct 2026. The second item was
 // intentionally left without a diameter until the customer clarified it.
 reviewedDrawings.push({ orderId:88,row:1,sourceFile:'תוספת בכתב ללא שרטוט — ליפט 12 מטר, קוטר 12',sourcePage:1,sourceSha256:'user-confirmed',
@@ -116,17 +118,18 @@ function repairSourceDrawingOrders(db) {
     db.transaction(()=>{
       rows.forEach((item,index)=>{
         const entry=entries[index];
-        const correctedItem = entry.previousDiameter !== undefined
+        const correctedItem = entry.previousDiameter !== undefined || entry.previousLengthMm !== undefined
           ? { ...item,diameter:entry.diameter,total_length_mm:entry.totalLengthMm,
             weight_per_unit:require('../constants').rebarKgPerMeter(entry.diameter)*entry.totalLengthMm/1000,
             total_weight:require('../constants').rebarKgPerMeter(entry.diameter)*entry.totalLengthMm/1000*entry.quantity } : item;
         const snapshot=repairedSnapshot(correctedItem,entry);
-        const after={shape_id:entry.shapeId,shape_name:entry.shapeName,segments:JSON.stringify(entry.segments),shape_snapshot_json:JSON.stringify(snapshot)};
+        const after={shape_id:entry.shapeId,shape_name:entry.shapeName,segments:JSON.stringify(entry.segments),shape_snapshot_json:JSON.stringify(snapshot),
+          diameter:correctedItem.diameter,total_length_mm:correctedItem.total_length_mm,weight_per_unit:correctedItem.weight_per_unit,total_weight:correctedItem.total_weight};
         db.prepare(`INSERT INTO source_geometry_repairs(version,order_id,item_id,source_file,source_page,source_row,before_json,after_json)
           VALUES(?,?,?,?,?,?,?,?)`).run(REPAIR_VERSION,orderId,item.id,entry.sourceFile,entry.sourcePage,entry.row,JSON.stringify(item),JSON.stringify(after));
         db.prepare('UPDATE items SET shape_id=?,shape_name=?,segments=?,shape_snapshot_json=? WHERE id=?')
           .run(after.shape_id,after.shape_name,after.segments,after.shape_snapshot_json,item.id);
-        if (entry.previousDiameter !== undefined) {
+        if (entry.previousDiameter !== undefined || entry.previousLengthMm !== undefined) {
           db.prepare('UPDATE items SET diameter=?,total_length_mm=?,weight_per_unit=?,total_weight=? WHERE id=?')
             .run(correctedItem.diameter,correctedItem.total_length_mm,correctedItem.weight_per_unit,correctedItem.total_weight,item.id);
           db.prepare('UPDATE pallets SET total_weight=(SELECT SUM(total_weight) FROM items WHERE pallet_id=?) WHERE id=?').run(item.pallet_id,item.pallet_id);
@@ -137,8 +140,33 @@ function repairSourceDrawingOrders(db) {
     })();
     repaired.push({orderId,items:rows.length});
   }
+  repairSourceLabels(db);
   if (repaired.length || skipped.length) console.log('[Source drawing audit]',JSON.stringify({repaired,skipped}));
   return {repaired,skipped};
+}
+
+function repairSourceLabels(db) {
+  let count = 0;
+  db.transaction(() => {
+    for (const entry of reviewedLabels) {
+      if (!entry.element) continue;
+      const audit = db.prepare('SELECT * FROM source_geometry_repairs WHERE version=? AND order_id=? AND source_row=?')
+        .get(REPAIR_VERSION,entry.orderId,entry.row);
+      if (!audit || db.prepare('SELECT 1 FROM source_geometry_repairs WHERE version=? AND item_id=?').get(LABEL_VERSION,audit.item_id)) continue;
+      const item = db.prepare('SELECT * FROM items WHERE id=?').get(audit.item_id);
+      const original = object(audit.before_json);
+      // Do not replace a name or geometry that a user has edited since the audit.
+      if (!item || !sourceDrawingForItem(item) || item.struct_element !== original.struct_element || Number(item.produced_qty)>0 || Number(item.loaded_qty)>0) continue;
+      const order = db.prepare('SELECT * FROM orders WHERE id=?').get(entry.orderId);
+      if (!order || order.locked || !['ממתינה לאישור','ממתינה לאישור לקוח'].includes(order.status)) continue;
+      const after = {...item,struct_element:entry.element.replace(/\s+/g,' ').trim()};
+      db.prepare('INSERT INTO source_geometry_repairs(version,order_id,item_id,source_file,source_page,source_row,before_json,after_json) VALUES(?,?,?,?,?,?,?,?)')
+        .run(LABEL_VERSION,entry.orderId,item.id,audit.source_file,audit.source_page,entry.row,JSON.stringify(item),JSON.stringify(after));
+      db.prepare('UPDATE items SET struct_element=? WHERE id=?').run(after.struct_element,item.id);
+      count++;
+    }
+  })();
+  if (count) console.log('[Source label audit]',JSON.stringify({repaired:count}));
 }
 
 module.exports = { REPAIR_VERSION, reviewedDrawings, geometryKey, sourceDrawingForItem, sourceDrawingSvg, repairedSnapshot, repairSourceDrawingOrders };

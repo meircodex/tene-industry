@@ -881,6 +881,7 @@
   {
     "orderId": 90,
     "row": 3,
+    "previousLengthMm": 3130,
     "sourceFile": "הזמנת ברזל - טיפוס 2G (G2) - ראש + קירות פיר.pdf",
     "sourcePage": 1,
     "sourceSha256": "74630fbdf56d88a09c20a1a6da41be644451d6898ac92aff9314956aa1ae5110",
@@ -1671,6 +1672,7 @@
   {
     "orderId": 90,
     "row": 15,
+    "previousLengthMm": 2290,
     "sourceFile": "הזמנת ברזל - טיפוס 2G (G2) - ראש + קירות פיר.pdf",
     "sourcePage": 3,
     "sourceSha256": "74630fbdf56d88a09c20a1a6da41be644451d6898ac92aff9314956aa1ae5110",

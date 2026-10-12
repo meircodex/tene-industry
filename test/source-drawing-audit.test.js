@@ -41,7 +41,7 @@ test('repairs are source identity guarded, retain every before state and never o
     const initial=repairSourceDrawingOrders(db);
     assert.equal(initial.skipped.length,0);
     assert.equal(initial.repaired.reduce((s,o)=>s+o.items,0),322);
-    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM source_geometry_repairs').get().n,322);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM source_geometry_repairs WHERE version=?').get('source-paths-20261012-v1').n,322);
     const item=db.prepare('SELECT * FROM items WHERE order_id=97 AND sort_order=4').get();
     const snapshot=JSON.parse(item.shape_snapshot_json);
     assert.deepEqual(snapshot.data.sides,[300,650,1050,700,1050,650,300]);
@@ -52,6 +52,26 @@ test('repairs are source identity guarded, retain every before state and never o
     const read=db.prepare('SELECT * FROM items WHERE id=?').get(item.id);
     assert.equal(read.segments,amended);
     assert.equal(sourceDrawingSvg(read),'');
+  } finally {db.close();}
+});
+
+test('source corrections recalculate weights and source labels without overwriting subsequent edits',()=>{
+  const db=fixtureDb();
+  try {
+    repairSourceDrawingOrders(db);
+    const kg=require('../constants').rebarKgPerMeter;
+    for (const [order,row,length,diameter,quantity] of [[90,3,5100,16,44],[90,15,2270,12,24],[88,2,2600,8,48]]) {
+      const item=db.prepare('SELECT * FROM items WHERE order_id=? AND sort_order=?').get(order,row);
+      assert.equal(item.total_length_mm,length);
+      assert.equal(item.diameter,diameter);
+      assert.equal(item.total_weight,kg(diameter)*length/1000*quantity);
+      assert.equal(JSON.parse(item.shape_snapshot_json).calculated.totalWeightKg,item.total_weight);
+    }
+    const item=db.prepare('SELECT * FROM items WHERE order_id=95 AND sort_order=3').get();
+    assert.match(item.struct_element,/ראש כלונס/);
+    db.prepare('UPDATE items SET struct_element=? WHERE id=?').run('Customer amended name',item.id);
+    repairSourceDrawingOrders(db);
+    assert.equal(db.prepare('SELECT struct_element FROM items WHERE id=?').get(item.id).struct_element,'Customer amended name');
   } finally {db.close();}
 });
 
