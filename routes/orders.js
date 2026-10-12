@@ -691,7 +691,20 @@ module.exports = function createOrdersRouter(deps) {
       return [excess, excess, side, width, width, side];
     };
     const normalizeItemForDisplay = (item, orderNum, itemPosition) => {
-      const raw = parseSegments(item.segments);
+      let raw = parseSegments(item.segments);
+      // A few legacy/manual rows kept geometry only inside the V2 snapshot
+      // while their legacy `segments` column stayed empty. Project that
+      // snapshot into the same path used by every renderer before auditing it.
+      if (!raw.length) {
+        const snapshot = parseJsonObject(item.shape_snapshot_json);
+        const snapshotSegments = snapshot?.machineOutput?.generic?.segments
+          || snapshot?.data?.segments
+          || snapshot?.data?.sides;
+        if (Array.isArray(snapshotSegments) && snapshotSegments.length) {
+          raw = snapshotSegments;
+          item.segments = JSON.stringify(snapshotSegments);
+        }
+      }
       const values = raw.map(lengthOf);
       if (!values.length || !values.every(Number.isFinite)) return;
       let next = null;
