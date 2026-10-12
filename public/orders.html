@@ -2364,6 +2364,14 @@ function itemMachineSequence(item) {
   if (isRealSpiralItem(item)) {
     return `ספיראלה: קוטר ברזל ${IronBendDisplayUnits.formatSteelDiameterMm(item.diameter) || '-'}, קוטר ספיראלה ${IronBendDisplayUnits.formatLengthCmFromMm(item.spiral_diameter_mm) || '-'}, N=${item.spiral_turns || '-'}`;
   }
+  const source = orderShapeSnapshot(item)?.sourceDrawing;
+  if (source) return segments.map((segment, idx) => {
+    const label = `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)}`;
+    if (idx === segments.length - 1) return label;
+    const angle = Number(segment.angle_deg);
+    const bend = Math.abs(180 - angle);
+    return label + (Math.abs(bend - 90) < .01 ? ` | כיפוף 90° ${angle > 180 ? 'ימינה' : 'שמאלה'}` : ' | כיפוף לפי השרטוט; זווית מספרית לא צוינה במקור');
+  }).join(' · ');
   return segments.map((segment, idx) => `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)} | זווית אחרי: ${Number.isFinite(segment.angle_deg) ? segment.angle_deg : 180}°`).join(' · ');
 }
 
@@ -2889,7 +2897,8 @@ function buildDetailHTML(o, pkgs) {
       // Do not reuse a legacy cached SVG for hoops. It may have been produced
       // before the tail/body convention was corrected; render2D below rebuilds
       // the closed hoop from the current six-segment machine sequence.
-      const canonicalShapeSvg = encodeURIComponent(closedHoopVisual ? '' : (item.shape_svg || ''));
+      const sourceDrawingVisual = String(item.shape_svg || '').includes('data-source-drawing="1"');
+      const canonicalShapeSvg = encodeURIComponent(closedHoopVisual && !sourceDrawingVisual ? '' : (item.shape_svg || ''));
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`

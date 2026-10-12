@@ -748,6 +748,8 @@ function liftPackageProductionSvg(item = {}) {
 }
 
 function itemShapeSvg(item = {}) {
+  const sourceSvg = require('./sourceDrawingGeometry').sourceDrawingSvg(item);
+  if (sourceSvg) return sourceSvg;
   if (isLiftPackageItem(item)) return liftPackageProductionSvg(item);
   if (isRoundPileCageItem(item)) return pileCageProductionSvg(item);
   const spiralSvg = spiralShapeSvg(item);

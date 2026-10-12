@@ -515,6 +515,10 @@ module.exports = function createProductionRouter(deps) {
     if (!item) return res.status(404).json({ error: 'item not found' });
     if (!isProductionGateOpen(item)) return sendProductionGateError(res, item);
 
+    const sourceDrawing = require('../services/sourceDrawingGeometry').sourceDrawingForItem(item);
+    if (sourceDrawing?.schematicAngles) {
+      return res.status(409).json({ error: 'שרטוט המקור אינו מציין זוויות מספריות לאלכסונים או לסגירה. יש לאשר את זוויות הייצור בעורך הפריט לפני שליחה למכונה.', code:'source_bend_angles_require_confirmation' });
+    }
     const now = new Date().toISOString();
 
     // Close previous item on this machine
@@ -548,7 +552,7 @@ module.exports = function createProductionRouter(deps) {
 
     // Send params to machine via Modbus
     const segments = productionCards.shapeSegmentsFromItem(item);
-    const angles   = segments.slice(1).map(s => s.angle_deg || 0);
+    const angles   = segments.slice(0, -1).map(s => s.angle_deg || 0);
     modbus.writeParams(machineIdNum, {
       diameter:       productionCards.shapeDiameterFromItem(item) || item.diameter,
       totalLengthMm:  productionCards.shapeTotalLengthMmFromItem(item) ?? item.total_length_mm,

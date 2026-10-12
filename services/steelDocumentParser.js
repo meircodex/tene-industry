@@ -201,8 +201,8 @@ function inferShape(row, values) {
       shape_type: 'bent',
       shape_description: elementWords || 'bent shape',
       segments: sideValues.map((value, index) => shapeSegment(value, index === sideValues.length - 1 ? 0 : 90)),
-      confidence: sideValues.length >= 2 ? 0.72 : 0.44,
-      review_notes: sideValues.length >= 2 ? [] : [{ field: 'shape', code: 'shape_not_detected', message: 'Shape text indicates bent/custom geometry but dimensions are incomplete.' }],
+      confidence: sideValues.length >= 2 ? 0.6 : 0.44,
+      review_notes: [{ field: 'shape', code: 'drawing_path_requires_review', message: 'Dimension callouts alone cannot establish path order or bend direction. Compare with the source drawing before approval.' }],
     };
   }
 
@@ -214,14 +214,12 @@ function inferShape(row, values) {
     const openLegNotation = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(elementWords);
     const explicitlyClosed = /חישוק|סגור|closed\s*stirrup/i.test(elementWords);
     return {
-      shape_name: openLegNotation && !explicitlyClosed
-        ? 'custom bent shape'
-        : (drawingDimensions.length >= 4 ? 'bent shape' : 'חישוק'),
+      shape_name: explicitlyClosed ? 'חישוק' : 'custom bent shape',
       shape_type: 'bent',
       shape_description: drawingDimensions.join(' / '),
       segments: drawingDimensions.map((value, index) => shapeSegment(value, index === drawingDimensions.length - 1 ? 0 : 90)),
-      confidence: 0.9,
-      review_notes: [],
+      confidence: 0.6,
+      review_notes: [{ field: 'shape', code: 'drawing_path_requires_review', message: 'A matching length checksum does not establish shape, closing tails, path order or bend direction. Verify the source drawing.' }],
     };
   }
 
