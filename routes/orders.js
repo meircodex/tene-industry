@@ -647,7 +647,9 @@ module.exports = function createOrdersRouter(deps) {
     const pallets = db.prepare('SELECT * FROM pallets WHERE order_id=? ORDER BY pallet_num').all(order.id);
     pallets.forEach(p => {
       p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY COALESCE(sort_order, id), id').all(p.id);
-      p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); });
+      // Screen dimensions have their own layout; printed cards retain their
+      // compact profile and the same saved geometry/manufacturing quantities.
+      p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item, { dimensionFontSize: 18 }); });
     });
     order.pallets = pallets;
     // One computed-on-read projection serves current and historical orders.

@@ -747,7 +747,7 @@ function liftPackageProductionSvg(item = {}) {
   return '<svg data-shape-kind="lift-package" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:100%;max-height:100px;overflow:visible">' + svg + '</svg>';
 }
 
-function itemShapeSvg(item = {}) {
+function itemShapeSvg(item = {}, options = {}) {
   const snapshot = typeof item.shape_snapshot_json === 'string' ? (()=>{try{return JSON.parse(item.shape_snapshot_json);}catch{return {};}})() : (item.shapeSnapshot || {});
   if (snapshot.family === 'mesh') return meshProductionSvg(snapshot);
   const explicitHoop = [item.shape_id, snapshot.shapeId, snapshot.shapeType].some(id => /^(closed[_-]stirrup|stirrup)$/.test(String(id)));
@@ -755,7 +755,7 @@ function itemShapeSvg(item = {}) {
   const hoopView = require('../public/hoop-view');
   const hoop = hoopView.parts(hoopSegments.map(s=>s.length_mm), hoopSegments.map(s=>s.angle_deg), explicitHoop);
   if (hoop && explicitHoop) return hoopView.render(hoop);
-  const sourceSvg = require('./sourceDrawingGeometry').sourceDrawingSvg(item);
+  const sourceSvg = require('./sourceDrawingGeometry').sourceDrawingSvg(item, options);
   if (sourceSvg) return sourceSvg;
   if (isLiftPackageItem(item)) return liftPackageProductionSvg(item);
   if (isRoundPileCageItem(item)) return pileCageProductionSvg(item);

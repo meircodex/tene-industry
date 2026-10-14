@@ -42,7 +42,7 @@ function sourceDrawingForItem(item = {}) {
   return drawing;
 }
 
-function sourceDrawingSvg(item = {}) {
+function sourceDrawingSvg(item = {}, options = {}) {
   const drawing = sourceDrawingForItem(item);
   if (!drawing) return '';
   const lines = drawing.lines || [];
@@ -94,9 +94,10 @@ function sourceDrawingSvg(item = {}) {
     ? lines.map((line,index)=>({a:map(line[0]).map(Number),b:map(line[1]).map(Number),index}))
     : mappedPoints.slice(0,-1).map((a,index)=>({a,b:mappedPoints[index+1],index,
       lengthMm:sequence.length===mappedPoints.length-1 ? Number(sequence[index]?.length_mm) : undefined}));
-  const positionedLabels = layoutSourceDimensions(labels.map(l=>({text:l.text,x:Number(map([l.x,l.y])[0]),y:Number(map([l.x,l.y])[1])})),edges,width,height);
+  const dimensionFontSize = Math.max(8, Math.min(24, Number(options.dimensionFontSize) || 11));
+  const positionedLabels = layoutSourceDimensions(labels.map(l=>({text:l.text,x:Number(map([l.x,l.y])[0]),y:Number(map([l.x,l.y])[1])})),edges,width,height,dimensionFontSize);
   const dimensions = positionedLabels.map(l => {
-    return `<text data-dimension-label="1" data-dimension-segment="${l.segmentIndex}" x="${l.x.toFixed(3)}" y="${l.y.toFixed(3)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Heebo" font-weight="800" font-size="11" fill="#173b6b" stroke="white" stroke-width="2" paint-order="stroke fill">${l.text}</text>`;
+    return `<text data-dimension-label="1" data-dimension-segment="${l.segmentIndex}" x="${l.x.toFixed(3)}" y="${l.y.toFixed(3)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Heebo" font-weight="800" font-size="${dimensionFontSize}" fill="#173b6b" stroke="white" stroke-width="2" paint-order="stroke fill">${l.text}</text>`;
   }).join('');
   return `<svg data-source-drawing="1" data-source-order="${drawing.orderId}" data-source-row="${drawing.row}" data-shape-kind="source-drawing" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" role="img" aria-label="צורה לפי שרטוט המקור" style="width:100%;height:100%;max-height:140px;overflow:visible"><path d="${path}" fill="none" stroke="#173b6b" stroke-width="3.5" stroke-linecap="square" stroke-linejoin="miter"/>${dimensions}</svg>`;
 }
@@ -109,7 +110,8 @@ function nearestOnEdge(point, edge) {
 
 function dimensionBox(label) {
   // Includes the white text halo and clearance around the rebar stroke.
-  const halfWidth=Math.max(10,label.text.length*3.6+4),halfHeight=10;
+  const fontScale=(Number(label.fontSize)||11)/11;
+  const halfWidth=Math.max(10,label.text.length*3.6*fontScale+4),halfHeight=10*fontScale;
   return {left:label.x-halfWidth,right:label.x+halfWidth,top:label.y-halfHeight,bottom:label.y+halfHeight};
 }
 
@@ -125,7 +127,7 @@ function edgeIntersectsBox(edge,box) {
   return true;
 }
 
-function layoutSourceDimensions(labels,edges,width=280,height=140) {
+function layoutSourceDimensions(labels,edges,width=280,height=140,fontSize=11) {
   const used=new Set(),occupied=[];
   const assigned=labels.map(label=>{
     const matching=edges.filter(edge=>Number.isFinite(edge.lengthMm)&&Math.abs(edge.lengthMm/10-Number(label.text))<.01);
@@ -136,7 +138,7 @@ function layoutSourceDimensions(labels,edges,width=280,height=140) {
       return Math.hypot(label.x-pa.x,label.y-pa.y)-Math.hypot(label.x-pb.x,label.y-pb.y);
     })[0];
     if(edge)used.add(edge.index);
-    return {...label,edge,segmentIndex:edge?.index ?? -1};
+    return {...label,fontSize,edge,segmentIndex:edge?.index ?? -1};
   });
   const clear=label=>{
     const box=dimensionBox(label);
