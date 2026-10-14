@@ -59,3 +59,30 @@ test('issued history occupies sixth print-grid cell and order information is ins
   // All inline scripts must still parse after editing nested template literals.
   for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 });
+
+test('cancel action requests a reason, guards double clicks and submits a fresh preview fingerprint',async()=>{
+  const calls=[];let allowReason;const reason=new Promise(resolve=>{allowReason=resolve;});
+  const client=vm.createContext({Set,console,requestCorrectionReason:()=>reason,confirm:()=>true,alert:message=>assert.fail(message),
+    fetchOrders:async()=>calls.push('refresh'),openDetail:async id=>calls.push(['detail',id]),
+    fetch:async(url,options)=>{calls.push([url,options]);return {ok:true,json:async()=>options?{ok:true}:{fingerprint:'fresh',items:[{id:1,quantity:10,old_status:'נשלח',status:'הועמס'}]}};}});
+  const begin=html.indexOf('const pendingCertificateCancellations =');
+  vm.runInContext(html.slice(begin,start),client);
+  client.confirmCertificateCancellation=async()=>true;
+  const first=client.cancelIssuedCertificate(94,7);
+  await Promise.resolve();await Promise.resolve();
+  await client.cancelIssuedCertificate(94,7);
+  assert.equal(calls.length,1,'double click must not create a second preview/action');
+  allowReason('היה חסר פריט');await first;
+  const post=calls.find(row=>Array.isArray(row)&&row[1]?.method==='POST');
+  assert.equal(post[0],'/api/orders/94/delivery-certificates/7/cancel');
+  assert.deepEqual(JSON.parse(post[1].body),{reason:'היה חסר פריט',expected_fingerprint:'fresh'});
+  assert.deepEqual(calls.slice(-2),['refresh',['detail',94]]);
+});
+
+test('abandoning cancellation does not send a POST',async()=>{
+  let posts=0;
+  const client=vm.createContext({Set,requestCorrectionReason:async()=>null,confirm:()=>assert.fail('must not confirm without reason'),alert:message=>assert.fail(message),
+    fetch:async(url,options)=>{if(options)posts++;return {ok:true,json:async()=>({fingerprint:'fresh',items:[]})};}});
+  vm.runInContext(html.slice(html.indexOf('const pendingCertificateCancellations ='),start),client);
+  await client.cancelIssuedCertificate(94,7);assert.equal(posts,0);
+});

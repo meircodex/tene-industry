@@ -1782,6 +1782,22 @@ function ensureCoreSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_delivery_note_orders_order
       ON delivery_note_orders(order_id, delivery_note_id);
 
+    -- Immutable originals are never deleted when a document is corrected.
+    CREATE TABLE IF NOT EXISTS delivery_note_cancellations (
+      note_id INTEGER PRIMARY KEY REFERENCES delivery_notes(id),
+      reason TEXT NOT NULL,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      restored_items_json TEXT NOT NULL,
+      order_status_before TEXT,
+      order_status_after TEXT
+    );
+    CREATE TABLE IF NOT EXISTS delivery_note_replacements (
+      new_note_id INTEGER NOT NULL REFERENCES delivery_notes(id),
+      cancelled_note_id INTEGER NOT NULL REFERENCES delivery_note_cancellations(note_id),
+      PRIMARY KEY(new_note_id,cancelled_note_id)
+    );
+
     CREATE TABLE IF NOT EXISTS export_log (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       destination   TEXT DEFAULT 'generic',

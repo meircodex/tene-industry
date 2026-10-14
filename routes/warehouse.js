@@ -1338,6 +1338,7 @@ module.exports = function createWarehouseRouter(deps) {
   // the package snapshot frozen at departure, so a later truck cannot change
   // an earlier delivery note by loading the rest of the order.
   router.get('/delivery-notes/:id/print', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    const cancelled=db.prepare('SELECT 1 FROM delivery_note_cancellations WHERE note_id=?').get(req.params.id);
     const note = db.prepare(`
       SELECT dn.*,o.delivery_address,c.name AS customer_name,c.phone AS customer_phone
       FROM delivery_notes dn
@@ -1381,7 +1382,7 @@ module.exports = function createWarehouseRouter(deps) {
     const orderLabel = linkedOrders.length > 1 ? 'הזמנות' : 'הזמנה';
     res.type('html').send(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>תעודת משלוח ${escapeHtml(note.note_num)}</title><style>
       body{font-family:Arial,sans-serif;color:#111;margin:0;padding:24mm;background:#fff}h1{margin:0 0 5mm;font-size:24px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin:0 0 8mm}.meta div{border:1px solid #222;padding:3mm}table{width:100%;border-collapse:collapse}th,td{border:1px solid #222;padding:3mm;text-align:right}th{background:#eee}.order-group td{background:#ddd;font-weight:900;border-top:2px solid #111}.total{font-size:18px;font-weight:bold;margin-top:7mm}@media print{body{padding:12mm}}
-    </style></head><body><h1>תעודת משלוח</h1><div class="meta"><div><b>מספר תעודה:</b> ${escapeHtml(note.note_num)}</div><div><b>${orderLabel}:</b> ${escapeHtml(orderNumbers)}</div><div><b>לקוח:</b> ${escapeHtml(note.customer_name || '—')}</div><div><b>תאריך יציאה:</b> ${escapeHtml(issuedAt)}</div><div><b>כתובת:</b> ${escapeHtml(note.delivery_address || '—')}</div><div><b>טלפון:</b> ${escapeHtml(note.customer_phone || '—')}</div></div>${deliveryRowsHtml}<p class="total">סה"כ למשאית זו: ${Number(note.total_weight || 0).toLocaleString('he-IL', { maximumFractionDigits: 3 })} ק"ג</p></body></html>`);
+    </style></head><body><h1>תעודת משלוח</h1>${cancelled?'<div style="border:3px solid #b42318;color:#b42318;padding:12px;font-weight:900">מבוטלת — אינה תעודת משלוח תקפה</div>':''}<div class="meta"><div><b>מספר תעודה:</b> ${escapeHtml(note.note_num)}</div><div><b>${orderLabel}:</b> ${escapeHtml(orderNumbers)}</div><div><b>לקוח:</b> ${escapeHtml(note.customer_name || '—')}</div><div><b>תאריך יציאה:</b> ${escapeHtml(issuedAt)}</div><div><b>כתובת:</b> ${escapeHtml(note.delivery_address || '—')}</div><div><b>טלפון:</b> ${escapeHtml(note.customer_phone || '—')}</div></div>${deliveryRowsHtml}<p class="total">סה"כ למשאית זו: ${Number(note.total_weight || 0).toLocaleString('he-IL', { maximumFractionDigits: 3 })} ק"ג</p></body></html>`);
   });
 
   router.post('/delivery-notes', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {

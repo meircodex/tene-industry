@@ -299,6 +299,9 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .issued-delivery-title{font-size:14px;font-weight:900;color:#481652;}
 .issued-delivery-documents a{display:block;padding:9px 11px;border:1px solid #d8b9e2;border-radius:9px;background:#fff;color:#481652;font-size:14px;font-weight:800;text-decoration:none;overflow-wrap:anywhere;}
 .issued-delivery-documents a:hover{background:#f0e4f5;}.issued-delivery-empty{font-size:13px;color:var(--dim);}
+.issued-delivery-document.is-cancelled{opacity:.7;border:1px dashed #b42318;padding:6px;border-radius:9px;}.issued-delivery-cancel{margin-top:5px;}.issued-delivery-note{font-size:12px;color:#b42318;overflow-wrap:anywhere;}
+#certificateCancelDialog{width:min(560px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid var(--border);border-radius:16px;padding:22px;color:var(--text);font-family:inherit;}
+#certificateCancelDialog::backdrop{background:rgba(2,26,72,.55);}#certificateCancelDialog pre{font:inherit;white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;}
 .print-btn.cutting{background:linear-gradient(135deg,#0f766e,#115e59) !important;cursor:pointer;width:100%;}
 .send-file-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1px solid #b9c9dd;border-radius:12px;background:#fff;color:#294764;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;transition:background .16s ease,border-color .16s ease;}
 .send-file-btn:hover{background:#eef5fb;border-color:#7294b6;}
@@ -596,6 +599,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   </div>
 </div>
 
+<dialog id="certificateCancelDialog" aria-labelledby="certificateCancelTitle" oncancel="event.preventDefault();resolveCertificateCancellation(false)"><h2 id="certificateCancelTitle">אישור ביטול תעודה לצורך תיקון</h2><pre id="certificateCancelDetails"></pre><div class="actions"><button type="button" class="btn-sm danger" onclick="resolveCertificateCancellation(true)">בטל תעודה ושחרר לתיקון</button><button type="button" class="btn-sm" autofocus onclick="resolveCertificateCancellation(false)">חזור ללא ביטול</button></div></dialog>
 <dialog id="orderPurgeDialog"><form id="orderPurgeForm"><h2>מחיקת הזמנה לצמיתות</h2><p id="orderPurgeTitle"></p><p>פעולה בלתי הפיכה. ההזמנה ופריטיה יימחקו; תיעוד הפעולה יישמר. לא ניתן למחוק הזמנות עם היסטוריית ייצור, אספקה, מלאי או חיוב מקושרת.</p><label>סיסמת / קוד הכניסה של מנהל המערכת<input id="orderPurgePassword" type="password" autocomplete="off" maxlength="128" required></label><label>הקלד את מספר ההזמנה לאישור נוסף<input id="orderPurgeConfirmation" autocomplete="off" required></label><div class="actions"><button class="btn-sm danger" type="submit">אני מאשר מחיקה לצמיתות</button><button class="btn-sm" type="button" onclick="closeOrderPurge()">בטל</button></div></form></dialog>
 <script>
 let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', orderBucket = new URLSearchParams(location.search).get('bucket') || 'active', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
@@ -2785,14 +2789,49 @@ function focusCommercialContributor(event, itemId) {
   target.animate([{ outline: '3px solid #e07b39' }, { outline: '0 solid transparent' }], { duration: 1500 });
 }
 
+const pendingCertificateCancellations = new Set();
+let certificateCancellationResolve=null;
+function confirmCertificateCancellation(noteId,preview,reason) {
+  if(certificateCancellationResolve) return Promise.resolve(false);
+  document.getElementById('certificateCancelDetails').textContent=`תעודה ${noteId} תישמר כמבוטלת. הכמויות ישתחררו לתעודה מתוקנת.\nסיבה: ${reason}\n${preview.items.map(row=>`פריט ${row.id}: ${row.quantity} יח׳ · מ־${row.old_status} ל־${row.status}`).join('\n')}`;
+  document.getElementById('certificateCancelDialog').showModal();
+  return new Promise(resolve=>{certificateCancellationResolve=resolve;});
+}
+function resolveCertificateCancellation(confirmed) {
+  document.getElementById('certificateCancelDialog').close();
+  const resolve=certificateCancellationResolve;certificateCancellationResolve=null;
+  resolve?.(confirmed);
+}
+async function cancelIssuedCertificate(orderId,noteId) {
+  const key=`${orderId}:${noteId}`;
+  if(pendingCertificateCancellations.has(key)) return;
+  pendingCertificateCancellations.add(key);
+  try {
+    const previewResponse=await fetch(`/api/orders/${orderId}/delivery-certificates/${noteId}/cancel-preview`);
+    const preview=await previewResponse.json();
+    if(!previewResponse.ok) throw new Error(preview.error||'לא ניתן לבדוק את התעודה');
+    const reason=await requestCorrectionReason({title:`ביטול תעודה ${noteId} לצורך תיקון`,info:'התעודה תישמר כמבוטלת והכמויות שלה ישתחררו לתעודה מתוקנת. סטטוסים שלא שונו מאז ההפקה יחזרו למצב הקודם; דיווחי ייצור ומלאי לא יימחקו. יש לציין מה היה שגוי.'});
+    if(!reason?.trim()) return;
+    if(!await confirmCertificateCancellation(noteId,preview,reason)) return;
+    const response=await fetch(`/api/orders/${orderId}/delivery-certificates/${noteId}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason,expected_fingerprint:preview.fingerprint})});
+    const result=await response.json();
+    if(!response.ok) throw new Error(result.error||'ביטול התעודה נכשל');
+    await fetchOrders();await openDetail(orderId);
+  } catch(error) {alert(error.message);}
+  finally {pendingCertificateCancellations.delete(key);}
+}
+
 function issuedDeliveryDocumentsHtml(o, progress) {
+  const canCancel=typeof window!=='undefined' && ['office','manager','admin'].includes(window.IronBendAuth?.currentUser()?.role);
   const notes = (progress.certificates || []).filter(note => Number.isSafeInteger(Number(note.id)) && Number(note.id) > 0);
   return `<section class="issued-delivery-documents" aria-label="תעודות משלוח שכבר הופקו">
     <div class="issued-delivery-title">🖨️ תעודות שהופקו — הדפסה חוזרת</div>
     ${notes.map(note => {
       const label = String(note.note_num || '').startsWith('CERT-') ? `תעודה ${Number(note.id)}` : (note.note_num || `תעודה ${Number(note.id)}`);
       const date = /^\d{4}-\d{2}-\d{2}/.test(String(note.issued_at || '')) ? String(note.issued_at).slice(0, 10).split('-').reverse().join('.') : '';
-      return `<a target="_blank" rel="noopener" href="/order-print.html?id=${Number(o.id)}&kind=delivery-certificate&note_id=${Number(note.id)}">${escHtml(label)}${date ? ` · ${escHtml(date)}` : ''} · פתיחה והדפסה</a>`;
+      return `<div class="issued-delivery-document${note.cancelled_at?' is-cancelled':''}"><a target="_blank" rel="noopener" href="/order-print.html?id=${Number(o.id)}&kind=delivery-certificate&note_id=${Number(note.id)}">${escHtml(label)}${date ? ` · ${escHtml(date)}` : ''}${note.cancelled_at?' · מבוטלת':''} · פתיחה והדפסה</a>
+        ${note.cancelled_at?`<div class="issued-delivery-note">מבוטלת: ${escHtml(note.cancellation_reason)}</div>`:canCancel&&note.can_cancel?`<button type="button" class="btn-sm danger issued-delivery-cancel" onclick="cancelIssuedCertificate(${Number(o.id)},${Number(note.id)})">בטל תעודה לצורך תיקון</button>`:''}
+        ${note.replaces_note_ids?.length?`<div class="issued-delivery-note">מחליפה תעודות מבוטלות: ${note.replaces_note_ids.map(Number).join(', ')}</div>`:''}</div>`;
     }).join('') || `<div class="issued-delivery-empty">${progress.shipped_unit_count ? 'יש פריטים שנשלחו, אך לא נמצאה תעודת מקור שמורה. אין לשחזר תעודה מהסטטוס בלבד.' : 'טרם נשמרו תעודות מקור. לאחר הפקת מקור הוא יופיע כאן להדפסה חוזרת.'}</div>`}
     ${progress.history_needs_review ? '<div style="color:var(--danger)">נדרש אימות היסטוריית משלוחים; הפקת מקור חסומה כדי למנוע כפילות.</div>' : ''}
   </section>`;
@@ -2835,7 +2874,7 @@ function buildDetailHTML(o, pkgs) {
   const prints = `<div class="print-btns">
     <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">📄 גיליון הזמנה</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
-    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — נותרו ${deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — ללא תעודה ${deliveryProgress.certificate_remaining_item_count ?? deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn cutting" onclick="openStraightStockCutting(event,${o.id})">✂️ תוכנית חיתוך ממוטות</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">📋 תעודה חלקית — הועמסו ${loadedItemCount} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
     ${issuedDeliveryDocumentsHtml(o, deliveryProgress)}

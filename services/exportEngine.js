@@ -198,6 +198,9 @@ function buildInvoiceExportPayload(db, { invoice_id, destination = DEFAULT_DESTI
 function buildDeliveryNoteExportPayload(db, { delivery_note_id, destination = DEFAULT_DESTINATION } = {}) {
   const database = requiredDb(db);
   const deliveryNoteId = normalizeId(delivery_note_id, 'delivery_note_id');
+  if(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='delivery_note_cancellations'").get() && database.prepare('SELECT 1 FROM delivery_note_cancellations WHERE note_id=?').get(deliveryNoteId)) {
+    throw Object.assign(new Error('delivery_note_cancelled'),{statusCode:409});
+  }
   const note = database.prepare('SELECT * FROM delivery_notes WHERE id = ?').get(deliveryNoteId);
 
   if (!note) {

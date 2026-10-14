@@ -34,7 +34,7 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   const endpoint = `/orders/${order}/delivery-certificate`;
   assert.equal((await get(endpoint+'?certificate_mode=source')).status,409,'original requires fresh preview');
   const preview = await (await get(endpoint+'-preview')).json();
-  assert.equal(preview.loaded_item_count,1);
+  assert.equal(preview.loaded_item_count,2,'supplied items without an original document qualify as already loaded');
   assert.equal(preview.total_item_count,3);
   assert.equal(preview.remaining_item_count,2);
   assert.equal(preview.shipped_unit_count,5);
@@ -47,7 +47,8 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   const source = await get(sourceUrl);
   assert.equal(source.status,200,await source.clone().text());
   const html = await source.text();
-  assert.match(html,/1 מתוך 3 פריטים/);
+  assert.match(html,/2 מתוך 3 פריטים/);
+  assert.equal(db.prepare('SELECT status FROM items WHERE id=?').get(two).status,'סופק','issuing the first certificate must not downgrade supplied status');
   assert.equal(db.prepare('SELECT status FROM items WHERE id=?').get(one).status,'נשלח');
   const note = db.prepare('SELECT * FROM delivery_notes WHERE order_id=?').get(order);
   assert.equal(JSON.parse(note.items_json)[0].quantity,10);

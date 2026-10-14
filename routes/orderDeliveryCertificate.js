@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { randomUUID } = require('node:crypto');
+const {cancellationPreview,cancelCertificate} = require('../services/deliveryCertificateCancellation');
 const { buildDeliveryCertificateProgress, remainingDeliveryItems, deliverySelectionFingerprint } = require('../services/deliveryCertificateProgress');
 const { isTechnicalRecognitionNote } = require('../services/intakeWorkflow');
 const productionCards = require('../services/productionCards');
@@ -93,6 +94,16 @@ module.exports = function createOrderDeliveryCertificateRouter(deps) {
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
   const industry = required('industry', deps.industry);
 
+router.get('/orders/:id/delivery-certificates/:noteId/cancel-preview', requireAnyRole(['office','manager','admin']), (req,res) => {
+  try { const {snapshot,...preview}=cancellationPreview(db,Number(req.params.id),Number(req.params.noteId)); res.setHeader('Cache-Control','no-store');res.json(preview); }
+  catch(error) {res.status(error.status||409).json({error:error.message});}
+});
+router.post('/orders/:id/delivery-certificates/:noteId/cancel', requireAnyRole(['office','manager','admin']), (req,res) => {
+  try {res.json(cancelCertificate(db,{orderId:Number(req.params.id),noteId:Number(req.params.noteId),reason:req.body?.reason,
+    expectedFingerprint:req.body?.expected_fingerprint,userId:req.auth?.sub,userName:req.auth?.display_name}));}
+  catch(error) {res.status(error.status||409).json({error:error.message});}
+});
+
 router.get('/orders/:id/delivery-certificate-preview', requireAnyRole(['office', 'warehouse', 'driver', 'manager', 'admin']), (req, res) => {
   const order = db.prepare('SELECT id FROM orders WHERE id=?').get(req.params.id);
   if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
@@ -118,11 +129,13 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   let progress = buildDeliveryCertificateProgress(db, order.id, allItems);
   let selectedItems = remainingDeliveryItems(allItems, progress, certificateMode === 'source' || requestedItemStatus === 'הועמס');
   let issuedNote = null;
+  let cancelledNote = null;
   let replay = false;
   const issueKey = String(req.query.issue_key || '');
   if (req.query.note_id) {
     issuedNote = db.prepare('SELECT dn.* FROM delivery_notes dn LEFT JOIN delivery_note_orders dno ON dno.delivery_note_id=dn.id AND dno.order_id=? WHERE dn.id=? AND (dn.order_id=? OR dno.order_id=?)').get(order.id, req.query.note_id, order.id, order.id);
     if (!issuedNote) return res.status(404).send('תעודה לא נמצאה בהזמנה');
+    cancelledNote = db.prepare('SELECT * FROM delivery_note_cancellations WHERE note_id=?').get(issuedNote.id);
     // Existing truck notes already have a snapshot-aware, read-only print route.
     // In particular never reconstruct legacy partial packages from current rows.
     if (!String(issuedNote.note_num || '').startsWith('CERT-')) return res.redirect('/api/delivery-notes/' + issuedNote.id + '/print');
@@ -134,6 +147,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
     if (!/^[a-f0-9-]{36}$/i.test(issueKey) || !req.query.selection_fingerprint) return res.status(409).send('יש לפתוח את בחירת מקור/טיוטה מחדש לפני הפקת מקור');
     issuedNote = db.prepare('SELECT * FROM delivery_notes WHERE note_num=? AND order_id=?').get('CERT-' + issueKey, order.id);
     if (issuedNote) {
+      if(db.prepare('SELECT 1 FROM delivery_note_cancellations WHERE note_id=?').get(issuedNote.id)) return res.status(409).send('תעודה זו בוטלה. יש לפתוח בחירת מקור חדשה לתעודה מתוקנת');
       selectedItems = JSON.parse(issuedNote.items_json);
       replay = true;
     } else if (progress.history_needs_review || requestedItemStatus !== 'הועמס' || order.status === 'בוטלה') {
@@ -265,19 +279,31 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
       const latestProgress = buildDeliveryCertificateProgress(db, order.id, latestItems);
       if (db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active' LIMIT 1").get(order.id)) throw new Error('יש לסיים את ההעמסה הפעילה במחסן לפני הפקת תעודה');
       if (deliverySelectionFingerprint(remainingDeliveryItems(latestItems, latestProgress, true)) !== req.query.selection_fingerprint || latestProgress.history_needs_review) throw new Error('ההעמסה השתנתה; פתח מחדש את התעודה');
-      const certificateOrder = { order_num: order.order_num, customer_name: order.customer_name, customer_phone: order.customer_phone, customer_address: order.customer_address, delivery_date: order.delivery_date };
+      const certificateOrder = { order_num: order.order_num, customer_name: order.customer_name, customer_phone: order.customer_phone, customer_address: order.customer_address, delivery_date: order.delivery_date, status:order.status };
       const snapshot = selectedItems.map(item => ({ ...item, certificate_progress: progress, certificate_order: certificateOrder, certificate_shape_svg: productionCards.itemShapeSvg(item) }));
       const inserted = db.prepare('INSERT INTO delivery_notes (note_num,order_id,order_num,customer_id,items_json,packages_json,total_weight) VALUES (?,?,?,?,?,\'[]\',?)').run('CERT-' + issueKey, order.id, order.order_num, order.customer_id, JSON.stringify(snapshot), wTotal);
       issuedNote = { id: Number(inserted.lastInsertRowid), note_num: 'CERT-' + issueKey };
+      const cancelled = db.prepare(`SELECT dc.note_id,dc.restored_items_json FROM delivery_note_cancellations dc JOIN delivery_notes dn ON dn.id=dc.note_id WHERE dn.order_id=?`).all(order.id);
+      for(const old of cancelled) {
+        const oldItems=JSON.parse(old.restored_items_json);
+        if(oldItems.some(row=>selectedItems.some(item=>Number(item.id)===Number(row.id)))) db.prepare('INSERT INTO delivery_note_replacements(new_note_id,cancelled_note_id) VALUES(?,?)').run(issuedNote.id,old.note_id);
+      }
       selectedItems.forEach(item => {
-        if (db.prepare("UPDATE items SET status='נשלח' WHERE id=? AND status='הועמס'").run(item.id).changes !== 1) throw new Error('ההעמסה השתנתה; פתח מחדש את התעודה');
+        const latest=latestItems.find(row=>Number(row.id)===Number(item.id));
+        if (!latest || !['הועמס','נשלח','סופק'].includes(latest.status)) throw new Error('ההעמסה השתנתה; פתח מחדש את התעודה');
+        // A source document must not move a supplied item backwards.
+        if(latest.status==='הועמס') db.prepare("UPDATE items SET status='נשלח' WHERE id=?").run(item.id);
       });
-      const remaining = latestProgress.remaining_item_count - selectedItems.length;
+      const remaining = latestProgress.certificate_remaining_item_count - selectedItems.length;
       db.prepare("UPDATE orders SET status=? WHERE id=? AND status NOT IN ('סופק – אושר','בוטלה')").run(remaining ? 'אספקה חלקית' : 'נשלחה', order.id);
     });
     try { markSent(); } catch (error) { return res.status(409).send(error.message); }
   }
+  // Correction explanations/replacement references are internal UI/audit data.
+  // Only a void marking belongs on an archived invalid document.
+  const correctionBanner = cancelledNote ? '<div style="border:3px solid #b42318;color:#b42318;padding:12px;text-align:center;font-weight:900">מבוטלת — אינה תעודת משלוח תקפה</div>' : '';
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control','no-store');
   res.send(`<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -381,6 +407,7 @@ tfoot .total-val{font-size:14px;color:#f0a060;}
   <!-- Header -->
   <div class="doc-title">ריכוז תעודת משלוח וסיכום משקלים סופי</div>
   <div class="doc-subtitle">${posLabel}</div>
+  ${correctionBanner}
   ${progress.history_needs_review ? '<div style="color:#a00;text-align:center;font-weight:bold">טיוטה לבדיקה בלבד — היסטוריית המשלוחים דורשת אימות; אין להוציא למשלוח.</div>' : ''}
   <div style="text-align:center;font-weight:700;margin-bottom:10px">${issuedNote ? `תעודה מס׳ ${issuedNote.id} · ` : ''}${selectedItems.length} מתוך ${progress.total_item_count} פריטים · יתרה לפני התעודה: ${progress.remaining_item_count} · יחידות בתעודה: ${selectedItems.reduce((n,i) => n + Number(i.quantity || 0), 0)}</div>
 
