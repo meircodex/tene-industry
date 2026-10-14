@@ -88,5 +88,14 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   db.prepare("UPDATE items SET status='הושלם' WHERE id=?").run(partial);
   assert.equal((await get(`/orders/${partialOrder}/delivery-certificate?certificate_mode=source&issue_key=${oldPreview.issue_key}&selection_fingerprint=${oldPreview.selection_fingerprint}`)).status,409,'changed loading rejected');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM delivery_notes WHERE order_id=?').get(partialOrder).n,1);
+  const completionOrder = db.prepare("INSERT INTO orders (order_num,customer_id,status) VALUES ('TEST-ALL-STAGES',?,'בייצור')").run(customer).lastInsertRowid;
+  const completionPallet = db.prepare('INSERT INTO pallets (order_id,pallet_num) VALUES (?,1)').run(completionOrder).lastInsertRowid;
+  const advancedRow = insert.run(completionPallet,completionOrder,3,6,'[]','סופק').lastInsertRowid;
+  const lastRow = insert.run(completionPallet,completionOrder,4,8,'[]','בייצור').lastInsertRowid;
+  assert.equal((await patch(lastRow,{status:'הושלם'})).status,200);
+  assert.equal(db.prepare('SELECT status FROM orders WHERE id=?').get(completionOrder).status,'הושלם – ממתין לאיסוף','already supplied row counts as produced');
+  assert.equal((await patch(lastRow,{status:'בייצור',correction_reason:'חזרה להשלמת עבודה'})).status,200);
+  assert.equal(db.prepare('SELECT status FROM orders WHERE id=?').get(completionOrder).status,'בייצור','rollback restores the work queue');
+  assert.ok(advancedRow > 0);
   assert.equal(two > 0,true);
 });

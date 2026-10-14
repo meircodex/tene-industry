@@ -450,10 +450,14 @@ function checkOrderComplete(orderId) {
   const pending = db.prepare(`
     SELECT COUNT(*) as c FROM items i
     JOIN pallets p ON i.pallet_id = p.id
-    WHERE p.order_id = ? AND i.status != 'הושלם'
+    WHERE p.order_id = ? AND i.cancelled_at IS NULL
+      AND i.status NOT IN ('הושלם','הועמס','נשלח','סופק','בוטל')
   `).get(orderId);
   if (pending.c === 0) {
-    db.prepare("UPDATE orders SET status='הושלם – ממתין לאיסוף' WHERE id=?").run(orderId);
+    // Completing the remaining work must not erase the independent shipment
+    // state of an order that has already departed in whole or in part.
+    const changed = db.prepare("UPDATE orders SET status='הושלם – ממתין לאיסוף' WHERE id=? AND status NOT IN ('אספקה חלקית','בהעמסה','נשלחה','בדרך ללקוח','בעיה באספקה','סופק – אושר','בוטלה')").run(orderId);
+    if (!changed.changes) return;
     const o = db.prepare('SELECT order_num FROM orders WHERE id=?').get(orderId);
     wsBroadcast('order_complete', { orderId, orderNum: o?.order_num });
   }

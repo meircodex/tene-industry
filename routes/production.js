@@ -182,7 +182,7 @@ module.exports = function createProductionRouter(deps) {
     )) {
       return setOrderStatusIfChanged(item.order_id, ORDER_STATUS.IN_PRODUCTION);
     }
-    if (nextItemStatus === ITEM_STATUS.DONE) {
+    if ([ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(nextItemStatus)) {
       checkOrderComplete(item.order_id);
     }
     return null;
@@ -629,7 +629,10 @@ module.exports = function createProductionRouter(deps) {
         'item', item.id, item.order_num, backwards ? 'item_status_correction' : 'item_status_change', 'status', item.status, status,
         correctionReason || (completed ? 'אישור שלבים מצטבר — כמות הפריט יוצרה; תעודות משלוח קיימות אינן מתבטלות' : ''), req.auth?.sub || null, req.auth?.display_name || null);
     })();
-    const orderStatus = syncOrderStatusAfterItemStatus(item, status);
+    let orderStatus = syncOrderStatusAfterItemStatus(item, status);
+    if (backwards && statusContracts.normalizeOrderStatus(item.order_status) === ORDER_STATUS.DONE_WAITING_PICKUP) {
+      orderStatus = setOrderStatusIfChanged(item.order_id, status === ITEM_STATUS.WAITING ? ORDER_STATUS.PRODUCTION_QUEUE : ORDER_STATUS.IN_PRODUCTION);
+    }
     const consumedReservations = completed ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
     res.json({ ok: true, order_status: orderStatus, consumedReservations });

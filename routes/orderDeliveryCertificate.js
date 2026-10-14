@@ -144,6 +144,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   if (!replay && requestedItemStatus && !['הועמס'].includes(requestedItemStatus)) return res.status(400).send('תעודה חלקית מופקת רק לפי פריטים שהועמסו');
   if (!selectedItems.length && (certificateMode === 'source' || requestedItemStatus || replay)) return res.status(409).send('אין פריטים שנותרו לתעודת משלוח');
   if (replay && selectedItems[0]?.certificate_progress) progress = selectedItems[0].certificate_progress;
+  if (replay && selectedItems[0]?.certificate_order) Object.assign(order, selectedItems[0].certificate_order);
 
   const fmtDate = d => {
     const dt = d ? new Date(d) : new Date();
@@ -260,7 +261,8 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
       const latestItems = db.prepare('SELECT i.* FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? ORDER BY p.pallet_num,i.id').all(order.id);
       const latestProgress = buildDeliveryCertificateProgress(db, order.id, latestItems);
       if (deliverySelectionFingerprint(remainingDeliveryItems(latestItems, latestProgress, true)) !== req.query.selection_fingerprint || latestProgress.history_needs_review) throw new Error('ההעמסה השתנתה; פתח מחדש את התעודה');
-      const snapshot = selectedItems.map(item => ({ ...item, certificate_progress: progress, certificate_shape_svg: productionCards.itemShapeSvg(item) }));
+      const certificateOrder = { order_num: order.order_num, customer_name: order.customer_name, customer_phone: order.customer_phone, customer_address: order.customer_address, delivery_date: order.delivery_date };
+      const snapshot = selectedItems.map(item => ({ ...item, certificate_progress: progress, certificate_order: certificateOrder, certificate_shape_svg: productionCards.itemShapeSvg(item) }));
       const inserted = db.prepare('INSERT INTO delivery_notes (note_num,order_id,order_num,customer_id,items_json,packages_json,total_weight) VALUES (?,?,?,?,?,\'[]\',?)').run('CERT-' + issueKey, order.id, order.order_num, order.customer_id, JSON.stringify(snapshot), wTotal);
       issuedNote = { id: Number(inserted.lastInsertRowid), note_num: 'CERT-' + issueKey };
       selectedItems.forEach(item => {
