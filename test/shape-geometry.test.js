@@ -157,11 +157,11 @@ test('bench preset opens as real 3D and keeps the schedule elevation in every 2D
   assert.ok(Math.abs(elevation[1][0] - elevation[2][0]) < 0.001, 'expected the left 17 cm rise to be vertical in 2D');
   assert.ok(Math.abs(elevation[2][1] - elevation[3][1]) < 0.001, 'expected the 30 cm bridge to be horizontal in 2D');
   assert.ok(Math.abs(elevation[3][0] - elevation[4][0]) < 0.001, 'expected the right 17 cm drop to be vertical in 2D');
-  assert.ok(elevation[0][0] < elevation[1][0] && elevation[0][1] === elevation[1][1], 'orthographic foot must be horizontal');
+  assert.ok(elevation[0][0] < elevation[1][0] && elevation[0][1] < elevation[1][1], 'expected the left 28 cm foot to enter the rise through an acute corner');
   const elevationIncoming = [elevation[0][0] - elevation[1][0], elevation[0][1] - elevation[1][1]];
   const elevationOutgoing = [elevation[2][0] - elevation[1][0], elevation[2][1] - elevation[1][1]];
-  assert.equal(elevationIncoming[0] * elevationOutgoing[0] + elevationIncoming[1] * elevationOutgoing[1],0,'2D corner must remain perpendicular');
-  assert.ok(elevation[5][0] > elevation[4][0] && elevation[5][1] === elevation[4][1]);
+  assert.ok(elevationIncoming[0] * elevationOutgoing[0] + elevationIncoming[1] * elevationOutgoing[1] > 0, 'expected the full 2D bench projection to keep the acute left corner');
+  assert.ok(elevation[5][0] > elevation[4][0] && elevation[5][1] > elevation[4][1], 'expected the right 28 cm foot to angle outward');
   assert.match(editor, /isBenchProjection\s*\?\s*benchBarSVGPath\(sides, 300, 260, 38, \{ rotateDegrees: this\._previewRotation \|\| 0 \}\)/);
 });
 
@@ -190,14 +190,14 @@ test('production card keeps all five bench segments and the 120 cm cut length', 
   assert.ok(pathMatch, 'expected a bench SVG path');
   const points = pathMatch[1].split(' L ').map(pair => pair.split(',').map(Number));
   assert.equal(points.length, 6);
-  assert.ok(points[0][0] < points[1][0] && points[0][1] === points[1][1]);
+  assert.ok(points[0][0] < points[1][0] && points[0][1] < points[1][1]);
   const incoming = [points[0][0] - points[1][0], points[0][1] - points[1][1]];
   const outgoing = [points[2][0] - points[1][0], points[2][1] - points[1][1]];
-  assert.equal(incoming[0] * outgoing[0] + incoming[1] * outgoing[1],0);
+  assert.ok(incoming[0] * outgoing[0] + incoming[1] * outgoing[1] > 0, 'expected the production bench SVG to keep the acute left corner');
   assert.equal(points[1][0], points[2][0]);
   assert.equal(points[2][1], points[3][1]);
   assert.equal(points[3][0], points[4][0]);
-  assert.ok(points[5][0] > points[4][0] && points[5][1] === points[4][1]);
+  assert.ok(points[5][0] > points[4][0] && points[5][1] > points[4][1]);
   assert.equal([280, 170, 300, 170, 280].reduce((sum, side) => sum + side, 0), 1200);
 });
 
@@ -548,7 +548,7 @@ test('shape editor renders closed stirrup overlap instead of drawing the overlap
   assert.match(editor, /function renderClosedStirrupEditor2D/);
   assert.match(editor, /data-shape-kind="closed-stirrup"/);
   assert.match(editor, /data-stirrup-marker="overlap"/);
-  assert.match(editor, /window\.IronBendHoopView\.parts\(sides,angles/);
+  assert.match(editor, /const stirrupParts = detectClosedStirrupParts\(sides, angles\)/);
   assert.match(editor, /renderClosedStirrupEditor2D\(stirrupParts, sides, 300, 260/);
 });
 
@@ -568,7 +568,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=83/);
+  assert.match(index, /shape-editor\.js\?v=81/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
@@ -701,7 +701,7 @@ test('new order item rows render a visible shape preview from length fallback', 
   assert.match(index, /item\.length \?\? item\.totalLengthMm \?\? item\.total_length_mm/);
   assert.match(index, /const sides = itemShapeSides\(item\);/);
   assert.match(index, /const sides = itemShapeSides\(item \|\| \{\}\);/);
-  assert.match(index, /const W = 260, H = 150, padX = 34, padY = 30/);
+  assert.match(index, /const W = 180, H = 96, padX = 28, padY = 22/);
 });
 
 test('manual add item opens the shape editor before creating an empty order row', () => {
@@ -833,20 +833,20 @@ test('ShapeEngineRouter renders Mesh 600x250 Ø8@20 as grid with MeshEngine', ()
   const { ShapeEngineRouter, MeshEngine } = loadShapeEditorGeometry();
   const mesh = {
     family: 'mesh',
-    length: 6000,
-    width: 2500,
+    length: 600,
+    width: 250,
     longitudinalDiameter: 8,
-    longitudinalSpacing: 200,
+    longitudinalSpacing: 20,
     transverseDiameter: 8,
-    transverseSpacing: 200,
+    transverseSpacing: 20,
   };
   const svg = ShapeEngineRouter.render(mesh, 300, 260);
 
   assert.equal(ShapeEngineRouter(mesh), MeshEngine);
   assert.match(svg, /data-engine="MeshEngine"/);
   assert.match(svg, /data-family="mesh"/);
-  assert.match(svg, /data-length="6000"/);
-  assert.match(svg, /data-width="2500"/);
+  assert.match(svg, /data-length="600"/);
+  assert.match(svg, /data-width="250"/);
   assert.match(svg, /data-longitudinal="Ø8@20 ס״מ"/);
   assert.match(svg, /data-transverse="Ø8@20 ס״מ"/);
   assert.ok((svg.match(/<line /g) || []).length >= 40, 'expected mesh grid lines');
@@ -976,10 +976,10 @@ test('MeshEngine spacing changes grid count while diameter changes bar thickness
   const spacingSvg = ShapeEngineRouter.render(widerSpacing, 300, 260);
   const thickSvg = ShapeEngineRouter.render(thicker, 300, 260);
 
-  assert.match(baseSvg, /data-longitudinal-count="14"/);
-  assert.match(spacingSvg, /data-longitudinal-count="10"/);
+  assert.match(baseSvg, /data-longitudinal-count="31"/);
+  assert.match(spacingSvg, /data-longitudinal-count="21"/);
   assert.match(thickSvg, /stroke-width="3\.5"/);
-  assert.match(thickSvg, /data-longitudinal-count="14"/);
+  assert.match(thickSvg, /data-longitudinal-count="31"/);
 });
 
 test('PileCageEngine treats pile editor dimension fields as centimeters', () => {
@@ -1899,7 +1899,7 @@ test('production card renders open U bars as a readable U shape, not a flattened
   assert.doesNotMatch(svg, /<circle/);
 });
 
-test('production card preserves the actual ratio of short bent legs to a long bar', () => {
+test('production card keeps short bent legs visually readable next to a long bar', () => {
   const svg = shapeSvg(JSON.stringify([
     { length_mm: 75, angle_deg: 90 },
     { length_mm: 2500, angle_deg: 90 },
@@ -1911,8 +1911,7 @@ test('production card preserves the actual ratio of short bent legs to a long ba
   const firstSegmentLength = Math.hypot(points[1][0] - points[0][0], points[1][1] - points[0][1]);
 
   assert.match(svg, /data-proportional-short-bends="1"/);
-  const bridgeLength=Math.hypot(points[2][0]-points[1][0],points[2][1]-points[1][1]);
-  assert.ok(Math.abs(firstSegmentLength/bridgeLength-75/2500)<.001);
+  assert.ok(firstSegmentLength >= 18, `expected short bent leg to remain readable, got ${firstSegmentLength}`);
   assert.match(svg, />7.5</);
 });
 
@@ -1930,8 +1929,8 @@ test('production card renders closed stirrups as a closed rectangular hoop', () 
   assert.match(svg, /Z/);
   assert.match(svg, />30</);
   assert.match(svg, />95</);
-  assert.match(svg, /data-canonical-hoop="1"/);
-  assert.match(svg, /data-hoop-closure="orthogonal"/);
+  assert.match(svg, /stroke="#a8b0ba"/);
+  assert.match(svg, /data-stirrup-marker="overlap"/);
   assert.doesNotMatch(svg, /data-tail=/);
   assert.doesNotMatch(svg, /end tails/);
   assert.doesNotMatch(svg, /<circle/);
@@ -1949,8 +1948,8 @@ test('production card accepts closed stirrup OCR with one visible overlap tail',
   assert.match(svg, /data-shape-kind="closed-stirrup"/);
   assert.match(svg, />30</);
   assert.match(svg, />95</);
-  assert.match(svg, /data-canonical-hoop="1"/);
-  assert.match(svg, /data-hoop-closure="single-end"/);
+  assert.match(svg, /stroke="#a8b0ba"/);
+  assert.match(svg, /data-stirrup-marker="overlap"/);
   assert.doesNotMatch(svg, /data-tail=/);
   assert.doesNotMatch(svg, /end tails/);
   assert.doesNotMatch(svg, /<circle/);

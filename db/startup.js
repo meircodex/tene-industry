@@ -60,10 +60,6 @@ function ensureRawMaterialVerificationStatusConstraint(db) {
   }
 }
 
-// Source drawing repairs are versioned, backed up and applied once. Numeric
-// similarity cannot establish either path order or bend direction.
-
-
 function runCoreMigrations(db) {
   ensureCustomerMergeSchema(db);
   // ── MIGRATIONS (safe column additions) ────────────────────────────
@@ -178,9 +174,6 @@ function runCoreMigrations(db) {
   addCol('items',      'qc_status',          "TEXT DEFAULT 'לא נבדק'"); // 'לא נבדק'|'עבר'|'נכשל'
   addCol('items',      'batch_id',           'INTEGER');          // raw material batch used
   addCol('items',      'total_weight',       'REAL DEFAULT 0');   // alias for weight column (compat)
-
-  require('../services/sourceDrawingGeometry').repairSourceDrawingOrders(db);
-  require('../services/sourceDrawingGeometry').repairSourceLengthAliases(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (

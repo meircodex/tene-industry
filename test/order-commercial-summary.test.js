@@ -118,24 +118,12 @@ test('hoops are kept distinct from rings and are priced as bent hoop processing'
     shape_name: 'חישוק',
     quantity: 7,
     total_weight: 21,
-    total_length_mm: 2800,
-    segments: JSON.stringify([100, 800, 500, 800, 500, 100].map((length_mm, index) => ({ length_mm, angle_deg: index === 5 ? 0 : 90 }))),
     shape_snapshot_json: JSON.stringify({ shapeType: 'closed_stirrup', data: {} }),
   })]);
   assert.equal(line(summary, 'bending_kg').value, 21);
   assert.equal(summaryLine(summary, 'rings_units'), null);
   assert.equal(line(summary, 'hoops_units').value, 7);
   assert.equal(line(summary, 'hoops_units').label, 'עיבוד חישוקים');
-});
-
-test('a stale hoop label cannot add a hoop charge to an actual open L', () => {
-  const summary = buildOrderCommercialSummary([item({
-    shape_name: 'חישוק L – עולה לקיר', total_weight: 21,
-    segments: JSON.stringify([{ length_mm: 200, angle_deg: 90 }, { length_mm: 4800, angle_deg: 0 }]),
-    shape_snapshot_json: JSON.stringify({ shapeType: 'closed_stirrup', data: {} }),
-  })]);
-  assert.equal(line(summary, 'bending_kg').value, 21);
-  assert.equal(summaryLine(summary, 'hoops_units'), null);
 });
 
 test('column penetration details are a separate per-unit add-on with cutting and bending', () => {

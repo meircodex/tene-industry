@@ -15,8 +15,7 @@
 <script src="/display-units.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/hoop-view.js?v=1"></script>
-<script src="/shape-editor.js?v=83"></script>
+<script src="/shape-editor.js?v=81"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -1507,8 +1506,8 @@
 </style>
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/order-item-row.css?v=1">
-<link rel="stylesheet" href="/new-order-editor.css?v=20261014">
-<link rel="stylesheet" href="/order-line-renderer.css?v=3">
+<link rel="stylesheet" href="/new-order-editor.css">
+<link rel="stylesheet" href="/order-line-renderer.css?v=2">
 </head>
 <body data-page="new">
 
@@ -1633,17 +1632,6 @@
               <button type="button" class="btn btn-primary" id="approveOrderImportBtn" onclick="approveOrderImport()" style="display:none">אשר וייבא</button>
               <div id="orderImportResult" class="import-status"></div>
             </div>
-          </div>
-        </details>
-        <details class="csv-import-details quick-code-import">
-          <summary>קוד הזמנה מהיר — הדבקה ללא קובץ</summary>
-          <div class="intake-row csv-import-row" style="display:block">
-            <div class="intake-row-label">שורה אחת לכל פריט · אורך במ״מ</div>
-            <textarea id="quickOrderCode" rows="5" dir="auto" placeholder="אלמנט|צורה|קוטר|כמות|אורך במ״מ&#10;קורה 1|מוט ישר|12|10|6000&#10;חישוק|חישוק|10|48|600"></textarea>
-            <button type="button" class="btn btn-primary" onclick="importQuickCodeText(document.getElementById('quickOrderCode').value)">הוסף שורות להזמנה</button>
-            <label class="btn btn-secondary" for="quickOrderJsonFile">טען קובץ קוד JSON</label>
-            <input id="quickOrderJsonFile" type="file" accept="application/json,.json" hidden onchange="importQuickJsonFile(this.files?.[0], this)">
-            <div class="import-status">אפשר גם JSON: [{"elementName":"קורה 1","shape":"מוט ישר","diameter":12,"quantity":10,"length":6000}]</div>
           </div>
         </details>
       </div>
@@ -2069,10 +2057,6 @@ function setupPanelTitle(type) {
 }
 
 function openSetupDrawer(type = 'customer') {
-  if (type === 'source' && typeof openQuickCodePanel === 'function') {
-    openQuickCodePanel();
-    return;
-  }
   const drawer = document.getElementById('orderSetupDrawer');
   if (!drawer) return;
   const normalized = type === 'site' ? 'delivery' : type;
@@ -2089,25 +2073,6 @@ function openSetupDrawer(type = 'customer') {
     if (details) details.open = active;
   });
   drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-function openQuickCodePanel() {
-  const drawer = document.getElementById('orderSetupDrawer');
-  const panel = document.getElementById('order-import-section-anchor');
-  if (!drawer || !panel) return;
-  drawer.hidden = false;
-  drawer.style.setProperty('display', 'block', 'important');
-  drawer.dataset.active = 'source';
-  setText('setupDrawerTitle', 'קוד הזמנה מהיר');
-  document.querySelectorAll('[data-setup-panel]').forEach(item => {
-    const active = item === panel;
-    item.hidden = !active;
-    item.classList.toggle('is-active', active);
-    item.classList.toggle('is-open', active);
-    item.style.setProperty('display', active ? 'block' : 'none', 'important');
-  });
-  panel.querySelector('details')?.setAttribute('open', '');
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function closeSetupDrawer() {
@@ -3174,7 +3139,11 @@ function roundPileCagePreviewSvg(item = {}) {
 function orderSketchGeometry(sides = [], angles = []) {
   const lengths = sides.map(Number).filter(value => Number.isFinite(value) && value > 0);
   if (!lengths.length) return { points: [], lengths: [] };
-  const visualLengths = lengths;
+  const longest = Math.max(...lengths);
+  const visualLengths = lengths.map((length) => {
+    if (lengths.length === 1) return 120;
+    return 22 + 62 * Math.pow(length / longest, 0.38);
+  });
   const points = [[0, 0]];
   let direction = 0;
   visualLengths.forEach((length, index) => {
@@ -3230,7 +3199,7 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
     : [];
   const geometry = suppliedPoints.length >= 2 ? { points: suppliedPoints } : orderSketchGeometry(sides, angles);
   if (geometry.points.length < 2) return '';
-  const W = 260, H = 150, padX = 34, padY = 30;
+  const W = 180, H = 96, padX = 28, padY = 22;
   const rawX = geometry.points.map(point => point[0]);
   const rawY = geometry.points.map(point => point[1]);
   const minX = Math.min(...rawX), maxX = Math.max(...rawX);
@@ -3258,7 +3227,7 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
       ny *= -1;
     }
     const distance = 11 + (index % 2) * 2;
-    return `<text x="${(midpoint[0] + nx * distance).toFixed(1)}" y="${(midpoint[1] + ny * distance).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-family="Heebo,Arial" font-weight="800" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(sides[index] / 10)}</text>`;
+    return `<text x="${(midpoint[0] + nx * distance).toFixed(1)}" y="${(midpoint[1] + ny * distance).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="Heebo,Arial" font-weight="700" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(sides[index] / 10)}</text>`;
   }).join('');
   const bendMarks = points.slice(1, -1).map((vertex, index) => {
     const angle = Number(angles[index]);
@@ -3295,10 +3264,6 @@ function itemPreviewShapeData(item = {}) {
 }
 
 function itemPreviewSvg(item, sides, angles) {
-  const hoop = !isBenchBarItem(item) && !item.is3d
-    ? window.IronBendHoopView?.parts(sides, angles, /closed[_-]stirrup/.test(String(itemPreviewShapeData(item).shapeType || item.shapeId || '')))
-    : null;
-  if (hoop) return window.IronBendHoopView.render(hoop);
   if (isRoundPileCageItem(item)) return roundPileCagePreviewSvg(item);
   if (isStandaloneRingItem(item)) return engineeringRingSketchSvg(item);
   if (sides.length) {
@@ -3375,12 +3340,6 @@ function openShapeEditor(palletId, itemId) {
     if (pileCage) shapeEditor.open(pileCage);
     return;
   }
-  if (contract?.family === 'mesh') {
-    shapeEditor.open({ ...contract.data, family:'mesh', shapeType:contract.shapeType,
-      presetId:item.shapeId || contract.shapeId, presetName:'רשת', quantity:item.qty,
-      diameter:contract.data.longitudinalDiameter, structElement:elementName, itemNumber, itemTotal });
-    return;
-  }
   if (contract?.family === 'spirals') {
     if (contract.shapeType === 'ring') {
       const ring = ringFieldsFromShapeData({ ...item, shapeSnapshot: contract });
@@ -3446,27 +3405,8 @@ function shapeSelected(data) {
   item.shapeEmoji  = data.presetEmoji;
   item.family      = data.family || 'bars';
   item.shapeSnapshot = approvedShapeContract(data);
-  item.textOnly = data.textOnly === true;
   item.steelFinish = data.steelFinish || data.data?.steelFinish || 'ribbed';
   const isPileCage = item.shapeSnapshot?.family === 'piles' && item.shapeSnapshot?.shapeType === 'round_pile_cage';
-  if (item.shapeSnapshot?.family === 'mesh') {
-    item.shapeName = 'רשת'; item.shapeSides = []; item.shapeAngles = [];
-    item.length = item.totalLengthMm = Number(item.shapeSnapshot.calculated?.totalLengthMm || 0);
-    item.diameter = Number(item.shapeSnapshot.data?.longitudinalDiameter || 0);
-    item.qty = Math.max(1, Number(data.orderItemQuantity || item.qty || 1));
-    if (data.structElement !== undefined) item.structElement = item.struct_element = item.elementName = data.structElement.trim();
-    _shapeTarget = null; renderPallets(); updateSummary(); return;
-  }
-  if (item.shapeSnapshot?.family === 'lifts') {
-    item.shapeName = 'חבילת ליפטים'; item.family = 'lifts';
-    item.shapeSides = []; item.shapeAngles = [];
-    item.length = item.totalLengthMm = Number(item.shapeSnapshot.data?.barLength || 0);
-    item.diameter = Number(item.shapeSnapshot.data?.diameter || 0);
-    item.qty = Math.max(1, Number(data.orderItemQuantity || 1));
-    _shapeTarget = null;
-    renderPallets(); updateSummary();
-    return;
-  }
   if (isPileCage) {
     const pile = roundPileCageVisualData(item);
     item.shapeName = 'PILE CAGE';
@@ -3494,7 +3434,6 @@ function shapeSelected(data) {
   item.azAngles   = item.is3d ? (data.azAngles || []) : null;
   item.elAngles   = item.is3d ? (data.elAngles || []) : null;
   item.diameter   = isSpiral ? (spiral.barDiameter || item.diameter || 8) : (Number(data.diameter) || item.diameter || 12);
-  if (data.textOnly) item.diameter = 0;
   item.spiral_diameter_mm = isSpiral ? (spiral.spiralDiameterMm || null) : null;
   item.spiral_turns = isSpiral ? (spiral.spiralTurns || null) : null;
   item.length      = isSpiral
@@ -3689,9 +3628,6 @@ function isSpiralOrderItem(item = {}) {
 }
 
 function calcItemWeight(item) {
-  const liftContract = itemShapeContract(item) || item.shapeSnapshot || {};
-  if (liftContract.family === 'mesh') return Math.max(0, Number(liftContract.calculated?.weightKg || 0)) * Math.max(1,Number(item.qty || item.quantity || 1));
-  if (liftContract.family === 'lifts') return Math.max(0, Number(liftContract.data?.weighedKg || 0));
   if (isRoundPileCageItem(item)) {
     const contract = itemShapeContract(item) || item.shapeSnapshot || {};
     const unitWeightKg = Number(contract?.calculated?.totalWeightKg ?? contract?.calculated?.weightKg ?? contract?.data?.assemblySummary?.totalWeightKg ?? 0);
@@ -3840,7 +3776,6 @@ function buildOrderPayload() {
       items: p.items.map(item => ({
         shapeId: item.shapeId,
         shapeName: item.shapeName,
-        textOnly: item.textOnly === true || (!item.shapeSnapshot && !item.length && !(item.shapeSides && item.shapeSides.length)),
         shapeSnapshot: item.shapeSnapshot || null,
         diameter: item.diameter,
         length: item.length,
@@ -4357,6 +4292,6 @@ document.getElementById('imgAnalyzeOverlay').addEventListener('click', function(
 });
 </script>
 <script src="/order-line-renderer.js?v=2"></script>
-<script src="/new-order-editor.js?v=10"></script>
+<script src="/new-order-editor.js?v=7"></script>
 </body>
 </html>

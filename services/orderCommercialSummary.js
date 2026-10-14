@@ -190,35 +190,23 @@ function classifyOrderItem(item = {}) {
   // rules own 'ליפט' for bent bars and must keep behaving exactly as before.
   const isLiftPackage = shape.family === 'lifts' || shape.shapeType === 'lift_package';
   const isPileCage = !isLiftPackage && Boolean(pileBreakdown || productionCards.isRoundPileCageItem(item));
-  // A chair supports mesh; mentioning its purpose must not turn the bar into
-  // mesh material and drop its cutting, bending and chair-unit services.
-  const isChair = shape.family !== 'mesh' && (shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text));
-  const isMesh = shape.family === 'mesh' || (shape.family !== 'bars' && !isChair
-    && /(^|[^\p{L}\p{N}])(mesh|wire mesh|רשת(?:ות)?)(?=$|[^\p{L}\p{N}])/iu.test(shape.text));
+  const isMesh = shape.family === 'mesh' || /(^|\W)(mesh|wire mesh|רשת)(\W|$)/i.test(shape.text);
   const isColumnPenetration = !isPileCage && !isMesh && (
     /חדירה\s*לעמודים?|עמודים?\s*חדירה|column\s*penetration|penetration\s*column/i.test(shape.text)
       // Imported penetration details are named "מוטה ... ב-2 כיוונים".
       || /מוטה[\s\S]*ב[-־]?2\s*כיוונים/.test(shape.text)
   );
+  const isChair = shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text);
   const isSpiral = !isPileCage && !isMesh && shape.shapeType !== 'ring' && (
     shape.family === 'spirals' && spiralTurns > 1.5
     || /spiral|helix|spring|coil|ספיר|סליל|קפיץ/i.test(shape.text)
   );
-  // Legacy imports sometimes labelled an open L/leg as "חישוק".  Geometry
-  // wins over that stale label: an open L with fewer than four segments is a
-  // bent bar and must never receive the per-hoop charge.
-  const openLegSegments = productionCards.shapeSegmentsFromItem(item);
-  const explicitHoopWording = /(^|\W)(hoop|חישוק|סגור|closed\s*stirrup)(\W|$)/i.test(shape.text);
-  const isOpenLeg = !explicitHoopWording && Array.isArray(openLegSegments)
-    && openLegSegments.length < 4
-    && /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=/i.test(shape.text);
   // A ring (טבעת) and a hoop/stirrup (חישוק) are different products and must
   // remain separate in the commercial summary. Prefer the explicit shape type
   // and then the product wording when legacy rows do not have a type.
-  const structurallyClosed = Array.isArray(openLegSegments) && openLegSegments.length >= 4;
-  const isHoop = structurallyClosed && !isOpenLeg && !isSpiral && !isPileCage && !isMesh && (
+  const isHoop = !isSpiral && !isPileCage && !isMesh && (
     ['closed_stirrup', 'stirrup', 'hoop'].includes(shape.shapeType)
-      || explicitHoopWording
+      || /(^|\W)(hoop|חישוק)(\W|$)/i.test(shape.text)
   );
   const isRing = !isHoop && !isSpiral && !isPileCage && !isMesh && (
     shape.shapeType === 'ring'

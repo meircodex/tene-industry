@@ -3,17 +3,6 @@ const productionCardShapes = require('./productionCards');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
 
 const REVIEW_NOTE_LABEL = '\u05d3\u05d5\u05e8\u05e9 \u05d0\u05d9\u05de\u05d5\u05ea \u05de\u05d5\u05dc \u05de\u05e7\u05d5\u05e8 \u05d4\u05e7\u05dc\u05d9\u05d8\u05d4';
-const PRODUCTION_PRINT_LAYOUT = Object.freeze({
-  cardWidthMm: 104,
-  cardHeightMm: 74,
-  columns: 2,
-  rows: 4,
-  gapMm: 0,
-  pageWidthMm: 210,
-  pageHeightMm: 297,
-  pageMarginMm: 0,
-});
-const PRODUCTION_CARDS_PER_PAGE = PRODUCTION_PRINT_LAYOUT.columns * PRODUCTION_PRINT_LAYOUT.rows;
 
 function printableItemNote(note) {
   const normalized = String(note || '').trim();
@@ -283,8 +272,8 @@ function renderA4CardPages(cardHtmlList) {
     return '<div class="cards-page"><div class="cards-grid"><div style="padding:40px;text-align:center;color:#888;">No order items</div></div></div>';
   }
   var pages = [];
-  for (var i = 0; i < cardHtmlList.length; i += PRODUCTION_CARDS_PER_PAGE) {
-    pages.push('<div class="cards-page"><div class="cards-grid">' + cardHtmlList.slice(i, i + PRODUCTION_CARDS_PER_PAGE).join('') + '</div></div>');
+  for (var i = 0; i < cardHtmlList.length; i += 8) {
+    pages.push('<div class="cards-page"><div class="cards-grid">' + cardHtmlList.slice(i, i + 8).join('') + '</div></div>');
   }
   return pages.join('');
 }
@@ -330,9 +319,9 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 
 /* ── Cards ── */
 .cards-pages{display:flex;flex-direction:column;gap:12mm;align-items:center;}
-.cards-page{width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm}mm;height:${PRODUCTION_PRINT_LAYOUT.pageHeightMm}mm;background:#fff;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.14);}
-.cards-grid{display:grid;grid-template-columns:repeat(${PRODUCTION_PRINT_LAYOUT.columns},${PRODUCTION_PRINT_LAYOUT.cardWidthMm}mm);grid-template-rows:repeat(${PRODUCTION_PRINT_LAYOUT.rows},${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm);grid-auto-rows:${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm;gap:${PRODUCTION_PRINT_LAYOUT.gapMm}mm;align-items:stretch;justify-content:center;align-content:center;width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm}mm;height:${PRODUCTION_PRINT_LAYOUT.pageHeightMm}mm;margin:0;background:#fff;}
-.prod-card{width:${PRODUCTION_PRINT_LAYOUT.cardWidthMm}mm;height:${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm;margin:0;background:#fff;border:0.25mm solid #1a2332;border-radius:0;
+.cards-page{width:210mm;height:297mm;background:#fff;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.14);}
+.cards-grid{display:grid;grid-template-columns:repeat(2,105mm);grid-template-rows:repeat(4,74.25mm);grid-auto-rows:74.25mm;gap:0;align-items:stretch;justify-content:start;width:210mm;height:297mm;margin:0;background:#fff;}
+.prod-card{width:105mm;height:74.25mm;margin:0;background:#fff;border:0.25mm solid #1a2332;border-radius:0;
   overflow:hidden;page-break-inside:avoid;break-inside:avoid;display:flex;flex-direction:column;
   font-size:8px;box-shadow:none;position:relative;}
 .prod-card.pile-cage-master-card{border:0.6mm solid #1a2332;background:#fff;}
@@ -431,28 +420,26 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .pc-shape-area svg{max-height:128px!important;}
 }
 
-@page{size:A4 portrait;margin:${PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm;}
 @media print{
-  html{direction:ltr!important;overflow:visible!important;margin:0!important;padding:0!important;}
-  body{width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;margin:0!important;padding:0!important;background:#fff!important;direction:ltr!important;position:static!important;}
+  html{direction:ltr!important;overflow:hidden!important;margin:0!important;padding:0!important;}
+  body{width:210mm!important;margin:0!important;padding:0!important;background:#fff!important;direction:ltr!important;position:absolute!important;left:0!important;top:0!important;}
   .screen-only{display:none!important;}
   body.preview-locked .cards-pages{display:none!important;}
-  body.preview-locked .print-blocked-page{display:flex!important;width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm;height:${PRODUCTION_PRINT_LAYOUT.pageHeightMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm;align-items:center;justify-content:center;text-align:center;font-family:'Heebo',Arial,sans-serif;font-size:18px;font-weight:900;color:#1a2332;padding:20mm;}
-  .cards-pages{display:block!important;margin:0!important;padding:0!important;direction:ltr!important;width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;}
-  .cards-page{width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;height:${PRODUCTION_PRINT_LAYOUT.pageHeightMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;margin:0!important;padding:0!important;overflow:hidden!important;box-shadow:none!important;break-after:page;page-break-after:always;}
+  body.preview-locked .print-blocked-page{display:flex!important;width:210mm;height:297mm;align-items:center;justify-content:center;text-align:center;font-family:'Heebo',Arial,sans-serif;font-size:18px;font-weight:900;color:#1a2332;padding:20mm;}
+  .cards-pages{display:block!important;margin:0!important;padding:0!important;direction:ltr!important;width:210mm!important;}
+  .cards-page{width:210mm!important;height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important;box-shadow:none!important;break-after:page;page-break-after:always;position:relative!important;left:0!important;}
   .cards-page:last-child{break-after:auto;page-break-after:auto;}
   .cards-grid{
     display:grid!important;
-    grid-template-columns:repeat(${PRODUCTION_PRINT_LAYOUT.columns}, ${PRODUCTION_PRINT_LAYOUT.cardWidthMm}mm);
-    grid-template-rows:repeat(${PRODUCTION_PRINT_LAYOUT.rows}, ${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm);
-    grid-auto-rows:${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm;
-    gap:${PRODUCTION_PRINT_LAYOUT.gapMm}mm;
+    grid-template-columns:repeat(2, 105mm);
+    grid-template-rows:repeat(4, 74.25mm);
+    grid-auto-rows:74.25mm;
+    gap:0;
     align-items:stretch;
-    justify-content:center;
-    align-content:center;
+    justify-content:start;
   }
-  .cards-grid{break-before:auto;page-break-before:auto;height:${PRODUCTION_PRINT_LAYOUT.pageHeightMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;width:${PRODUCTION_PRINT_LAYOUT.pageWidthMm - 2 * PRODUCTION_PRINT_LAYOUT.pageMarginMm}mm!important;}
-  .prod-card{border:0.25mm solid #1a2332!important;border-radius:0!important;overflow:hidden!important;box-sizing:border-box!important;width:${PRODUCTION_PRINT_LAYOUT.cardWidthMm}mm!important;height:${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm!important;}
+  .cards-grid{break-before:auto;page-break-before:auto;height:297mm!important;width:210mm!important;}
+  .prod-card{border:0.25mm solid #1a2332!important;border-radius:0!important;overflow:hidden!important;box-sizing:border-box!important;width:105mm!important;height:74.25mm!important;}
   .pc-pick{display:none!important;}
   .prod-card[data-picked="0"]{display:none!important;}
   .cards-page[data-empty-page="1"]{display:none!important;}
@@ -474,8 +461,8 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .pc-print-qr-code canvas,.pc-print-qr-code img{width:22mm!important;height:22mm!important;display:block;}
   .pc-print-status{width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-top:0.25mm solid #1a2332;font-size:10px;font-weight:900;letter-spacing:0;text-align:center;line-height:1.1;background:#1a2332!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .prod-card{
-    width:${PRODUCTION_PRINT_LAYOUT.cardWidthMm}mm!important;
-    height:${PRODUCTION_PRINT_LAYOUT.cardHeightMm}mm!important;
+    width:105mm!important;
+    height:74.25mm!important;
     margin:0!important;
     box-shadow:none;
     break-inside:avoid;
@@ -516,6 +503,7 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .pc-footer{padding:2px 5px;}
   .pc-brand{font-size:7px;}
   .pc-brand-num{font-size:11px;}
+  @page{size:A4 portrait;margin:0!important;}
 }
 </style>
 </head>
@@ -535,7 +523,7 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
     </span>
   <button class="btn-print" onclick="IronBendDocExport.download({ button: this, filename: 'כרטיסיות ייצור ${order.order_num}', pageSelector: '.cards-page', scale: 3 })">⬇️ הורד PDF</button>
   <button class="btn-print" onclick="IronBendDocExport.send({ button: this, filename: 'כרטיסיות ייצור ${order.order_num}', pageSelector: '.cards-page', scale: 3 })">📤 שלח</button>
-    <span style="font-size:13px;color:#555;">הזמנה ${order.order_num} · ${order.customer_name || ''} · ${cardItems.length} כרטיסיות · 8 כרטיסיות ב־A4 לאורך, להדפיס ב־100% (גודל אמיתי), כרטיס 104×74 מ״מ</span>
+    <span style="font-size:13px;color:#555;">הזמנה ${order.order_num} · ${order.customer_name || ''} · ${cardItems.length} כרטיסיות</span>
   </div>
 
 <!-- ── Card grid – server-rendered, barcodes added by JS ── -->
@@ -798,16 +786,14 @@ function closedStirrupPartsClient(segments) {
   var checkedAngles = segments.slice(0, Math.min(4, segments.length - 1));
   if (checkedAngles.length && !checkedAngles.every(function(s){ return isRightAngleValue(s.angle_deg); })) return null;
 
-  if (values.length >= 6) {
-    // Imported closed hoops use either:
-    //   excess, excess, side, width, width, side
-    // or side/excess/width/excess/width/side.
-    var a = values[0], b = values[1], c = values[2], d = values[3], e = values[4], f = values[5];
-    if (isSimilarDimensionClient(a, b) && isSimilarDimensionClient(c, f) && isSimilarDimensionClient(d, e)) {
-      return { top: d, right: c, bottom: e, left: f, tailStart: a, tailEnd: b };
-    }
-    if (isSimilarDimensionClient(a, d) && isSimilarDimensionClient(b, f) && isSimilarDimensionClient(c, e)) {
-      return { top: c, right: b, bottom: e, left: f, tailStart: a, tailEnd: d };
+  if (values.length >= 5) {
+    var sideA = values[0], tailStart = values[1], horizontalA = values[2], tailEnd = values[3], horizontalB = values[4], sideB = values[5] || sideA;
+    if (
+      isSimilarDimensionClient(tailStart, tailEnd || tailStart) &&
+      isSimilarDimensionClient(sideA, sideB) &&
+      isSimilarDimensionClient(horizontalA, horizontalB)
+    ) {
+      return { top: horizontalA, right: sideA, bottom: horizontalB, left: sideB, tailStart: tailStart, tailEnd: tailEnd };
     }
   }
 
@@ -1133,10 +1119,15 @@ function hasPrintableBends(segments) {
 }
 
 function shapeSvgForCard(item, segments) {
-  // The server regenerates canonical geometry for every saved item. Never
-  // replace a reviewed hoop with this legacy client-side dimension guess.
-  if (item.shape_svg) return item.shape_svg;
-  var generated = buildShapeSVG(Array.isArray(segments) ? segments : []);
+  var cleanSegments = Array.isArray(segments) ? segments : [];
+  var generated = buildShapeSVG(cleanSegments);
+  var name = String((item && (item.shape_name || item.shapeName || item.shape)) || '').toLowerCase();
+  var type = String((item && (item.shapeType || item.shape_type)) || '').toLowerCase();
+  var isHoop = /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(name + ' ' + type);
+  // Cached SVGs on older orders were generic bars and could swap the hoop's
+  // body sides with its two closure tails. Always regenerate a hoop card from
+  // the current machine sequence.
+  if (isHoop && cleanSegments.length) return generated;
   return item.shape_svg || generated;
 }
 
@@ -1247,7 +1238,7 @@ function buildCard(item, subQty, totalCards, cardIdx) {
 
 // ── Generate & render all cards ───────────────────────────────────
 function appendCardToA4Pages(container, cardEl, index) {
-  if (index % ${PRODUCTION_CARDS_PER_PAGE} === 0) {
+  if (index % 8 === 0) {
     var page = document.createElement('div');
     page.className = 'cards-page';
     var grid = document.createElement('div');

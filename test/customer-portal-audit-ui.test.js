@@ -110,8 +110,8 @@ test('customer-facing prices use the shared two-decimal formatter', () => {
 test('factory and customer adapters consume one canonical order-line renderer', () => {
   assert.match(html, /IronBendOrderLineRenderer\.render/);
   assert.match(editor, /IronBendOrderLineRenderer\.render/);
-  assert.match(html, /order-line-renderer\.css\?v=3/);
-  assert.match(fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8'), /order-line-renderer\.css\?v=3/);
+  assert.match(html, /order-line-renderer\.css\?v=2/);
+  assert.match(fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8'), /order-line-renderer\.css\?v=2/);
   assert.match(rendererCss, /\.ib-order-lines \.order-lines-head/);
   const context = vm.createContext({ window: {} });
   vm.runInContext(renderer, context);
@@ -131,7 +131,7 @@ test('factory and customer adapters consume one canonical order-line renderer', 
 
 test('factory order editor cache version is bumped with the shared table integration', () => {
   const factory = fs.readFileSync(path.join(__dirname, '../public/index.html'), 'utf8');
-  assert.match(factory, /new-order-editor\.js\?v=\d+/);
+  assert.match(factory, /new-order-editor\.js\?v=7/);
   assert.match(editor, /unitLengthCm:\s*unitLenCm/);
   assert.doesNotMatch(editor, /\bunitLengthCm,\s*totalLength/);
 });

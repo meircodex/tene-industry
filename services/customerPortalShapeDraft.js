@@ -653,21 +653,11 @@ function parsePortalShapeSnapshot(value) {
   return isShapeDataContractV2(snapshot) ? snapshot : null;
 }
 
-function meshOrderMetrics(item = {}) {
-  const snapshot = parsePortalShapeSnapshot(item.shapeSnapshot ?? item.shape_snapshot ?? item.shape_snapshot_json ?? item.shapeData ?? item.shapeContract);
-  if (snapshot?.family !== 'mesh') return null;
-  // Recalculate from physical millimetre dimensions, never trust a client
-  // weight or price. The portal and office use the same validated mesh model.
-  const mesh = buildMeshSnapshot(snapshot, normalizeMeshData(snapshot.data || {}));
-  return { snapshot:mesh.shapeSnapshot, totalLengthMm:mesh.totalLengthMm, weightKg:mesh.weightPerUnit, diameter:mesh.diameter };
-}
-
 module.exports = {
   buildPortalShapeDraft,
   validatePortalShapeDraft,
   portalShapeDraftToOrderItem,
   parsePortalShapeSnapshot,
-  meshOrderMetrics,
 };
 
 

@@ -142,7 +142,7 @@ const SHAPE_PRESETS = [
   { id: 's13', name: 'צורה 12', family: 'bars', category: 'פיגורה', icon: 'w', bends: 4, sides: [200, 300, 300, 300, 200], angles: [135, 90, 90, 135], emoji: 'W' },
   { id: 's14', name: 'צורה 13',    family: 'bars', category: 'פיגורה', icon: 'c', bends: 4, sides: [300, 200, 400, 200, 300], angles: [90, 90, 90, 90],   emoji: 'C' },
   { id: 's15', name: 'ספסל',       family: 'bars', category: 'פיגורה', icon: 'bench', bends: 4, sides: [280, 170, 300, 170, 280], angles: [90, 90, 90, 90], is3d: 1, azAngles: [0, 90, 90, 90, 90], elAngles: [90, 0, 0, 0, 90], shapeType: 'bench_bar', emoji: '🪑' },
-  { id: 'mesh1', name: 'רשת', family: 'mesh', icon: 'mesh', bends: 0, length: 6000, width: 2500, longitudinalDiameter: 8, longitudinalSpacing: 200, transverseDiameter: 8, transverseSpacing: 200, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0, emoji: '#', specialty: 'mesh' },
+  { id: 'mesh1', name: 'רשת', family: 'mesh', icon: 'mesh', bends: 0, length: 600, width: 250, longitudinalDiameter: 8, longitudinalSpacing: 20, transverseDiameter: 8, transverseSpacing: 20, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0, emoji: '#', specialty: 'mesh' },
   { id: 'round-pile-cage', name: 'כלוב כלונס עגול', family: 'piles', icon: 'pile', bends: 0, roundPileCage: true, pileDiameter: 60, pileLength: 1200, longitudinalBars: 10, longitudinalDiameter: 20, straightBarCount: 5, bentBarCount: 5, straightBarLength: 1200, bentBarLength: 1220, bendLength: 20, barPattern: 'alternate', barSpacingDisplayMode: 'center', spiralDiameter: 8, spiralOuterDiameter: 48, spiralPitch: 20, spiralZones: buildRoundPileCageStandardZones(1200), hoopsEnabled: true, hoopDiameter: 18, hoopOuterDiameter: 42, hoopQuantity: '', hoopStart: 150, hoopSpacing: 300, emoji: '◎', specialty: 'pile' },
   { id: 'spiral1', name: 'ספיראלה', family: 'spirals', icon: 'spiral', bends: 0, barDiameter: 8, spiralDiameter: 400, turns: 20, emoji: '🌀', specialty: 'spiral' },
   { id: 'ring1', name: 'טבעת עגולה', family: 'spirals', icon: 'ring', bends: 0, barDiameter: 18, ringDiameter: 420, spiralDiameter: 420, overlap: 200, turns: 1, shapeType: 'ring', emoji: '⭕', specialty: 'ring' },
@@ -157,7 +157,7 @@ const SHAPE_FAMILIES = [
   { id: 'lifts',   label: 'ליפטים' },
 ];
 
-SHAPE_PRESETS.push({ id: 'lift-package', name: 'חבילת ליפטים', family: 'lifts', icon: 'lift', bends: 0, diameter: 12, barLength: 12000, weighedKg: 0, quantity: 0, emoji: '📦', specialty: 'lift' });
+SHAPE_PRESETS.push({ id: 'lift-package', name: 'חבילת ליפטים', family: 'lifts', icon: 'lift', bends: 0, diameter: 12, barLength: 1200, weighedKg: 0, quantity: 0, emoji: '📦', specialty: 'lift' });
 
 const SHAPE_CATEGORY_FILTERS = ['הכל', 'חישוק', 'פיגורה', 'ספירלים', 'ציפורים', 'משקפיים', 'קלמרה'];
 const SHAPE_SIDE_FILTERS = ['הכל', 1, 2, 3, 4, 5, 6, 7, 8];
@@ -339,23 +339,22 @@ function shapeSVGPath(sides, angles, w, h, padding = 14, opts = {}) {
 }
 
 // A bench is manufactured as a real 3D bar, but its 2D schedule projection is
-// a proportional orthographic elevation: feet, two uprights, and a top
+// the conventional five-leg elevation: angled feet, two uprights, and a top
 // bridge. Keep this projection stable anywhere the user explicitly chooses 2D.
 function benchBarSVGPath(sides, w, h, padding = 14, opts = {}) {
   const values = Array.isArray(sides) ? sides.map(value => Math.max(1, Number(value) || 0)) : [];
   if (values.length !== 5) return shapeSVGPath(values, [], w, h, padding);
   const [leftFoot, leftRise, bridge, rightDrop, rightFoot] = values;
-  // Orthographic elevation; perspective belongs only in the optional 3D view.
-  const leftProjection = leftFoot;
-  const rightProjection = rightFoot;
-  const leftVerticalProjection = 0;
+  const leftProjection = leftFoot / Math.SQRT2;
+  const rightProjection = rightFoot / Math.SQRT2;
+  const leftVerticalProjection = Math.min(leftProjection, leftRise * 0.72);
   const raw = [
     [0, leftRise - leftVerticalProjection],
     [leftProjection, leftRise],
     [leftProjection, 0],
     [leftProjection + bridge, 0],
     [leftProjection + bridge, rightDrop],
-    [leftProjection + bridge + rightProjection, rightDrop],
+    [leftProjection + bridge + rightProjection, rightDrop + rightProjection],
   ];
   const visualPoints = rotatePointListAroundBounds(raw, opts.rotateDegrees);
   const xs = visualPoints.map(point => point[0]);
@@ -421,7 +420,6 @@ function isRightBendAngle(angle) {
 }
 
 function detectClosedStirrupParts(sides, angles) {
-  if (window.IronBendHoopView) return window.IronBendHoopView.parts(sides, angles);
   const values = Array.isArray(sides) ? sides.map(Number) : [];
   if (values.length < 4 || values.some(v => !Number.isFinite(v) || v <= 0)) return null;
   const checkedAngles = Array.isArray(angles) ? angles.slice(0, Math.min(4, values.length - 1)) : [];
@@ -460,7 +458,6 @@ function detectClosedStirrupParts(sides, angles) {
 }
 
 function renderClosedStirrupEditor2D(parts, sides, w, h, opts = {}) {
-  if (window.IronBendHoopView) return window.IronBendHoopView.render(parts, w, h);
   const padding = opts.padding || 38;
   const horizontal = Math.max(parts.top || 0, parts.bottom || 0, 1);
   const vertical = Math.max(parts.left || 0, parts.right || 0, 1);
@@ -861,8 +858,6 @@ PolylineBarEngine.render = function(shape, w = 300, h = 260, opts = {}) {
   const sides = Array.isArray(shape?.sides) ? shape.sides.map(Number) : [];
   const angles = Array.isArray(shape?.angles) ? shape.angles.map(Number) : [];
   if (!sides.length) return '<text x="50%" y="50%" text-anchor="middle" fill="#7a93ab" font-size="12">אין צורה</text>';
-  const hoop = window.IronBendHoopView?.parts(sides,angles,/closed[_-]stirrup/.test(String(shape.shapeType || shape.shapeId || '')));
-  if (hoop && opts.view !== '3d') return window.IronBendHoopView.render(hoop,w,h);
   if (opts.view === '3d') return shape3DSVG(sides, angles, w, h, opts.diameter || 12, opts);
   const { path, pts } = shapeSVGPath(sides, angles, w, h, opts.padding || 24);
   const labelHtml = pts.slice(0, -1).map((p, i) => {
@@ -898,33 +893,33 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
   const innerTop = Math.min(width, edgeTop);
   const innerBottom = Math.max(innerTop, width - Math.min(width, edgeBottom));
   const verticalPositions = [];
-  for (let x = innerLeft; x <= innerRight + 0.001; x += transSpacing) verticalPositions.push(Math.min(innerRight, x));
+  for (let x = innerLeft; x <= innerRight + 0.001; x += longSpacing) verticalPositions.push(Math.min(innerRight, x));
   if (!verticalPositions.length || verticalPositions[verticalPositions.length - 1] !== innerRight) verticalPositions.push(innerRight);
   const horizontalPositions = [];
-  for (let y = innerTop; y <= innerBottom + 0.001; y += longSpacing) horizontalPositions.push(Math.min(innerBottom, y));
+  for (let y = innerTop; y <= innerBottom + 0.001; y += transSpacing) horizontalPositions.push(Math.min(innerBottom, y));
   if (!horizontalPositions.length || horizontalPositions[horizontalPositions.length - 1] !== innerBottom) horizontalPositions.push(innerBottom);
   const verticals = verticalPositions.map(mm => {
     const x = x0 + mm * box.scale;
-    return `<line class="mesh-transverse-bar" data-se-focus="mesh-transverse-bars mesh-transverse-diameter mesh-transverse-spacing" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, transDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
+    return `<line class="mesh-longitudinal-bar" data-se-focus="mesh-longitudinal-bars mesh-longitudinal-diameter mesh-longitudinal-spacing" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, longDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
   }).join('');
   const horizontals = horizontalPositions.map(mm => {
     const y = y0 + mm * box.scale;
-    return `<line class="mesh-longitudinal-bar" data-se-focus="mesh-longitudinal-bars mesh-longitudinal-diameter mesh-longitudinal-spacing" x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, longDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
+    return `<line class="mesh-transverse-bar" data-se-focus="mesh-transverse-bars mesh-transverse-diameter mesh-transverse-spacing" x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, transDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
   }).join('');
-  const longitudinalSpec = `Ø${longDia}@${formatLengthCmFromMm(longSpacing)}`;
-  const transverseSpec = `Ø${transDia}@${formatLengthCmFromMm(transSpacing)}`;
+  const longitudinalSpec = `Ø${longDia}@${formatLengthCm(longSpacing)}`;
+  const transverseSpec = `Ø${transDia}@${formatLengthCm(transSpacing)}`;
   const spacingHelperPath = `M ${(x1 - 61).toFixed(1)} ${(y1 + 18).toFixed(1)} H ${(x1 - 20).toFixed(1)}
     M ${(x1 - 61).toFixed(1)} ${(y1 + 28).toFixed(1)} H ${(x1 - 20).toFixed(1)}
     M ${(x1 - 50).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}
     M ${(x1 - 34).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}`;
   return `<g data-engine="MeshEngine" data-family="mesh" data-length="${length}" data-width="${width}"
       data-longitudinal="${longitudinalSpec}" data-transverse="${transverseSpec}"
-      data-longitudinal-count="${horizontalPositions.length}" data-transverse-count="${verticalPositions.length}"
+      data-longitudinal-count="${verticalPositions.length}" data-transverse-count="${horizontalPositions.length}"
       data-edge-left="${edgeLeft}" data-edge-right="${edgeRight}" data-edge-top="${edgeTop}" data-edge-bottom="${edgeBottom}">
     <rect data-se-focus="mesh-length mesh-width mesh-edge" x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${box.drawW.toFixed(1)}" height="${box.drawH.toFixed(1)}" fill="#fff" stroke="#d8dde5"/>
     ${horizontals}${verticals}
-    <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">L ${formatLengthCmFromMm(length)}</text>
-    <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">W ${formatLengthCmFromMm(width)}</text>
+    <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">L ${formatLengthCm(length)}</text>
+    <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">W ${formatLengthCm(width)}</text>
     <g class="se-engineer-helper" data-se-focus="mesh-longitudinal-spacing mesh-transverse-spacing">
       <rect class="se-helper-panel" x="${(x1 - 72).toFixed(1)}" y="${(y1 + 8).toFixed(1)}" width="64" height="34" rx="4"/>
       <path d="${spacingHelperPath}" stroke="#475569" stroke-width="1.5" fill="none"/>
@@ -1997,7 +1992,7 @@ function buildShapeDataContractV2(shape) {
         ? (isStandaloneRingShape(safeShape) ? buildRingShapeContract(safeShape) : buildSpiralShapeContract(safeShape))
         : buildBarsShapeContract(safeShape);
   const approvedAt = new Date().toISOString();
-  const displayName = String(safeShape.displayName || safeShape.presetName || safeShape.shapeName || safeShape.name || (family === 'lifts' ? 'חבילת ליפטים' : ''));
+  const displayName = String(safeShape.displayName || safeShape.presetName || safeShape.shapeName || safeShape.name || '');
   const data = cleanShapePayload(familyPayload.data || {});
   const calculated = normalizeCalculatedPayload(familyPayload.calculated || {});
   const generic = normalizeGenericMachineOutput(familyPayload.generic || {}, calculated, family, shapeType);
@@ -2047,7 +2042,6 @@ function legacyApprovedShapeFields(shape, contract) {
     family,
   };
   if (family === 'mesh' || family === 'piles') return { ...base, ...contract.data };
-  if (family === 'lifts') return { ...base, ...contract.data, sides:[], angles:[], total_length_mm:contract.data.barLength, segments:[] };
   if (family === 'spirals') return {
     ...base,
     ...contract.data,
@@ -3048,7 +3042,7 @@ class ShapeEditorModal {
   #seModal .se-bottom-summary .se-summary-item{min-width:0!important;width:auto!important;padding:5px 6px!important;}
   #seModal .se-bottom-summary .se-summary-item:nth-child(n+4){display:none!important;}
   #seModal.se-ring-editor .se-bottom-summary{grid-template-columns:repeat(4,minmax(0,1fr))!important;}
-  #seModal .se-bottom-summary .se-quantity-item{display:block!important;}
+  #seModal.se-ring-editor .se-bottom-summary .se-quantity-item{display:block!important;}
   #seModal .se-summary-item span{font-size:9px!important;}
   #seModal .se-summary-item strong{font-size:14px!important;}
   #seModal .se-summary-item small{font-size:9px!important;}
@@ -3792,7 +3786,6 @@ class ShapeEditorModal {
       </div>
       <div class="se-foot-actions">
         <button class="se-cancel-btn" id="seCancel">ביטול</button>
-        <button class="se-text-only-btn" id="seTextOnly">אשר כטקסט בלבד</button>
         <button class="se-save-shape-btn" id="seSaveShapeBtn">שמור צורה</button>
         <button class="se-ok-btn" id="seOk">אשר צורה</button>
       </div>
@@ -3816,7 +3809,6 @@ class ShapeEditorModal {
   _bindEvents() {
     document.getElementById('seClose').onclick         = () => this.close();
     document.getElementById('seCancel').onclick        = () => this.close();
-    document.getElementById('seTextOnly').onclick      = () => this._confirmTextOnly();
     document.getElementById('seOk').onclick            = () => this._confirm();
     document.getElementById('seAddSide').onclick       = () => this._addSide();
     document.getElementById('seSaveShapeBtn').onclick  = () => this._showSaveBar();
@@ -4614,15 +4606,14 @@ class ShapeEditorModal {
     this._setFamilyEditorChrome('lifts');
     const lift = this.current;
     if (lift.diameter == null) lift.diameter = 12;
-    if (lift.barLength == null) lift.barLength = 12000;
+    if (lift.barLength == null) lift.barLength = 1200;
     if (lift.weighedKg == null) lift.weighedKg = 0;
     const body = document.getElementById('seTableBody');
     if (!body) return;
     const meta = {
       diameter:  ['Ø','קוטר ברזל','מ״מ','לדוגמה 12'],
-      barLength: ['📏','אורך מוט','ס״מ','לדוגמה 1200 = 12 מטר'],
+      barLength: ['📏','אורך מוט','ס״מ','לדוגמה 120'],
       weighedKg: ['⚖','משקל כולל אחרי שקילה','ק״ג','לדוגמה 194'],
-      quantity: ['📦','מספר חבילות','חבילות','לדוגמה 2'],
     };
     const field = (key, min = 0, step = 0.1) => {
       const m = meta[key] || ['•', key, '', ''];
@@ -4631,7 +4622,6 @@ class ShapeEditorModal {
     };
     body.innerHTML = `
       <tr class="se-family-row">${field('diameter', 1)}${field('barLength', 1)}</tr>
-      <tr class="se-family-row">${field('quantity', 1, 1)}<td colspan="2">הכמות היא מספר החבילות, לא מספר המוטות.</td></tr>
       <tr class="se-family-row">${field('weighedKg', 0, 0.1)}<td colspan="2"><div class="se-lift-note">שוקלים את כל החבילות יחד — המשקל הזה הוא הסה״כ, והכמות לא מוכפלת בו.</div></td></tr>`;
   }
 
@@ -4639,7 +4629,7 @@ class ShapeEditorModal {
     if (!this.current) return;
     const n = Number(val);
     if (!Number.isFinite(n) || n < 0) return;
-    this.current[key] = key === 'barLength' ? n * 10 : key === 'quantity' ? Math.round(n) : n;
+    this.current[key] = key === 'barLength' ? n * 10 : n;
     this._render();
     this._updateSummaryValues();
   }
@@ -6105,9 +6095,7 @@ class ShapeEditorModal {
         this._updateSummaryValues();
         return;
       }
-      const stirrupParts = window.IronBendHoopView
-        ? window.IronBendHoopView.parts(sides,angles,/closed[_-]stirrup/.test(String(this.current.shapeType || this.current.shapeId || '')))
-        : detectClosedStirrupParts(sides, angles);
+      const stirrupParts = detectClosedStirrupParts(sides, angles);
       if (stirrupParts && !isBenchProjection) {
         svg.innerHTML = renderClosedStirrupEditor2D(stirrupParts, sides, 300, 260, {
           padding: 38,
@@ -6207,10 +6195,10 @@ class ShapeEditorModal {
         const tagW = dimensionTagWidth(value);
         html += `<g data-se-focus="bar-side-${i}" transform="translate(${lx.toFixed(1)} ${ly.toFixed(1)}) rotate(${labelAngle.toFixed(1)})"
             data-seg-click="${i}" style="cursor:pointer">
-          <rect x="${(-tagW/2).toFixed(1)}" y="-11" width="${tagW}" height="22" rx="3"
+          <rect x="${(-tagW/2).toFixed(1)}" y="-8" width="${tagW}" height="16" rx="3"
             fill="${fill}" stroke="${stroke}" stroke-width=".8"
             data-seg-click="${i}"/>
-          <text x="0" y="5" text-anchor="middle" font-size="13"
+          <text x="0" y="4" text-anchor="middle" font-size="10"
             font-family="Heebo,Arial" font-weight="800" fill="#111827"
             data-seg-click="${i}">${value}</text>
         </g>`;
@@ -6330,11 +6318,6 @@ class ShapeEditorModal {
         return;
       }
     }
-    if (this.current.family === 'lifts' && !(Number(this.current.diameter)>0 && Number(this.current.barLength)>0
-      && Number.isInteger(Number(this.current.quantity)) && Number(this.current.quantity)>0 && Number(this.current.weighedKg)>=0)) {
-      alert('יש להזין קוטר, אורך מוט ומספר חבילות חיובי. אפשר להשאיר משקל 0 עד לשקילה.');
-      return;
-    }
     const isReal3D = this.current.is3d === 1 || this.current.is3d === true;
     const orderItemQuantity = Math.max(1, Number(this.current.quantity || this.current.qty || 1) || 1);
     const normalized = {
@@ -6351,33 +6334,6 @@ class ShapeEditorModal {
       ...contract,
       orderItemQuantity,
       structElement: (document.getElementById('seElementName')?.value ?? this.current.structElement ?? '').trim(),
-    });
-    this.close();
-  }
-
-  _confirmTextOnly() {
-    if (!this.current || !this.onSelect) return;
-    const elementName = String(document.getElementById('seElementName')?.value || this.current.structElement || '').trim();
-    const quantity = Math.max(1, Number(document.getElementById('seQuantityInput')?.value || this.current.quantity || this.current.qty || 1) || 1);
-    if (!elementName) {
-      const input = document.getElementById('seElementName');
-      input?.classList.add('se-invalid');
-      input?.focus();
-      return;
-    }
-    this.onSelect({
-      textOnly: true,
-      presetId: null,
-      presetName: '',
-      presetEmoji: null,
-      family: 'manual',
-      shapeType: 'manual_text',
-      diameter: 0,
-      sides: [],
-      angles: [],
-      total_length_mm: 0,
-      orderItemQuantity: quantity,
-      structElement: elementName,
     });
     this.close();
   }
@@ -6416,7 +6372,7 @@ class ShapeEditorModal {
     if (this._blankNewEntry) this.current = null;
     this._previewRotation = shapePreviewRotation(existingData || {});
     seSyncRotateButton();
-    if (existingData?.family === 'mesh' || existingData?.family === 'piles' || existingData?.family === 'spirals' || existingData?.family === 'lifts') {
+    if (existingData?.family === 'mesh' || existingData?.family === 'piles' || existingData?.family === 'spirals') {
       this.current = { ...existingData, quantity: this._pendingQuantity };
       this._pileCageTemplateMode = existingData?.roundPileCage && matchesRoundPileCageStandardZones(existingData)
         ? ROUND_PILE_CAGE_STANDARD_TEMPLATE

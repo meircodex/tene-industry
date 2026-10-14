@@ -16,13 +16,12 @@
 <script src="/status-contracts-client.js"></script>
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
-<script src="/hoop-view.js?v=1"></script>
-<script src="/shape-renderer.js?v=5" defer></script>
+<script src="/shape-renderer.js?v=4" defer></script>
 <script src="/rebar-weights.js"></script>
 <script src="/straight-stock-cutting.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=83"></script>
+<script src="/shape-editor.js?v=81"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -188,15 +187,12 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   color:var(--dim);font-family:'Heebo',sans-serif;font-size:12px;font-weight:600;
   cursor:pointer;transition:all .15s;min-height:40px;-webkit-tap-highlight-color:transparent;}
 .status-btn:hover,.status-btn.cur{border-color:var(--accent);color:var(--accent);background:rgba(224,123,57,0.08);}
-.item-row{display:grid;grid-template-columns:300px 1fr auto;gap:14px;padding:14px;border:1px solid rgba(2,26,72,0.08);border-radius:14px;
+.item-row{display:grid;grid-template-columns:230px 1fr auto;gap:14px;padding:14px;border:1px solid rgba(2,26,72,0.08);border-radius:14px;
   margin-bottom:10px;background:#fbfcfe;align-items:stretch;}
 .item-row:last-child{border-bottom:none;}
-.item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:200px;height:200px;
+.item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:150px;height:150px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6px;}
-.item-visual svg{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;display:block;overflow:visible;}
-/* Readable screen dimensions without resizing print cards or cage captions. */
-.item-visual svg:is([data-shape-kind="generic-bar"],[data-shape-kind="straight-bar"],[data-shape-kind="bench-bar"],[data-shape-kind="open-u"],[data-shape-kind="closed-stirrup"],[data-shape-kind="rounded-end-bar"]) text:not([data-angle-label]){font-size:16px;font-weight:900;}
-.item-visual svg [data-angle-label]{font-size:14px;}
+.item-visual svg{width:100%!important;height:100%!important;display:block;overflow:visible;}
 .pile-cage-detail-visual{border:2px solid #102a43;background:linear-gradient(135deg,#f8fbff,#fff)!important;}
 .pile-cage-badge{font-size:12px;font-weight:950;letter-spacing:1px;color:#102a43;border:2px solid #102a43;border-radius:999px;padding:3px 8px;background:#fff;white-space:nowrap;}
 .pile-assembly{grid-column:1/-1;border-top:1px solid rgba(2,26,72,.10);padding-top:14px;margin-top:2px;}
@@ -1001,27 +997,12 @@ async function setStatus(id, status) {
 }
 
 async function setItemStatusFromOrder(orderId, itemId, status) {
-  const item = findDetailItem(orderId, itemId);
-  const rank = ['ממתין','בייצור','הושלם','הועמס','נשלח','סופק'];
-  let reason = '';
-  if (item && rank.indexOf(status)>=0 && rank.indexOf(status)<rank.indexOf(item.status)) {
-    reason = await requestCorrectionReason();
-    if (!reason) { await openDetail(orderId); return false; }
-  }
   const response = await fetch(`/api/items/${itemId}/status`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, correction_reason: reason })
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok === false) {
-    const messages = {
-      status_correction_reason_required:'נדרשת סיבת תיקון לחזרה בסטטוס.',
-      status_correction_role_required:'חזרה בסטטוס דורשת הרשאת מנהל או משרד.',
-      shipment_correction_required:'הפריט כבר נשלח. יש לבצע תיקון משלוח מתועד, ולא להחזיר אותו לרשימת ההעמסה.',
-      production_quantity_correction_required:'כבר נרשמה תוצרת. חזרה לממתין מחייבת תיקון תוצרת מתועד.',
-      loading_correction_required:'הפריט משויך להעמסה מאומתת. יש לתקן אותו מתוך מסך ההעמסה.',
-      item_not_released_to_production:'ההזמנה עדיין לא אושרה לייצור.',
-    };
-    alert(messages[result.error] || result.error || 'עדכון סטטוס הפריט נכשל');
+    alert(result.error || 'עדכון סטטוס הפריט נכשל');
     await openDetail(orderId);
     return false;
   }
@@ -1893,12 +1874,7 @@ async function saveOrderEdit(event) {
 function safeJson(value, fallback = []) {
   if (!value) return fallback;
   if (Array.isArray(value)) return value;
-  let parsed = value;
-  try { parsed = JSON.parse(value); } catch(e) { return fallback; }
-  if (Array.isArray(parsed)) return parsed;
-  if (Array.isArray(parsed?.segments)) return parsed.segments;
-  if (Array.isArray(parsed?.sides)) return parsed.sides;
-  return fallback;
+  try { return JSON.parse(value); } catch(e) { return fallback; }
 }
 
 function segmentLength(segment) {
@@ -2337,18 +2313,6 @@ function itemAngles(item) {
   });
 }
 
-// A few handwritten imports contain the dimensions in the item name but no
-// machine path.  Draw the known square/rectangle as a visual cue without
-// inventing tails or changing billing data.
-function shapeNamePreviewSides(item) {
-  const name = String(item?.shape_name || item?.struct_element || '');
-  const match = name.match(/(\d+(?:[.,]\d+)?)\s*[×x*]\s*(\d+(?:[.,]\d+)?)/i);
-  if (!match) return [];
-  const a = Number(match[1].replace(',', '.')) * 10;
-  const b = Number(match[2].replace(',', '.')) * 10;
-  return a > 0 && b > 0 ? [a, b, a, b] : [];
-}
-
 function rawItemSegments(item) {
   if (isRealSpiralItem(item)) return [];
   return safeJson(item.segments).map(segment => (
@@ -2360,10 +2324,13 @@ function rawItemSegments(item) {
 
 function isOpenUShape(item, sides) {
   const name = String(item?.shape_name || '').toLowerCase();
+  const angleList = itemAngles(item);
+  const hasTwoRightBends = angleList.length >= 2
+    && angleList.slice(0, 2).every(angle => Math.abs(Number(angle) - 90) <= 1);
   return !isRealSpiralItem(item)
     && Array.isArray(sides)
     && sides.length === 3
-    && /open|hook|anchor|צורת ח|צורת u|פתוח|פתוחה|\bu\b/.test(name);
+    && (/open|hook|anchor|צורת ח|צורת u|פתוח|פתוחה|\bu\b/.test(name) || hasTwoRightBends);
 }
 
 function openULegWarning(item, sides) {
@@ -2376,21 +2343,10 @@ function openULegWarning(item, sides) {
 }
 
 function itemMachineSequence(item) {
-  const raw = rawItemSegments(item);
-  const segments = raw.length ? raw : (isClosedHoopItem(item)
-    ? shapeNamePreviewSides(item).map(length_mm => ({ length_mm, angle_deg: 90 }))
-    : []);
+  const segments = rawItemSegments(item);
   if (isRealSpiralItem(item)) {
     return `ספיראלה: קוטר ברזל ${IronBendDisplayUnits.formatSteelDiameterMm(item.diameter) || '-'}, קוטר ספיראלה ${IronBendDisplayUnits.formatLengthCmFromMm(item.spiral_diameter_mm) || '-'}, N=${item.spiral_turns || '-'}`;
   }
-  const source = orderShapeSnapshot(item)?.sourceDrawing;
-  if (source) return segments.map((segment, idx) => {
-    const label = `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)}`;
-    if (idx === segments.length - 1) return label;
-    const angle = Number(segment.angle_deg);
-    const bend = Math.abs(180 - angle);
-    return label + (Math.abs(bend - 90) < .01 ? ` | כיפוף 90° ${angle > 180 ? 'ימינה' : 'שמאלה'}` : ' | כיפוף לפי השרטוט; זווית מספרית לא צוינה במקור');
-  }).join(' · ');
   return segments.map((segment, idx) => `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)} | זווית אחרי: ${Number.isFinite(segment.angle_deg) ? segment.angle_deg : 180}°`).join(' · ');
 }
 
@@ -2409,13 +2365,7 @@ function renderDetailShapes() {
     const turns = Number(el.dataset.spiralTurns || 0);
     el.innerHTML = buildSpiralSvg(diameter, turns);
   });
-  fallbackShapes.filter(el => el.dataset.closedHoop === '1').forEach(el => {
-    try {
-      const sides = JSON.parse(decodeURIComponent(el.dataset.sides || '%5B%5D'));
-      el.innerHTML = buildClosedHoopDetailSvg(sides) || 'אין צורה';
-    } catch (e) { el.textContent = 'אין צורה'; }
-  });
-  fallbackShapes.filter(el => el.hasAttribute('data-detail-shape') && el.dataset.closedHoop !== '1').forEach(el => {
+  fallbackShapes.filter(el => el.hasAttribute('data-detail-shape')).forEach(el => {
     try {
       const sides = JSON.parse(decodeURIComponent(el.dataset.sides || '%5B%5D'));
       const angles = JSON.parse(decodeURIComponent(el.dataset.angles || '%5B%5D'));
@@ -2441,36 +2391,6 @@ function buildSpiralSvg(diameter, turns) {
     <circle cx="110" cy="62" r="18" stroke="#f3b074" stroke-width="4" fill="none" opacity=".7"/>
     <text x="110" y="118" text-anchor="middle" font-size="11" fill="#1f2937">קוטר ${escHtml(IronBendDisplayUnits.formatLengthCmFromMm(diameter))} · N=${escHtml(turns)}</text>
   </svg>`;
-}
-
-function buildClosedHoopDetailSvg(sides) {
-  const v = (Array.isArray(sides) ? sides : []).map(Number).filter(n => Number.isFinite(n) && n > 0);
-  if (v.length === 4) {
-    const [left, top, right, bottom] = v;
-    return `<svg viewBox="0 0 250 150" aria-label="closed hoop" style="width:100%;height:100%">
-      <rect x="58" y="28" width="134" height="86" fill="none" stroke="#1a2332" stroke-width="5" rx="1"/>
-      <text x="125" y="20" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(top)}</text>
-      <text x="125" y="137" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(bottom)}</text>
-      <text x="43" y="76" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(left)}</text>
-      <text x="207" y="76" text-anchor="middle" font-size="12" font-weight="800" fill="#1a2332">${IronBendDisplayUnits.formatLengthCmFromMm(right)}</text>
-    </svg>`;
-  }
-  if (v.length < 6) return '';
-  const similar = (a, b) => Math.abs(a - b) <= Math.max(10, Math.max(a, b) * 0.12);
-  let tailA = v[0], tailB = v[1], right = v[2], top = v[3], bottom = v[4], left = v[5];
-  if (!(similar(v[0], v[1]) && similar(v[2], v[5]) && similar(v[3], v[4]))) {
-    if (similar(v[0], v[3]) && similar(v[1], v[5]) && similar(v[2], v[4])) {
-      tailA = v[0]; tailB = v[3]; right = v[1]; top = v[2]; bottom = v[4]; left = v[5];
-    } else return '';
-  }
-  const cm = n => IronBendDisplayUnits.formatLengthCmFromMm(n);
-  const ratio = Math.max(top, bottom) / Math.max(right, left);
-  const W = 250, H = 150, boxW = ratio >= 1 ? 142 : Math.max(70, 100 * ratio), boxH = ratio >= 1 ? Math.max(62, 100 / ratio) : 100;
-  const x = (W - boxW) / 2, y = 28 + (100 - boxH) / 2, r = x + boxW, b = y + boxH;
-  const marker = Math.min(30, Math.max(16, Math.min(boxW, boxH) * .28));
-  const markerX = r - marker, markerY = y + marker;
-  const label = (x1, y1, text, anchor = 'middle') => `<text x="${x1}" y="${y1}" text-anchor="${anchor}" dominant-baseline="middle" font-size="12" font-weight="900" fill="#182536">${text}</text>`;
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="חישוק" style="width:100%;height:100%;max-height:142px;overflow:visible"><path d="M${x},${y} H${r} V${b} H${x} Z" fill="none" stroke="#173b6b" stroke-width="5" stroke-linejoin="round"/><path d="M${markerX},${y} V${markerY} H${r}" fill="none" stroke="#173b6b" stroke-width="4" stroke-linecap="square"/>${label((x+r)/2,y-14,cm(top))}${label(r+23,(y+b)/2,cm(right))}${label((x+r)/2,b+15,cm(bottom))}${label(x-23,(y+b)/2,cm(left))}${label(markerX-4,y+marker/2,cm(tailA),'end')}${label((markerX+r)/2,markerY+13,cm(tailB))}</svg>`;
 }
 
 function orderShapeSnapshot(item) {
@@ -2898,11 +2818,7 @@ function buildDetailHTML(o, pkgs) {
       const length = itemLength(item);
       const weight = itemWeight(item);
       const sides = itemSegments(item);
-      const visualSides = sides.length ? sides : shapeNamePreviewSides(item);
-      const angles = itemAngles(item).length
-        ? itemAngles(item)
-        : (isClosedHoopItem(item) && visualSides.length === 4 ? [90, 90, 90, 90] : []);
-      const closedHoopVisual = isClosedHoopItem(item) && (visualSides.length === 4 || visualSides.length === 6);
+      const angles = itemAngles(item);
       const dims = sides.length ? sides.join(' / ') : itemDimensions(item);
       const shapeMismatch = shapeMismatchWarning(item, sides);
       const openUWarning = openULegWarning(item, sides);
@@ -2916,7 +2832,7 @@ function buildDetailHTML(o, pkgs) {
       // Do not reuse a legacy cached SVG for hoops. It may have been produced
       // before the tail/body convention was corrected; render2D below rebuilds
       // the closed hoop from the current six-segment machine sequence.
-      const canonicalShapeSvg = encodeURIComponent(item.shape_svg || '');
+      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) ? '' : (item.shape_svg || ''));
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`
@@ -2924,9 +2840,8 @@ function buildDetailHTML(o, pkgs) {
         ? `<div class="item-visual" data-detail-shape="1" data-shape-svg="${canonicalShapeSvg}" data-spiral-shape="1" data-spiral-diameter="${escHtml(item.spiral_diameter_mm)}" data-spiral-turns="${escHtml(item.spiral_turns)}" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה"></div>`
         : `<div class="item-visual"
           data-detail-shape="1"
-          data-closed-hoop="${closedHoopVisual ? '1' : '0'}"
           data-shape-svg="${canonicalShapeSvg}"
-          data-sides="${encodeURIComponent(JSON.stringify(visualSides))}"
+          data-sides="${encodeURIComponent(JSON.stringify(sides))}"
           data-angles="${encodeURIComponent(JSON.stringify(angles))}"
           onclick="openItemEdit(event, ${o.id}, ${item.id})"
           title="ערוך צורה"></div>`;
@@ -2986,7 +2901,6 @@ function buildDetailHTML(o, pkgs) {
 
   const itemsSec = `<div class="d-section">
     <div class="d-title" style="justify-content:space-between"><span>📦 פריטים לייצור</span><button class="review-btn primary" onclick="openAddItem(event, ${o.id})">➕ הוסף להזמנה</button></div>
-    <div class="commercial-summary-hint" style="margin-bottom:10px">השרטוטים להמחשת הצורה — המידות הרשומות הן הקובעות, אין למדוד מהציור.</div>
     ${palletsHtml||'<div style="color:var(--muted);font-size:13px">אין פריטים</div>'}
   </div>`;
 
@@ -3185,7 +3099,6 @@ function orderShapeDataFromItem(item) {
     presetId: snapshot.shapeId || snapshot.shape_id || item?.shape_id || null,
     shapeType: snapshot.shapeType || snapshot.shape_type || item?.shape_type || null,
     family: snapshot.family || 'bars',
-    ...(snapshot.family === 'lifts' ? {barLength:snapshotData.barLength, weighedKg:snapshotData.weighedKg} : {}),
     diameter: Number(snapshotData.diameter ?? item?.diameter) || 12,
     is3d: is3d ? 1 : 0,
     azAngles: is3d && Array.isArray(snapshotData.azAngles) ? snapshotData.azAngles.map(Number) : null,

@@ -26,7 +26,6 @@ function validateShapeGeometry(segments) {
 const steelModule = require('../modules/steel-rebar');
 const { normalizeSpiralParams, spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
-const { meshOrderMetrics } = require('./customerPortalShapeDraft');
 const {
   allocateOrderItemStock,
   openProcurementForStockShortages,
@@ -67,8 +66,8 @@ function roundPileCageOrderMetrics(item = {}) {
 function liftPackageOrderMetrics(item = {}) {
   const snapshot = parseShapeSnapshotObject(item.shapeSnapshot ?? item.shape_snapshot ?? item.shapeData ?? item.shape_data ?? item.shapeContract ?? item.shape_contract ?? item.shape_snapshot_json);
   if (snapshot?.family !== 'lifts' || snapshot?.shapeType !== 'lift_package') return null;
-  const weighedKg = Number(snapshot.data?.weighedKg ?? snapshot.calculated?.weighedKg ?? snapshot.calculated?.totalWeightKg);
-  if (!Number.isFinite(weighedKg) || weighedKg < 0) throw Object.assign(new Error('invalid_lift_weight'),{statusCode:400});
+  const weighedKg = Number(snapshot.calculated?.totalWeightKg ?? snapshot.calculated?.weighedKg ?? snapshot.data?.weighedKg);
+  if (!(weighedKg > 0)) return null;
   const packages = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
   // orders.js multiplies weightPerUnit by the quantity, so hand it the share
   // per package and the line lands back on the weighed total.
@@ -207,41 +206,29 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
       (pallet.items || []).forEach(rawItem => {
         globalItemSequence += 1;
         const item = withShapeContractLegacyFields(rawItem);
-        // Text-only order lines are intentional manual additions (for example
-        // a lift or a hoop noted in writing without a drawing). They carry a
-        // name and quantity, but no geometry, length, weight, or production
-        // shape. Keep them in the order without forcing fake dimensions.
-        const textOnly = item.textOnly === true || item.text_only === true;
         const pileCageMetrics = roundPileCageOrderMetrics(rawItem);
         // A lift carries no bends and no cut list - it is a bought bundle, so it
         // skips the geometry checks the same way a cage does.
         const liftMetrics = pileCageMetrics ? null : liftPackageOrderMetrics(rawItem);
-        const meshMetrics = meshOrderMetrics(rawItem);
-        if (meshMetrics) {
-          item.shapeSnapshot = meshMetrics.snapshot;
-          item.diameter = meshMetrics.diameter;
-        }
         const spiral = normalizeSpiralParams(item);
         const sourceLengthMm = Number(item.length ?? item.total_length_mm ?? 0) || 0;
         const sourceSides = Array.isArray(item.sides) ? item.sides : [];
-        const longSimpleCoil = !meshMetrics && !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
+        const longSimpleCoil = !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
         const isSpiralLike = spiral.isSpiral || longSimpleCoil;
         const sides = isSpiralLike
           ? []
           : ((item.sides && item.sides.length) ? item.sides : (item.length ? [item.length] : []));
-        const totalLengthMm = meshMetrics ? meshMetrics.totalLengthMm : pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
+        const totalLengthMm = pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
           ? (sourceLengthMm || spiralCutLengthMm(spiral.spiralDiameterMm, spiral.turns))
           : (sides.reduce((s, v) => s + Number(v), 0) || Number(item.length) || 0);
         const angles = item.angles || [];
-        const segmentsArr = meshMetrics || pileCageMetrics || liftMetrics || isSpiralLike
+        const segmentsArr = pileCageMetrics || liftMetrics || isSpiralLike
           ? []
           : normalizeSegments(
               item.shapeName,
               sides.map((len, i) => ({ length_mm: Number(len), angle_deg: angles[i] ?? 0 }))
             );
-        const shapeName = textOnly
-          ? String(item.structElement || item.struct_element || item.elementName || item.element_name || item.shapeName || item.shape_name || 'ללא סרטוט').trim()
-          : longSimpleCoil
+        const shapeName = longSimpleCoil
           ? 'spiral'
           : isSpiralLike
           ? normalizeShapeName(item.shapeName || item.shape_name || 'spiral', segmentsArr, {
@@ -249,25 +236,22 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
               spiral_turns: spiral.turns || null,
             })
           : normalizeShapeName(item.shapeName, segmentsArr);
-        if (!textOnly && !isSpiralLike && !pileCageMetrics && !liftMetrics && !meshMetrics) {
+        if (!isSpiralLike && !pileCageMetrics && !liftMetrics) {
           const geoCheck = validateShapeGeometry(segmentsArr);
           if (!geoCheck.valid) throw Object.assign(new Error(geoCheck.error), { statusCode: 400 });
         }
         const segments = JSON.stringify(segmentsArr);
         const hasShapeV2Envelope = isShapeDataContractV2(item.shapeSnapshot ?? item.shape_snapshot ?? item.shapeData ?? item.shape_data ?? item.shapeContract ?? item.shape_contract ?? item.shape_snapshot_json);
-        const persistedShapeName = textOnly
-          ? shapeName
-          : (pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName));
-        const weightPerUnit = meshMetrics ? meshMetrics.weightKg : pileCageMetrics
+        const persistedShapeName = pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName);
+        const weightPerUnit = pileCageMetrics
           ? pileCageMetrics.weightKg
           : (liftMetrics ? liftMetrics.weightPerUnit : calcWeightPerUnit(item.diameter, totalLengthMm));
-        const effectiveWeightPerUnit = textOnly ? 0 : weightPerUnit;
         // Waste is an order-level billing adjustment only. Production must use
         // the ordered item quantity without adding or rounding a percentage.
         const productionQty = item.qty || 1;
         const machine = assignResource(item.diameter);
 
-        const totalWeight = effectiveWeightPerUnit * (item.qty || 1);
+        const totalWeight = weightPerUnit * (item.qty || 1);
         const reviewNotes = Array.isArray(item.reviewNotes || item.review_notes) ? (item.reviewNotes || item.review_notes) : [];
         const reviewNotesJson = reviewNotes.length ? JSON.stringify(reviewNotes) : null;
         const reviewStatus = reviewNotes.length ? (item.reviewStatus || item.review_status || 'pending') : (item.reviewStatus || item.review_status || null);
@@ -318,19 +302,17 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
           shape_snapshot_json: shapeSnapshot,
         });
 
-        const allocation = (textOnly || totalWeight <= 0)
-          ? { allocated: true, reason: 'text_only' }
-          : allocateOrderItemStock(db, {
-              orderId,
-              itemId: itemResult.lastInsertRowid,
-              item: {
-                diameter: item.diameter,
-                material_type: item.material_type || item.materialType || null,
-              },
-              requiredWeightKg: totalWeight,
-              requestedRawMaterialId: selectedRawMaterialId(item),
-              policy: inventoryPolicy,
-            });
+        const allocation = allocateOrderItemStock(db, {
+          orderId,
+          itemId: itemResult.lastInsertRowid,
+          item: {
+            diameter: item.diameter,
+            material_type: item.material_type || item.materialType || null,
+          },
+          requiredWeightKg: totalWeight,
+          requestedRawMaterialId: selectedRawMaterialId(item),
+          policy: inventoryPolicy,
+        });
         if (!allocation.allocated && ['no_stock', 'insufficient_stock'].includes(allocation.reason)) {
           inventoryShortages.push({
             itemId: itemResult.lastInsertRowid,

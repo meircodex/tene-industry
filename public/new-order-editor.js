@@ -86,8 +86,7 @@
       importBtn.onclick = event => {
         event.preventDefault();
         event.stopPropagation();
-        if (typeof window.openQuickCodePanel === 'function') window.openQuickCodePanel();
-        else openQuickOrderImport();
+        openQuickOrderImport();
       };
     });
     ensureQuickOrderImportInput();
@@ -804,35 +803,14 @@
   ];
 
   function normalizeIntakeRow(row = {}) {
-    const rawSides = row.shapeSides ?? row.sides ?? row['צלעות'] ?? row['מידות צורה'];
-    const shapeSides = Array.isArray(rawSides)
-      ? rawSides.map(Number).filter(value => Number.isFinite(value) && value > 0)
-      : String(rawSides || '').split(/[\/,;\s]+/).map(value => Number(value)).filter(value => Number.isFinite(value) && value > 0);
-    const rawAngles = row.shapeAngles ?? row.angles ?? row['זוויות'];
-    const shapeAngles = Array.isArray(rawAngles)
-      ? rawAngles.map(Number).filter(Number.isFinite)
-      : String(rawAngles || '').split(/[\/,;\s]+/).map(value => Number(value)).filter(Number.isFinite);
-    const elementName = String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim();
-    let shape = String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר';
-    // An L/leg bar is an open bent bar, never a closed hoop.  Quick imports
-    // previously trusted the supplied label and could turn an L with 2–3
-    // segments into a billable hoop.  Preserve explicit hoop wording, but
-    // correct the common L/leg notation when the geometry is open.
-    const looksLikeOpenL = /(^|\s)L\s*[–-]|רגל|עולה\s+לקיר|L\s*=|רגליים/i.test(elementName);
-    if (looksLikeOpenL && String(shape).trim() === 'חישוק' && shapeSides.length < 4 && !/חישוק|סגור/i.test(elementName)) {
-      shape = 'custom bent shape';
-    }
     return {
-      elementName,
+      elementName: String(rowValue(row, STRUCT_ELEMENT_ALIASES)).trim(),
       sourceItemNumber: String(rowValue(row, SOURCE_ITEM_NUMBER_ALIASES)).trim(),
       sourceRowNumber: numeric(rowValue(row, SOURCE_ROW_NUMBER_ALIASES), 0) || null,
-      shape,
+      shape: String(row.shape || row.shapeName || row['צורה'] || 'מוט ישר').trim() || 'מוט ישר',
       diameter: numeric(row.diameter ?? row['קוטר'] ?? row.barDiameter ?? row.barDiameterMm, 0),
       quantity: numeric(row.quantity ?? row.qty ?? row['כמות'], 0),
-      length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0)
-        || shapeSides.reduce((sum, value) => sum + value, 0),
-      shapeSides,
-      shapeAngles,
+      length: numeric(row.length ?? row.lengthMm ?? row['אורך'] ?? row['אורך בממ'] ?? row['אורך במ״מ'], 0),
       note: String(row.note || row.notes || row['הערה'] || '').trim(),
     };
   }
@@ -910,57 +888,6 @@
     reader.readAsText(file, 'utf-8');
   }
 
-  // Fast, offline order entry: paste one line per item instead of uploading a PDF.
-  // Supported formats:
-  //   element|shape|diameter|quantity|length_mm
-  //   JSON array of the same fields (also accepts Hebrew aliases).
-  function importQuickCodeText(text = '') {
-    const raw = String(text || '').trim();
-    if (!raw) return { added: 0, error: 'הדבק קוד הזמנה לפני הייבוא' };
-    let rows = [];
-    try {
-      if (raw.startsWith('[') || raw.startsWith('{')) {
-        const parsed = JSON.parse(raw);
-        const list = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.items) ? parsed.items : [parsed]);
-        rows = list.map(row => normalizeIntakeRow(row));
-      } else {
-        const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-        const delimiter = lines.some(line => line.includes('|')) ? '|' : detectDelimiter(lines[0]);
-        const first = parseDelimitedLine(lines[0], delimiter).map(value => value.trim().toLowerCase());
-        const hasHeader = first.some(value => ['element','elementname','אלמנט','שם פריט','שם האלמנט','shape','צורה','diameter','קוטר','quantity','כמות','length','אורך'].includes(value));
-        const headers = hasHeader ? first : ['elementName','shape','diameter','quantity','length'];
-        rows = (hasHeader ? lines.slice(1) : lines).map(line => {
-          const cells = parseDelimitedLine(line, delimiter);
-          const obj = {};
-          headers.forEach((header, index) => { obj[header] = cells[index] || ''; });
-          return normalizeIntakeRow(obj);
-        });
-      }
-    } catch (error) {
-      return { added: 0, error: 'קוד הזמנה אינו תקין: ' + (error.message || 'JSON/שורות') };
-    }
-    const valid = rows.filter(row => validateIntakeRow(row).ok);
-    const added = addIntakeRowsToOrder(valid, { silentInvalid: true });
-    if (added > 0) showQuickImportMessage(`${added} שורות נוספו להזמנה מקוד מהיר`);
-    else showQuickImportMessage('לא נמצאו שורות תקינות. הפורמט: אלמנט|צורה|קוטר|כמות|אורך במ״מ');
-    return { added, invalid: rows.length - valid.length };
-  }
-
-  function importQuickJsonFile(file, input) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = importQuickCodeText(reader.result || '');
-      if (result?.added > 0) showQuickImportMessage(`${result.added} שורות נוספו מקובץ JSON`);
-      if (input) input.value = '';
-    };
-    reader.onerror = () => {
-      showQuickImportMessage('לא ניתן לקרוא את קובץ ה-JSON');
-      if (input) input.value = '';
-    };
-    reader.readAsText(file, 'utf-8');
-  }
-
   async function importQuickOcrFile(file, input) {
     const documentType = document.getElementById('ocrDocumentType')?.value || 'order';
     if (typeof window.routeNonOrderOcrDocument === 'function' && window.routeNonOrderOcrDocument(documentType)) {
@@ -1029,21 +956,14 @@
     const length = numeric(item.length, 0);
     const diameter = numeric(item.diameter, 12);
     const elementName = item.elementName || '';
-    const shapeSides = Array.isArray(item.shapeSides) && item.shapeSides.length
-      ? item.shapeSides.map(value => Math.round(Number(value))).filter(value => Number.isFinite(value) && value > 0)
-      : [length];
-    const shapeAngles = Array.isArray(item.shapeAngles) && item.shapeAngles.length
-      ? item.shapeAngles.map(Number).filter(Number.isFinite)
-      : shapeSides.slice(0, -1).map(() => 90);
-    const isBent = shapeSides.length > 1;
     return {
       id: Date.now() + Math.floor(Math.random() * 100000),
-      shapeId: isBent ? 'bent_bar' : 'straight_bar',
+      shapeId: 'straight_bar',
       shapeEmoji: '━',
       shapeName: item.shape || 'מוט ישר',
       family: 'bars',
-      shapeSides,
-      shapeAngles,
+      shapeSides: [length],
+      shapeAngles: [],
       diameter,
       length,
       qty: quantity,
@@ -1057,7 +977,7 @@
       source_item_number: item.sourceItemNumber || null,
       sourceRowNumber: item.sourceRowNumber || null,
       source_row_number: item.sourceRowNumber || null,
-      shapeSnapshot: isBent ? null : buildIntakeStraightSnapshot({ length: shapeSides[0], diameter, quantity }),
+      shapeSnapshot: buildIntakeStraightSnapshot({ length, diameter, quantity }),
     };
   }
 
@@ -1487,7 +1407,7 @@
       main.style.setProperty('direction', 'ltr', 'important');
       main.style.setProperty('overflow-x', 'hidden', 'important');
     }
-    document.querySelectorAll('.progress-bar,.no-bottom-actions,.order-more-action,.summary-bar>.submit-btn,.no-internal-stat,.add-pallet-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
+    document.querySelectorAll('.progress-bar,#orderSetupDrawer,.no-bottom-actions,.order-more-action,.summary-bar>.submit-btn,.no-internal-stat,.add-pallet-btn').forEach(el => el.style.setProperty('display', 'none', 'important'));
   }
 
   function exposeGlobals() {
@@ -1523,8 +1443,6 @@
     window.closeIntakePanel = closeIntakePanel;
     window.openQuickOrderImport = openQuickOrderImport;
     window.handleQuickOrderImportFile = handleQuickOrderImportFile;
-    window.importQuickCodeText = importQuickCodeText;
-    window.importQuickJsonFile = importQuickJsonFile;
     window.addIntakeRowsToOrder = addIntakeRowsToOrder;
     window.createOrderItemFromIntakeRow = createOrderItemFromIntakeRow;
     window.validateIntakeRow = validateIntakeRow;

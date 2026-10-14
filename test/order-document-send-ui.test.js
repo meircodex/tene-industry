@@ -107,7 +107,7 @@ function loadDocumentSending() {
   vm.runInContext(`let currentDetailOrder = order, allOrders = [], currentSendFile = null;
     ${html.slice(configStart, configEnd)}
     ${html.slice(functionsStart, functionsEnd)}
-    const o = order, loadedItemCount = 0;
+    const o = order;
     globalThis.printButtons = ${prints[1]};`, context);
   const click = (markup, handlerPattern) => {
     const handler = [...markup.matchAll(/onclick="([^"]+)"/g)].map(match => match[1]).find(value => handlerPattern.test(value));

@@ -157,7 +157,7 @@ body[data-page="new"] .order-lines-grid-guides>span{border-right:2px solid #9db0
 body[data-page="new"] .order-lines-grid-guides>span:last-child{border-right:0!important}
 
 /* Row */
-body[data-page="new"] .order-line-row{height:152px!important;border-bottom:2px solid #9db0c5!important;background:#fff!important;transition:background .1s!important}
+body[data-page="new"] .order-line-row{height:82px!important;border-bottom:2px solid #9db0c5!important;background:#fff!important;transition:background .1s!important}
 body[data-page="new"] .order-lines-body>.order-line-row:last-of-type{border-bottom:0!important}
 body[data-page="new"] .order-lines-body>.order-line-row:nth-of-type(even){background:#fafcff!important}
 body[data-page="new"] .order-line-row:hover{background:#eef4ff!important}
@@ -176,9 +176,9 @@ body[data-page="new"] .line-element:focus{outline:none!important;border-color:#4
 /* צורה ומידות */
 body[data-page="new"] .line-shape{border:0!important;background:transparent!important;padding:3px!important;cursor:pointer!important;display:flex!important;align-items:center!important;justify-content:center!important;font-family:inherit!important;width:100%!important;height:100%!important}
 body[data-page="new"] .line-shape:hover{background:rgba(74,144,217,.07)!important}
-body[data-page="new"] .line-shape-sketch{width:100%!important;height:144px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important}
+body[data-page="new"] .line-shape-sketch{width:100%!important;height:76px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:hidden!important}
 body[data-page="new"] .line-shape-sketch svg,
-body[data-page="new"] .line-shape svg{width:260px!important;height:144px!important;max-width:100%!important;display:block!important}
+body[data-page="new"] .line-shape svg{width:180px!important;height:76px!important;max-width:100%!important;display:block!important}
 body[data-page="new"] .line-round-pile-cage{box-shadow:inset 4px 0 0 #102a43!important}
 body[data-page="new"] .line-round-pile-cage .line-shape{position:relative!important;flex-direction:column!important;gap:0!important}
 body[data-page="new"] .line-round-pile-cage .line-shape-sketch{height:47px!important}
@@ -247,8 +247,8 @@ body[data-page="new"] .line-add-btn:hover{background:#eef4ff!important;color:#17
   body[data-page="new"] .order-line-row>.line-qty{grid-area:qty!important;width:46px!important;height:30px!important;border:1.5px solid #d0dcea!important;border-radius:7px!important;background:#f7fafd!important}
   body[data-page="new"] .line-delete{grid-area:delete!important;width:28px!important;font-size:16px!important}
   body[data-page="new"] .line-shape{grid-area:shape!important;min-height:36px!important}
-  body[data-page="new"] .line-shape-sketch{width:100%!important;height:100px!important}
-  body[data-page="new"] .line-shape-sketch svg,body[data-page="new"] .line-shape svg{max-height:100px!important}
+  body[data-page="new"] .line-shape-sketch{width:100%!important;height:34px!important}
+  body[data-page="new"] .line-shape-sketch svg,body[data-page="new"] .line-shape svg{max-height:30px!important}
   body[data-page="new"] .line-round-pile-cage .line-shape{min-height:56px!important}
   body[data-page="new"] .line-round-pile-cage .line-shape-sketch{height:38px!important}
   body[data-page="new"] .line-round-pile-cage .pile-cage-preview-svg{height:38px!important;max-width:230px!important}

@@ -84,11 +84,6 @@ module.exports = function createProductionRouter(deps) {
     return item?.status === ITEM_STATUS.CANCELLED || item?.cancelled_at != null || item?.production_stopped_at != null;
   }
 
-  function isBackwardItemStatus(from, to) {
-    const ranks=[ITEM_STATUS.WAITING,ITEM_STATUS.IN_PRODUCTION,ITEM_STATUS.DONE,ITEM_STATUS.LOADED,ITEM_STATUS.SENT,ITEM_STATUS.DELIVERED];
-    return ranks.indexOf(to)>=0 && ranks.indexOf(to)<ranks.indexOf(from);
-  }
-
   function sendCancellationStoppedError(res, item) {
     return res.status(409).json({
       error: 'production_stopped_by_cancellation',
@@ -401,7 +396,6 @@ module.exports = function createProductionRouter(deps) {
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
-    if (isBackwardItemStatus(item.status,status)) return res.status(409).json({error:'use_status_correction_route'});
     if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
@@ -428,10 +422,6 @@ module.exports = function createProductionRouter(deps) {
     let previousActualWeight = null;
     let nextItemStatus = null;
     function addStatusUpdate(nextStatus) {
-      if (isBackwardItemStatus(item.status,nextStatus)) {
-        res.status(409).json({error:'use_status_correction_route'});
-        return false;
-      }
       if (nextStatus === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) {
         sendProductionGateError(res, item);
         return false;
@@ -446,7 +436,6 @@ module.exports = function createProductionRouter(deps) {
       const requestedQty = Number(item.quantity) || 0;
       if (!Number.isFinite(producedQty) || producedQty < 0 || !Number.isInteger(producedQty)) return res.status(400).json({ error: 'invalid produced_qty' });
       if (requestedQty > 0 && producedQty > requestedQty) return res.status(400).json({ error: 'produced_qty_exceeds_quantity', quantity: requestedQty });
-      if (producedQty < Number(item.produced_qty || 0)) return res.status(409).json({error:'production_quantity_correction_required'});
       fields.push('produced_qty=?'); vals.push(producedQty);
       if (requestedQty > 0 && producedQty >= requestedQty && item.status !== ITEM_STATUS.DONE) {
         if (!addStatusUpdate(ITEM_STATUS.DONE)) return;
@@ -526,10 +515,6 @@ module.exports = function createProductionRouter(deps) {
     if (!item) return res.status(404).json({ error: 'item not found' });
     if (!isProductionGateOpen(item)) return sendProductionGateError(res, item);
 
-    const sourceDrawing = require('../services/sourceDrawingGeometry').sourceDrawingForItem(item);
-    if (sourceDrawing?.schematicAngles) {
-      return res.status(409).json({ error: 'שרטוט המקור אינו מציין זוויות מספריות לאלכסונים או לסגירה. יש לאשר את זוויות הייצור בעורך הפריט לפני שליחה למכונה.', code:'source_bend_angles_require_confirmation' });
-    }
     const now = new Date().toISOString();
 
     // Close previous item on this machine
@@ -563,7 +548,7 @@ module.exports = function createProductionRouter(deps) {
 
     // Send params to machine via Modbus
     const segments = productionCards.shapeSegmentsFromItem(item);
-    const angles   = segments.slice(0, -1).map(s => s.angle_deg || 0);
+    const angles   = segments.slice(1).map(s => s.angle_deg || 0);
     modbus.writeParams(machineIdNum, {
       diameter:       productionCards.shapeDiameterFromItem(item) || item.diameter,
       totalLengthMm:  productionCards.shapeTotalLengthMmFromItem(item) ?? item.total_length_mm,
@@ -625,37 +610,14 @@ module.exports = function createProductionRouter(deps) {
     if (!item) return res.status(404).json({ error: 'not found' });
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     if (!productionWritableItemStatuses.has(status)) return res.status(400).json({ error: 'invalid production status' });
-    const sequence = [ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED];
-    const backwards = sequence.indexOf(status)>=0 && sequence.indexOf(status)<sequence.indexOf(item.status);
-    const reason = String(req.body.correction_reason || '').trim();
-    if ([ITEM_STATUS.SENT,ITEM_STATUS.DELIVERED].includes(item.status) && status!==item.status && status!==ITEM_STATUS.DELIVERED) return res.status(409).json({ error:'shipment_correction_required' });
-    if (status===ITEM_STATUS.WAITING && status!==item.status && Number(item.produced_qty)>0) return res.status(409).json({ error:'production_quantity_correction_required' });
-    if (backwards) {
-      if (!["office","manager","admin"].includes(String(req.userRole || req.auth?.role || ''))) return res.status(403).json({ error:'status_correction_role_required' });
-      if (reason.length<3) return res.status(400).json({ error:'status_correction_reason_required' });
-      if ([ITEM_STATUS.SENT,ITEM_STATUS.DELIVERED].includes(item.status)) return res.status(409).json({ error:'shipment_correction_required' });
-      if (status===ITEM_STATUS.WAITING && Number(item.produced_qty)>0) return res.status(409).json({ error:'production_quantity_correction_required' });
-      const loaded = db.prepare(`SELECT 1 FROM order_loading_session_packages lp JOIN order_loading_sessions ls ON ls.id=lp.session_id
-        WHERE ls.order_id=? AND ls.status<>'cancelled' AND lp.state='loaded'
-        AND EXISTS(SELECT 1 FROM json_each(lp.item_ids_json) WHERE CAST(value AS INTEGER)=?) LIMIT 1`).get(item.order_id,item.id);
-      if (loaded) return res.status(409).json({ error:'loading_correction_required' });
-    }
-    const reopen = backwards && item.status===ITEM_STATUS.DONE && status===ITEM_STATUS.IN_PRODUCTION
-      && (productionOrderGateStatuses.has(statusContracts.normalizeOrderStatus(item.order_status)) || statusContracts.normalizeOrderStatus(item.order_status)===ORDER_STATUS.DONE_WAITING_PICKUP);
-    if (status === ITEM_STATUS.IN_PRODUCTION && !reopen && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
+    if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
     if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
-    let orderStatus, consumedReservations;
-    db.transaction(()=>{
-      db.prepare(`UPDATE items SET status=?${status===ITEM_STATUS.IN_PRODUCTION&&!item.started_at?',started_at=?':''}${status===ITEM_STATUS.DONE?',completed_at=?':''}${backwards && sequence.indexOf(status)<2?',completed_at=NULL':''} WHERE id=?`)
-        .run(...Object.values(updates), req.params.id);
-      orderStatus = syncOrderStatusAfterItemStatus(item, status);
-      if (backwards && sequence.indexOf(status)<2 && statusContracts.normalizeOrderStatus(item.order_status)===ORDER_STATUS.DONE_WAITING_PICKUP) orderStatus=setOrderStatusIfChanged(item.order_id,ORDER_STATUS.IN_PRODUCTION);
-      consumedReservations = status === ITEM_STATUS.DONE ? consumeProductionReservations(item) : { consumed: 0 };
-      db.prepare('INSERT INTO audit_log(entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,notes,user_id,user_name) VALUES(?,?,?,?,?,?,?,?,?,?)')
-        .run('item',item.id,item.order_num,backwards?'item_status_correction':'item_status_change','status',item.status,status,reason||null,req.userId||req.auth?.sub||null,req.auth?.display_name||null);
-    })();
+    db.prepare(`UPDATE items SET status=?${status===ITEM_STATUS.IN_PRODUCTION&&!item.started_at?',started_at=?':''}${status===ITEM_STATUS.DONE?',completed_at=?':''} WHERE id=?`)
+      .run(...Object.values(updates), req.params.id);
+    const orderStatus = syncOrderStatusAfterItemStatus(item, status);
+    const consumedReservations = status === ITEM_STATUS.DONE ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
     res.json({ ok: true, order_status: orderStatus, consumedReservations });
   });
@@ -688,12 +650,6 @@ module.exports = function createProductionRouter(deps) {
       if (!statusContracts.isValidItemStatus(nextStatus) || !productionWritableItemStatuses.has(nextStatus)) {
         return false;
       }
-      const ranks=[ITEM_STATUS.WAITING,ITEM_STATUS.IN_PRODUCTION,ITEM_STATUS.DONE,ITEM_STATUS.LOADED,ITEM_STATUS.SENT,ITEM_STATUS.DELIVERED];
-      if ((ranks.indexOf(nextStatus)>=0 && ranks.indexOf(nextStatus)<ranks.indexOf(item.status))
-        || ([ITEM_STATUS.SENT,ITEM_STATUS.DELIVERED].includes(item.status) && nextStatus!==item.status && nextStatus!==ITEM_STATUS.DELIVERED)) {
-        res.status(409).json({error:'use_status_correction_route'});
-        return false;
-      }
       if (nextStatus === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) {
         sendProductionGateError(res, item);
         return false;
@@ -724,7 +680,6 @@ module.exports = function createProductionRouter(deps) {
       if (requestedQty > 0 && producedQty > requestedQty) {
         return res.status(400).json({ error: 'produced_qty_exceeds_quantity', quantity: requestedQty });
       }
-      if (producedQty < Number(item.produced_qty || 0)) return res.status(409).json({error:'production_quantity_correction_required'});
       fields.push('produced_qty=?'); vals.push(producedQty);
 
       if (status === undefined) {

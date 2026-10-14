@@ -20,7 +20,6 @@ const {
 } = require('../services/inventoryReservation');
 const { createPricer } = require('../services/pricer');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
-const { meshOrderMetrics } = require('../services/customerPortalShapeDraft');
 const { buildOrderCommercialSummary } = require('../services/orderCommercialSummary');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
@@ -66,8 +65,6 @@ function roundPileCageOrderMetrics(item = {}) {
 }
 
 function buildOrderItemShapeSnapshotJson(rawItem = {}, fallback = {}) {
-  const meshMetrics = meshOrderMetrics(rawItem);
-  if (meshMetrics) return JSON.stringify(meshMetrics.snapshot);
   const candidate = shapeSnapshotCandidate(rawItem);
   const fullEnvelope = parseJsonObject(candidate);
   if (isShapeDataContractV2(fullEnvelope)) return JSON.stringify(fullEnvelope);
@@ -293,14 +290,7 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   function cleanItemPayload(body, existingItem = {}) {
-    const meshMetrics = meshOrderMetrics({ ...existingItem, ...body });
     const pileCageMetrics = roundPileCageOrderMetrics({ ...existingItem, ...body });
-    const familySnapshot = parseJsonObject(shapeSnapshotCandidate(body) ?? shapeSnapshotCandidate(existingItem));
-    const isLift = familySnapshot?.family === 'lifts' && familySnapshot?.shapeType === 'lift_package';
-    const weighedKg = isLift ? Number(familySnapshot.data?.weighedKg) : null;
-    if (isLift && (!Number.isFinite(weighedKg) || weighedKg < 0 || !(Number(familySnapshot.data?.barLength)>0))) {
-      throw Object.assign(new Error('invalid_lift_package'), { statusCode: 400 });
-    }
     body = withShapeContractLegacyFields(body || {});
     let segments = existingItem.segments || '[]';
     if (body.segments !== undefined) {
@@ -310,7 +300,7 @@ module.exports = function createOrdersRouter(deps) {
         const length = Number(segment?.length_mm ?? segment?.length);
         const angle = Number(segment?.angle_deg ?? segment?.angle ?? 180);
         if (!Number.isFinite(length) || length < 0) throw Object.assign(new Error(`invalid segment length at ${index + 1}`), { statusCode: 400 });
-        if (!Number.isFinite(angle) || angle < -360 || angle > 360) throw Object.assign(new Error(`invalid segment angle at ${index + 1}`), { statusCode: 400 });
+        if (!Number.isFinite(angle) || angle < 0 || angle > 180) throw Object.assign(new Error(`invalid segment angle at ${index + 1}`), { statusCode: 400 });
         clean.push({ length_mm: length, angle_deg: angle });
       }
       segments = JSON.stringify(clean);
@@ -319,7 +309,7 @@ module.exports = function createOrdersRouter(deps) {
     const shapeName = pileCageMetrics ? 'PILE CAGE' : (body.shape_name !== undefined ? String(body.shape_name || '').trim() : existingItem.shape_name);
     const diameter = body.diameter !== undefined ? Number(body.diameter) : Number(existingItem.diameter);
     const quantity = body.quantity !== undefined ? Number(body.quantity) : Number(existingItem.quantity);
-    const totalLengthMm = meshMetrics ? meshMetrics.totalLengthMm : isLift ? Number(familySnapshot.data.barLength) : pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
+    const totalLengthMm = pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
       ? Number(body.total_length_mm)
       : (Array.isArray(body.segments)
         ? body.segments.reduce((sum, segment) => sum + Number(segment?.length_mm ?? segment?.length ?? 0), 0)
@@ -342,8 +332,8 @@ module.exports = function createOrdersRouter(deps) {
     if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('invalid quantity'), { statusCode: 400 });
     if (!Number.isFinite(totalLengthMm) || totalLengthMm < 0) throw Object.assign(new Error('invalid total_length_mm'), { statusCode: 400 });
 
-    if (meshMetrics || pileCageMetrics || isLift) segments = '[]';
-    const weightPerUnit = meshMetrics ? meshMetrics.weightKg : isLift ? weighedKg / quantity : pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
+    if (pileCageMetrics) segments = '[]';
+    const weightPerUnit = pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
     const totalWeight = weightPerUnit * quantity;
     return { shapeName, diameter, quantity, totalLengthMm, segments, spiralDiameter, spiralTurns, note, structElement, structFloor, sheetNum, weightPerUnit, totalWeight };
   }
@@ -647,9 +637,7 @@ module.exports = function createOrdersRouter(deps) {
     const pallets = db.prepare('SELECT * FROM pallets WHERE order_id=? ORDER BY pallet_num').all(order.id);
     pallets.forEach(p => {
       p.items = db.prepare('SELECT * FROM items WHERE pallet_id=? ORDER BY COALESCE(sort_order, id), id').all(p.id);
-      // Screen dimensions have their own layout; printed cards retain their
-      // compact profile and the same saved geometry/manufacturing quantities.
-      p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item, { dimensionFontSize: 18, schematic: true }); });
+      p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); });
     });
     order.pallets = pallets;
     // One computed-on-read projection serves current and historical orders.

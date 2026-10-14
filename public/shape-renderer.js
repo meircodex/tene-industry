@@ -70,7 +70,6 @@
   }
 
   function closedStirrupParts(sides, angles) {
-    if (window.IronBendHoopView) return window.IronBendHoopView.parts(sides,angles);
     if (!Array.isArray(sides) || sides.length < 4) return null;
     const lengths = sides.map(n => Number(n) || 0);
     if (lengths.some(n => n <= 0)) return null;
@@ -192,7 +191,7 @@
 
   function readableDisplaySides(sides, opts) {
     const values = (sides || []).map(n => Number(n) || 0);
-    if (!opts || opts.readableScale !== true) return values;
+    if (opts && opts.readableScale === false) return values;
     const positive = values.filter(n => n > 0);
     if (positive.length < 2) return values;
     const max = Math.max(...positive);
@@ -249,10 +248,6 @@
 
     const stirrup = closedStirrupParts(sides, angles || []);
     if (stirrup) {
-      if (window.IronBendHoopView) {
-        container.innerHTML = window.IronBendHoopView.render(stirrup,Math.max(220,W),Math.max(160,H));
-        return;
-      }
       svg.setAttribute('data-shape-kind', 'closed-stirrup');
       renderClosedStirrup2D(svg, stirrup, W, H, opts);
       container.appendChild(svg);

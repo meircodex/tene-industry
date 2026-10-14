@@ -365,16 +365,25 @@ function closedStirrupParts(segments) {
     .every(segment => isRightAngle(segment.angle_deg));
   if (!rightAngles) return null;
 
-  if (segments.length >= 6) {
-    // Imported closed hoops use either:
-    //   excess, excess, side, width, width, side
-    // or side/excess/width/excess/width/side.
-    const [a, b, c, d, e, f] = lengths;
-    if (isSimilarDimension(a, b) && isSimilarDimension(c, f) && isSimilarDimension(d, e)) {
-      return { top: d, right: c, bottom: e, left: f, tailStart: a, tailEnd: b };
-    }
-    if (isSimilarDimension(a, d) && isSimilarDimension(b, f) && isSimilarDimension(c, e)) {
-      return { top: c, right: b, bottom: e, left: f, tailStart: a, tailEnd: d };
+  if (segments.length >= 5) {
+    // Imported hoop rows use: side, closure excess, side, closure excess,
+    // side, side. The two inner segments are the closure excesses; the first
+    // and last segments are the matching body side (e.g. 25/10/50/10/50/25).
+    const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
+    const hasSmallTails = isSimilarDimension(tailStart, tailEnd || tailStart);
+    if (
+      hasSmallTails &&
+      isSimilarDimension(sideA, sideB || sideA) &&
+      isSimilarDimension(horizontalA, horizontalB)
+    ) {
+      return {
+        top: horizontalA,
+        right: sideA,
+        bottom: horizontalB,
+        left: sideB || sideA,
+        tailStart,
+        tailEnd,
+      };
     }
   }
 
@@ -747,16 +756,7 @@ function liftPackageProductionSvg(item = {}) {
   return '<svg data-shape-kind="lift-package" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:100%;max-height:100px;overflow:visible">' + svg + '</svg>';
 }
 
-function itemShapeSvg(item = {}, options = {}) {
-  const snapshot = typeof item.shape_snapshot_json === 'string' ? (()=>{try{return JSON.parse(item.shape_snapshot_json);}catch{return {};}})() : (item.shapeSnapshot || {});
-  if (snapshot.family === 'mesh') return meshProductionSvg(snapshot);
-  const explicitHoop = [item.shape_id, snapshot.shapeId, snapshot.shapeType].some(id => /^(closed[_-]stirrup|stirrup)$/.test(String(id)));
-  const hoopSegments = shapeSegmentsFromItem(item);
-  const hoopView = require('../public/hoop-view');
-  const hoop = hoopView.parts(hoopSegments.map(s=>s.length_mm), hoopSegments.map(s=>s.angle_deg), explicitHoop);
-  if (hoop && explicitHoop) return hoopView.render(hoop);
-  const sourceSvg = require('./sourceDrawingGeometry').sourceDrawingSvg(item, options);
-  if (sourceSvg) return sourceSvg;
+function itemShapeSvg(item = {}) {
   if (isLiftPackageItem(item)) return liftPackageProductionSvg(item);
   if (isRoundPileCageItem(item)) return pileCageProductionSvg(item);
   const spiralSvg = spiralShapeSvg(item);
@@ -768,27 +768,7 @@ function itemShapeSvg(item = {}, options = {}) {
   return spiralSvg || shapeSvg(segments, {
     rotateDegrees: isBench ? 180 : 0,
     shapeKind: isBench ? 'bench-bar' : 'generic-bar',
-    schematic: options.schematic === true,
   });
-}
-
-function meshProductionSvg(snapshot) {
-  const d = snapshot.data || {};
-  const L = Number(d.length), W = Number(d.width);
-  if (!(L > 0 && W > 0)) return '<svg viewBox="0 0 260 140"><text x="130" y="70" text-anchor="middle">רשת — חסרות מידות</text></svg>';
-  const scale = Math.min(182/L, 78/W), x = (260-L*scale)/2, y = (140-W*scale)/2;
-  const barPositions = (total, spacing, start, end) => {
-    const limit = total - Math.max(0,Number(end)||0), out = [];
-    const pitch = Number(spacing);
-    if (!(pitch > 0)) return out;
-    for (let v=Math.max(0,Number(start)||0); v<=limit+.001 && out.length<2000; v+=pitch) out.push(v);
-    if (out.length && out[out.length-1]<limit) out.push(limit);
-    return out;
-  };
-  const horizontal = barPositions(W,d.longitudinalSpacing,d.edgeTop,d.edgeBottom).map(v=>`<line x1="${x}" y1="${y+v*scale}" x2="${x+L*scale}" y2="${y+v*scale}"/>`).join('');
-  const vertical = barPositions(L,d.transverseSpacing,d.edgeLeft,d.edgeRight).map(v=>`<line x1="${x+v*scale}" y1="${y}" x2="${x+v*scale}" y2="${y+W*scale}"/>`).join('');
-  const spec = `Ø${Number(d.longitudinalDiameter)}@${Number(d.longitudinalSpacing)/10} / Ø${Number(d.transverseDiameter)}@${Number(d.transverseSpacing)/10}`;
-  return `<svg data-shape-kind="mesh" data-length-mm="${L}" data-width-mm="${W}" viewBox="0 0 260 140" style="width:100%;height:100%"><g fill="none" stroke="#1a2332" stroke-width="1">${horizontal}${vertical}</g><g font-family="Arial" font-size="12" text-anchor="middle" font-weight="800"><text x="130" y="${y-10}">${L/10} ס״מ</text><text x="${x-22}" y="70">${W/10}</text><text x="130" y="130">${spec} ס״מ</text></g></svg>`;
 }
 
 function roundedEndBarProductionSvg(segments, radiusMm = null) {
@@ -817,11 +797,14 @@ function benchBarProductionSvg(segments) {
   const sides = segments.map(segment => Number(segment.length_mm || 0));
   const width = 260;
   const height = 140;
-  const [foot, rise, bridge, drop, end] = sides;
-  const raw = [[0,rise],[foot,rise],[foot,0],[foot+bridge,0],[foot+bridge,drop],[foot+bridge+end,drop]];
-  const scale = Math.min((width-72)/(foot+bridge+end),(height-60)/Math.max(rise,drop));
-  const ox=(width-(foot+bridge+end)*scale)/2, oy=(height-Math.max(rise,drop)*scale)/2;
-  const points = raw.map(([x,y])=>[ox+x*scale,oy+y*scale]);
+  const points = [
+    [25, 50],
+    [62, 82],
+    [62, 30],
+    [198, 30],
+    [198, 82],
+    [235, 116],
+  ];
   const path = `M ${points.map(point => point.join(',')).join(' L ')}`;
   const center = [
     points.reduce((sum, point) => sum + point[0], 0) / points.length,
@@ -987,15 +970,14 @@ function shapeSvg(segmentsRaw, opts = {}) {
 
     if (segments.length === 1) return straightShapeSvg(segments[0]);
     if (isOpenUShape(segments)) return openUShapeSvg(segments);
-    const hoopView=require('../public/hoop-view');
-    const stirrup = hoopView.parts(segments.map(s=>s.length_mm),segments.map(s=>s.angle_deg));
-    if (stirrup) return hoopView.render(stirrup);
+    const stirrup = closedStirrupParts(segments);
+    if (stirrup) return closedStirrupSvg(stirrup);
     const angledOpenStirrup = angledOpenStirrupParts(segments);
     if (angledOpenStirrup) return angledOpenStirrupSvg(angledOpenStirrup);
 
     const sides = segments.map(segment => Number(segment.length_mm || 0));
     const angles = segments.map(segment => segment.angle_deg);
-    const visualSides = opts.schematic ? proportionalPrintSides(sides) : sides;
+    const visualSides = separateOverlappingSides(proportionalPrintSides(sides), angles);
     const points = normalizeShapePointsBaseBottom(calcShapePoints(visualSides, angles), opts);
 
     const xs = points.map(point => point[0]);
@@ -1029,7 +1011,7 @@ function shapeSvg(segmentsRaw, opts = {}) {
       }
     }
 
-    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="${opts.schematic ? 0 : 1}" data-schematic="${opts.schematic ? 1 : 0}" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
+    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
   } catch {
     return '<svg viewBox="0 0 220 60"><line x1="10" y1="30" x2="210" y2="30" stroke="#ccc" stroke-width="2"/></svg>';
   }
