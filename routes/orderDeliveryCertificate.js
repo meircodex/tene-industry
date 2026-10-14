@@ -98,7 +98,8 @@ router.get('/orders/:id/delivery-certificate-preview', requireAnyRole(['office',
   if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
   const items = db.prepare('SELECT i.* FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? ORDER BY p.pallet_num,i.id').all(order.id);
   const progress = buildDeliveryCertificateProgress(db, order.id, items);
-  res.json({ ...progress, issue_key: randomUUID(), selection_fingerprint: deliverySelectionFingerprint(remainingDeliveryItems(items, progress, true)) });
+  const activeLoadingSession = Boolean(db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active' LIMIT 1").get(order.id));
+  res.json({ ...progress, active_loading_session: activeLoadingSession, issue_key: randomUUID(), selection_fingerprint: deliverySelectionFingerprint(remainingDeliveryItems(items, progress, true)) });
 });
 
 // ── DELIVERY CERTIFICATE ─────────────────────────────────────────
@@ -139,6 +140,8 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
       return res.status(409).send('נדרש אימות היסטוריה; מקור מותר רק לפריטים שהועמסו וטרם נשלחו');
     } else if (!selectedItems.length || deliverySelectionFingerprint(selectedItems) !== req.query.selection_fingerprint) {
       return res.status(409).send('ההעמסה השתנתה או שאין פריטים שנותרו. פתח מחדש את בחירת התעודה');
+    } else if (db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active' LIMIT 1").get(order.id)) {
+      return res.status(409).send('יש העמסה פעילה במחסן. יש לסיים אותה ולהפיק את התעודה שם, כדי למנוע משלוח כפול');
     }
   }
   if (!replay && requestedItemStatus && !['הועמס'].includes(requestedItemStatus)) return res.status(400).send('תעודה חלקית מופקת רק לפי פריטים שהועמסו');
@@ -260,6 +263,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
     const markSent = db.transaction(() => {
       const latestItems = db.prepare('SELECT i.* FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? ORDER BY p.pallet_num,i.id').all(order.id);
       const latestProgress = buildDeliveryCertificateProgress(db, order.id, latestItems);
+      if (db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active' LIMIT 1").get(order.id)) throw new Error('יש לסיים את ההעמסה הפעילה במחסן לפני הפקת תעודה');
       if (deliverySelectionFingerprint(remainingDeliveryItems(latestItems, latestProgress, true)) !== req.query.selection_fingerprint || latestProgress.history_needs_review) throw new Error('ההעמסה השתנתה; פתח מחדש את התעודה');
       const certificateOrder = { order_num: order.order_num, customer_name: order.customer_name, customer_phone: order.customer_phone, customer_address: order.customer_address, delivery_date: order.delivery_date };
       const snapshot = selectedItems.map(item => ({ ...item, certificate_progress: progress, certificate_order: certificateOrder, certificate_shape_svg: productionCards.itemShapeSvg(item) }));

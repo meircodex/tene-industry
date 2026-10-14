@@ -55,7 +55,7 @@
     status.innerHTML = '<div class="mark">🚚</div><div class="title">איזו תעודה להפיק?</div>'
       + '<div class="warning">טיוטה רק מציגה את היתרה ואינה משנה סטטוסים.<br>מקור כולל רק ' + preview.loaded_item_count + ' מתוך ' + preview.total_item_count + ' פריטים שהועמסו וטרם נשלחו (' + preview.loaded_unit_count + ' יחידות).<br>לאחר הפקת מקור יישארו ' + preview.remaining_after_loaded_count + ' פריטים. המקור נשמר להדפסה חוזרת בלי משלוח נוסף.</div>'
       + '<div class="choice"><a class="btn secondary" href="' + draft.href + '">הפק טיוטה</a>'
-      + (preview.loaded_item_count && !preview.history_needs_review ? '<a class="btn" href="' + source.href + '">הפק מקור וסמן כנשלח</a>' : '<div class="msg">' + (preview.history_needs_review ? 'נדרש אימות היסטוריית המשלוחים לפני הפקת מקור.' : 'אין יתרה שהועמסה להפקת מקור.') + '</div>') + '</div>';
+      + (preview.loaded_item_count && !preview.history_needs_review && !preview.active_loading_session ? '<a class="btn" href="' + source.href + '">הפק מקור וסמן כנשלח</a>' : '<div class="msg">' + (preview.active_loading_session ? 'יש העמסה פעילה במחסן. יש לסיים אותה ולהפיק את התעודה שם.' : preview.history_needs_review ? 'נדרש אימות היסטוריית המשלוחים לפני הפקת מקור.' : 'אין יתרה שהועמסה להפקת מקור.') + '</div>') + '</div>';
   }
 
   async function load(){

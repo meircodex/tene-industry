@@ -6,6 +6,7 @@
 // order-loading session is active.
 const { expandProductionCardsForOrder } = require('./productionCardPrintPage');
 const { ITEM_STATUS } = require('../status-contracts');
+const { buildDeliveryCertificateProgress } = require('./deliveryCertificateProgress');
 
 function tryParseJson(value) {
   if (!value) return null;
@@ -99,7 +100,12 @@ function cardIsCompleted(card) {
 }
 
 function projectOrderCards(db, order) {
-  const expanded = expandProductionCardsForOrder(sourceItemsForOrder(db, order.id), tryParseJson);
+  const sourceItems = sourceItemsForOrder(db, order.id);
+  const progress = buildDeliveryCertificateProgress(db, order.id, sourceItems);
+  const unavailable = new Set(progress.items.filter(row => row.remaining_qty <= 0).map(row => row.id));
+  // A manual source certificate is also a real departure. Correcting the item
+  // back to DONE must not make its old QR eligible for a second truck.
+  const expanded = expandProductionCardsForOrder(sourceItems.filter(item => !unavailable.has(Number(item.id))), tryParseJson);
   return expanded.map(card => {
     const token = workerCardToken(order.order_num, card);
     return {

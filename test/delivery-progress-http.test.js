@@ -62,6 +62,8 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   assert.equal(after.delivery_progress.shipped_item_count,2,'ledger survives rollback');
   assert.equal(after.delivery_progress.remaining_item_count,1);
   assert.equal(after.delivery_progress.loaded_item_count,0);
+  const { projectOrderCards } = require('../services/productionCardLoading');
+  assert.equal(projectOrderCards(db,{id:order,order_num:'TEST-PARTIAL'}).some(card=>card.parent_item_id===Number(one)),false,'the warehouse QR cannot ship a corrected source row again');
   assert.equal(after.pallets[0].items.find(i=>i.id===Number(three)).quantity,20,'unshipped row untouched');
   const advanced = await patch(three,{status:'סופק'});
   assert.equal(advanced.status,200,await advanced.clone().text());
@@ -87,6 +89,15 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   const oldPreview = await (await get(`/orders/${partialOrder}/delivery-certificate-preview`)).json();
   db.prepare("UPDATE items SET status='הושלם' WHERE id=?").run(partial);
   assert.equal((await get(`/orders/${partialOrder}/delivery-certificate?certificate_mode=source&issue_key=${oldPreview.issue_key}&selection_fingerprint=${oldPreview.selection_fingerprint}`)).status,409,'changed loading rejected');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM delivery_notes WHERE order_id=?').get(partialOrder).n,1);
+  db.prepare("UPDATE items SET status='הועמס' WHERE id=?").run(partial);
+  const beforeWarehouse = await (await get(`/orders/${partialOrder}/delivery-certificate-preview`)).json();
+  db.prepare('INSERT INTO order_loading_sessions (session_uid,order_id,order_num) VALUES (?,?,?)').run('TEST-ACTIVE',partialOrder,'TEST-PACK');
+  const withWarehouse = await (await get(`/orders/${partialOrder}/delivery-certificate-preview`)).json();
+  assert.equal(withWarehouse.active_loading_session,true);
+  const conflicting = await get(`/orders/${partialOrder}/delivery-certificate?certificate_mode=source&issue_key=${beforeWarehouse.issue_key}&selection_fingerprint=${beforeWarehouse.selection_fingerprint}`);
+  assert.equal(conflicting.status,409,'manual source and warehouse completion cannot race');
+  assert.match(await conflicting.text(),/העמסה פעילה במחסן/);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM delivery_notes WHERE order_id=?').get(partialOrder).n,1);
   const completionOrder = db.prepare("INSERT INTO orders (order_num,customer_id,status) VALUES ('TEST-ALL-STAGES',?,'בייצור')").run(customer).lastInsertRowid;
   const completionPallet = db.prepare('INSERT INTO pallets (order_id,pallet_num) VALUES (?,1)').run(completionOrder).lastInsertRowid;
