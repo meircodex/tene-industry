@@ -1133,15 +1133,10 @@ function hasPrintableBends(segments) {
 }
 
 function shapeSvgForCard(item, segments) {
-  var cleanSegments = Array.isArray(segments) ? segments : [];
-  var generated = buildShapeSVG(cleanSegments);
-  var name = String((item && (item.shape_name || item.shapeName || item.shape)) || '').toLowerCase();
-  var type = String((item && (item.shapeType || item.shape_type)) || '').toLowerCase();
-  var isHoop = /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(name + ' ' + type);
-  // Cached SVGs on older orders were generic bars and could swap the hoop's
-  // body sides with its two closure tails. Always regenerate a hoop card from
-  // the current machine sequence.
-  if (isHoop && cleanSegments.length) return generated;
+  // The server regenerates canonical geometry for every saved item. Never
+  // replace a reviewed hoop with this legacy client-side dimension guess.
+  if (item.shape_svg) return item.shape_svg;
+  var generated = buildShapeSVG(Array.isArray(segments) ? segments : []);
   return item.shape_svg || generated;
 }
 

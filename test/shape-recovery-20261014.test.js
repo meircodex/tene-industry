@@ -40,6 +40,19 @@ test('closure lengths are independent and never selected by smallest-dimension s
   }
 });
 
+test('the actual inline print script never discards the canonical hoop drawing',()=>{
+  const script=fs.readFileSync('services/productionCardPrintPage.js','utf8');
+  const fn=script.match(/function shapeSvgForCard\(item, segments\) \{[\s\S]*?\n\}/)[0];
+  const ctx={buildShapeSVG:()=>'<svg data-legacy="1"></svg>'};vm.createContext(ctx);vm.runInContext(fn,ctx);
+  for(const entry of source.reviewedDrawings.filter(e=>e.shapeId==='closed_stirrup')) {
+    const item={shape_id:entry.shapeId,shape_name:'חישוק',segments:JSON.stringify(entry.segments)};
+    item.shape_snapshot_json=JSON.stringify(source.repairedSnapshot(item,entry));
+    item.shape_svg=cards.itemShapeSvg(item);
+    assert.equal(ctx.shapeSvgForCard(item,entry.segments),item.shape_svg);
+  }
+  assert.match(ctx.shapeSvgForCard({},[]),/data-legacy/);
+});
+
 test('length alias repair is narrow, backed up, idempotent and preserves manufacturing state',()=>{
   const db=new Database(':memory:');
   try {
