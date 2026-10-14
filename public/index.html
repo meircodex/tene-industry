@@ -3295,7 +3295,9 @@ function itemPreviewShapeData(item = {}) {
 }
 
 function itemPreviewSvg(item, sides, angles) {
-  const hoop = window.IronBendHoopView?.parts(sides, angles, /closed[_-]stirrup/.test(String(itemPreviewShapeData(item).shapeType || item.shapeId || '')));
+  const hoop = !isBenchBarItem(item) && !item.is3d
+    ? window.IronBendHoopView?.parts(sides, angles, /closed[_-]stirrup/.test(String(itemPreviewShapeData(item).shapeType || item.shapeId || '')))
+    : null;
   if (hoop) return window.IronBendHoopView.render(hoop);
   if (isRoundPileCageItem(item)) return roundPileCagePreviewSvg(item);
   if (isStandaloneRingItem(item)) return engineeringRingSketchSvg(item);

@@ -190,13 +190,15 @@ function classifyOrderItem(item = {}) {
   // rules own 'ליפט' for bent bars and must keep behaving exactly as before.
   const isLiftPackage = shape.family === 'lifts' || shape.shapeType === 'lift_package';
   const isPileCage = !isLiftPackage && Boolean(pileBreakdown || productionCards.isRoundPileCageItem(item));
-  const isMesh = shape.family === 'mesh' || /(^|\W)(mesh|wire mesh|רשת)(\W|$)/i.test(shape.text);
+  // A chair supports mesh; mentioning its purpose must not turn the bar into
+  // mesh material and drop its cutting, bending and chair-unit services.
+  const isChair = shape.family !== 'mesh' && (shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text));
+  const isMesh = shape.family === 'mesh' || (!isChair && /(^|\W)(mesh|wire mesh|רשת)(\W|$)/i.test(shape.text));
   const isColumnPenetration = !isPileCage && !isMesh && (
     /חדירה\s*לעמודים?|עמודים?\s*חדירה|column\s*penetration|penetration\s*column/i.test(shape.text)
       // Imported penetration details are named "מוטה ... ב-2 כיוונים".
       || /מוטה[\s\S]*ב[-־]?2\s*כיוונים/.test(shape.text)
   );
-  const isChair = shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text);
   const isSpiral = !isPileCage && !isMesh && shape.shapeType !== 'ring' && (
     shape.family === 'spirals' && spiralTurns > 1.5
     || /spiral|helix|spring|coil|ספיר|סליל|קפיץ/i.test(shape.text)
