@@ -65,6 +65,15 @@ test('a lift with no weighing yet is still valid and simply weighs nothing', () 
   assert.equal(contract.validation.valid, true);
 });
 
+test('lift approval legacy adapter does not read missing bar sides',()=>{
+  const {buildShapeDataContractV2,legacyApprovedShapeFields}=loadShapeEditor();
+  const contract=buildShapeDataContractV2({...LIFT,barLength:12000});
+  const approved=legacyApprovedShapeFields(LIFT,contract);
+  assert.equal(approved.family,'lifts');assert.equal(approved.barLength,12000);
+  assert.equal(approved.weighedKg,48.5);assert.equal(approved.sides.length,0);
+  assert.equal(approved.angles.length,0);
+});
+
 test('a lift missing its diameter or bar length is rejected', () => {
   const { buildShapeDataContractV2 } = loadShapeEditor();
   assert.equal(buildShapeDataContractV2({ ...LIFT, diameter: 0 }).validation.valid, false);

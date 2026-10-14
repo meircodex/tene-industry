@@ -46,9 +46,39 @@ function sourceDrawingSvg(item = {}) {
   const drawing = sourceDrawingForItem(item);
   if (!drawing) return '';
   const lines = drawing.lines || [];
-  const points = drawing.points.length ? drawing.points : lines.flat();
+  let points = drawing.points.length ? drawing.points : lines.flat();
   if (points.length < 2) return '';
-  const labels = (drawing.labels || []).filter(l => Number.isFinite(l.x) && Number.isFinite(l.y) && /^\d+(?:\.\d+)?$/.test(l.text));
+  let labels = (drawing.labels || []).filter(l => Number.isFinite(l.x) && Number.isFinite(l.y) && /^\d+(?:\.\d+)?$/.test(l.text));
+  const segmentValue = item.segments || object(item.shape_snapshot_json ?? item.shapeSnapshot).segments;
+  const rawSegments = typeof segmentValue === 'string' ? object(segmentValue) : segmentValue;
+  const sequence = Array.isArray(rawSegments) ? rawSegments : [];
+  // The source supplies direction/handedness, the saved dimensions supply
+  // length. PDF sketches are not to scale. Never change saved bend angles.
+  if (!lines.length && points.length===sequence.length+1 && sequence.every(s=>Number(s.length_mm)>0)) {
+    const original=points;
+    const rebuilt=[[0,0]];
+    const originalEdges=original.slice(0,-1).map((a,i)=>({a,b:original[i+1],index:i}));
+    originalEdges.forEach((edge,i)=>{
+      const dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1],norm=Math.hypot(dx,dy)||1;
+      const start=rebuilt[i], length=Number(sequence[i].length_mm);
+      rebuilt.push([start[0]+dx/norm*length,start[1]+dy/norm*length]);
+    });
+    const outset=Math.max(...sequence.map(s=>Number(s.length_mm)))*.06;
+    labels=labels.map(label=>{
+      const matches=originalEdges.filter(edge=>Math.abs(Number(sequence[edge.index].length_mm)/10-Number(label.text))<.11);
+      const candidates=matches.length?matches:originalEdges;
+      const edge=candidates.reduce((best,e)=>{
+        const p=nearestOnEdge(label,e),q=nearestOnEdge(label,best);
+        return Math.hypot(label.x-p.x,label.y-p.y)<Math.hypot(label.x-q.x,label.y-q.y)?e:best;
+      },candidates[0]);
+      const a=rebuilt[edge.index],b=rebuilt[edge.index+1];
+      const dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1],norm=Math.hypot(dx,dy)||1;
+      let nx=-dy/norm,ny=dx/norm;
+      if ((label.x-(edge.a[0]+edge.b[0])/2)*nx+(label.y-(edge.a[1]+edge.b[1])/2)*ny<0) {nx=-nx;ny=-ny;}
+      return {...label,x:(a[0]+b[0])/2+nx*outset,y:(a[1]+b[1])/2+ny*outset};
+    });
+    points=rebuilt;
+  }
   const xs = points.map(p => p[0]).concat(labels.map(l => l.x));
   const ys = points.map(p => p[1]).concat(labels.map(l => l.y));
   const minX = Math.min(...xs), minY = Math.min(...ys), rangeX = Math.max(...xs)-minX || 1, rangeY = Math.max(...ys)-minY || 1;
@@ -60,9 +90,6 @@ function sourceDrawingSvg(item = {}) {
     ? lines.map(line => 'M '+line.map(p => map(p).join(',')).join(' L ')).join(' ')
     : 'M '+points.map(p => map(p).join(',')).join(' L ');
   const mappedPoints = points.map(p => map(p).map(Number));
-  const segmentValue = item.segments || object(item.shape_snapshot_json ?? item.shapeSnapshot).segments;
-  const rawSegments = typeof segmentValue === 'string' ? object(segmentValue) : segmentValue;
-  const sequence = Array.isArray(rawSegments) ? rawSegments : [];
   const edges = lines.length
     ? lines.map((line,index)=>({a:map(line[0]).map(Number),b:map(line[1]).map(Number),index}))
     : mappedPoints.slice(0,-1).map((a,index)=>({a,b:mappedPoints[index+1],index,
@@ -176,7 +203,7 @@ function repairedSnapshot(item, entry) {
     calculated: { ...object(old.calculated), totalLengthMm: entry.totalLengthMm, unitLengthMm: entry.totalLengthMm, quantity: item.quantity,
       unitWeightKg: item.weight_per_unit, weightKg: item.weight_per_unit, totalWeightKg: item.total_weight, bendCount: Math.max(0, segments.length-1) },
     machineOutput: { ...object(old.machineOutput), generic: { ...object(old.machineOutput?.generic), family:'bars', shapeType:entry.shapeId,
-      diameter:item.diameter, segments, totalLengthMm:entry.totalLengthMm, bendCount:Math.max(0,segments.length-1),
+      diameter:item.diameter, segments, totalLengthMm:entry.totalLengthMm, lengthMm:entry.totalLengthMm, bendCount:Math.max(0,segments.length-1),
       angleBasis:sourceDrawing.angleBasis, requiresAngleConfirmation:sourceDrawing.schematicAngles } },
   };
 }
@@ -258,4 +285,28 @@ function repairSourceLabels(db) {
   if (count) console.log('[Source label audit]',JSON.stringify({repaired:count}));
 }
 
-module.exports = { REPAIR_VERSION, reviewedDrawings, geometryKey, sourceDrawingForItem, sourceDrawingSvg, repairedSnapshot, repairSourceDrawingOrders,layoutSourceDimensions,dimensionBox,edgeIntersectsBox };
+// Only repair an obsolete length alias on an already source-verified snapshot.
+// No changes to steel, geometry, quantities, statuses, inventory or prices.
+function repairSourceLengthAliases(db) {
+  const version='source-length-alias-20261014-v1';
+  const rows=db.prepare('SELECT i.*,p.order_id AS source_order_id FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id BETWEEN 87 AND 100').all();
+  let count=0;
+  db.transaction(()=>{
+    for (const row of rows) {
+      const drawing=sourceDrawingForItem(row), snapshot=object(row.shape_snapshot_json), generic=snapshot.machineOutput?.generic;
+      const length=Number(row.total_length_mm);
+      if (!drawing || !generic || !(length>0) || Number(snapshot.calculated?.totalLengthMm)!==length
+        || Number(generic.totalLengthMm)!==length || generic.lengthMm==null || Number(generic.lengthMm)===length) continue;
+      if(db.prepare('SELECT 1 FROM source_geometry_repairs WHERE version=? AND item_id=?').get(version,row.id)) continue;
+      const before=row.shape_snapshot_json;
+      generic.lengthMm=length;
+      const after=JSON.stringify(snapshot);
+      db.prepare('INSERT INTO source_geometry_repairs(version,order_id,item_id,source_file,source_page,source_row,before_json,after_json) VALUES(?,?,?,?,?,?,?,?)')
+        .run(version,row.source_order_id,row.id,drawing.sourceFile,drawing.sourcePage,drawing.row,before,after);
+      db.prepare('UPDATE items SET shape_snapshot_json=? WHERE id=? AND shape_snapshot_json=?').run(after,row.id,before);
+      count++;
+    }
+  })();
+  return count;
+}
+module.exports = { REPAIR_VERSION, reviewedDrawings, geometryKey, sourceDrawingForItem, sourceDrawingSvg, repairedSnapshot, repairSourceDrawingOrders,repairSourceLengthAliases,layoutSourceDimensions,dimensionBox,edgeIntersectsBox };

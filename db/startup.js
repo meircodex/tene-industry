@@ -180,6 +180,7 @@ function runCoreMigrations(db) {
   addCol('items',      'total_weight',       'REAL DEFAULT 0');   // alias for weight column (compat)
 
   require('../services/sourceDrawingGeometry').repairSourceDrawingOrders(db);
+  require('../services/sourceDrawingGeometry').repairSourceLengthAliases(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS customer_portal_order_idempotency (

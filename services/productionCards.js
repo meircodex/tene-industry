@@ -748,6 +748,12 @@ function liftPackageProductionSvg(item = {}) {
 }
 
 function itemShapeSvg(item = {}) {
+  const snapshot = typeof item.shape_snapshot_json === 'string' ? (()=>{try{return JSON.parse(item.shape_snapshot_json);}catch{return {};}})() : (item.shapeSnapshot || {});
+  const explicitHoop = [item.shape_id, snapshot.shapeId, snapshot.shapeType].some(id => /^(closed[_-]stirrup|stirrup)$/.test(String(id)));
+  const hoopSegments = shapeSegmentsFromItem(item);
+  const hoopView = require('../public/hoop-view');
+  const hoop = hoopView.parts(hoopSegments.map(s=>s.length_mm), hoopSegments.map(s=>s.angle_deg), explicitHoop);
+  if (hoop && explicitHoop) return hoopView.render(hoop);
   const sourceSvg = require('./sourceDrawingGeometry').sourceDrawingSvg(item);
   if (sourceSvg) return sourceSvg;
   if (isLiftPackageItem(item)) return liftPackageProductionSvg(item);
@@ -790,14 +796,11 @@ function benchBarProductionSvg(segments) {
   const sides = segments.map(segment => Number(segment.length_mm || 0));
   const width = 260;
   const height = 140;
-  const points = [
-    [25, 50],
-    [62, 82],
-    [62, 30],
-    [198, 30],
-    [198, 82],
-    [235, 116],
-  ];
+  const [foot, rise, bridge, drop, end] = sides;
+  const raw = [[0,rise],[foot,rise],[foot,0],[foot+bridge,0],[foot+bridge,drop],[foot+bridge+end,drop]];
+  const scale = Math.min((width-72)/(foot+bridge+end),(height-60)/Math.max(rise,drop));
+  const ox=(width-(foot+bridge+end)*scale)/2, oy=(height-Math.max(rise,drop)*scale)/2;
+  const points = raw.map(([x,y])=>[ox+x*scale,oy+y*scale]);
   const path = `M ${points.map(point => point.join(',')).join(' L ')}`;
   const center = [
     points.reduce((sum, point) => sum + point[0], 0) / points.length,
@@ -963,14 +966,15 @@ function shapeSvg(segmentsRaw, opts = {}) {
 
     if (segments.length === 1) return straightShapeSvg(segments[0]);
     if (isOpenUShape(segments)) return openUShapeSvg(segments);
-    const stirrup = closedStirrupParts(segments);
-    if (stirrup) return closedStirrupSvg(stirrup);
+    const hoopView=require('../public/hoop-view');
+    const stirrup = hoopView.parts(segments.map(s=>s.length_mm),segments.map(s=>s.angle_deg));
+    if (stirrup) return hoopView.render(stirrup);
     const angledOpenStirrup = angledOpenStirrupParts(segments);
     if (angledOpenStirrup) return angledOpenStirrupSvg(angledOpenStirrup);
 
     const sides = segments.map(segment => Number(segment.length_mm || 0));
     const angles = segments.map(segment => segment.angle_deg);
-    const visualSides = separateOverlappingSides(proportionalPrintSides(sides), angles);
+    const visualSides = sides;
     const points = normalizeShapePointsBaseBottom(calcShapePoints(visualSides, angles), opts);
 
     const xs = points.map(point => point[0]);

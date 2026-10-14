@@ -16,12 +16,13 @@
 <script src="/status-contracts-client.js"></script>
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
-<script src="/shape-renderer.js?v=4" defer></script>
+<script src="/hoop-view.js?v=1"></script>
+<script src="/shape-renderer.js?v=5" defer></script>
 <script src="/rebar-weights.js"></script>
 <script src="/straight-stock-cutting.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=81"></script>
+<script src="/shape-editor.js?v=82"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -187,10 +188,10 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   color:var(--dim);font-family:'Heebo',sans-serif;font-size:12px;font-weight:600;
   cursor:pointer;transition:all .15s;min-height:40px;-webkit-tap-highlight-color:transparent;}
 .status-btn:hover,.status-btn.cur{border-color:var(--accent);color:var(--accent);background:rgba(224,123,57,0.08);}
-.item-row{display:grid;grid-template-columns:230px 1fr auto;gap:14px;padding:14px;border:1px solid rgba(2,26,72,0.08);border-radius:14px;
+.item-row{display:grid;grid-template-columns:300px 1fr auto;gap:14px;padding:14px;border:1px solid rgba(2,26,72,0.08);border-radius:14px;
   margin-bottom:10px;background:#fbfcfe;align-items:stretch;}
 .item-row:last-child{border-bottom:none;}
-.item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:150px;height:150px;
+.item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:200px;height:200px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6px;}
 .item-visual svg{width:100%!important;height:100%!important;display:block;overflow:visible;}
 .pile-cage-detail-visual{border:2px solid #102a43;background:linear-gradient(135deg,#f8fbff,#fff)!important;}
@@ -997,12 +998,27 @@ async function setStatus(id, status) {
 }
 
 async function setItemStatusFromOrder(orderId, itemId, status) {
+  const item = findDetailItem(orderId, itemId);
+  const rank = ['ממתין','בייצור','הושלם','הועמס','נשלח','סופק'];
+  let reason = '';
+  if (item && rank.indexOf(status)>=0 && rank.indexOf(status)<rank.indexOf(item.status)) {
+    reason = await requestCorrectionReason();
+    if (!reason) { await openDetail(orderId); return false; }
+  }
   const response = await fetch(`/api/items/${itemId}/status`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, correction_reason: reason })
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok === false) {
-    alert(result.error || 'עדכון סטטוס הפריט נכשל');
+    const messages = {
+      status_correction_reason_required:'נדרשת סיבת תיקון לחזרה בסטטוס.',
+      status_correction_role_required:'חזרה בסטטוס דורשת הרשאת מנהל או משרד.',
+      shipment_correction_required:'הפריט כבר נשלח. יש לבצע תיקון משלוח מתועד, ולא להחזיר אותו לרשימת ההעמסה.',
+      production_quantity_correction_required:'כבר נרשמה תוצרת. חזרה לממתין מחייבת תיקון תוצרת מתועד.',
+      loading_correction_required:'הפריט משויך להעמסה מאומתת. יש לתקן אותו מתוך מסך ההעמסה.',
+      item_not_released_to_production:'ההזמנה עדיין לא אושרה לייצור.',
+    };
+    alert(messages[result.error] || result.error || 'עדכון סטטוס הפריט נכשל');
     await openDetail(orderId);
     return false;
   }
@@ -2897,8 +2913,7 @@ function buildDetailHTML(o, pkgs) {
       // Do not reuse a legacy cached SVG for hoops. It may have been produced
       // before the tail/body convention was corrected; render2D below rebuilds
       // the closed hoop from the current six-segment machine sequence.
-      const sourceDrawingVisual = String(item.shape_svg || '').includes('data-source-drawing="1"');
-      const canonicalShapeSvg = encodeURIComponent(closedHoopVisual && !sourceDrawingVisual ? '' : (item.shape_svg || ''));
+      const canonicalShapeSvg = encodeURIComponent(item.shape_svg || '');
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`
@@ -3166,6 +3181,7 @@ function orderShapeDataFromItem(item) {
     presetId: snapshot.shapeId || snapshot.shape_id || item?.shape_id || null,
     shapeType: snapshot.shapeType || snapshot.shape_type || item?.shape_type || null,
     family: snapshot.family || 'bars',
+    ...(snapshot.family === 'lifts' ? {barLength:snapshotData.barLength, weighedKg:snapshotData.weighedKg} : {}),
     diameter: Number(snapshotData.diameter ?? item?.diameter) || 12,
     is3d: is3d ? 1 : 0,
     azAngles: is3d && Array.isArray(snapshotData.azAngles) ? snapshotData.azAngles.map(Number) : null,

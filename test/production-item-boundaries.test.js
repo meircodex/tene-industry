@@ -387,6 +387,49 @@ test('production enforces order item ownership boundaries', async (t) => {
     assert.equal(order.status, statusContracts.ORDER_STATUS.IN_PRODUCTION);
   });
 
+  await t.test('manager can reopen a completed item with an audited reason without erasing produced quantities', async()=>{
+    const done=seedOrderWithItem('PB-REOPEN',statusContracts.ORDER_STATUS.DONE_WAITING_PICKUP,statusContracts.ITEM_STATUS.DONE);
+    db.prepare('UPDATE items SET produced_qty=3 WHERE id=?').run(done.itemId);
+    const managerHeaders=authHeaders(reportsManager);
+    const endpoint=`/api/items/${done.itemId}/status`;
+    const missing=await request(endpoint,{method:'PATCH',headers:managerHeaders,body:JSON.stringify({status:statusContracts.ITEM_STATUS.IN_PRODUCTION})});
+    assert.equal(missing.status,400);
+    const denied=await request(endpoint,{method:'PATCH',headers,body:JSON.stringify({status:statusContracts.ITEM_STATUS.IN_PRODUCTION,correction_reason:'test correction'})});
+    assert.equal(denied.status,403);
+    const reopened=await request(endpoint,{method:'PATCH',headers:managerHeaders,body:JSON.stringify({status:statusContracts.ITEM_STATUS.IN_PRODUCTION,correction_reason:'incorrect completion'})});
+    assert.equal(reopened.status,200);
+    assert.equal(db.prepare('SELECT produced_qty FROM items WHERE id=?').get(done.itemId).produced_qty,3);
+    assert.equal(db.prepare('SELECT status FROM orders WHERE id=?').get(done.orderId).status,statusContracts.ORDER_STATUS.IN_PRODUCTION);
+    assert.equal(db.prepare("SELECT notes FROM audit_log WHERE entity_id=? AND action='item_status_correction'").get(done.itemId).notes,'incorrect completion');
+    const wait=await request(endpoint,{method:'PATCH',headers:managerHeaders,body:JSON.stringify({status:statusContracts.ITEM_STATUS.WAITING,correction_reason:'incorrect completion'})});
+    assert.equal(wait.status,409);
+    assert.equal((await wait.json()).error,'production_quantity_correction_required');
+    db.prepare('UPDATE items SET status=? WHERE id=?').run(statusContracts.ITEM_STATUS.SENT,done.itemId);
+    const shipped=await request(endpoint,{method:'PATCH',headers:managerHeaders,body:JSON.stringify({status:statusContracts.ITEM_STATUS.LOADED,correction_reason:'wrong shipment'})});
+    assert.equal(shipped.status,409);
+    assert.equal((await shipped.json()).error,'shipment_correction_required');
+  });
+
+  await t.test('adding and editing lift packages through the order API retains the scale total, including an unweighed bundle',async()=>{
+    const order=seedOrderWithItem('PB-LIFT-ADD',statusContracts.ORDER_STATUS.PENDING_APPROVAL);
+    const vm=require('node:vm');
+    const ctx={window:{},console,localStorage:{getItem:()=>null,setItem:()=>{}}};
+    ctx.window.IronBendSteelRebarShapes=require('../modules/steel-rebar/shapes');
+    vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'../public/shape-editor.js'),'utf8'),ctx);
+    const contract=ctx.buildShapeDataContractV2({family:'lifts',diameter:12,barLength:12000,weighedKg:194});
+    const payload={shape_name:'חבילת ליפטים',diameter:12,quantity:4,shapeSnapshot:contract};
+    const created=await request(`/api/orders/${order.orderId}/items`,{method:'POST',headers:authHeaders(reportsManager),body:JSON.stringify(payload)});
+    assert.equal(created.status,200);
+    const itemId=(await created.json()).itemId;
+    const before=db.prepare('SELECT * FROM items WHERE id=?').get(itemId);
+    assert.equal(before.total_weight,194);assert.equal(before.total_length_mm,12000);assert.equal(before.weight_per_unit,48.5);
+    const changed=await request(`/api/orders/${order.orderId}/items/${itemId}`,{method:'PATCH',headers:authHeaders(reportsManager),body:JSON.stringify({quantity:2})});
+    assert.equal(changed.status,200);assert.equal(db.prepare('SELECT total_weight FROM items WHERE id=?').get(itemId).total_weight,194);
+    const unweighed=ctx.buildShapeDataContractV2({family:'lifts',diameter:12,barLength:12000,weighedKg:0});
+    const zero=await request(`/api/orders/${order.orderId}/items`,{method:'POST',headers:authHeaders(reportsManager),body:JSON.stringify({...payload,shapeSnapshot:unweighed})});
+    assert.equal(zero.status,200);assert.equal((await zero.json()).total_weight,0);
+  });
+
   await t.test('last completed production item completes the order automatically', async () => {
     const approved = seedOrderWithItem('PB-AUTO-DONE', statusContracts.ORDER_STATUS.IN_PRODUCTION, statusContracts.ITEM_STATUS.IN_PRODUCTION);
     const response = await request(`/api/items/${approved.itemId}/status`, {

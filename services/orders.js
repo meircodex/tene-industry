@@ -66,8 +66,8 @@ function roundPileCageOrderMetrics(item = {}) {
 function liftPackageOrderMetrics(item = {}) {
   const snapshot = parseShapeSnapshotObject(item.shapeSnapshot ?? item.shape_snapshot ?? item.shapeData ?? item.shape_data ?? item.shapeContract ?? item.shape_contract ?? item.shape_snapshot_json);
   if (snapshot?.family !== 'lifts' || snapshot?.shapeType !== 'lift_package') return null;
-  const weighedKg = Number(snapshot.calculated?.totalWeightKg ?? snapshot.calculated?.weighedKg ?? snapshot.data?.weighedKg);
-  if (!(weighedKg > 0)) return null;
+  const weighedKg = Number(snapshot.data?.weighedKg ?? snapshot.calculated?.weighedKg ?? snapshot.calculated?.totalWeightKg);
+  if (!Number.isFinite(weighedKg) || weighedKg < 0) throw Object.assign(new Error('invalid_lift_weight'),{statusCode:400});
   const packages = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
   // orders.js multiplies weightPerUnit by the quantity, so hand it the share
   // per package and the line lands back on the weighed total.

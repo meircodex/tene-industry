@@ -106,7 +106,8 @@ test('hoops retain closing tails, are billed as hoops, and L bars never gain hoo
     assert.equal(e.shapeName,'חישוק');
     const item={shape_name:e.shapeName,diameter:e.diameter,quantity:e.quantity,total_length_mm:e.totalLengthMm,segments:JSON.stringify(e.segments),total_weight:1};
     item.shape_snapshot_json=JSON.stringify(repairedSnapshot(item,e));
-    assert.match(cards.itemShapeSvg(item),/data-source-drawing/);
+    assert.match(cards.itemShapeSvg(item),/data-canonical-hoop="1"/);
+    assert.equal(cards.shapeSvgForProductionCard(item),cards.itemShapeSvg(item));
     assert.equal(classifyOrderItem(item).kind,'hoop');
   }
   const l=reviewedDrawings.find(e=>e.orderId===96&&e.row===7);

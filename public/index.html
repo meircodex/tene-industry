@@ -15,7 +15,8 @@
 <script src="/display-units.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=81"></script>
+<script src="/hoop-view.js?v=1"></script>
+<script src="/shape-editor.js?v=82"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -1506,8 +1507,8 @@
 </style>
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/order-item-row.css?v=1">
-<link rel="stylesheet" href="/new-order-editor.css">
-<link rel="stylesheet" href="/order-line-renderer.css?v=2">
+<link rel="stylesheet" href="/new-order-editor.css?v=20261014">
+<link rel="stylesheet" href="/order-line-renderer.css?v=3">
 </head>
 <body data-page="new">
 
@@ -3173,11 +3174,7 @@ function roundPileCagePreviewSvg(item = {}) {
 function orderSketchGeometry(sides = [], angles = []) {
   const lengths = sides.map(Number).filter(value => Number.isFinite(value) && value > 0);
   if (!lengths.length) return { points: [], lengths: [] };
-  const longest = Math.max(...lengths);
-  const visualLengths = lengths.map((length) => {
-    if (lengths.length === 1) return 120;
-    return 22 + 62 * Math.pow(length / longest, 0.38);
-  });
+  const visualLengths = lengths;
   const points = [[0, 0]];
   let direction = 0;
   visualLengths.forEach((length, index) => {
@@ -3233,7 +3230,7 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
     : [];
   const geometry = suppliedPoints.length >= 2 ? { points: suppliedPoints } : orderSketchGeometry(sides, angles);
   if (geometry.points.length < 2) return '';
-  const W = 180, H = 96, padX = 28, padY = 22;
+  const W = 260, H = 150, padX = 34, padY = 30;
   const rawX = geometry.points.map(point => point[0]);
   const rawY = geometry.points.map(point => point[1]);
   const minX = Math.min(...rawX), maxX = Math.max(...rawX);
@@ -3261,7 +3258,7 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
       ny *= -1;
     }
     const distance = 11 + (index % 2) * 2;
-    return `<text x="${(midpoint[0] + nx * distance).toFixed(1)}" y="${(midpoint[1] + ny * distance).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="Heebo,Arial" font-weight="700" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(sides[index] / 10)}</text>`;
+    return `<text x="${(midpoint[0] + nx * distance).toFixed(1)}" y="${(midpoint[1] + ny * distance).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="13" font-family="Heebo,Arial" font-weight="800" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(sides[index] / 10)}</text>`;
   }).join('');
   const bendMarks = points.slice(1, -1).map((vertex, index) => {
     const angle = Number(angles[index]);
@@ -3298,6 +3295,8 @@ function itemPreviewShapeData(item = {}) {
 }
 
 function itemPreviewSvg(item, sides, angles) {
+  const hoop = window.IronBendHoopView?.parts(sides, angles, /closed[_-]stirrup/.test(String(itemPreviewShapeData(item).shapeType || item.shapeId || '')));
+  if (hoop) return window.IronBendHoopView.render(hoop);
   if (isRoundPileCageItem(item)) return roundPileCagePreviewSvg(item);
   if (isStandaloneRingItem(item)) return engineeringRingSketchSvg(item);
   if (sides.length) {
@@ -3442,6 +3441,16 @@ function shapeSelected(data) {
   item.textOnly = data.textOnly === true;
   item.steelFinish = data.steelFinish || data.data?.steelFinish || 'ribbed';
   const isPileCage = item.shapeSnapshot?.family === 'piles' && item.shapeSnapshot?.shapeType === 'round_pile_cage';
+  if (item.shapeSnapshot?.family === 'lifts') {
+    item.shapeName = 'חבילת ליפטים'; item.family = 'lifts';
+    item.shapeSides = []; item.shapeAngles = [];
+    item.length = item.totalLengthMm = Number(item.shapeSnapshot.data?.barLength || 0);
+    item.diameter = Number(item.shapeSnapshot.data?.diameter || 0);
+    item.qty = Math.max(1, Number(data.orderItemQuantity || 1));
+    _shapeTarget = null;
+    renderPallets(); updateSummary();
+    return;
+  }
   if (isPileCage) {
     const pile = roundPileCageVisualData(item);
     item.shapeName = 'PILE CAGE';
@@ -3664,6 +3673,8 @@ function isSpiralOrderItem(item = {}) {
 }
 
 function calcItemWeight(item) {
+  const liftContract = itemShapeContract(item) || item.shapeSnapshot || {};
+  if (liftContract.family === 'lifts') return Math.max(0, Number(liftContract.data?.weighedKg || 0));
   if (isRoundPileCageItem(item)) {
     const contract = itemShapeContract(item) || item.shapeSnapshot || {};
     const unitWeightKg = Number(contract?.calculated?.totalWeightKg ?? contract?.calculated?.weightKg ?? contract?.data?.assemblySummary?.totalWeightKg ?? 0);
