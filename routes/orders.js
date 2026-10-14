@@ -21,6 +21,7 @@ const {
 const { createPricer } = require('../services/pricer');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
 const { buildOrderCommercialSummary } = require('../services/orderCommercialSummary');
+const { buildDeliveryCertificateProgress } = require('../services/deliveryCertificateProgress');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
 const { createHistoricalProductionReconciliationService } = require('../services/historicalProductionReconciliation');
@@ -522,7 +523,12 @@ module.exports = function createOrdersRouter(deps) {
     if (where.length) sql += ' WHERE ' + where.join(' AND ');
     sql += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?';
     params.push(page.limit, page.offset);
-    res.json(db.prepare(sql).all(...params));
+    const rows = db.prepare(sql).all(...params);
+    for (const order of rows) {
+      const items = db.prepare('SELECT i.* FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? ORDER BY i.id').all(order.id);
+      order.delivery_progress = buildDeliveryCertificateProgress(db, order.id, items);
+    }
+    res.json(rows);
   });
 
   // Cancellation has its own review and commit routes.  A regular status
@@ -644,6 +650,7 @@ module.exports = function createOrdersRouter(deps) {
     // It never rewrites an order and keeps overlapping kg services separate
     // from piece-based work such as chairs and rings.
     order.commercial_summary = buildOrderCommercialSummary(pallets.flatMap(p => p.items));
+    order.delivery_progress = buildDeliveryCertificateProgress(db, order.id, pallets.flatMap(p => p.items));
     res.json(order);
   });
 

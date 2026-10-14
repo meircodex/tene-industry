@@ -36,15 +36,26 @@
     status.querySelector('.err').textContent = message;
   }
 
-  function chooseCertificateMode(){
+  async function chooseCertificateMode(){
+    const auth = window.IronBendAuth;
+    const fetcher = auth && auth.fetch ? auth.fetch.bind(auth) : window.fetch.bind(window);
+    let preview;
+    try {
+      const response = await fetcher('/api/orders/' + encodeURIComponent(id) + '/delivery-certificate-preview', { credentials: 'same-origin' });
+      if (!response.ok) throw new Error('לא ניתן לבדוק את יתרת ההזמנה. רענן והתחבר מחדש במידת הצורך.');
+      preview = await response.json();
+    } catch (error) { fail(error.message); return; }
     const draft = new URL(location.href);
     draft.searchParams.set('certificate_mode', 'draft');
     const source = new URL(location.href);
     source.searchParams.set('certificate_mode', 'source');
+    source.searchParams.set('item_status', 'הועמס');
+    source.searchParams.set('issue_key', preview.issue_key);
+    source.searchParams.set('selection_fingerprint', preview.selection_fingerprint);
     status.innerHTML = '<div class="mark">🚚</div><div class="title">איזו תעודה להפיק?</div>'
-      + '<div class="warning">טיוטה רק מציגה את הפריטים ואינה משנה סטטוסים.<br>מקור מסמן את הפריטים שהועמסו כ״נשלח״, כדי שלא יופיעו בתעודה נוספת.</div>'
+      + '<div class="warning">טיוטה רק מציגה את היתרה ואינה משנה סטטוסים.<br>מקור כולל רק ' + preview.loaded_item_count + ' מתוך ' + preview.total_item_count + ' פריטים שהועמסו וטרם נשלחו (' + preview.loaded_unit_count + ' יחידות).<br>לאחר הפקת מקור יישארו ' + preview.remaining_after_loaded_count + ' פריטים. המקור נשמר להדפסה חוזרת בלי משלוח נוסף.</div>'
       + '<div class="choice"><a class="btn secondary" href="' + draft.href + '">הפק טיוטה</a>'
-      + '<a class="btn" href="' + source.href + '">הפק מקור וסמן כנשלח</a></div>';
+      + (preview.loaded_item_count && !preview.history_needs_review ? '<a class="btn" href="' + source.href + '">הפק מקור וסמן כנשלח</a>' : '<div class="msg">' + (preview.history_needs_review ? 'נדרש אימות היסטוריית המשלוחים לפני הפקת מקור.' : 'אין יתרה שהועמסה להפקת מקור.') + '</div>') + '</div>';
   }
 
   async function load(){
@@ -52,8 +63,8 @@
       fail('Invalid print request.');
       return;
     }
-    if (kind === 'delivery-certificate' && !params.has('certificate_mode')) {
-      chooseCertificateMode();
+    if (kind === 'delivery-certificate' && !params.has('certificate_mode') && !params.has('note_id')) {
+      await chooseCertificateMode();
       return;
     }
     const extra = new URLSearchParams();

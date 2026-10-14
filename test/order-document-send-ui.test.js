@@ -108,6 +108,8 @@ function loadDocumentSending() {
     ${html.slice(configStart, configEnd)}
     ${html.slice(functionsStart, functionsEnd)}
     const o = order;
+    const loadedItemCount = 0;
+    const deliveryProgress = { total_item_count: 0, loaded_item_count: 0, remaining_item_count: 0, certificates: [] };
     globalThis.printButtons = ${prints[1]};`, context);
   const click = (markup, handlerPattern) => {
     const handler = [...markup.matchAll(/onclick="([^"]+)"/g)].map(match => match[1]).find(value => handlerPattern.test(value));

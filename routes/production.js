@@ -30,6 +30,7 @@ module.exports = function createProductionRouter(deps) {
     ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
     ORDER_STATUS.PRODUCTION_QUEUE,
     ORDER_STATUS.IN_PRODUCTION,
+    ORDER_STATUS.PARTIAL_DELIVERY,
   ]);
   const productionStartItemStatuses = new Set([
     ITEM_STATUS.WAITING,
@@ -214,7 +215,7 @@ module.exports = function createProductionRouter(deps) {
     const status = String(card.status || '');
     const requestedQty = Number(card.quantity || 0);
     const producedQty = Number(card.produced_qty || 0);
-    if (status === ITEM_STATUS.DONE || status === ITEM_STATUS.DELIVERED || (requestedQty > 0 && producedQty >= requestedQty)) {
+    if ([ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(status) || (requestedQty > 0 && producedQty >= requestedQty)) {
       return { code: 'completed', label: 'הושלם', tone: 'green' };
     }
     if (status === ITEM_STATUS.IN_PRODUCTION || producedQty > 0) {
@@ -610,14 +611,26 @@ module.exports = function createProductionRouter(deps) {
     if (!item) return res.status(404).json({ error: 'not found' });
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     if (!productionWritableItemStatuses.has(status)) return res.status(400).json({ error: 'invalid production status' });
-    if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
-    const updates = { status };
-    if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
-    if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
-    db.prepare(`UPDATE items SET status=?${status===ITEM_STATUS.IN_PRODUCTION&&!item.started_at?',started_at=?':''}${status===ITEM_STATUS.DONE?',completed_at=?':''} WHERE id=?`)
-      .run(...Object.values(updates), req.params.id);
+    const stages = [ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED];
+    const beforeStage = stages.indexOf(item.status);
+    const afterStage = stages.indexOf(status);
+    const backwards = (afterStage >= 0 && afterStage < beforeStage) || (beforeStage >= 2 && afterStage < 0);
+    const correctionReason = String(req.body.correction_reason || '').trim();
+    if (backwards && correctionReason.length < 3) return res.status(409).json({ error: 'יש להזין סיבת תיקון להחזרת סטטוס לאחור' });
+    if (status === ITEM_STATUS.IN_PRODUCTION && !backwards && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
+    const completed = afterStage >= stages.indexOf(ITEM_STATUS.DONE);
+    const now = new Date().toISOString();
+    db.transaction(() => {
+      db.prepare(`UPDATE items SET status=?,started_at=?,completed_at=?,produced_qty=? WHERE id=?`).run(
+        status, afterStage >= 1 ? (item.started_at || now) : item.started_at,
+        completed ? (item.completed_at || now) : (backwards ? null : item.completed_at),
+        completed ? Math.max(Number(item.produced_qty || 0), Number(item.quantity || 0)) : Number(item.produced_qty || 0), item.id);
+      db.prepare('INSERT INTO audit_log (entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,notes,user_id,user_name) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
+        'item', item.id, item.order_num, backwards ? 'item_status_correction' : 'item_status_change', 'status', item.status, status,
+        correctionReason || (completed ? 'אישור שלבים מצטבר — כמות הפריט יוצרה; תעודות משלוח קיימות אינן מתבטלות' : ''), req.auth?.sub || null, req.auth?.display_name || null);
+    })();
     const orderStatus = syncOrderStatusAfterItemStatus(item, status);
-    const consumedReservations = status === ITEM_STATUS.DONE ? consumeProductionReservations(item) : { consumed: 0 };
+    const consumedReservations = completed ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
     res.json({ ok: true, order_status: orderStatus, consumedReservations });
   });
