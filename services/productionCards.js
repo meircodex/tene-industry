@@ -227,6 +227,7 @@ function isOpenUShape(segments) {
 
   return isRightAngle(segments[0].angle_deg)
     && isRightAngle(segments[1].angle_deg)
+    && signedAngleDegrees(segments[0].angle_deg) === signedAngleDegrees(segments[1].angle_deg)
     && legsShorterThanBridge
     && legsSimilar;
 }
@@ -372,9 +373,11 @@ function closedStirrupParts(segments) {
       return { top: lengths[2], right: lengths[1], bottom: lengths[4], left: lengths[3], tailStart: lengths[0], tailEnd: lengths[5] };
     }
   }
-  const rightAngles = segments.slice(0, Math.min(4, segments.length - 1))
+  const checkedAngles = segments.slice(0, Math.min(4, segments.length - 1))
     .filter(segment => segment.angle_deg != null)
-    .every(segment => isRightAngle(segment.angle_deg));
+    .map(segment => signedAngleDegrees(segment.angle_deg));
+  const rightAngles = checkedAngles.every(isRightAngle)
+    && checkedAngles.every(angle => angle === checkedAngles[0]);
   if (!rightAngles) return null;
 
   if (segments.length >= 5) {

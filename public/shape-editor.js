@@ -447,7 +447,8 @@ function detectClosedStirrupParts(sides, angles) {
     }
   }
   const checkedAngles = Array.isArray(angles) ? angles.slice(0, Math.min(4, values.length - 1)) : [];
-  if (checkedAngles.length && !checkedAngles.every(isRightBendAngle)) return null;
+  if (checkedAngles.length && (!checkedAngles.every(isRightBendAngle)
+    || !checkedAngles.every(angle => signedDisplayAngle(angle) === signedDisplayAngle(checkedAngles[0])))) return null;
 
   if (values.length >= 5) {
     const right = values[0];

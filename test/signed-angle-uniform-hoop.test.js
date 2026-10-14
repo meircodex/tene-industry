@@ -65,6 +65,9 @@ test('both source hoops in order 91 use an upright rectangle, not a rotated gene
 test('an open L or mixed-direction rectangle is not forced into a hoop drawing', () => {
   const ctx = editorContext();
   assert.equal(ctx.detectClosedStirrupParts([100,500,800,500,800,100],[135,90,270,90,135]),null);
+  assert.equal(ctx.detectClosedStirrupParts([500,800,500,800],[90,270,90]),null);
+  assert.doesNotMatch(cards.itemShapeSvg({segments:JSON.stringify([{length_mm:500,angle_deg:90},{length_mm:800,angle_deg:270},{length_mm:500,angle_deg:90},{length_mm:800,angle_deg:0}])}),/data-shape-kind="closed-stirrup"/);
+  assert.doesNotMatch(cards.itemShapeSvg({segments:JSON.stringify([{length_mm:500,angle_deg:90},{length_mm:800,angle_deg:270},{length_mm:500,angle_deg:0}])}),/data-shape-kind="open-u"/);
   assert.doesNotMatch(cards.itemShapeSvg({shape_name:'L',segments:JSON.stringify([{length_mm:500,angle_deg:270},{length_mm:800,angle_deg:0}])}),/data-shape-kind="closed-stirrup"/);
 });
 

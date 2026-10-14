@@ -771,6 +771,7 @@ function isOpenUShapeClient(segments) {
   var legsShorterThanBridge = leftLeg < bridge && rightLeg < bridge;
   return isRightAngleValue(segments[0].angle_deg)
     && isRightAngleValue(segments[1].angle_deg)
+    && displayBendAngleDeg(segments[0].angle_deg) === displayBendAngleDeg(segments[1].angle_deg)
     && legsShorterThanBridge
     && legsSimilar;
 }
