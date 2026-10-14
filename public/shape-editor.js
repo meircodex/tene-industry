@@ -256,8 +256,8 @@ function calcShapePoints(sides, angles) {
 
 function normalizeShapePointsBaseBottom(points, opts = {}) {
   if (!Array.isArray(points) || points.length < 2) return points;
-  let longest = { index: 0, length: 0, angle: 0 };
-  for (let i = 0; i < points.length - 1; i++) {
+  let longest = window.IronBendDisplayUnits?.diagramBaseSegment?.(points) || { index: 0, length: 0, angle: 0 };
+  for (let i = 0; !window.IronBendDisplayUnits?.diagramBaseSegment && i < points.length - 1; i++) {
     const dx = points[i + 1][0] - points[i][0];
     const dy = points[i + 1][1] - points[i][1];
     const length = Math.hypot(dx, dy);
@@ -265,8 +265,9 @@ function normalizeShapePointsBaseBottom(points, opts = {}) {
   }
   if (!longest.length) return points;
 
-  const cos = Math.cos(-longest.angle);
-  const sin = Math.sin(-longest.angle);
+  const alignmentAngle = Math.atan(Math.tan(longest.angle));
+  const cos = Math.cos(-alignmentAngle);
+  const sin = Math.sin(-alignmentAngle);
   let rotated = points.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos]);
   const base = rotated[longest.index];
   const baseNext = rotated[longest.index + 1];
@@ -886,17 +887,21 @@ PolylineBarEngine.render = function(shape, w = 300, h = 260, opts = {}) {
   if (opts.view === '3d') return shape3DSVG(sides, angles, w, h, opts.diameter || 12, opts);
   const stirrup = detectClosedStirrupParts(sides, angles);
   if (stirrup) return `<g data-engine="PolylineBarEngine" data-family="bars">${renderClosedStirrupEditor2D(stirrup, sides, w, h, opts)}</g>`;
-  const { path, pts } = shapeSVGPath(sides, angles, w, h, opts.padding || 24);
+  const maxSide = Math.max(...sides,1);
+  const visualSides = window.IronBendDisplayUnits?.diagramVisualSides?.(sides) || sides.map(side=>Math.max(side,maxSide*0.14));
+  const { path, pts } = shapeSVGPath(visualSides, angles, w, h, opts.padding || 38);
+  const dimensions = window.IronBendDisplayUnits?.diagramDimensionPositions?.(pts,sides.map(side=>formatLengthCmFromMm(side)),20);
   const labelHtml = pts.slice(0, -1).map((p, i) => {
     const next = pts[i + 1];
-    const mx = (p[0] + next[0]) / 2;
-    const my = (p[1] + next[1]) / 2;
-    return `<text x="${mx.toFixed(1)}" y="${(my - 8).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">${svgEscape(formatLengthCmFromMm(sides[i]))}</text>`;
+    const mx = dimensions?.[i]?.x ?? (p[0] + next[0]) / 2;
+    const my = dimensions?.[i]?.y ?? (p[1] + next[1]) / 2 - 8;
+    const mid = [(p[0]+next[0])/2,(p[1]+next[1])/2];
+    return `<g data-side-dimension="${i}"><line x1="${mid[0].toFixed(1)}" y1="${mid[1].toFixed(1)}" x2="${mx.toFixed(1)}" y2="${my.toFixed(1)}" stroke="#aeb8c5" stroke-width="0.8"/><text data-length-label="1" x="${mx.toFixed(1)}" y="${my.toFixed(1)}" dominant-baseline="middle" text-anchor="middle" font-size="12" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">${svgEscape(formatLengthCmFromMm(sides[i]))}</text></g>`;
   }).join('');
   const bends = pts.slice(1, -1).map((p, i) => {
     const angle = angles[i];
-    if (angle == null || angle === 180) return '';
-    return `<text x="${p[0].toFixed(1)}" y="${(p[1] + 18).toFixed(1)}" text-anchor="middle" font-size="10" font-family="Heebo,Arial" font-weight="800" fill="#c9621a">${svgEscape(signedAngleLabel(angle))}</text>`;
+    if (angle == null || Math.abs(signedDisplayAngle(angle)) === 180) return '';
+    return `<text data-angle-label="1" direction="ltr" x="${p[0].toFixed(1)}" y="${(p[1] + 18).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#c9621a">${svgEscape(signedAngleLabel(angle))}</text>`;
   }).join('');
   return `<g data-engine="PolylineBarEngine" data-family="bars"><path d="${path}" fill="none" stroke="#3d5e78" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${labelHtml}${bends}</g>`;
 };

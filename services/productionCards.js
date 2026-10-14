@@ -1,5 +1,5 @@
 const { isTechnicalRecognitionNote } = require('./intakeWorkflow');
-const { signedAngleDegrees, formatSignedAngle } = require('../public/display-units');
+const { signedAngleDegrees, formatSignedAngle, diagramBaseSegment, diagramDimensionPositions, diagramVisualSides } = require('../public/display-units');
 
 const REVIEW_NOTE_LABEL = '\u05d3\u05d5\u05e8\u05e9 \u05d0\u05d9\u05de\u05d5\u05ea \u05de\u05d5\u05dc \u05de\u05e7\u05d5\u05e8 \u05d4\u05e7\u05dc\u05d9\u05d8\u05d4';
 
@@ -239,15 +239,7 @@ function isSimilarDimension(a, b, tolerance = 0.12) {
 }
 
 function proportionalPrintSides(sides) {
-  const clean = (Array.isArray(sides) ? sides : []).map(value => Math.max(0, Number(value || 0)));
-  const max = Math.max(0, ...clean);
-  if (!max) return clean;
-  return clean.map(length => {
-    if (!length) return 0;
-    const ratio = max / length;
-    if (ratio < 6) return length;
-    return Math.min(max, Math.max(length, max * 0.14));
-  });
+  return diagramVisualSides(sides);
 }
 
 
@@ -322,17 +314,14 @@ function calcShapePoints(sides, angles) {
 
 function normalizeShapePointsBaseBottom(points, opts = {}) {
   if (!Array.isArray(points) || points.length < 2) return points;
-  let longest = { index: 0, length: 0, angle: 0 };
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const dx = points[i + 1][0] - points[i][0];
-    const dy = points[i + 1][1] - points[i][1];
-    const length = Math.hypot(dx, dy);
-    if (length > longest.length) longest = { index: i, length, angle: Math.atan2(dy, dx) };
-  }
+  const longest = diagramBaseSegment(points);
   if (!longest.length) return points;
 
-  const cos = Math.cos(-longest.angle);
-  const sin = Math.sin(-longest.angle);
+  // Horizontal means either leftward or rightward. Do not spin a leftward
+  // 100 cm base through 180 degrees and move its return hook to the wrong end.
+  const alignmentAngle = Math.atan(Math.tan(longest.angle));
+  const cos = Math.cos(-alignmentAngle);
+  const sin = Math.sin(-alignmentAngle);
   let rotated = points.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos]);
   const base = rotated[longest.index];
   const baseNext = rotated[longest.index + 1];
@@ -464,7 +453,7 @@ function rightAngleMarkerSvg(previous, corner, next) {
 }
 
 function dimensionLabelSvg(text, x, y, width = 38) {
-  return '<text x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="10" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.8" paint-order="stroke fill" stroke-linejoin="round">' + escapeHtml(text) + '</text>';
+  return '<text data-length-label="1" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="12" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.8" paint-order="stroke fill" stroke-linejoin="round">' + escapeHtml(text) + '</text>';
 }
 
 function sideDimensionSvg(start, end, value, center, distance = 18) {
@@ -485,7 +474,7 @@ function sideDimensionSvg(start, end, value, center, distance = 18) {
     dimensionLabelSvg(text, label[0], label[1], width);
 }
 
-function angleMarkerSvg(previous, corner, next, angle, center) {
+function angleMarkerSvg(previous, corner, next, angle, center, occupied = []) {
   if (!isPrintableBendAngle(angle)) return '';
   // 90° היא ברירת המחדל של כיפוף במוט - לא מסמנים אותה בשרטוט.
   // בחישוקים הסימון נשמר - שם יש חוק אחר.
@@ -494,7 +483,13 @@ function angleMarkerSvg(previous, corner, next, angle, center) {
   const b = unitVector(corner, next);
   const p1 = pointAt(corner, a, 13);
   const p2 = pointAt(corner, b, 13);
-  const label = angleLabelPosition(previous, corner, next, 22);
+  let label = angleLabelPosition(previous, corner, next, 24);
+  for (let distance = 24; distance <= 78; distance += 9) {
+    label = angleLabelPosition(previous, corner, next, distance);
+    const halfWidth=angleText(angle).length*3.5+3;
+    if (!occupied.some(box => label[0]-halfWidth<box.right+3 && label[0]+halfWidth>box.left-3 && label[1]-8<box.bottom+3 && label[1]+8>box.top-3)) break;
+  }
+  occupied.push({left:label[0]-angleText(angle).length*3.5-3,right:label[0]+angleText(angle).length*3.5+3,top:label[1]-8,bottom:label[1]+8});
   return '<path d="M ' + p1[0].toFixed(1) + ',' + p1[1].toFixed(1) + ' Q ' + corner[0].toFixed(1) + ',' + corner[1].toFixed(1) + ' ' + p2[0].toFixed(1) + ',' + p2[1].toFixed(1) + '" fill="none" stroke="#c9621a" stroke-width="1.4" stroke-linecap="round"/>' +
     angleLabelSvg(angleText(angle), label[0], label[1]);
 }
@@ -855,7 +850,7 @@ function openUShapeSvg(segments) {
   // 90° היא ברירת המחדל של כיפוף במוט - לא מסמנים אותה בשרטוט.
   // בחישוקים הסימון נשמר - שם יש חוק אחר.
 
-  return `<svg data-shape-kind="open-u" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
+  return `<svg data-shape-kind="open-u" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:140px;overflow:visible">${svg}</svg>`;
 }
 
 function angledOpenStirrupParts(segments) {
@@ -906,20 +901,20 @@ function closedStirrupSvg(parts) {
   svg += `<path data-stirrup-marker="overlap" d="${markerPath}" fill="none" stroke="#1a2332" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>`;
   svg += `<path d="${markerPath}" fill="none" stroke="#3a5070" stroke-width="1.4" stroke-linecap="square" stroke-linejoin="miter"/>`;
   if (parts.tailStart > 0) {
-    svg += `<text data-tail-dim="1" x="${(markerX - 4).toFixed(1)}" y="${(y + marker / 2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="9" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailStart))}</text>`;
+    svg += `<text data-tail-dim="1" x="${(markerX - 6).toFixed(1)}" y="${(y + marker / 2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailStart))}</text>`;
   }
   if (parts.tailEnd > 0) {
-    svg += `<text data-tail-dim="1" x="${((markerX + right) / 2).toFixed(1)}" y="${(markerY + 9).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailEnd))}</text>`;
+    svg += `<text data-tail-dim="1" x="${((markerX + right) / 2).toFixed(1)}" y="${(markerY + 13).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailEnd))}</text>`;
   }
 
   [
-    { x: midX, y: y - 11, value: parts.top },
-    { x: right + 20, y: midY, value: parts.right },
-    { x: midX, y: bottom + 13, value: parts.bottom },
-    { x: x - 20, y: midY, value: parts.left },
+    { x: midX, y: y - 18, value: parts.top },
+    { x: right + 24, y: midY, value: parts.right },
+    { x: midX, y: bottom + 18, value: parts.bottom },
+    { x: x - 24, y: midY, value: parts.left },
   ].forEach(label => {
     svg += `<rect x="${(label.x - 18).toFixed(1)}" y="${(label.y - 7).toFixed(1)}" width="36" height="14" rx="3" fill="white" fill-opacity="0.94"/>`;
-    svg += `<text x="${label.x.toFixed(1)}" y="${label.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="10" font-family="Heebo,Arial" font-weight="900" fill="#1a2332">${escapeHtml(displayLengthCm(label.value))}</text>`;
+    svg += `<text data-length-label="1" x="${label.x.toFixed(1)}" y="${label.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="12" font-family="Heebo,Arial" font-weight="900" fill="#1a2332">${escapeHtml(displayLengthCm(label.value))}</text>`;
   });
 
   [
@@ -931,7 +926,7 @@ function closedStirrupSvg(parts) {
     svg += rightAngleMarkerSvg(previous, corner, next);
   });
 
-  return `<svg data-shape-kind="closed-stirrup" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:112px;overflow:visible">${svg}</svg>`;
+  return `<svg data-shape-kind="closed-stirrup" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:140px;overflow:visible">${svg}</svg>`;
 }
 
 function angledOpenStirrupSvg(parts) {
@@ -976,7 +971,7 @@ function shapeSvg(segmentsRaw, opts = {}) {
     const segments = parseSegments(segmentsRaw);
     const width = 260;
     const height = 140;
-    const padding = 46;
+    const padding = 38;
     if (!segments.length) {
       return '<svg viewBox="0 0 220 60" style="width:100%;max-height:80px">' +
         '<line x1="12" y1="30" x2="208" y2="30" stroke="#1a2332" stroke-width="3" stroke-linecap="round"/>' +
@@ -1015,18 +1010,22 @@ function shapeSvg(segmentsRaw, opts = {}) {
     svg += `<path d="${path}" fill="none" stroke="#3a5070" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`;
 
     const center = [mapped.reduce((sum, point) => sum + point[0], 0) / mapped.length, mapped.reduce((sum, point) => sum + point[1], 0) / mapped.length];
-    for (let i = 0; i < mapped.length - 1; i += 1) {
-      svg += sideDimensionSvg(mapped[i], mapped[i + 1], sides[i], center, 15);
-    }
+    const dimensions = diagramDimensionPositions(mapped,sides.map(displayLengthCm),20);
+    dimensions.forEach(label => {
+      svg += `<g data-side-dimension="${label.index}" data-length-mm="${sides[label.index]}"><line x1="${label.mid[0].toFixed(1)}" y1="${label.mid[1].toFixed(1)}" x2="${label.x.toFixed(1)}" y2="${label.y.toFixed(1)}" stroke="#aeb8c5" stroke-width="0.8"/>${dimensionLabelSvg(displayLengthCm(sides[label.index]),label.x,label.y)}</g>`;
+    });
+    const occupied = dimensions.map(label=>label.box);
 
     for (let i = 1; i < mapped.length - 1; i += 1) {
       const angle = angles[i - 1];
       if (isPrintableBendAngle(angle)) {
-        svg += angleMarkerSvg(mapped[i - 1], mapped[i], mapped[i + 1], angle, center);
+        svg += angleMarkerSvg(mapped[i - 1], mapped[i], mapped[i + 1], angle, center, occupied);
       }
     }
 
-    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
+    const left=Math.min(0,...occupied.map(box=>box.left-5)),top=Math.min(0,...occupied.map(box=>box.top-5));
+    const right=Math.max(width,...occupied.map(box=>box.right+5)),bottom=Math.max(height,...occupied.map(box=>box.bottom+5));
+    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="1" data-dimension-layout="outside" preserveAspectRatio="xMidYMid meet" viewBox="${left.toFixed(1)} ${top.toFixed(1)} ${(right-left).toFixed(1)} ${(bottom-top).toFixed(1)}" style="width:100%;height:100%;max-height:160px;overflow:visible">${svg}</svg>`;
   } catch {
     return '<svg viewBox="0 0 220 60"><line x1="10" y1="30" x2="210" y2="30" stroke="#ccc" stroke-width="2"/></svg>';
   }

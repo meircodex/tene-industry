@@ -12,7 +12,7 @@ function loadShapeEditorGeometry(initialStorage = {}) {
   const snapshotSource = fs.readFileSync(path.join(__dirname, '..', 'services', 'shapeSnapshot.js'), 'utf8');
   const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
   const context = {
-    window: {},
+    window: { IronBendDisplayUnits: require('../public/display-units') },
     IronBendSteelRebarShapes: steelRebarShapes,
     console,
     localStorage: {
@@ -568,7 +568,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=82/);
+  assert.match(index, /shape-editor\.js\?v=83/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
