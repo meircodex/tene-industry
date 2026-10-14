@@ -92,6 +92,7 @@ const createWorkerInvitationsRouter = require('./routes/workerInvitations');
 const createQrAccessRouter = require('./routes/qrAccess');
 const createMobileAppLinksRouter = require('./services/mobileAppLinks');
 const createAttendedRemoteSupportRouter = require('./routes/attendedRemoteSupport');
+const createBugReportsRouter = require('./routes/bugReports');
 const { createAccessControl } = require('./services/accessControl');
 const { createAttendedRemoteSupportService } = require('./services/attendedRemoteSupport');
 const { MACHINE_STATES, STATE_TRANSITIONS } = constants;
@@ -330,7 +331,7 @@ const allRouteFactories = [
   createOrderPrintA4Router, createProductionMetricsRouter, createProductionShiftsRouter,
   createCatalogRouter, createPriorityRouter, createPriorityExportRouter, createBrandingRouter, createLicenseRouter,
   createAccessRouter, createDeviceEnrollmentRouter, createQrAccessRouter, createWorkerInvitationsRouter,
-  createAttendedRemoteSupportRouter,
+  createAttendedRemoteSupportRouter, createBugReportsRouter,
 ];
 const routeManifests = allRouteFactories.map(f => f.manifest).filter(Boolean);
 const accessControl = createAccessControl({ routeManifests, settingsService });
@@ -338,6 +339,7 @@ const accessControl = createAccessControl({ routeManifests, settingsService });
 app.use('/api', createAccessRouter({ requireRole, accessControl }));
 
 seedCoreData(db);
+app.use('/api', createBugReportsRouter({ db, requireRole }));
 
 // Isolated attended-support channel. It never reuses the machine realtime
 // websocket, and it accepts screen/control traffic only through a rotating
@@ -406,6 +408,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/warehouse.js', factory: createWarehouseRouter },
     { file: 'routes/access.js', factory: createAccessRouter },
     { file: 'routes/attendedRemoteSupport.js', factory: createAttendedRemoteSupportRouter },
+    { file: 'routes/bugReports.js', factory: createBugReportsRouter },
   ],
 });
 

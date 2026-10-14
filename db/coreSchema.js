@@ -1,6 +1,7 @@
 'use strict';
 
 const { ensureFinanceSchema } = require('./financeSchema');
+const { ensureBugReportSchema } = require('./bugReportSchema');
 
 function tableColumns(db, table) {
   return db.pragma(`table_info(${table})`).map(column => column.name);
@@ -1975,6 +1976,7 @@ function ensureCoreSchema(db) {
   }
 
   ensureFinanceSchema(db);
+  ensureBugReportSchema(db);
 }
 
 module.exports = {

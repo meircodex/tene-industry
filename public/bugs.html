@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>דיווחי באגים ותיקונים — IronBend</title><link rel="stylesheet" href="/bugs.css?v=1"><script src="/auth-client.js"></script><script src="/nav.js?v=bugs1" defer></script><script src="/bugs.js?v=1" defer></script></head>
+<body>
+<main>
+  <header class="page-heading"><div><h1>דיווחי באגים ותיקונים</h1><p>מה לא תקין → איך צריך להיות → טיפול ותמונת תיקון → אישור שלך</p></div><button id="new-report" class="primary">+ דיווח חדש</button></header>
+  <p class="notice">כאן מרכזים את הדיווחים והשיחה על התיקון. כדי שאטפל בדיווח יחד איתך, שלח לי בצ׳אט את מספרו או השתמש ב״העתק פרטי דיווח לצ׳אט״. הדיווחים אינם נשלחים אוטומטית לבינה מלאכותית.</p>
+  <div id="feedback" role="status" aria-live="polite"></div>
+  <section id="create-panel" class="panel" hidden>
+    <h2>דיווח חדש</h2>
+    <form id="create-form">
+      <label>כותרת קצרה<input name="title" maxlength="160" required placeholder="לדוגמה: המספר מכסה את סימון הכיפוף"></label>
+      <div class="two"><label>מה לא טוב בפועל?<textarea name="actual" maxlength="6000" required></textarea></label><label>איך זה צריך להיות?<textarea name="expected" maxlength="6000" required></textarea></label></div>
+      <div class="four"><label>מספר הזמנה<input name="order_reference" maxlength="80" placeholder="לדוגמה: 097"></label><label>מספר פריט<input name="item_reference" maxlength="80" placeholder="לדוגמה: 4, 7"></label><label>קישור למסך בתוכנה<input name="page_path" maxlength="2000" placeholder="/orders.html?id=97" dir="ltr"></label><label>עדיפות<select name="priority"><option value="normal">רגילה</option><option value="urgent">דחופה — מפריעה לעבודה</option><option value="low">נמוכה</option></select></label></div>
+      <div class="two"><div class="upload" data-kind="before"><label>תמונות הבעיה — לפני התיקון<input type="file" name="before" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><div class="upload" data-kind="expected"><label>תמונת מקור / איך צריך להיות<input type="file" name="expected" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div></div>
+      <p class="muted">אפשר לבחור תמונות, לגרור אותן לתיבה, או ללחוץ בתיבה ולהדביק צילום מסך (Ctrl+V). עד 3 תמונות לתיבה, 4 מ״ב לתמונה.</p>
+      <div class="actions"><button type="submit" class="primary">שלח דיווח</button><button type="button" id="cancel-create">בטל</button></div>
+    </form>
+  </section>
+  <div class="workspace">
+    <aside class="panel"><div class="list-heading"><h2>הדיווחים</h2><button id="refresh">רענן</button></div><label>חיפוש<input id="search" type="search" placeholder="כותרת, הזמנה או מספר דיווח"></label><label>מצב טיפול<select id="filter"><option value="open">כל הפתוחים</option><option value="all">כל הדיווחים והארכיון</option><option value="new">חדש</option><option value="needs_info">ממתין למידע</option><option value="in_progress">בטיפול</option><option value="awaiting_confirmation">תוקן — ממתין לאישור</option><option value="closed">אושר ונסגר</option></select></label><p id="list-summary" class="muted"></p><div id="report-list"></div></aside>
+    <section id="detail" class="panel"><p>בחר דיווח כדי לראות תמונות, שיחה ותיעוד טיפול.</p></section>
+  </div>
+</main>
+<dialog id="image-dialog"><button id="close-image" aria-label="סגור תמונה">סגור ×</button><img id="full-image" alt="תמונת דיווח מוגדלת"></dialog>
+</body></html>
