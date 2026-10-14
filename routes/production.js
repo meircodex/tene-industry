@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const createProductionMachinesRouter = require('./productionMachines');
 const productionCards = require('../services/productionCards');
+const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
 const { consumeReservationsForProduction, calculateMaterialStockPosition, normalizeMaterialType } = require('../services/inventoryReservation');
 const { expandProductionCardsForOrder } = require('../services/productionCardPrintPage');
 
@@ -385,8 +386,12 @@ module.exports = function createProductionRouter(deps) {
     const item = selectWorkerCardById(parsed.itemId);
     if (!item) return res.status(404).json({ error: 'not_found' });
     workerCardActivity.record(req, item, 'opened', { source: 'worker_card_qr' });
-    res.json({ items: [item], grouped: {} });
+    try {
+      const original_card=req.query.original==='1'?buildWorkerOriginalCard(db,item,parsed.token):undefined;
+      res.set('Cache-Control','no-store').json({ items: [item], grouped: {},original_card });
+    } catch(error){res.status(error.statusCode||400).json({error:error.message});}
   });
+
 
   router.patch('/worker-card/:id/status', requireQrPermission('production'), (req, res) => {
     const status = req.body?.status;

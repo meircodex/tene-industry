@@ -57,7 +57,8 @@ test('production cards open on the visible card sheet instead of an empty picker
 test('production card customer and item description stay readable without truncation', () => {
   const printPage = read('services/productionCardPrintPage.js');
 
-  assert.match(printPage, /class="pc-print-customer"/);
+  assert.match(read('public/production-card-face.js'), /class="pc-print-customer"/);
+  assert.match(printPage, /IronBendProductionCardFace\.render/);
   assert.match(printPage, /\.pc-print-customer\{[^}]*font-size:12px[^}]*font-weight:900/);
   assert.match(printPage, /\.pc-print-ref\{[^}]*min-height:11mm[^}]*font-size:12\.5px[^}]*white-space:normal[^}]*overflow:visible[^}]*overflow-wrap:anywhere/);
   assert.doesNotMatch(printPage, /\.pc-print-ref\{[^}]*text-overflow:ellipsis/);

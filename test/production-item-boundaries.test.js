@@ -296,6 +296,15 @@ test('production enforces order item ownership boundaries', async (t) => {
     assert.equal(body.items.length, 1);
     assert.equal(body.items[0].id, approved.itemId);
     assert.ok(body.items[0].shape_svg);
+    const beforeOriginal=db.prepare('SELECT * FROM items WHERE id=?').get(approved.itemId);
+    const originalView=await request(`/api/worker-card?card=${encodeURIComponent(card)}&original=1`,{headers});
+    assert.equal(originalView.status,200);
+    const originalBody=await originalView.json();
+    assert.equal(originalBody.original_card.item_id,approved.itemId);
+    assert.equal(originalBody.original_card.read_only,true);
+    assert.match(originalBody.original_card.html,/pc-print-face/);
+    assert.match(originalBody.original_card.html,/PCS/);
+    assert.deepEqual(db.prepare('SELECT * FROM items WHERE id=?').get(approved.itemId),beforeOriginal);
 
     const response = await request(`/api/worker-card/${approved.itemId}`, {
       method: 'PATCH',
@@ -316,9 +325,10 @@ test('production enforces order item ownership boundaries', async (t) => {
     `).all(approved.itemId);
     assert.deepEqual(activity.map(row => [row.action, row.actor_name, row.device_name]), [
       ['opened', 'production-boundary', 'Boundary Phone'],
+      ['opened', 'production-boundary', 'Boundary Phone'],
       ['updated', 'production-boundary', 'Boundary Phone'],
     ]);
-    assert.deepEqual(JSON.parse(activity[1].details_json), {
+    assert.deepEqual(JSON.parse(activity[2].details_json), {
       from_status: statusContracts.ITEM_STATUS.WAITING,
       to_status: statusContracts.ITEM_STATUS.IN_PRODUCTION,
       produced_qty: 2,

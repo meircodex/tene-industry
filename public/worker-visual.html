@@ -31,6 +31,19 @@
     body.scan-entry .queue-link,body.scan-entry .scan-panel,body.scan-entry .tabs,body.scan-entry .panel{display:none!important}
     body.scan-entry .columns{display:block}
     body.scan-entry main{max-width:760px;padding:12px}
+    body.scan-entry header,body.scan-entry .progress{display:none}
+    .original-work-card{max-width:760px;margin:10px auto 0;padding:0 12px}.original-work-card>h2{font-size:15px;margin:0 0 7px;color:#31566a}
+    .original-card-face{border:1px solid #1a2332;background:#fff;overflow:hidden;min-height:290px}
+    .original-card-face .pc-print-face{display:grid;grid-template-columns:1fr;direction:ltr;width:100%;min-height:290px;background:#fff}
+    .original-card-face .pc-print-main{display:grid;grid-template-rows:auto auto minmax(175px,1fr) 52px;direction:ltr;min-width:0}
+    .original-card-face .pc-print-head{display:flex;justify-content:space-between;gap:12px;align-items:center;background:#1a2332;color:white;padding:12px 14px;font-size:20px;font-weight:900}
+    .original-card-face .pc-print-head-meta{display:flex;align-items:center;gap:12px;min-width:0}.original-card-face .pc-print-customer{font-size:17px;font-weight:900;overflow-wrap:anywhere}.original-card-face .pc-print-diameter{font-size:20px;white-space:nowrap}
+    .original-card-face .pc-print-ref{font-size:17px;font-weight:800;line-height:1.35;direction:rtl;text-align:right;border-bottom:1px solid #d8dee8;padding:9px 14px;overflow-wrap:anywhere}
+    .original-card-face .pc-print-shape{display:flex;align-items:center;justify-content:center;min-height:175px;padding:8px 18px}.original-card-face .pc-print-shape svg{width:100%;height:175px;max-height:240px}
+    .original-card-face .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;border-top:1px solid #1a2332;font-size:20px;font-weight:900;text-align:center}.original-card-face .pc-print-bottom span+span{border-left:1px solid #1a2332}.original-card-face .split-badge{font-size:14px;margin-left:9px}
+    .order-work-controls{width:100%;display:grid;gap:10px}.order-work-controls .worker-action{background:#17766d;border:1px solid #ffffff80;font-size:22px;min-height:62px;display:flex;justify-content:center;align-items:center;gap:12px}.start-icon{font-size:30px}
+    .order-work-controls label{display:grid;gap:7px;font-weight:800;font-size:17px}.order-work-controls select{width:100%;font:inherit;font-size:18px;border:1px solid #c8dce6;border-radius:10px;color:#072e49;background:#fff;padding:13px;min-height:52px}.order-work-controls select:disabled{opacity:.85}.order-permission-note{font-size:13px;color:#d8f2fa;line-height:1.4}.order-work-context{font-size:14px;color:#d8f2fa}
+    body.scan-entry .card.scanned::before{display:none}body.scan-entry .card-head{display:none}body.scan-entry .order-head{display:block}
     @media(max-width:760px){
       header{padding:10px 12px;gap:10px;align-items:flex-start}
       header h1{font-size:17px;line-height:1.15}
@@ -65,6 +78,7 @@
 <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
+  <section class="original-work-card" id="originalWorkCard" hidden aria-label="כרטיס העבודה המקורי"><h2>כרטיס העבודה המקורי</h2><div class="original-card-face" id="originalCardFace"></div></section>
   <header>
     <div class="brand"><small>טנא תעשיות · תחנת עובד</small><h1>דשבורד איסוף כרטיסים</h1></div>
     <div class="live"><i class="dot"></i><span id="sync">מסנכרן</span></div>
@@ -90,7 +104,7 @@
   <script src="/display-units.js"></script>
   <script src="/status-contracts-client.js"></script>
   <script>
-    const state={items:[],selected:null,focusItemId:null,scanToken:null};
+    const state={items:[],selected:null,focusItemId:null,scanToken:null,originalCard:null};
     const ENTRY_PARAMS=new URLSearchParams(location.search);
     const SCAN_ENTRY=ENTRY_PARAMS.get('scan')==='1'||ENTRY_PARAMS.has('card')||ENTRY_PARAMS.has('item');
     document.body.classList.toggle('scan-entry',SCAN_ENTRY);
@@ -136,7 +150,7 @@
       const input=document.querySelector('#cardScanInput');
       if(input)input.value=parsed.token||String(item.id);
       render();
-      requestAnimationFrame(()=>document.querySelector(`[data-item-id="${item.id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}));
+      requestAnimationFrame(()=>document.querySelector(SCAN_ENTRY?'#originalWorkCard':`[data-item-id="${item.id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}));
       showScanResult(`נפתח כרטיס ${parsed.cardTotal>1?parsed.cardIndex+'/'+parsed.cardTotal+' · ':''}${item.order_num||item.order_id}`,'ok');
       return true;
     }
@@ -161,7 +175,10 @@
       allProgress();
       document.querySelector('#orders').innerHTML=orders.length?orders.map(o=>`<button class="order ${o.order_id===state.selected?'active':''}" onclick="selectOrder(${o.order_id})"><strong>${esc(o.order_num||`הזמנה ${o.order_id}`)}</strong><span>${esc(o.customer_name||'לקוח')} · ${o.items.length} כרטיסים</span><span>${o.items.filter(i=>statusKey(i.status)==='done').length}/${o.items.length} בוצעו</span></button>`).join(''):'<div class="empty">אין הזמנות ממתינות</div>';
       const order=orders.find(o=>o.order_id===state.selected);
-      document.querySelector('#orderHead').innerHTML=order?`<div class="order-head"><div><h2>${esc(order.order_num||`הזמנה ${order.order_id}`)}</h2><span>${esc(order.customer_name||'לקוח')} · עדיפות ${esc(order.priority||'רגיל')}</span></div><div class="badge">${order.items.length} כרטיסים</div></div>`:'';
+      const focused=order?.items.find(item=>Number(item.id)===Number(state.focusItemId));
+      document.querySelector('#originalWorkCard').hidden=!SCAN_ENTRY;
+      document.querySelector('#originalCardFace').innerHTML=SCAN_ENTRY?(state.originalCard?.html||'<div class="empty">כרטיס המקור אינו זמין. יש לבדוק את הקוד — לא נוצר שרטוט חלופי.</div>'):'';
+      document.querySelector('#orderHead').innerHTML=order?`<div class="order-head">${SCAN_ENTRY&&focused?workerOrderControls(order,focused):`<div><h2>${esc(order.order_num||`הזמנה ${order.order_id}`)}</h2><span>${esc(order.customer_name||'לקוח')} · עדיפות ${esc(order.priority||'רגיל')}</span></div><div class="badge">${order.items.length} כרטיסים</div>`}</div>`:'';
       const visibleItems=order?(SCAN_ENTRY?(state.focusItemId?order.items.filter(item=>Number(item.id)===Number(state.focusItemId)):[]):order.items):[];
       document.querySelector('#cards').innerHTML=order&&visibleItems.length?visibleItems.map((item,index)=>card(item,index)).join(''):order?'<div class="empty">הכרטיס שנסרק לא נמצא בהזמנה הפתוחה</div>':'<div class="empty">אין הזמנה פתוחה</div>';
     }
@@ -172,7 +189,24 @@
       const mainText=key==='waiting'?'התחל ייצור':key==='production'?'סיים כרטיס':statusText[key];
       const disabled=key==='done'||key==='supplied'?' disabled':'';
       const cardTitle=scanned&&state.scanToken?esc(state.scanToken):index+1;
+      if(SCAN_ENTRY)return `<article class="card scanned" data-item-id="${item.id}">${inlineProductionPanel(item,key)}</article>`;
       return `<article class="card ${scanned?'scanned':''}" data-item-id="${item.id}"><div class="card-head"><div class="worker-card-title"><b>כרטיס ${cardTitle}</b><span class="worker-status-pill ${key}">${statusText[key]}</span></div><div class="worker-card-summary"><div class="worker-metric"><span>כמות</span><strong>${Number(item.quantity)||0} יח׳</strong></div><div class="worker-metric"><span>קוטר ברזל</span><strong>${esc(IronBendDisplayUnits.formatSteelDiameterMm(item.diameter))}</strong></div><div class="worker-metric"><span>אורך</span><strong>${esc(IronBendDisplayUnits.formatLengthCmFromMm(total(item)))}</strong></div></div></div><div class="drawing">${drawing(item)}<span class="shape-scale-note">תצוגה קריאה</span></div><div class="worker-primary-actions"><button class="worker-action ${key}" onclick="setStatus(${item.id},'${mainKey}')" ${disabled}>${mainText}</button></div>${inlineProductionPanel(item,key)}</article>`
+    }
+    function workerOrderControls(order,item){
+      const key=supplied(item)?'supplied':statusKey(item.status),next=key==='waiting'?'production':key==='production'?'done':key;
+      const text=key==='waiting'?'התחל ייצור':key==='production'?'סיים כרטיס':statusText[key];
+      const role=window.IronBendAuth?.currentUser()?.role||'';
+      const canChange=['office','production','manager','admin'].includes(role);
+      const transitions=(window.IronBendStatus?.allowedOrderTransitions(order.order_status)||[]).filter(status=>status!=='בוטלה'&&(status!=='אושרה – ממתין לייצור'||['manager','admin'].includes(role))&&(status!=='בהעמסה'||['manager','admin'].includes(role)));
+      const options=[order.order_status,...(canChange?transitions:[])].filter(Boolean);
+      return `<div class="order-work-controls"><button type="button" class="worker-action ${key}" onclick="setStatus(${item.id},'${next}')" ${['done','supplied'].includes(key)?'disabled':''}><span class="start-icon" aria-hidden="true">${key==='waiting'?'▶':key==='production'?'✓':'●'}</span><span>${text}</span></button><label for="workerOrderStatus">סטטוס הזמנה<select id="workerOrderStatus" onchange="setWorkerOrderStatus(event,${order.order_id})" ${canChange?'':'disabled'}>${options.map(status=>`<option value="${esc(status)}">${esc(status)}</option>`).join('')}</select></label>${canChange?'':'<div class="order-permission-note">שינוי סטטוס ההזמנה דורש התחברות עם הרשאה מתאימה. עדכון הכרטיס זמין לפי הרשאת הסריקה.</div>'}<div class="order-work-context">${esc(order.order_num)} · ${esc(order.customer_name||'')}</div></div>`;
+    }
+    async function setWorkerOrderStatus(event,orderId){
+      const order=grouped().find(row=>row.order_id===orderId),select=event.target,next=select.value;
+      if(!order||next===order.order_status)return;
+      if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״? זו פעולה על ההזמנה, לא רק על הכרטיס שנסרק.`)){select.value=order.order_status;return;}
+      select.disabled=true;
+      try{const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status})});const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.error||'עדכון סטטוס ההזמנה נכשל');await load();}catch(error){alert(error.message);select.value=order.order_status;select.disabled=false;}
     }
     function targetWeight(item){return Number(item.weight ?? item.total_weight ?? 0)||0}
     function actualWeight(item){return Number(item.actual_weight_kg ?? 0)||0}
@@ -232,9 +266,9 @@
       if(input)input.value=next||'';
       await saveProductionFields(id,event);
     }
-    async function setStatus(id,key){const payload={status:apiStatus[key]};if(SCAN_ENTRY)payload.card=publicWorkerCardToken();const r=await fetch(workerCardApi(id,'/status'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(r.ok){const item=state.items.find(item=>item.id===id);if(item)item.status=apiStatus[key];render()}}
+    async function setStatus(id,key){const payload={status:apiStatus[key]};if(SCAN_ENTRY)payload.card=publicWorkerCardToken();try{const r=await fetch(workerCardApi(id,'/status'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const result=await r.json().catch(()=>({}));throw Error(result.message||result.error||'עדכון סטטוס הכרטיס נכשל');}await load();}catch(error){alert(error.message);}}
     function selectOrder(id){state.selected=id;state.focusItemId=null;state.scanToken=null;render();document.querySelector('.panel').classList.add('mobile-hidden');document.querySelector('.stage').classList.remove('mobile-hidden')}
-    async function load(){try{const scanToken=publicWorkerCardToken();const url=SCAN_ENTRY?`/api/worker-card?card=${encodeURIComponent(scanToken)}`:'/api/production-queue?visual=1';const r=await fetch(url);if(SCAN_ENTRY&&r.status===403){location.replace('/scan.html?activation_required=1');return}if(!r.ok)throw Error(r.status);state.items=(await r.json()).items||[];document.querySelector('#sync').textContent='חי';const parsed=state.focusItemId?null:scanFromLocation();if(parsed&&parsed.itemId){if(!focusScannedCard(parsed)){render();showScanResult('הקוד נסרק, אבל הכרטיס לא נמצא בתור הייצור הנוכחי.','err')}}else render()}catch{document.querySelector('#sync').textContent='מתחבר מחדש'}}
+    async function load(){try{const scanToken=publicWorkerCardToken();const url=SCAN_ENTRY?`/api/worker-card?card=${encodeURIComponent(scanToken)}&original=1`:'/api/production-queue?visual=1';const r=await fetch(url);if(SCAN_ENTRY&&r.status===403){location.replace('/scan.html?activation_required=1');return}if(!r.ok)throw Error(r.status);const data=await r.json();state.items=data.items||[];state.originalCard=data.original_card||null;document.querySelector('#sync').textContent='חי';const parsed=state.focusItemId?null:scanFromLocation();if(parsed&&parsed.itemId){if(!focusScannedCard(parsed)){render();showScanResult('הקוד נסרק, אבל הכרטיס לא נמצא בתור הייצור הנוכחי.','err')}}else render()}catch{document.querySelector('#sync').textContent='מתחבר מחדש';if(SCAN_ENTRY){state.items=[];state.originalCard=null;render();document.querySelector('#originalCardFace').innerHTML='<div class="empty">לא ניתן לטעון את כרטיס העבודה המקורי. יש לבדוק את הקוד או לרענן את הדף. לא ניתן להתחיל ייצור מכרטיס שלא נטען.</div>';}}}
     document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelector('.panel').classList.toggle('mobile-hidden',b.dataset.pane!=='panel');document.querySelector('.stage').classList.toggle('mobile-hidden',b.dataset.pane!=='stage')});
     function ws(){try{const socket=new WebSocket(window.IronBendAuth?.webSocketUrl?.('/')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);socket.onmessage=event=>{try{if(['item_status','item_progress','new_order','order_status'].includes(JSON.parse(event.data).type))load()}catch{}};socket.onclose=()=>setTimeout(ws,2000)}catch{}}
     load();if(!SCAN_ENTRY)ws();

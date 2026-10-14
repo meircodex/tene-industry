@@ -297,6 +297,7 @@ function renderA4CardPages(cardHtmlList) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Libre+Barcode+128&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="/production-card-face.js?v=1"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direction:rtl;}
@@ -1178,20 +1179,7 @@ function buildCard(item, subQty, totalCards, cardIdx) {
   var h = '<div class="prod-card'+(isPileAssembly ? ' pile-cage-master-card pile-cage-assembly-card' : (item.pile_component_type ? ' pile-cage-component-card' : ''))+'" data-item-id="'+cardKey+'" data-parent-item-id="'+itemId+'" data-virtual-card="'+(item.virtual_card?1:0)+'" data-picked="1">';
   h += '<button type="button" class="pc-pick" title="\u05e1\u05de\u05df / \u05d1\u05d8\u05dc \u05db\u05e8\u05d8\u05d9\u05e1\u05d9\u05d9\u05d4 \u05d6\u05d5" onclick="togglePickedCard(this,event)">\u2713</button>';
   h += splitTools;
-  h += '<div class="pc-print-face">';
-  h += '<div class="pc-print-main">';
-  var orderShort = (ORDER_NUM.match(/[0-9]/g) || []).join('').slice(-3);
-  var orderLabel = orderShort ? '#' + orderShort : ORDER_NUM;
-  // Header leads with the order number; the item number moves to the line below.
-  h += '<div class="pc-print-head"><b style="white-space:nowrap">'+escapeHtml(orderLabel)+badge+'</b><span class="pc-print-head-meta"><span class="pc-print-customer">'+escapeHtml(CUSTOMER)+'</span><b class="pc-print-diameter">Ø '+escapeHtml(diameterLabel)+'</b></span></div>';
-  h += '<div class="pc-print-ref">'+printRef+'</div>';
-  h += '<div class="pc-print-shape">'+shapeSvg+'</div>';
-  h += isPileAssembly
-    ? '<div class="pc-print-bottom"><span>L = '+totalLengthCm+' cm</span><span>CAGES '+displayQty+'</span></div>'
-    : '<div class="pc-print-bottom"><span>L = '+totalLengthCm+' cm</span><span>PCS '+displayQty+'</span></div>';
-  h += '</div>';
-  h += '<div class="pc-print-qr-panel"><div class="pc-print-qr-code" data-worker-card-code="'+escapeHtml(workerCode)+'"></div></div>';
-  h += '</div>';
+  h += IronBendProductionCardFace.render({ orderNumber:ORDER_NUM,customer:CUSTOMER,diameterLabel:diameterLabel,reference:itemOrderLineLabel(item)+(refExtra?' · '+refExtra:''),shapeSvg:shapeSvg,lengthCm:totalLengthCm,quantity:displayQty,isPileAssembly:isPileAssembly,splitLabel:cardNum||'',workerCode:workerCode });
   h += '<div class="pc-head">';
   h += '<div><div class="pc-title">'+badge+escapeHtml(title)+'</div><div class="pc-date">'+escapeHtml(shapeSubtitle)+' · '+PRINT_DATE+'</div></div>';
   h += '<div class="pc-top-barcode"><div class="bc-font-top">'+barData+'</div><div class="bc-label">'+barData+'</div></div>';

@@ -113,7 +113,7 @@ function dynamicPrintCards(items) {
     }
     return element;
   };
-  const context = { document, console: { error() {} }, setTimeout() {}, window: {}, fetch() {} };
+  const context = { document, console: { error() {} }, setTimeout() {}, window: {}, fetch() {}, IronBendProductionCardFace: require('../public/production-card-face') };
   const executable = inline.replace(/\/\/ Init: render fixed production cards and QR codes\.[\s\S]*$/, '');
   vm.runInNewContext(executable, context);
   const originalAppend = cardsGrid.appendChild.bind(cardsGrid);
