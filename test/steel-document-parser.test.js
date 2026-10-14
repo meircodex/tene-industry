@@ -91,3 +91,30 @@ test('steel document parser reconstructs rows by coordinates, not OCR token orde
   assert.equal(parsed.items[0].diameter, 8);
   assert.equal(parsed.items[0].total_length_cm, 690);
 });
+
+test('current Easybar layout keeps its distinct bands and labels below the numeric row', () => {
+  const word = (text, x, top = 180) => ({ text, page: 1, x0: x, x1: x + 8, top, bottom: top + 8 });
+  const parsed = parseSteelDocument({ tokens: [
+    word('1', 550), word('8', 302), word('51', 270), word('6.90', 218),
+    word('139', 120), word('20', 320), word('670', 370, 194),
+    word('999', 370, 168), // previous drawing row must not leak in
+  ] });
+  assert.equal(parsed.items.length, 1);
+  const item = parsed.items[0];
+  assert.equal(item.diameter, 8);
+  assert.equal(item.quantity, 51);
+  assert.equal(item.total_length_mm, 6900);
+  assert.deepEqual(item.segments.map(s => s.length_mm), [200, 6700]);
+});
+
+test('each page selects its own layout without mixing quantity with drawing dimensions', () => {
+  const word = (text, x, page, top) => ({ text, page, x0: x, x1: x + 8, top, bottom: top + 8 });
+  const parsed = parseSteelDocument({ tokens: [
+    word('1', 578, 1, 144), word('8.0', 249, 1, 144), word('51', 225, 1, 144),
+    word('6.90', 161, 1, 144), word('139', 32, 1, 144), word('20', 308, 1, 144), word('670', 351, 1, 144),
+    word('2', 550, 2, 180), word('12', 302, 2, 180), word('17', 270, 2, 180),
+    word('5.00', 218, 2, 180), word('75', 120, 2, 180), word('500', 370, 2, 194),
+  ] });
+  assert.deepEqual(parsed.items.map(item => [item.item_number, item.diameter, item.quantity, item.total_length_mm]),
+    [['1', 8, 51, 6900], ['2', 12, 17, 5000]]);
+});

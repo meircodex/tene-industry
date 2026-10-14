@@ -126,6 +126,24 @@ const TASSA_COLUMNS = {
   item_number: [540, 570],
 };
 
+// Earlier Easybar exports use a wider numeric table and print drawing labels
+// on the same baseline as the quantity. Keep both layouts; changing the bands
+// globally corrupts otherwise valid historical uploads.
+const TASSA_LEGACY_COLUMNS = {
+  weight_kg: [20, 70], kg_per_m: [70, 110], row_total_length_m: [110, 150],
+  unit_length_m: [150, 190], element_quantity: [190, 220],
+  quantity: [220, 245], diameter: [245, 275],
+  bar_mark_or_shape_leg: [300, 335], shape_dimension: [335, 450],
+  element_name: [450, 570], item_number: [570, 595],
+};
+
+function columnsForPage(tokens) {
+  // The item-number column is independent of the drawing labels. Do not use
+  // a drawing value (e.g. 20) to guess either diameter or quantity.
+  const legacyMarks = tokens.filter(token => isDataRowItemToken(token, TASSA_LEGACY_COLUMNS));
+  return legacyMarks.length ? TASSA_LEGACY_COLUMNS : TASSA_COLUMNS;
+}
+
 function inBand(token, [min, max]) {
   const x = (Number(token.x0) + Number(token.x1)) / 2;
   return x >= min && x <= max;
@@ -147,9 +165,11 @@ function rowText(words) {
   return words.slice().sort((a, b) => a.x0 - b.x0).map(word => word.text).join(' ');
 }
 
-function isDataRowItemToken(token) {
+function isDataRowItemToken(token, columns) {
   const itemNumber = toNumber(token.text);
-  return Number.isInteger(itemNumber) && itemNumber > 0 && itemNumber < 10000 && token.x0 >= 535 && token.top > 160 && token.top < 780;
+  const minTop = columns === TASSA_LEGACY_COLUMNS ? 130 : 160;
+  return /^\d+$/.test(token.text) && Number.isInteger(itemNumber) && itemNumber > 0 && itemNumber < 10000
+    && inBand(token, columns.item_number) && token.top > minTop && token.top < 780;
 }
 
 function reconstructTassaRows(tokens = []) {
@@ -161,13 +181,14 @@ function reconstructTassaRows(tokens = []) {
   });
 
   [...byPage.entries()].forEach(([page, pageTokens]) => {
-    const itemTokens = pageTokens.filter(isDataRowItemToken).sort((a, b) => a.top - b.top || a.x0 - b.x0);
+    const columns = columnsForPage(pageTokens);
+    const itemTokens = pageTokens.filter(token => isDataRowItemToken(token, columns)).sort((a, b) => a.top - b.top || a.x0 - b.x0);
     itemTokens.forEach((itemToken, index) => {
       const nextTop = itemTokens[index + 1]?.top ?? itemToken.top + 58;
       const top = itemToken.top - 18;
       const bottom = Math.min(nextTop - 6, itemToken.top + 54);
       const words = pageTokens.filter(token => token.top >= top && token.top <= bottom);
-      rows.push({ page, itemToken, words, bbox: bboxFromWords(words), text: rowText(words) });
+      rows.push({ page, itemToken, words, columns, bbox: bboxFromWords(words), text: rowText(words) });
     });
   });
 
@@ -192,7 +213,7 @@ function inferShape(row, values) {
   const longSide = values.shape_dimension_cm;
   const drawingDimensions = (values.shape_dimensions_cm || []).filter(value => Number(value) > 0);
   const leg = values.shape_leg_cm;
-  const elementWords = wordsInBand(row.words, TASSA_COLUMNS.element_name).map(word => word.text).join(' ');
+  const elementWords = wordsInBand(row.words, row.columns.element_name).map(word => word.text).join(' ');
 
   if (/[ח]/.test(elementWords)) {
     const sideValues = drawingDimensions;
@@ -282,17 +303,18 @@ function buildFieldReviewNote(field, code, message, value, word) {
 }
 
 function parseTassaRow(row, index) {
-  const itemWord = firstNumberInBand(row.words, TASSA_COLUMNS.item_number) || row.itemToken;
-  const diameterWord = firstNumberInBand(row.words, TASSA_COLUMNS.diameter);
-  const quantityWord = firstNumberInBand(row.words, TASSA_COLUMNS.quantity);
-  const unitLengthWord = firstNumberInBand(row.words, TASSA_COLUMNS.unit_length_m);
-  const rowTotalLengthWord = firstNumberInBand(row.words, TASSA_COLUMNS.row_total_length_m);
-  const weightWord = firstNumberInBand(row.words, TASSA_COLUMNS.weight_kg);
-  const legWord = firstNumberInBand(row.words, TASSA_COLUMNS.bar_mark_or_shape_leg);
+  const columns = row.columns;
+  const itemWord = row.itemToken;
+  const diameterWord = firstNumberInBand(row.words, columns.diameter);
+  const quantityWord = firstNumberInBand(row.words, columns.quantity);
+  const unitLengthWord = firstNumberInBand(row.words, columns.unit_length_m);
+  const rowTotalLengthWord = firstNumberInBand(row.words, columns.row_total_length_m);
+  const weightWord = firstNumberInBand(row.words, columns.weight_kg);
+  const legWord = firstNumberInBand(row.words, columns.bar_mark_or_shape_leg);
   // Drawing dimensions are printed below the numeric table row. Ignore a
   // trailing centre-leg token from the previous row when row windows overlap.
-  const shapeWords = numbersInBand(row.words, TASSA_COLUMNS.shape_dimension)
-    .filter(word => Number(word.top) >= Number(row.itemToken.top) + 8);
+  const shapeWords = numbersInBand(row.words, columns.shape_dimension)
+    .filter(word => Number(word.top) >= Number(row.itemToken.top) + (columns === TASSA_LEGACY_COLUMNS ? -2 : 8));
   const shapeWord = shapeWords[0] || null;
 
   const itemNumber = toNumber(itemWord?.text);
@@ -343,7 +365,7 @@ function parseTassaRow(row, index) {
   return {
     original_row_number: itemNumber ? String(itemNumber) : String(index + 1),
     item_number: itemNumber ? String(itemNumber) : null,
-    element_name: wordsInBand(row.words, TASSA_COLUMNS.element_name).map(word => word.text).join(' ') || null,
+    element_name: wordsInBand(row.words, columns.element_name).map(word => word.text).join(' ') || null,
     shape_description: shape.shape_description || null,
     diameter,
     quantity,
