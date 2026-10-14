@@ -20,6 +20,7 @@ const {
 } = require('../services/inventoryReservation');
 const { createPricer } = require('../services/pricer');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
+const { meshOrderMetrics } = require('../services/customerPortalShapeDraft');
 const { buildOrderCommercialSummary } = require('../services/orderCommercialSummary');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
@@ -65,6 +66,8 @@ function roundPileCageOrderMetrics(item = {}) {
 }
 
 function buildOrderItemShapeSnapshotJson(rawItem = {}, fallback = {}) {
+  const meshMetrics = meshOrderMetrics(rawItem);
+  if (meshMetrics) return JSON.stringify(meshMetrics.snapshot);
   const candidate = shapeSnapshotCandidate(rawItem);
   const fullEnvelope = parseJsonObject(candidate);
   if (isShapeDataContractV2(fullEnvelope)) return JSON.stringify(fullEnvelope);
@@ -290,6 +293,7 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   function cleanItemPayload(body, existingItem = {}) {
+    const meshMetrics = meshOrderMetrics({ ...existingItem, ...body });
     const pileCageMetrics = roundPileCageOrderMetrics({ ...existingItem, ...body });
     const familySnapshot = parseJsonObject(shapeSnapshotCandidate(body) ?? shapeSnapshotCandidate(existingItem));
     const isLift = familySnapshot?.family === 'lifts' && familySnapshot?.shapeType === 'lift_package';
@@ -315,7 +319,7 @@ module.exports = function createOrdersRouter(deps) {
     const shapeName = pileCageMetrics ? 'PILE CAGE' : (body.shape_name !== undefined ? String(body.shape_name || '').trim() : existingItem.shape_name);
     const diameter = body.diameter !== undefined ? Number(body.diameter) : Number(existingItem.diameter);
     const quantity = body.quantity !== undefined ? Number(body.quantity) : Number(existingItem.quantity);
-    const totalLengthMm = isLift ? Number(familySnapshot.data.barLength) : pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
+    const totalLengthMm = meshMetrics ? meshMetrics.totalLengthMm : isLift ? Number(familySnapshot.data.barLength) : pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
       ? Number(body.total_length_mm)
       : (Array.isArray(body.segments)
         ? body.segments.reduce((sum, segment) => sum + Number(segment?.length_mm ?? segment?.length ?? 0), 0)
@@ -338,8 +342,8 @@ module.exports = function createOrdersRouter(deps) {
     if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('invalid quantity'), { statusCode: 400 });
     if (!Number.isFinite(totalLengthMm) || totalLengthMm < 0) throw Object.assign(new Error('invalid total_length_mm'), { statusCode: 400 });
 
-    if (pileCageMetrics || isLift) segments = '[]';
-    const weightPerUnit = isLift ? weighedKg / quantity : pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
+    if (meshMetrics || pileCageMetrics || isLift) segments = '[]';
+    const weightPerUnit = meshMetrics ? meshMetrics.weightKg : isLift ? weighedKg / quantity : pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
     const totalWeight = weightPerUnit * quantity;
     return { shapeName, diameter, quantity, totalLengthMm, segments, spiralDiameter, spiralTurns, note, structElement, structFloor, sheetNum, weightPerUnit, totalWeight };
   }

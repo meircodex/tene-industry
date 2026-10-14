@@ -749,6 +749,7 @@ function liftPackageProductionSvg(item = {}) {
 
 function itemShapeSvg(item = {}) {
   const snapshot = typeof item.shape_snapshot_json === 'string' ? (()=>{try{return JSON.parse(item.shape_snapshot_json);}catch{return {};}})() : (item.shapeSnapshot || {});
+  if (snapshot.family === 'mesh') return meshProductionSvg(snapshot);
   const explicitHoop = [item.shape_id, snapshot.shapeId, snapshot.shapeType].some(id => /^(closed[_-]stirrup|stirrup)$/.test(String(id)));
   const hoopSegments = shapeSegmentsFromItem(item);
   const hoopView = require('../public/hoop-view');
@@ -768,6 +769,25 @@ function itemShapeSvg(item = {}) {
     rotateDegrees: isBench ? 180 : 0,
     shapeKind: isBench ? 'bench-bar' : 'generic-bar',
   });
+}
+
+function meshProductionSvg(snapshot) {
+  const d = snapshot.data || {};
+  const L = Number(d.length), W = Number(d.width);
+  if (!(L > 0 && W > 0)) return '<svg viewBox="0 0 260 140"><text x="130" y="70" text-anchor="middle">רשת — חסרות מידות</text></svg>';
+  const scale = Math.min(182/L, 78/W), x = (260-L*scale)/2, y = (140-W*scale)/2;
+  const barPositions = (total, spacing, start, end) => {
+    const limit = total - Math.max(0,Number(end)||0), out = [];
+    const pitch = Number(spacing);
+    if (!(pitch > 0)) return out;
+    for (let v=Math.max(0,Number(start)||0); v<=limit+.001 && out.length<2000; v+=pitch) out.push(v);
+    if (out.length && out[out.length-1]<limit) out.push(limit);
+    return out;
+  };
+  const horizontal = barPositions(W,d.longitudinalSpacing,d.edgeTop,d.edgeBottom).map(v=>`<line x1="${x}" y1="${y+v*scale}" x2="${x+L*scale}" y2="${y+v*scale}"/>`).join('');
+  const vertical = barPositions(L,d.transverseSpacing,d.edgeLeft,d.edgeRight).map(v=>`<line x1="${x+v*scale}" y1="${y}" x2="${x+v*scale}" y2="${y+W*scale}"/>`).join('');
+  const spec = `Ø${Number(d.longitudinalDiameter)}@${Number(d.longitudinalSpacing)/10} / Ø${Number(d.transverseDiameter)}@${Number(d.transverseSpacing)/10}`;
+  return `<svg data-shape-kind="mesh" data-length-mm="${L}" data-width-mm="${W}" viewBox="0 0 260 140" style="width:100%;height:100%"><g fill="none" stroke="#1a2332" stroke-width="1">${horizontal}${vertical}</g><g font-family="Arial" font-size="12" text-anchor="middle" font-weight="800"><text x="130" y="${y-10}">${L/10} ס״מ</text><text x="${x-22}" y="70">${W/10}</text><text x="130" y="130">${spec} ס״מ</text></g></svg>`;
 }
 
 function roundedEndBarProductionSvg(segments, radiusMm = null) {

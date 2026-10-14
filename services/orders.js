@@ -26,6 +26,7 @@ function validateShapeGeometry(segments) {
 const steelModule = require('../modules/steel-rebar');
 const { normalizeSpiralParams, spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
+const { meshOrderMetrics } = require('./customerPortalShapeDraft');
 const {
   allocateOrderItemStock,
   openProcurementForStockShortages,
@@ -215,19 +216,24 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
         // A lift carries no bends and no cut list - it is a bought bundle, so it
         // skips the geometry checks the same way a cage does.
         const liftMetrics = pileCageMetrics ? null : liftPackageOrderMetrics(rawItem);
+        const meshMetrics = meshOrderMetrics(rawItem);
+        if (meshMetrics) {
+          item.shapeSnapshot = meshMetrics.snapshot;
+          item.diameter = meshMetrics.diameter;
+        }
         const spiral = normalizeSpiralParams(item);
         const sourceLengthMm = Number(item.length ?? item.total_length_mm ?? 0) || 0;
         const sourceSides = Array.isArray(item.sides) ? item.sides : [];
-        const longSimpleCoil = !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
+        const longSimpleCoil = !meshMetrics && !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
         const isSpiralLike = spiral.isSpiral || longSimpleCoil;
         const sides = isSpiralLike
           ? []
           : ((item.sides && item.sides.length) ? item.sides : (item.length ? [item.length] : []));
-        const totalLengthMm = pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
+        const totalLengthMm = meshMetrics ? meshMetrics.totalLengthMm : pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
           ? (sourceLengthMm || spiralCutLengthMm(spiral.spiralDiameterMm, spiral.turns))
           : (sides.reduce((s, v) => s + Number(v), 0) || Number(item.length) || 0);
         const angles = item.angles || [];
-        const segmentsArr = pileCageMetrics || liftMetrics || isSpiralLike
+        const segmentsArr = meshMetrics || pileCageMetrics || liftMetrics || isSpiralLike
           ? []
           : normalizeSegments(
               item.shapeName,
@@ -243,7 +249,7 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
               spiral_turns: spiral.turns || null,
             })
           : normalizeShapeName(item.shapeName, segmentsArr);
-        if (!textOnly && !isSpiralLike && !pileCageMetrics && !liftMetrics) {
+        if (!textOnly && !isSpiralLike && !pileCageMetrics && !liftMetrics && !meshMetrics) {
           const geoCheck = validateShapeGeometry(segmentsArr);
           if (!geoCheck.valid) throw Object.assign(new Error(geoCheck.error), { statusCode: 400 });
         }
@@ -252,7 +258,7 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
         const persistedShapeName = textOnly
           ? shapeName
           : (pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName));
-        const weightPerUnit = pileCageMetrics
+        const weightPerUnit = meshMetrics ? meshMetrics.weightKg : pileCageMetrics
           ? pileCageMetrics.weightKg
           : (liftMetrics ? liftMetrics.weightPerUnit : calcWeightPerUnit(item.diameter, totalLengthMm));
         const effectiveWeightPerUnit = textOnly ? 0 : weightPerUnit;

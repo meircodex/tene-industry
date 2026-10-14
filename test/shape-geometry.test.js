@@ -568,7 +568,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=82/);
+  assert.match(index, /shape-editor\.js\?v=83/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
@@ -833,20 +833,20 @@ test('ShapeEngineRouter renders Mesh 600x250 Ø8@20 as grid with MeshEngine', ()
   const { ShapeEngineRouter, MeshEngine } = loadShapeEditorGeometry();
   const mesh = {
     family: 'mesh',
-    length: 600,
-    width: 250,
+    length: 6000,
+    width: 2500,
     longitudinalDiameter: 8,
-    longitudinalSpacing: 20,
+    longitudinalSpacing: 200,
     transverseDiameter: 8,
-    transverseSpacing: 20,
+    transverseSpacing: 200,
   };
   const svg = ShapeEngineRouter.render(mesh, 300, 260);
 
   assert.equal(ShapeEngineRouter(mesh), MeshEngine);
   assert.match(svg, /data-engine="MeshEngine"/);
   assert.match(svg, /data-family="mesh"/);
-  assert.match(svg, /data-length="600"/);
-  assert.match(svg, /data-width="250"/);
+  assert.match(svg, /data-length="6000"/);
+  assert.match(svg, /data-width="2500"/);
   assert.match(svg, /data-longitudinal="Ø8@20 ס״מ"/);
   assert.match(svg, /data-transverse="Ø8@20 ס״מ"/);
   assert.ok((svg.match(/<line /g) || []).length >= 40, 'expected mesh grid lines');
@@ -976,10 +976,10 @@ test('MeshEngine spacing changes grid count while diameter changes bar thickness
   const spacingSvg = ShapeEngineRouter.render(widerSpacing, 300, 260);
   const thickSvg = ShapeEngineRouter.render(thicker, 300, 260);
 
-  assert.match(baseSvg, /data-longitudinal-count="31"/);
-  assert.match(spacingSvg, /data-longitudinal-count="21"/);
+  assert.match(baseSvg, /data-longitudinal-count="14"/);
+  assert.match(spacingSvg, /data-longitudinal-count="10"/);
   assert.match(thickSvg, /stroke-width="3\.5"/);
-  assert.match(thickSvg, /data-longitudinal-count="31"/);
+  assert.match(thickSvg, /data-longitudinal-count="14"/);
 });
 
 test('PileCageEngine treats pile editor dimension fields as centimeters', () => {

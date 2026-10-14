@@ -16,7 +16,7 @@
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
 <script src="/hoop-view.js?v=1"></script>
-<script src="/shape-editor.js?v=82"></script>
+<script src="/shape-editor.js?v=83"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -3373,6 +3373,12 @@ function openShapeEditor(palletId, itemId) {
     if (pileCage) shapeEditor.open(pileCage);
     return;
   }
+  if (contract?.family === 'mesh') {
+    shapeEditor.open({ ...contract.data, family:'mesh', shapeType:contract.shapeType,
+      presetId:item.shapeId || contract.shapeId, presetName:'רשת', quantity:item.qty,
+      diameter:contract.data.longitudinalDiameter, structElement:elementName, itemNumber, itemTotal });
+    return;
+  }
   if (contract?.family === 'spirals') {
     if (contract.shapeType === 'ring') {
       const ring = ringFieldsFromShapeData({ ...item, shapeSnapshot: contract });
@@ -3441,6 +3447,14 @@ function shapeSelected(data) {
   item.textOnly = data.textOnly === true;
   item.steelFinish = data.steelFinish || data.data?.steelFinish || 'ribbed';
   const isPileCage = item.shapeSnapshot?.family === 'piles' && item.shapeSnapshot?.shapeType === 'round_pile_cage';
+  if (item.shapeSnapshot?.family === 'mesh') {
+    item.shapeName = 'רשת'; item.shapeSides = []; item.shapeAngles = [];
+    item.length = item.totalLengthMm = Number(item.shapeSnapshot.calculated?.totalLengthMm || 0);
+    item.diameter = Number(item.shapeSnapshot.data?.longitudinalDiameter || 0);
+    item.qty = Math.max(1, Number(data.orderItemQuantity || item.qty || 1));
+    if (data.structElement !== undefined) item.structElement = item.struct_element = item.elementName = data.structElement.trim();
+    _shapeTarget = null; renderPallets(); updateSummary(); return;
+  }
   if (item.shapeSnapshot?.family === 'lifts') {
     item.shapeName = 'חבילת ליפטים'; item.family = 'lifts';
     item.shapeSides = []; item.shapeAngles = [];
@@ -3674,6 +3688,7 @@ function isSpiralOrderItem(item = {}) {
 
 function calcItemWeight(item) {
   const liftContract = itemShapeContract(item) || item.shapeSnapshot || {};
+  if (liftContract.family === 'mesh') return Math.max(0, Number(liftContract.calculated?.weightKg || 0)) * Math.max(1,Number(item.qty || item.quantity || 1));
   if (liftContract.family === 'lifts') return Math.max(0, Number(liftContract.data?.weighedKg || 0));
   if (isRoundPileCageItem(item)) {
     const contract = itemShapeContract(item) || item.shapeSnapshot || {};
