@@ -193,7 +193,8 @@ function classifyOrderItem(item = {}) {
   // A chair supports mesh; mentioning its purpose must not turn the bar into
   // mesh material and drop its cutting, bending and chair-unit services.
   const isChair = shape.family !== 'mesh' && (shape.shapeType === 'bench_bar' || shape.shapeId === 's15' || /(^|\W)(chair|bench|כסא|כסאות|ספסל)(\W|$)/i.test(shape.text));
-  const isMesh = shape.family === 'mesh' || (!isChair && /(^|\W)(mesh|wire mesh|רשת)(\W|$)/i.test(shape.text));
+  const isMesh = shape.family === 'mesh' || (shape.family !== 'bars' && !isChair
+    && /(^|[^\p{L}\p{N}])(mesh|wire mesh|רשת(?:ות)?)(?=$|[^\p{L}\p{N}])/iu.test(shape.text));
   const isColumnPenetration = !isPileCage && !isMesh && (
     /חדירה\s*לעמודים?|עמודים?\s*חדירה|column\s*penetration|penetration\s*column/i.test(shape.text)
       // Imported penetration details are named "מוטה ... ב-2 כיוונים".

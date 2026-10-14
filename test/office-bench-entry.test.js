@@ -32,6 +32,25 @@ test('an explicit mesh family still wins over chair wording in an annotation', (
   assert.equal(classifyOrderItem(item).kind, 'mesh');
 });
 
+test('a canonical bent bar cannot become mesh through source review notes', () => {
+  const item = chair(8);
+  item.shape_name = 'מוט מכופף'; item.shape_id = 's3';
+  item.struct_element = 'אזור חדירה';
+  item.note = 'הזוויות אינן מפורטות במקור, נדרשת בדיקה לפני ייצור';
+  item.shape_snapshot_json = JSON.stringify({family:'bars',shapeType:'bent_bar'});
+  assert.equal(classifyOrderItem(item).kind, 'bent_rebar');
+  item.note += '; סמוך לרשת';
+  assert.equal(classifyOrderItem(item).kind, 'bent_rebar');
+});
+
+test('legacy Hebrew mesh wording uses real Unicode word boundaries', () => {
+  const item = {shape_name:'מוט מכופף',note:'נדרשת בדיקה',quantity:8,total_weight:28.95,
+    total_length_mm:2290,segments:JSON.stringify([{length_mm:490,angle_deg:225},{length_mm:1200,angle_deg:135},{length_mm:600}])};
+  assert.equal(classifyOrderItem(item).kind, 'bent_rebar');
+  item.shape_name = 'רשת לבניין';
+  assert.equal(classifyOrderItem(item).kind, 'mesh');
+});
+
 test('office preview uses chair projection before rectangular hoop recognition', () => {
   const html = fs.readFileSync('public/index.html','utf8');
   const points = [[0,0],[30,0],[30,14],[60,14],[60,0],[90,0]];
