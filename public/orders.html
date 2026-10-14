@@ -144,6 +144,9 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   box-shadow:0 8px 28px rgba(2,26,72,0.07);}
 .hero-title{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px;}
 .hero-main{font-size:22px;font-weight:900;color:var(--text);line-height:1.25;}
+.hero-order-info{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.hero-order-info .info-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.hero-order-info .info-label{font-size:12px;}.hero-order-info .info-value{font-size:15px;overflow-wrap:anywhere;}
 .hero-metric{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
 .metric-box{background:#f4f7fb;border-radius:12px;padding:10px 12px;}
 .metric-label{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;}
@@ -292,6 +295,10 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .print-btn.cards{background:linear-gradient(135deg,#021A48,#17356f) !important;}
 .print-btn.a4{background:linear-gradient(135deg,#1a7a42,#0f5a2f) !important;}
 .print-btn.delivery{background:linear-gradient(135deg,#6d217d,#481652) !important;}
+.issued-delivery-documents{min-width:0;display:grid;gap:7px;padding:10px 12px;border:1px solid #d8b9e2;border-radius:12px;background:#faf4fc;}
+.issued-delivery-title{font-size:14px;font-weight:900;color:#481652;}
+.issued-delivery-documents a{display:block;padding:9px 11px;border:1px solid #d8b9e2;border-radius:9px;background:#fff;color:#481652;font-size:14px;font-weight:800;text-decoration:none;overflow-wrap:anywhere;}
+.issued-delivery-documents a:hover{background:#f0e4f5;}.issued-delivery-empty{font-size:13px;color:var(--dim);}
 .print-btn.cutting{background:linear-gradient(135deg,#0f766e,#115e59) !important;cursor:pointer;width:100%;}
 .send-file-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1px solid #b9c9dd;border-radius:12px;background:#fff;color:#294764;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;transition:background .16s ease,border-color .16s ease;}
 .send-file-btn:hover{background:#eef5fb;border-color:#7294b6;}
@@ -2778,6 +2785,30 @@ function focusCommercialContributor(event, itemId) {
   target.animate([{ outline: '3px solid #e07b39' }, { outline: '0 solid transparent' }], { duration: 1500 });
 }
 
+function issuedDeliveryDocumentsHtml(o, progress) {
+  const notes = (progress.certificates || []).filter(note => Number.isSafeInteger(Number(note.id)) && Number(note.id) > 0);
+  return `<section class="issued-delivery-documents" aria-label="תעודות משלוח שכבר הופקו">
+    <div class="issued-delivery-title">🖨️ תעודות שהופקו — הדפסה חוזרת</div>
+    ${notes.map(note => {
+      const label = String(note.note_num || '').startsWith('CERT-') ? `תעודה ${Number(note.id)}` : (note.note_num || `תעודה ${Number(note.id)}`);
+      const date = /^\d{4}-\d{2}-\d{2}/.test(String(note.issued_at || '')) ? String(note.issued_at).slice(0, 10).split('-').reverse().join('.') : '';
+      return `<a target="_blank" rel="noopener" href="/order-print.html?id=${Number(o.id)}&kind=delivery-certificate&note_id=${Number(note.id)}">${escHtml(label)}${date ? ` · ${escHtml(date)}` : ''} · פתיחה והדפסה</a>`;
+    }).join('') || `<div class="issued-delivery-empty">${progress.shipped_unit_count ? 'יש פריטים שנשלחו, אך לא נמצאה תעודת מקור שמורה. אין לשחזר תעודה מהסטטוס בלבד.' : 'טרם נשמרו תעודות מקור. לאחר הפקת מקור הוא יופיע כאן להדפסה חוזרת.'}</div>`}
+    ${progress.history_needs_review ? '<div style="color:var(--danger)">נדרש אימות היסטוריית משלוחים; הפקת מקור חסומה כדי למנוע כפילות.</div>' : ''}
+  </section>`;
+}
+
+function orderHeroInfoHtml(o, driverNotes) {
+  return `<div class="hero-order-info"><div class="hero-title">פרטי הזמנה</div><div class="info-grid">
+    <div><div class="info-label">ערוץ</div><div class="info-value">${escHtml(o.channel ?? '—')}</div></div>
+    ${o.delivery_address ? `<div><div class="info-label">כתובת</div><div class="info-value">${escHtml(o.delivery_address)}</div></div>` : ''}
+    ${o.struct_element ? `<div><div class="info-label">שם פריט</div><div class="info-value">${escHtml(o.struct_element)}</div></div>` : ''}
+    ${o.struct_floor ? `<div><div class="info-label">קומה</div><div class="info-value">${escHtml(o.struct_floor)}</div></div>` : ''}
+    ${o.sheet_num ? `<div><div class="info-label">גיליון</div><div class="info-value">${escHtml(o.sheet_num)}</div></div>` : ''}
+    ${driverNotes ? `<div style="grid-column:1/-1"><div class="info-label">הערות לנהג</div><div class="info-value">${escHtml(driverNotes)}</div></div>` : ''}
+  </div></div>`;
+}
+
 function buildDetailHTML(o, pkgs) {
   const driverNotes = visibleOrderNote(o.driver_notes);
 
@@ -2790,6 +2821,7 @@ function buildDetailHTML(o, pkgs) {
         <div class="metric-box"><div class="metric-label">אספקה</div><div class="metric-value">${escHtml(o.delivery_date ?? '—')}</div></div>
         <div class="metric-box"><div class="metric-label">משקל</div><div class="metric-value" style="color:var(--accent)">${(o.total_weight||0).toFixed(1)} ק"ג</div></div>
       </div>
+      ${orderHeroInfoHtml(o, driverNotes)}
     </div>
     <div class="hero-card">
       <div class="hero-title">סטטוס הזמנה</div>
@@ -2802,27 +2834,12 @@ function buildDetailHTML(o, pkgs) {
   const loadedItemCount = deliveryProgress.loaded_item_count;
   const prints = `<div class="print-btns">
     <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
-    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">&#128196; &#1492;&#1491;&#1508;&#1505;&#1514; A4</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">📄 גיליון הזמנה</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — נותרו ${deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
     <div class="print-action-pair"><button type="button" class="print-btn cutting" onclick="openStraightStockCutting(event,${o.id})">✂️ תוכנית חיתוך ממוטות</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">📋 תעודה חלקית — הועמסו ${loadedItemCount} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
-  </div><div class="d-section"><div class="d-title">תעודות מקור שכבר הופקו — צפייה והדפסה חוזרת</div>${(deliveryProgress.certificates || []).map(note => `<a class="btn-sm" target="_blank" rel="noopener" href="/order-print.html?id=${o.id}&kind=delivery-certificate&note_id=${Number(note.id)}">פתח תעודה ${Number(note.id)}</a>`).join(' ') || (deliveryProgress.shipped_unit_count ? 'יש פריטים שסומנו כנשלחו/סופקו, אך לא נמצאה תעודת מקור שמורה. אי אפשר לשחזר מסמך מהסטטוס בלבד; מקורות חדשים יישמרו כאן.' : 'טרם נשמרו תעודות מקור.')}${deliveryProgress.history_needs_review ? '<p style="color:var(--danger)">נדרש אימות היסטוריית משלוחים; הפקת מקור חסומה כדי למנוע כפילות.</p>' : ''}</div>`;
-
-  // ── Info
-  const info = `<div class="d-section">
-    <div class="d-title">📌 פרטי הזמנה</div>
-    <div class="info-grid">
-      <div><div class="info-label">לקוח</div><div class="info-value">${escHtml(o.customer_name??'—')}</div></div>
-      <div><div class="info-label">ערוץ</div><div class="info-value">${escHtml(o.channel??'—')}</div></div>
-      <div><div class="info-label">תאריך אספקה</div><div class="info-value">${escHtml(o.delivery_date??'—')}</div></div>
-      <div><div class="info-label">משקל כולל</div><div class="info-value" style="color:var(--accent)">${(o.total_weight||0).toFixed(1)} ק"ג</div></div>
-      ${o.delivery_address?`<div style="grid-column:span 2"><div class="info-label">כתובת</div><div class="info-value">${escHtml(o.delivery_address)}</div></div>`:''}
-      ${driverNotes?`<div style="grid-column:span 2"><div class="info-label">הערות לנהג</div><div class="info-value">${escHtml(driverNotes)}</div></div>`:''}
-      ${o.struct_element?`<div><div class="info-label">שם פריט</div><div class="info-value">${escHtml(o.struct_element)}</div></div>`:''}
-      ${o.struct_floor?`<div><div class="info-label">קומה</div><div class="info-value">${escHtml(o.struct_floor)}</div></div>`:''}
-      ${o.sheet_num?`<div><div class="info-label">גיליון</div><div class="info-value">${escHtml(o.sheet_num)}</div></div>`:''}
-    </div>
-  </div>`; // BUG-25: added struct_element / struct_floor / sheet_num
+    ${issuedDeliveryDocumentsHtml(o, deliveryProgress)}
+  </div>`;
 
   const hasStartedProduction = orderHasStartedProduction(o);
   const orderActions = `<div class="d-section">
@@ -2969,7 +2986,7 @@ function buildDetailHTML(o, pkgs) {
     pkgSec = `<div class="d-section"><div class="d-title">🏷️ חבילות</div>${pkgRows}</div>`;
   }
 
-  return hero + prints + info + commercialSummaryHtml(o) + orderActions + statusSec + itemsSec + pkgSec;
+  return hero + prints + commercialSummaryHtml(o) + orderActions + statusSec + itemsSec + pkgSec;
 }
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }

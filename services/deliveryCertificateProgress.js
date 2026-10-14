@@ -19,7 +19,7 @@ function quantity(value) {
 function buildDeliveryCertificateProgress(db, orderId, items) {
   const shipped = new Map();
   let historyNeedsReview = false;
-  const notes = db.prepare(`SELECT dn.id,dn.items_json,dn.packages_json,dno.items_json AS scoped_items
+  const notes = db.prepare(`SELECT dn.id,dn.note_num,dn.issued_at,dn.items_json,dn.packages_json,dno.items_json AS scoped_items
     FROM delivery_notes dn LEFT JOIN delivery_note_orders dno
       ON dno.delivery_note_id=dn.id AND dno.order_id=?
     WHERE dn.order_id=? OR dno.order_id=? ORDER BY dn.id`).all(orderId, orderId, orderId);
@@ -67,7 +67,7 @@ function buildDeliveryCertificateProgress(db, orderId, items) {
   return {
     production_status: completedItems.length === activeItems.length && activeItems.length ? 'הושלם – ממתין לאיסוף' : activeItems.some(item => stages.indexOf(item.status) >= 1) ? 'בייצור' : 'ממתינה לאישור',
     stage_counts: { produced: completedItems.length, loaded: activeItems.filter(item => stages.indexOf(item.status) >= 3).length, sent: activeItems.filter(item => stages.indexOf(item.status) >= 4).length, delivered: activeItems.filter(item => stages.indexOf(item.status) >= 5).length },
-    certificates: notes.map(note => ({ id: note.id })),
+    certificates: notes.map(note => ({ id: note.id, note_num: note.note_num, issued_at: note.issued_at })),
     total_item_count: total,
     shipped_item_count: rows.filter(row => !row.cancelled && row.remaining_qty === 0 && row.shipped_qty > 0).length,
     partially_shipped_item_count: rows.filter(row => row.shipped_qty > 0 && row.remaining_qty > 0).length,

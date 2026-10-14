@@ -62,6 +62,10 @@ test('source snapshots are repeatable, stale-safe, and independent of corrected 
   assert.equal(after.delivery_progress.shipped_item_count,2,'ledger survives rollback');
   assert.equal(after.delivery_progress.remaining_item_count,1);
   assert.equal(after.delivery_progress.loaded_item_count,0);
+  assert.equal(after.delivery_progress.certificates[0].id,note.id);
+  assert.equal(after.delivery_progress.certificates[0].note_num,note.note_num);
+  assert.equal(after.delivery_progress.certificates[0].issued_at,note.issued_at);
+  assert.deepEqual(db.prepare('SELECT * FROM delivery_notes WHERE id=?').get(note.id),note,'opening saved source and listing its metadata do not mutate the document');
   const { projectOrderCards } = require('../services/productionCardLoading');
   assert.equal(projectOrderCards(db,{id:order,order_num:'TEST-PARTIAL'}).some(card=>card.parent_item_id===Number(one)),false,'the warehouse QR cannot ship a corrected source row again');
   assert.equal(after.pallets[0].items.find(i=>i.id===Number(three)).quantity,20,'unshipped row untouched');

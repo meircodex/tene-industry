@@ -104,10 +104,13 @@ function loadDocumentSending() {
   const functionsStart = html.indexOf('function openA4PrintDialog(');
   const functionsEnd = html.indexOf('function requestCorrectionReason(', functionsStart);
   const prints = html.match(/const prints = (`[\s\S]*?`);/);
+  const issuedDocumentsStart = html.indexOf('function issuedDeliveryDocumentsHtml(');
+  const issuedDocumentsEnd = html.indexOf('function orderHeroInfoHtml(', issuedDocumentsStart);
   assert.ok(configStart >= 0 && configEnd > configStart && functionsStart >= 0 && functionsEnd > functionsStart && prints);
   vm.runInContext(`let currentDetailOrder = order, allOrders = [], currentSendFile = null;
     ${html.slice(configStart, configEnd)}
     ${html.slice(functionsStart, functionsEnd)}
+    ${html.slice(issuedDocumentsStart, issuedDocumentsEnd)}
     const o = order;
     const loadedItemCount = 0;
     const deliveryProgress = { total_item_count: 0, loaded_item_count: 0, remaining_item_count: 0, certificates: [] };
