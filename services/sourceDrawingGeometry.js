@@ -58,9 +58,14 @@ function sourceDrawingSvg(item = {}, options = {}) {
     const original=points;
     const rebuilt=[[0,0]];
     const originalEdges=original.slice(0,-1).map((a,i)=>({a,b:original[i+1],index:i}));
+    const longest=Math.max(...sequence.map(s=>Number(s.length_mm)));
     originalEdges.forEach((edge,i)=>{
       const dx=edge.b[0]-edge.a[0],dy=edge.b[1]-edge.a[1],norm=Math.hypot(dx,dy)||1;
-      const start=rebuilt[i], length=Number(sequence[i].length_mm);
+      const actualLength=Number(sequence[i].length_mm);
+      // View-only minimum: a short return must remain recognisable as a bend.
+      // Labels and the machine sequence always retain the actual dimensions.
+      const length=options.schematic ? Math.max(actualLength,longest*.14) : actualLength;
+      const start=rebuilt[i];
       rebuilt.push([start[0]+dx/norm*length,start[1]+dy/norm*length]);
     });
     const outset=Math.max(...sequence.map(s=>Number(s.length_mm)))*.06;
@@ -99,7 +104,7 @@ function sourceDrawingSvg(item = {}, options = {}) {
   const dimensions = positionedLabels.map(l => {
     return `<text data-dimension-label="1" data-dimension-segment="${l.segmentIndex}" x="${l.x.toFixed(3)}" y="${l.y.toFixed(3)}" text-anchor="middle" dominant-baseline="middle" font-family="Arial,Heebo" font-weight="800" font-size="${dimensionFontSize}" fill="#173b6b" stroke="white" stroke-width="2" paint-order="stroke fill">${l.text}</text>`;
   }).join('');
-  return `<svg data-source-drawing="1" data-source-order="${drawing.orderId}" data-source-row="${drawing.row}" data-shape-kind="source-drawing" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" role="img" aria-label="צורה לפי שרטוט המקור" style="width:100%;height:100%;max-height:140px;overflow:visible"><path d="${path}" fill="none" stroke="#173b6b" stroke-width="3.5" stroke-linecap="square" stroke-linejoin="miter"/>${dimensions}</svg>`;
+  return `<svg data-source-drawing="1" data-source-order="${drawing.orderId}" data-source-row="${drawing.row}" data-shape-kind="source-drawing" data-schematic="${options.schematic ? 1 : 0}" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" role="img" aria-label="צורה לפי שרטוט המקור" style="width:100%;height:100%;max-height:140px;overflow:visible"><path d="${path}" fill="none" stroke="#173b6b" stroke-width="3.5" stroke-linecap="square" stroke-linejoin="miter"/>${dimensions}</svg>`;
 }
 
 function nearestOnEdge(point, edge) {

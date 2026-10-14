@@ -768,6 +768,7 @@ function itemShapeSvg(item = {}, options = {}) {
   return spiralSvg || shapeSvg(segments, {
     rotateDegrees: isBench ? 180 : 0,
     shapeKind: isBench ? 'bench-bar' : 'generic-bar',
+    schematic: options.schematic === true,
   });
 }
 
@@ -994,7 +995,7 @@ function shapeSvg(segmentsRaw, opts = {}) {
 
     const sides = segments.map(segment => Number(segment.length_mm || 0));
     const angles = segments.map(segment => segment.angle_deg);
-    const visualSides = sides;
+    const visualSides = opts.schematic ? proportionalPrintSides(sides) : sides;
     const points = normalizeShapePointsBaseBottom(calcShapePoints(visualSides, angles), opts);
 
     const xs = points.map(point => point[0]);
@@ -1028,7 +1029,7 @@ function shapeSvg(segmentsRaw, opts = {}) {
       }
     }
 
-    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
+    return `<svg data-shape-kind="${opts.shapeKind || 'generic-bar'}" data-scale-mode="print-fit" data-proportional-short-bends="${opts.schematic ? 0 : 1}" data-schematic="${opts.schematic ? 1 : 0}" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ${width} ${height}" style="width:100%;height:100%;max-height:100px;overflow:visible">${svg}</svg>`;
   } catch {
     return '<svg viewBox="0 0 220 60"><line x1="10" y1="30" x2="210" y2="30" stroke="#ccc" stroke-width="2"/></svg>';
   }

@@ -1813,7 +1813,7 @@ test('order detail prefers canonical server-rendered production shape SVG', () =
   assert.match(ordersHtml, /data-shape-svg/);
   assert.match(ordersHtml, /el.dataset.shapeSvg/);
   assert.match(ordersHtml, /decodeURIComponent\(el\.dataset\.shapeSvg\)/);
-  assert.match(ordersRoute, /item\.shape_svg = productionCards\.itemShapeSvg\(item, \{ dimensionFontSize: 18 \}\)/);
+  assert.match(ordersRoute, /item\.shape_svg = productionCards\.itemShapeSvg\(item, \{ dimensionFontSize: 18, schematic: true \}\)/);
 });
 
 

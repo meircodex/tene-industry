@@ -193,7 +193,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .item-row:last-child{border-bottom:none;}
 .item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:200px;height:200px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6px;}
-.item-visual svg{width:100%!important;height:100%!important;max-height:none!important;display:block;overflow:visible;}
+.item-visual svg{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;display:block;overflow:visible;}
 /* Readable screen dimensions without resizing print cards or cage captions. */
 .item-visual svg:is([data-shape-kind="generic-bar"],[data-shape-kind="straight-bar"],[data-shape-kind="bench-bar"],[data-shape-kind="open-u"],[data-shape-kind="closed-stirrup"],[data-shape-kind="rounded-end-bar"]) text:not([data-angle-label]){font-size:16px;font-weight:900;}
 .item-visual svg [data-angle-label]{font-size:14px;}
@@ -2986,6 +2986,7 @@ function buildDetailHTML(o, pkgs) {
 
   const itemsSec = `<div class="d-section">
     <div class="d-title" style="justify-content:space-between"><span>📦 פריטים לייצור</span><button class="review-btn primary" onclick="openAddItem(event, ${o.id})">➕ הוסף להזמנה</button></div>
+    <div class="commercial-summary-hint" style="margin-bottom:10px">השרטוטים להמחשת הצורה — המידות הרשומות הן הקובעות, אין למדוד מהציור.</div>
     ${palletsHtml||'<div style="color:var(--muted);font-size:13px">אין פריטים</div>'}
   </div>`;
 

@@ -26,7 +26,7 @@ test('readable order dimensions preserve saved geometry and the compact print pr
 
 test('large dimensions stay inside their frame without hiding bends or other labels', () => {
   for(const entry of reviewedDrawings.filter(e=>e.shapeId!=='closed_stirrup')) {
-    const svg = sourceDrawingSvg(fixture(entry),{dimensionFontSize:18});
+    const svg = sourceDrawingSvg(fixture(entry),{dimensionFontSize:18,schematic:true});
     const path=svg.match(/<path d="([^"]+)"/)[1], edges=[];
     let previous;
     for(const token of path.matchAll(/([ML]) ([\d.]+),([\d.]+)/g)) {
@@ -51,8 +51,25 @@ test('large dimensions stay inside their frame without hiding bends or other lab
 test('readability styles are scoped to order diagrams, not print pages or cage captions', () => {
   const html=fs.readFileSync('public/orders.html','utf8');
   assert.match(html,/\.item-visual svg\{[^}]*max-height:none!important/);
+  assert.match(html,/\.item-visual svg\{[^}]*max-width:none!important/);
   assert.match(html,/\.item-visual svg:is\([^}]+font-size:16px/);
   assert.match(html,/\.item-visual svg \[data-angle-label\]\{font-size:14px/);
   const routes=fs.readFileSync('routes/orders.js','utf8');
-  assert.match(routes,/itemShapeSvg\(item, \{ dimensionFontSize: 18 \}\)/);
+  assert.match(routes,/itemShapeSvg\(item, \{ dimensionFontSize: 18, schematic: true \}\)/);
+});
+
+test('schematic screen U and L retain visible short bends without altering manufacturing data', () => {
+  const entry=reviewedDrawings.find(e=>e.orderId===96&&e.row===4), item=fixture(entry);
+  const before=JSON.stringify(item);
+  const svg=itemShapeSvg(item,{dimensionFontSize:18,schematic:true});
+  const points=[...svg.match(/<path d="([^"]+)"/)[1].matchAll(/[ML] ([\d.]+),([\d.]+)/g)].map(m=>[+m[1],+m[2]]);
+  const shortLeg=Math.abs(points[1][1]-points[0][1]),bridge=Math.abs(points[2][0]-points[1][0]);
+  assert.ok(shortLeg/bridge>=.139 && shortLeg>=25);
+  assert.match(svg,/>46<\/text>/); assert.match(svg,/>870<\/text>/);
+  assert.equal(JSON.stringify(item),before);
+  const l={segments:JSON.stringify([{length_mm:100,angle_deg:90},{length_mm:9000,angle_deg:0}]),shape_name:'L'};
+  const raw=JSON.stringify(l), normal=itemShapeSvg(l), schematic=itemShapeSvg(l,{schematic:true});
+  assert.notEqual(normal.match(/<path d="([^"]+)"/)[1],schematic.match(/<path d="([^"]+)"/)[1]);
+  assert.match(schematic,/>10<\/text>/);assert.match(schematic,/>900<\/text>/);
+  assert.equal(JSON.stringify(l),raw);
 });
