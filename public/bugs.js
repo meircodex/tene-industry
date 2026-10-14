@@ -46,7 +46,7 @@
     });
   }
   function formData(form) {
-    const data = new FormData(form); data.delete('before');data.delete('expected');data.delete('after');
+    const data = new FormData(form); data.delete('before');data.delete('expected_image');data.delete('after');
     form.querySelectorAll('.upload').forEach(zone=>zone.bugFiles().forEach(f=>data.append(zone.dataset.kind,f,f.name)));
     return data;
   }

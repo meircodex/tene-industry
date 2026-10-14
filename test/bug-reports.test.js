@@ -7,6 +7,7 @@ const os=require('node:os');
 const path=require('node:path');
 const Database=require('better-sqlite3');
 const express=require('express');
+const vm=require('node:vm');
 const {ensureBugReportSchema}=require('../db/bugReportSchema');
 const {createBugReportsService,safePagePath,validateFiles}=require('../services/bugReports');
 const router=require('../routes/bugReports');
@@ -16,6 +17,16 @@ const image=(kind='before')=>({fieldname:kind,originalname:'בדיקה.png',mime
 const worker={id:'2',name:'עובד',role:'production'},admin={id:'1',name:'מנהל',role:'admin'},other={id:'3',name:'אחר',role:'production'};
 const body=()=>({request_uid:crypto.randomUUID(),title:'מידה לא מובנת',actual:'המספר מכסה את הקו',expected:'המספר מחוץ לצורה',page_path:'/orders.html?id=97&token=secret',order_reference:'097',item_reference:'4',priority:'urgent'});
 function setup(t){const db=new Database(':memory:');db.pragma('foreign_keys=ON');ensureBugReportSchema(db);t.after(()=>db.close());return{db,s:createBugReportsService({db})};}
+
+test('browser multipart form retains expected description while rebuilding chosen image fields',()=>{
+  const js=fs.readFileSync(path.join(__dirname,'../public/bugs.js'),'utf8');
+  const source=js.match(/function formData\(form\) \{[\s\S]*?\n  \}/)[0];
+  class MockFormData{constructor(form){this.values=new Map(form.values);}delete(k){this.values.delete(k);}append(k,v){const previous=this.values.get(k);this.values.set(k,previous===undefined?v:[previous,v]);}get(k){return this.values.get(k);}}
+  const build=vm.runInNewContext('('+source+')',{FormData:MockFormData});
+  const form={values:[['expected','תיאור המצב הרצוי'],['before','empty file'],['expected_image','empty file']],querySelectorAll:()=>[{dataset:{kind:'expected'},bugFiles:()=>[{name:'expected.png'}]}]};
+  const result=build(form);assert.equal(result.get('expected')[0],'תיאור המצב הרצוי');assert.equal(result.get('expected')[1].name,'expected.png');assert.equal(result.get('expected_image'),undefined);
+  const html=fs.readFileSync(path.join(__dirname,'../public/bugs.html'),'utf8');assert.match(html,/textarea name="expected"/);assert.match(html,/type="file" name="expected_image"/);
+});
 
 test('bug reports are persistent, additive and creation retries are idempotent',t=>{
   const {db,s}=setup(t);db.exec('CREATE TABLE orders(id INTEGER, total_weight REAL); INSERT INTO orders VALUES(97,475.3)');
