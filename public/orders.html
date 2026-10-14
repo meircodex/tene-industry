@@ -14,6 +14,8 @@
 <script src="/auth-client.js"></script>
 <script src="/display-units.js?v=2"></script>
 <script src="/status-contracts-client.js"></script>
+<script src="/order-workspace.js?v=1"></script>
+<link rel="stylesheet" href="/orders-workspace.css?v=1">
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
 <script src="/shape-renderer.js?v=5" defer></script>
@@ -373,7 +375,6 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   <!-- FILTERS -->
   <div class="filters">
     <button type="button" class="filter-btn" id="ordersViewBtn" onclick="setOrdersView('orders')">הזמנות</button>
-    <button type="button" class="filter-btn" id="quotesViewBtn" onclick="setOrdersView('quotes')">הצעות מחיר</button>
     <span id="statusFilterButtons" style="display:contents"></span>
     <div class="search-wrap">
       <input class="search-box" id="searchBox" placeholder="🔍 חיפוש..." oninput="applyFilter()">
@@ -382,17 +383,18 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   </div>
 
   <!-- DESKTOP TABLE -->
+  <div class="trash-notice" id="trashNotice" hidden>סל המחזור שומר את ההזמנה וההיסטוריה וניתן לשחזר ממנו. הסתרה מהרשימה אינה מבטלת ייצור או הקצאות מלאי. מחיקה לצמיתות דורשת סיסמת מנהל ונחסמת כשיש היסטוריה מקושרת.</div>
   <div class="orders-wrap">
     <div class="table-scroll">
-      <table>
+      <table class="orders-table">
         <thead id="ordersTableHead">
           <tr>
-            <th>מספר</th><th>לקוח</th><th>מקור</th><th>אספקה</th><th>עדיפות</th>
-            <th>משקל</th><th>סטטוס</th><th>נוצרה</th><th></th>
+            <th>מספר הזמנה</th><th>לקוח</th><th>תאריך אספקה</th><th>משקל (ק״ג)</th>
+            <th>סטטוס הזמנה</th><th>הערות</th><th>פעולות</th>
           </tr>
         </thead>
         <tbody id="ordersBody">
-          <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--muted)">טוען...</td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--dim)">טוען...</td></tr>
         </tbody>
       </table>
     </div>
@@ -539,10 +541,10 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 
 <div class="edit-overlay" id="correctionReasonOverlay" onclick="closeCorrectionReason(event)">
   <form class="edit-panel" onsubmit="submitCorrectionReason(event)">
-    <div class="edit-head"><div class="edit-title">סיבת תיקון לאחר תחילת ייצור</div><button type="button" class="detail-close" onclick="cancelCorrectionReason()">✕</button></div>
+    <div class="edit-head"><div class="edit-title" id="correctionReasonTitle">סיבת תיקון לאחר תחילת ייצור</div><button type="button" class="detail-close" onclick="cancelCorrectionReason()">✕</button></div>
     <div class="edit-body">
-      <div class="edit-note">הפעולה תישלח לשרת לבדיקה מול הרשאת הניהול הקיימת ותירשם ביומן הביקורת.</div>
-      <div class="edit-note">החזרת סטטוס פריט לאחור אינה מבטלת תעודת מקור שכבר הופקה, ואינה מוחקת כמויות שיוצרו או תנועות מלאי.</div>
+      <div class="edit-note" id="correctionReasonInfo">הפעולה תישלח לשרת לבדיקה מול הרשאת הניהול הקיימת ותירשם ביומן הביקורת.</div>
+      <div class="edit-note" id="correctionReasonProductionInfo">החזרת סטטוס פריט לאחור אינה מבטלת תעודת מקור שכבר הופקה, ואינה מוחקת כמויות שיוצרו או תנועות מלאי.</div>
       <div class="edit-field edit-wide"><label for="correctionReasonInput">סיבת התיקון</label><textarea id="correctionReasonInput" minlength="3" maxlength="1000" required></textarea></div>
     </div>
     <div class="edit-actions"><button type="submit" class="edit-save">המשך לתיקון</button><button type="button" class="edit-cancel" onclick="cancelCorrectionReason()">ביטול</button></div>
@@ -587,13 +589,15 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   </div>
 </div>
 
+<dialog id="orderPurgeDialog"><form id="orderPurgeForm"><h2>מחיקת הזמנה לצמיתות</h2><p id="orderPurgeTitle"></p><p>פעולה בלתי הפיכה. ההזמנה ופריטיה יימחקו; תיעוד הפעולה יישמר. לא ניתן למחוק הזמנות עם היסטוריית ייצור, אספקה, מלאי או חיוב מקושרת.</p><label>סיסמת / קוד הכניסה של מנהל המערכת<input id="orderPurgePassword" type="password" autocomplete="off" maxlength="128" required></label><label>הקלד את מספר ההזמנה לאישור נוסף<input id="orderPurgeConfirmation" autocomplete="off" required></label><div class="actions"><button class="btn-sm danger" type="submit">אני מאשר מחיקה לצמיתות</button><button class="btn-sm" type="button" onclick="closeOrderPurge()">בטל</button></div></form></dialog>
 <script>
-let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
+let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', orderBucket = new URLSearchParams(location.search).get('bucket') || 'active', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
 let orderShapeEditor = null, pendingShapeEdit = null;
+let ordersFetchGeneration=0, pendingOrderPurge=null;
 const PRINT_DOCUMENTS = Object.freeze({
   'print-cards': { kind: 'print-cards', label: 'כרטיסיות ייצור', fileLabel: 'כרטיסיות-ייצור' },
-  'print-a4': { kind: 'print-a4', label: 'הזמנה A4', fileLabel: 'הזמנה' },
-  'print-a4-th': { kind: 'print-a4', lang: 'th', label: 'הזמנה A4 – תאילנדית', fileLabel: 'הזמנה-תאילנדית' },
+  'print-a4': { kind: 'print-a4', label: 'גיליון הזמנה', fileLabel: 'גיליון-הזמנה' },
+  'print-a4-th': { kind: 'print-a4', lang: 'th', label: 'גיליון הזמנה – תאילנדית', fileLabel: 'גיליון-הזמנה-תאילנדית' },
   'delivery-certificate': { kind: 'delivery-certificate', label: 'תעודת משלוח', fileLabel: 'תעודת-משלוח' },
 });
 const STATUS_CONTRACT = window.IronBendStatus || {};
@@ -658,24 +662,28 @@ function connectWS() {
   };
   ws.onmessage = e => {
     const { type } = JSON.parse(e.data);
-    if (['new_order','order_status','order_complete','order_updated','order_item_added','order_item_updated','order_item_deleted','order_cancellation_disposition','order_quote_created','order_quote_converted'].includes(type)) fetchOrders();
+    if (['new_order','order_status','order_complete','order_updated','order_deleted','order_item_added','order_item_updated','order_item_deleted','order_cancellation_disposition','order_quote_created','order_quote_converted'].includes(type)) fetchOrders();
   };
 }
 
 // ── Data ───────────────────────────────────────────────────────────────
 async function fetchOrders() {
+  const generation=++ordersFetchGeneration;
   fetch('/api/portal-requests').then(r=>r.ok?r.json():null).then(data=>{
     if(data) document.getElementById('portalInboxLink').textContent=`בקשות לקוח: ${data.pendingCount} לטיפול · ${data.unreadCount} חדשות — פתח תיבה`;
   }).catch(()=>{});
   try {
     const url = viewMode === 'quotes'
       ? '/api/order-quotes' + (activeStatus ? '?status=' + encodeURIComponent(activeStatus) : '')
-      : '/api/orders' + (activeStatus ? '?status=' + encodeURIComponent(activeStatus) : '');
+      : '/api/orders?bucket=' + encodeURIComponent(orderBucket) + '&limit=500';
     const response = await fetch(url);
     if (!response.ok) throw new Error(`${viewMode} ${response.status}`);
-    if (viewMode === 'quotes') allQuotes = await response.json();
-    else allOrders = await response.json();
+    const data=await response.json();
+    if(generation!==ordersFetchGeneration)return;
+    if (viewMode === 'quotes') allQuotes = data;
+    else allOrders = data;
   } catch (error) {
+    if(generation!==ordersFetchGeneration)return;
     console.error('fetchOrders failed', error);
     if (viewMode === 'quotes') allQuotes = [];
     else allOrders = [];
@@ -708,6 +716,16 @@ function applyFilter() {
 
 function renderStatusFilters() {
   const target = document.getElementById('statusFilterButtons');
+  if(viewMode !== 'quotes') {
+    const buckets=[['active','הזמנות בתהליך'],['delivered','הזמנות שסופקו'],['closed','הזמנות סגורות'],['cancelled','בוטלו'],['trash','סל מחזור']];
+    if(!buckets.some(([key])=>key===orderBucket))orderBucket='active';
+    target.innerHTML=buckets.map(([key,label])=>`<button type="button" class="filter-btn${key===orderBucket?' active':''}" data-bucket="${key}">${label}</button>`).join('');
+    target.querySelectorAll('[data-bucket]').forEach(button=>button.onclick=()=>{orderBucket=button.dataset.bucket;const url=new URL(location.href);url.searchParams.set('bucket',orderBucket);url.searchParams.delete('status');history.replaceState(null,'',url);renderStatusFilters();fetchOrders();});
+    document.getElementById('ordersViewBtn').hidden=true;
+    document.getElementById('trashNotice').hidden=orderBucket!=='trash';
+    document.getElementById('ordersPageTitle').textContent='הזמנות';
+    return;
+  }
   const filters = viewMode === 'quotes' ? QUOTE_STATUS_FILTERS : ORDER_STATUS_FILTERS;
   if (!filters.some(filter => filter.status === activeStatus)) activeStatus = '';
   target.innerHTML = filters.map(filter =>
@@ -727,13 +745,13 @@ function renderStatusFilters() {
     });
   });
   document.getElementById('ordersViewBtn').classList.toggle('active', viewMode === 'orders');
-  document.getElementById('quotesViewBtn').classList.toggle('active', viewMode === 'quotes');
   document.getElementById('ordersPageTitle').textContent = viewMode === 'quotes' ? '💬 הצעות מחיר' : '📋 הזמנות';
 }
 
 function setOrdersView(nextView) {
   viewMode = nextView === 'quotes' ? 'quotes' : 'orders';
   activeStatus = '';
+  orderBucket='active';
   const url = new URL(location.href);
   if (viewMode === 'quotes') url.searchParams.set('view', 'quotes');
   else url.searchParams.delete('view');
@@ -803,27 +821,32 @@ function channelLabel(o) {
   return `<span style="color:var(--muted);font-size:12px">${escHtml(o.channel || 'משרד')}</span>`;
 }
 function actionBtns(o, stopProp = true, includePrints = true) {
-  const sp = stopProp ? 'onclick="event.stopPropagation()"' : '';
-  const transitions = allowedOrderTransitions(o.status).filter(status => status !== ORDER_STATUS.CANCELLED);
-  const transitionButtons = transitions.map(status => {
-    const label = ORDER_ACTION_LABELS.get(status) || status;
-    const cls = status === ORDER_STATUS.APPROVED_WAITING_PRODUCTION ? 'btn-sm success' : 'btn-sm';
-    return `<button class="${cls}" onclick="event.stopPropagation();setStatus(${o.id},${jsAttr(status)})">${escHtml(label)}</button>`;
-  }).join('');
-  const printButtons = includePrints ? `
-    <a class="btn-sm" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" title="כרטיסיות">🖨️</a>
-    <a class="btn-sm" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" title="תעודת משלוח">📋</a>
-  ` : '';
-  const deleteBtn = `<button class="btn-sm danger" onclick="event.stopPropagation();deleteOrder(${o.id},${jsAttr(o.order_num)})" title="מחק הזמנה">🗑️</button>`;
-  const editBtn = `<button class="btn-sm" onclick="event.stopPropagation();openOrderEdit(event,${o.id})" title="ערוך הזמנה">✎ ערוך</button>`;
-  const cancelBtn = o.status === ORDER_STATUS.CANCELLED ? '' : `<button class="btn-sm danger" onclick="event.stopPropagation();openCancellationReview(event,${o.id})" title="ביטול עם החלטת מלאי/גריטה">בטל</button>`;
-  return `<div class="actions" ${sp}>
-    ${transitionButtons}
-    ${printButtons}
-    ${editBtn}
-    ${cancelBtn}
-    ${deleteBtn}
-  </div>`;
+  const role=window.IronBendAuth?.currentUser().role;
+  if(o.deleted_at)return `<div class="actions" onclick="event.stopPropagation()"><button class="btn-sm" onclick="restoreOrderFromTrash(${o.id})">שחזר</button>${role==='admin'?`<button class="btn-sm danger" onclick="openOrderPurge(${o.id})">מחק לצמיתות</button>`:''}</div>`;
+  return `<div class="actions" onclick="event.stopPropagation()"><a class="btn-sm" href="/order-print.html?id=${o.id}&kind=print-a4" target="_blank" rel="noopener" title="הדפס גיליון הזמנה (A4)" aria-label="הדפס גיליון הזמנה ${escHtml(o.order_num)}">🖨️</a>${['office','manager','admin'].includes(role)?`<button class="btn-sm danger" onclick="deleteOrder(${o.id},${jsAttr(o.order_num)})" title="העבר לסל המחזור" aria-label="העבר את ${escHtml(o.order_num)} לסל המחזור">🗑️</button>`:''}</div>`;
+}
+
+function orderStatusSelect(o) {
+  const role=window.IronBendAuth?.currentUser().role;
+  const canChange=['office','production','manager','admin'].includes(role),canPay=['office','manager','admin'].includes(role);
+  const current=o.payment_status==='paid'?'__paid':o.status;
+  let options=o.payment_status==='paid'?[['__paid','שולם'],['__unpaid','בטל סימון שולם — תיקון']]:[[o.status,o.status],...allowedOrderTransitions(o.status).filter(s=>(s!==ORDER_STATUS.APPROVED_WAITING_PRODUCTION||['manager','admin'].includes(role))&&(s!==ORDER_STATUS.LOADING||['manager','admin'].includes(role))).map(s=>[s,s])];
+  if(canPay&&o.payment_status!=='paid')options.push(['__paid','שולם — סימון ידני']);
+  return `<select class="order-status-select" aria-label="סטטוס הזמנה ${escHtml(o.order_num)}" onclick="event.stopPropagation()" onchange="changeListOrderStatus(event,${o.id})" ${!canChange||o.deleted_at||(o.payment_status==='paid'&&!canPay)?'disabled':''}>${options.map(([value,label])=>`<option value="${escHtml(value)}"${value===current?' selected':''}>${escHtml(label)}</option>`).join('')}</select>`;
+}
+
+async function changeListOrderStatus(event,id) {
+  event.stopPropagation();const select=event.target,order=allOrders.find(o=>o.id===id),next=select.value;if(!order)return;
+  select.disabled=true;
+  try {
+    if(next==='__paid'||next==='__unpaid') {
+      const paid=next==='__paid';const reason=paid?'סימון ידני של ההזמנה כשולמה':await requestCorrectionReason({title:'תיקון סימון שולם',info:'מה סיבת ביטול הסימון שולם? סטטוס הייצור והאספקה והמסמכים נשמרים ללא שינוי.'});
+      if(!reason?.trim()||!confirm(paid?'לסמן את ההזמנה כשולמה ולהעביר להזמנות סגורות? זהו סימון ידני בלבד — אינו מפיק קבלה ואינו משנה את הנהלת החשבונות.':'לאשר תיקון של סימון התשלום? סטטוס הייצור והאספקה יישאר ללא שינוי.'))return;
+      const response=await fetch(`/api/orders/${id}/payment`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,payment_status:paid?'paid':'unpaid',reason})});const data=await response.json();if(!response.ok)throw new Error(data.error);await fetchOrders();
+    } else if(next===ORDER_STATUS.CANCELLED)await openCancellationReview(event,id);
+    else if(confirm(`לשנות את סטטוס ${order.order_num} ל״${next}״?${next===ORDER_STATUS.DELIVERED_CONFIRMED?' ההזמנה תעבור ללשונית הזמנות שסופקו.':''}`))await setStatus(id,next,order.status);
+  }catch(error){alert(error.message||'עדכון הסטטוס נכשל');}
+  finally {applyFilter();}
 }
 
 // ── Desktop table ──────────────────────────────────────────────────────
@@ -832,22 +855,20 @@ function setTableHead(labels) {
 }
 
 function renderTable(orders) {
-  setTableHead(['מספר', 'לקוח', 'אספקה', 'עדיפות', 'משקל', 'סטטוס', 'נוצרה', '']);
+  setTableHead(['מספר הזמנה', 'לקוח', 'תאריך אספקה', 'משקל (ק״ג)', 'סטטוס הזמנה', 'הערות', 'פעולות']);
   const body = document.getElementById('ordersBody');
   if (!orders.length) {
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">אין הזמנות</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--dim)">אין הזמנות בלשונית זו</td></tr>';
     return;
   }
   body.innerHTML = orders.map(o => `
-    <tr onclick="openDetail(${o.id})">
+    <tr class="order-row row-${window.IronBendOrderWorkspace.rowTone(o)}" ${o.deleted_at?'':`onclick="openDetail(${o.id})"`}>
       <td><span class="order-num">${escHtml(o.order_num)}</span></td>
       <td>${escHtml(o.customer_name ?? '—')}</td>
-      <td>${channelLabel(o)}</td>
-      <td style="white-space:nowrap">${escHtml(o.delivery_date ?? '—')}</td>
-      <td>${urgentLabel(o)}</td>
-      <td class="weight-tag">${(o.total_weight||0).toFixed(0)} ק"ג</td>
-      <td><span class="badge ${sBadgeClass(o.status)}">${escHtml(primaryOrderStatusLabel(o))}</span>${deliveryProgressBadge(o)}</td>
-      <td style="color:var(--muted);font-size:12px">${new Date(o.created_at).toLocaleDateString('he-IL')}</td>
+      <td class="delivery-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</td>
+      <td class="weight-tag">${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})}</td>
+      <td>${orderStatusSelect(o)}</td>
+      <td><div class="order-notes" title="${escHtml(window.IronBendOrderWorkspace.notes(o).join('\n'))}">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||'—'}</div></td>
       <td>${actionBtns(o)}</td>
     </tr>`).join('');
 }
@@ -860,24 +881,23 @@ function renderCards(orders) {
     return;
   }
   wrap.innerHTML = orders.map(o => `
-    <div class="m-card" onclick="openDetail(${o.id})">
+    <div class="m-card row-${window.IronBendOrderWorkspace.rowTone(o)}" ${o.deleted_at?'':`onclick="openDetail(${o.id})"`}>
       <div class="m-card-top">
         <div>
           <div class="m-card-num">${escHtml(o.order_num)}</div>
           <div class="m-card-customer">${escHtml(o.customer_name ?? '—')}</div>
         </div>
-        <span class="badge ${sBadgeClass(o.status)}">${escHtml(primaryOrderStatusLabel(o))}</span>${deliveryProgressBadge(o)}
+        ${orderStatusSelect(o)}
       </div>
       <div class="m-card-meta">
         ${Number(o.portal_order) === 1 || o.channel === 'פורטל לקוח' ? '<span>🌐 פורטל לקוח</span>' : ''}
-        ${o.delivery_date ? `<span>📅 ${escHtml(o.delivery_date)}</span>` : ''}
+        ${o.delivery_date ? `<span>תאריך אספקה: ${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span>` : ''}
         <span>⚖️ ${(o.total_weight||0).toFixed(0)} ק"ג</span>
         ${o.priority === 'דחוף' ? '<span style="color:var(--danger);font-weight:700">⚡ דחוף</span>' : ''}
       </div>
+      <div class="order-notes">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||''}</div>
       <div class="m-card-actions">
         ${actionBtns(o, false, false)}
-        <a class="btn-sm" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" onclick="event.stopPropagation()">🖨️ כרטיסיות</a>
-        <a class="btn-sm" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" onclick="event.stopPropagation()">📋 תעודה</a>
       </div>
   </div>`).join('');
 }
@@ -984,11 +1004,11 @@ function openConvertedQuoteOrder(orderId) {
 }
 
 // ── Status update ──────────────────────────────────────────────────────
-async function setStatus(id, status) {
+async function setStatus(id, status, expectedStatus) {
   const response = await fetch(`/api/orders/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
+    body: JSON.stringify({ status, expected_status: expectedStatus })
   });
   const result = await response.json().catch(() => ({}));
   if (response.status === 401 || response.status === 403) {
@@ -1002,7 +1022,7 @@ async function setStatus(id, status) {
     alert((result.error || 'עדכון סטטוס נכשל') + allowed);
     return false;
   }
-  fetchOrders();
+  await fetchOrders();
   return true;
 }
 
@@ -1637,7 +1657,7 @@ function openA4PrintDialog(orderId, mode = 'print') {
   dialog.style.cssText = 'position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,34,27,.48);';
   dialog.innerHTML = `<div style="width:min(430px,100%);box-sizing:border-box;padding:22px;border-radius:16px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.24);direction:rtl;">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-      <div><h2 style="margin:0;color:#183d2b;font-size:22px;">${actionMode === 'send' ? 'שליחת קובץ A4' : 'הדפסת A4'}</h2><p style="margin:6px 0 0;color:#587060;font-size:13px;">${actionMode === 'send' ? 'בחר שפה למסמך שיישמר כ‑PDF ולשליחה.' : 'בחר שפה לפני פתיחת ההדפסה.'}</p></div>
+      <div><h2 style="margin:0;color:#183d2b;font-size:22px;">${actionMode === 'send' ? 'שליחת גיליון הזמנה' : 'הדפסת גיליון הזמנה'}</h2><p style="margin:6px 0 0;color:#587060;font-size:13px;">${actionMode === 'send' ? 'בחר שפה למסמך שיישמר כ‑PDF ולשליחה.' : 'בחר שפה לפני פתיחת ההדפסה.'}</p></div>
       <button type="button" onclick="closePrintDialog('a4PrintDialog')" aria-label="סגור" style="border:0;background:transparent;color:#587060;font-size:26px;line-height:1;cursor:pointer;">&times;</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;">
@@ -1793,8 +1813,12 @@ async function copyDocumentName() {
 }
 
 function requestCorrectionReason() {
+  const options=arguments[0] || {};
   const overlay = document.getElementById('correctionReasonOverlay');
   const input = document.getElementById('correctionReasonInput');
+  document.getElementById('correctionReasonTitle').textContent=options.title || 'סיבת תיקון לאחר תחילת ייצור';
+  document.getElementById('correctionReasonInfo').textContent=options.info || 'הפעולה תישלח לשרת לבדיקה מול הרשאת הניהול הקיימת ותירשם ביומן הביקורת.';
+  document.getElementById('correctionReasonProductionInfo').hidden=Boolean(options.title);
   input.value = '';
   overlay.classList.add('show');
   requestAnimationFrame(() => input.focus());
@@ -2806,7 +2830,7 @@ function buildDetailHTML(o, pkgs) {
     <div class="review-actions">
       <button class="review-btn primary" onclick="openOrderEdit(event, ${o.id})">ערוך פרטי הזמנה</button>
       ${o.status === ORDER_STATUS.CANCELLED ? '' : `<button class="review-btn danger" onclick="openCancellationReview(event, ${o.id})">בטל הזמנה + החלטת תוצרת</button>`}
-      <button class="review-btn danger" ${hasStartedProduction ? 'disabled title="לא מוחקים הזמנה לאחר תחילת ייצור באחת הכרטיסיות"' : ''} onclick="deleteOrder(${o.id},${jsAttr(o.order_num)})">מחק הזמנה</button>
+      <button class="review-btn danger" onclick="deleteOrder(${o.id},${jsAttr(o.order_num)})">העבר לסל המחזור</button>
     </div>
     <div class="detail-customer" style="margin-top:8px">${hasStartedProduction ? 'החל ייצור בכרטיסייה אחת או יותר: תיקון פרטי ההזמנה דורש הרשאת ניהול וסיבת תיקון. כרטיסייה שכבר החלה ייצור אינה ניתנת למחיקה.' : 'אפשר לערוך או למחוק לפני תחילת ייצור.'}</div>
   </div>`;
@@ -3280,15 +3304,15 @@ async function addParsedItemToOrder(event, index) {
 }
 
 async function deleteOrder(orderId, orderNum) {
-  if (!confirm(`למחוק את הזמנה ${orderNum}?\nפעולה זו בלתי הפיכה.`)) return;
-  const token = localStorage.getItem('ib_access_token') || sessionStorage.getItem('ib_access_token');
-  const response = await fetch(`/api/orders/${orderId}`, {
-    method: 'DELETE',
-    headers: token ? { Authorization: 'Bearer ' + token } : {}
-  });
+  const order=allOrders.find(o=>Number(o.id)===Number(orderId)) || currentDetailOrder;
+  if(!order||Number(order.id)!==Number(orderId))return;
+  if(!confirm(`להעביר את הזמנה ${orderNum} לסל המחזור ולהוציא אותה מהרשימה?\nההזמנה והפריטים לא יימחקו וניתן לשחזר אותם. אין בכך ביטול של ייצור או הקצאות מלאי.`))return;
+  const reason=await requestCorrectionReason({title:'העברה לסל המחזור',info:'מה הסיבה להעברה לסל המחזור? ההזמנה וההיסטוריה נשמרות; אין בכך ביטול של ייצור או הקצאת מלאי.'});if(!reason?.trim())return;
+  if(!confirm(`אישור נוסף: להעביר את ${orderNum} לסל המחזור?`))return;
+  const response = await fetch(`/api/orders/${orderId}/trash`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,reason})});
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'מחיקת ההזמנה נכשלה');
+    alert(result.error || 'העברה לסל המחזור נכשלה');
     return;
   }
   if (currentDetailOrder && Number(currentDetailOrder.id) === Number(orderId)) {
@@ -3297,6 +3321,12 @@ async function deleteOrder(orderId, orderNum) {
   }
   await fetchOrders();
 }
+
+async function restoreOrderFromTrash(id){const order=allOrders.find(o=>o.id===id);if(!order||!confirm(`לשחזר את ${order.order_num}? ההזמנה תחזור ללשונית המתאימה לסטטוס האספקה והתשלום שלה.`))return;const response=await fetch(`/api/orders/${id}/restore`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,reason:'שחזור מתוך סל המחזור'})});const result=await response.json();if(!response.ok){alert(result.error);return;}await fetchOrders();}
+async function openOrderPurge(id){const order=allOrders.find(o=>o.id===id);if(!order)return;const response=await fetch(`/api/orders/${id}/purge-review`);const review=await response.json();if(!response.ok||!review.can_purge){alert(review.error||review.reason||'המחיקה נחסמה כדי לשמור על ההיסטוריה');return;}pendingOrderPurge=order;document.getElementById('orderPurgeForm').reset();document.getElementById('orderPurgeTitle').textContent=order.order_num;document.getElementById('orderPurgeDialog').showModal();}
+function closeOrderPurge(){document.getElementById('orderPurgeForm').reset();document.getElementById('orderPurgeDialog').close();pendingOrderPurge=null;}
+document.getElementById('orderPurgeDialog').addEventListener('cancel',closeOrderPurge);
+document.getElementById('orderPurgeForm').onsubmit=async event=>{event.preventDefault();const order=pendingOrderPurge;if(!order)return;if(document.getElementById('orderPurgeConfirmation').value.trim()!==order.order_num){alert('מספר ההזמנה לא תואם');return;}const button=event.currentTarget.querySelector('button[type=submit]');button.disabled=true;const password=document.getElementById('orderPurgePassword').value;document.getElementById('orderPurgePassword').value='';try{const response=await fetch(`/api/orders/${order.id}/purge`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,password,reason:'מחיקה לצמיתות לאחר אישור וסיסמת מנהל'})});const result=await response.json();if(!response.ok)throw new Error(result.error);closeOrderPurge();await fetchOrders();}catch(error){alert(error.message||'המחיקה נכשלה');}finally{button.disabled=false;}};
 
 function startQtyEdit(event, orderId, itemId, current) {
   event?.stopPropagation?.();

@@ -320,11 +320,12 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     const pendingOrderId = seedInternalOrder(customerId, 'ORDER-DELETE-OFFICE-PENDING');
     assert.equal((await request(`/api/orders/${pendingOrderId}`, { method: 'DELETE' })).status, 401);
     assert.equal((await request(`/api/orders/${pendingOrderId}`, { method: 'DELETE', headers: authHeaders(production) })).status, 403);
-    assert.equal((await request(`/api/orders/${pendingOrderId}`, { method: 'DELETE', headers: authHeaders(office) })).status, 200);
+    assert.equal((await request(`/api/orders/${pendingOrderId}`, { method: 'DELETE', headers: authHeaders(office) })).status, 409);
+    assert.ok(db.prepare('SELECT id FROM orders WHERE id=?').get(pendingOrderId), 'legacy DELETE must not permanently remove an order without a password');
 
     const approvedOrderId = seedInternalOrder(customerId, 'ORDER-DELETE-OFFICE-APPROVED');
     db.prepare('UPDATE orders SET status=? WHERE id=?').run(statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION, approvedOrderId);
-    assert.equal((await request(`/api/orders/${approvedOrderId}`, { method: 'DELETE', headers: authHeaders(office) })).status, 200);
+    assert.equal((await request(`/api/orders/${approvedOrderId}`, { method: 'DELETE', headers: authHeaders(office) })).status, 409);
 
     const departedOrderId = seedInternalOrder(customerId, 'ORDER-DELETE-OFFICE-DEPARTED');
     db.prepare('UPDATE orders SET status=? WHERE id=?').run(statusContracts.ORDER_STATUS.ON_THE_WAY, departedOrderId);

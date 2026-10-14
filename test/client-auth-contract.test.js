@@ -729,7 +729,8 @@ test('orders screen status actions keep JavaScript arguments safe inside HTML at
 
   assert.match(orders, /function jsAttr\(value\)/);
   assert.match(orders, /return escHtml\(jsArg\(value\)\)/);
-  assert.match(orders, /setStatus\(\$\{o\.id\},\$\{jsAttr\(status\)\}\)/);
+  assert.match(orders, /changeListOrderStatus\(event,\$\{o\.id\}\)/);
+  assert.match(orders, /option value="\$\{escHtml\(value\)\}"/);
   assert.match(orders, /setStatusAndClose\(\$\{o\.id\},\$\{jsAttr\(s\)\}\)/);
   assert.match(orders, /printQR\(\$\{jsAttr\(p\.package_code\)\},\$\{jsAttr\(p\.order_num\)\}/);
   assert.doesNotMatch(orders, /setStatus\(\$\{o\.id\},\$\{jsArg\(status\)\}\)/);

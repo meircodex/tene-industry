@@ -22,6 +22,8 @@ const { createPricer } = require('../services/pricer');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
 const { buildOrderCommercialSummary } = require('../services/orderCommercialSummary');
 const { buildDeliveryCertificateProgress } = require('../services/deliveryCertificateProgress');
+const { createOrderWorkspaceService, bucketCondition } = require('../services/orderWorkspace');
+const { rateLimit } = require('express-rate-limit');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
 const { createHistoricalProductionReconciliationService } = require('../services/historicalProductionReconciliation');
@@ -246,6 +248,20 @@ module.exports = function createOrdersRouter(deps) {
   const quotes = createOrderQuoteService(db, { createOrderFromPayload });
   const cancellations = createOrderCancellationService(db);
   const historicalReconciliations = createHistoricalProductionReconciliationService(db);
+  const workspace = createOrderWorkspaceService({ db });
+  const purgeLimiter = rateLimit({ windowMs:15*60000, limit:5, standardHeaders:true, legacyHeaders:false });
+  const workspaceActor = req => ({id:req.auth.sub,name:String(req.auth.display_name || req.auth.username || req.auth.sub)});
+  function workspaceAction(action) { return (req,res) => { try {
+    const result=workspace[action](req.params.id,workspaceActor(req),req.body||{});
+    auditLog('order',Number(req.params.id),result.order_num || result.orderNum,'order_'+action,null,null,null,req.body?.reason||null,req.auth.sub,workspaceActor(req).name);
+    wsBroadcast('order_updated',{id:Number(req.params.id)});
+    res.json({success:true,order:action==='purge'?undefined:result,...(action==='purge'?result:{})});
+  } catch(error) { res.status(error.statusCode || 409).json({error:error.statusCode?error.message:'הפעולה נחסמה כדי לשמור על היסטוריית ההזמנה'}); } }; }
+  router.post('/orders/:id/trash', requireAnyRole(['office','manager','admin']), workspaceAction('trash'));
+  router.post('/orders/:id/restore', requireAnyRole(['office','manager','admin']), workspaceAction('restore'));
+  router.patch('/orders/:id/payment', requireAnyRole(['office','manager','admin']), workspaceAction('payment'));
+  router.post('/orders/:id/purge', requireRole('admin'), purgeLimiter, workspaceAction('purge'));
+  router.get('/orders/:id/purge-review', requireRole('admin'), (req,res) => {try{const row=workspace.read(req.params.id);const reason=workspace.purgeBlock(row);res.json({can_purge:!reason,reason});}catch(error){res.status(error.statusCode||400).json({error:error.message});}});
 
   function normalizePreviewItem(item = {}, index = 0) {
     const shapeSnapshot = parseJsonObject(item.shape_snapshot_json) || parseJsonObject(item.shapeSnapshot) || null;
@@ -517,6 +533,7 @@ module.exports = function createOrdersRouter(deps) {
                FROM orders o LEFT JOIN customers c ON o.customer_id = c.id`;
     const params = [];
     const where = [];
+    try { where.push(bucketCondition(req.query.bucket)); } catch(error) { return res.status(400).json({error:error.message}); }
     if (status) { where.push('o.status = ?'); params.push(normalizeOrderStatus(status)); }
     if (date) { where.push('DATE(o.delivery_date)=?'); params.push(date); }
     if (priority) { where.push('o.priority = ?'); params.push(priority); }
@@ -804,6 +821,9 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   function baseOrderEditError(order) {
+    if (order.deleted_at || db.prepare('SELECT deleted_at FROM orders WHERE id=?').get(order.id || order.order_id)?.deleted_at) {
+      return { statusCode:409, message:'יש לשחזר את ההזמנה מסל המחזור לפני עריכה' };
+    }
     if (normalizeOrderStatus(order.status) === ORDER_STATUS.CANCELLED) {
       return { statusCode: 409, message: 'לא ניתן לערוך הזמנה שבוטלה; היסטוריית הביטול נשמרת' };
     }
@@ -979,6 +999,8 @@ module.exports = function createOrdersRouter(deps) {
     const requestedStatus = normalizeOrderStatus(status);
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
     if (!order) return res.status(404).json({ error: 'לא נמצא' });
+    if (order.deleted_at) return res.status(409).json({error:'יש לשחזר את ההזמנה מסל המחזור לפני שינוי סטטוס'});
+    if (req.body.expected_status !== undefined && req.body.expected_status !== order.status) return res.status(409).json({error:'סטטוס ההזמנה עודכן בינתיים. יש לרענן לפני שינוי'});
     if (requestedStatus === ORDER_STATUS.CANCELLED) {
       return res.status(409).json({
         error: 'cancellation_review_required',
@@ -1001,7 +1023,7 @@ module.exports = function createOrdersRouter(deps) {
     const old = order.status;
     const approvedAt = transition.isApproval ? new Date().toISOString() : null;
     db.prepare(
-      'UPDATE orders SET status=?, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
+      'UPDATE orders SET status=?, workspace_version=workspace_version+1, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
     ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
     const releasedReservations = { order_id: order.id, released: 0 };
     auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, null, req.userId || userId || null, req.auth?.display_name || userName || null);
@@ -1206,21 +1228,7 @@ module.exports = function createOrdersRouter(deps) {
     const blocked = orderDeleteError(order);
     if (blocked) return res.status(blocked.statusCode).json({ error: blocked.message });
 
-    const before = JSON.stringify({ order_num: order.order_num, status: order.status });
-    const deletion = db.transaction(() => {
-      const releasedReservations = releaseAllReservationsForOrder(db, { order_id: order.id });
-      db.prepare('DELETE FROM production_card_weights WHERE order_id=?').run(order.id);
-      db.prepare('DELETE FROM scan_log WHERE order_num=?').run(order.order_num);
-      db.prepare('DELETE FROM items WHERE pallet_id IN (SELECT id FROM pallets WHERE order_id=?)').run(order.id);
-      db.prepare('DELETE FROM pallets WHERE order_id=?').run(order.id);
-      db.prepare('DELETE FROM orders WHERE id=?').run(order.id);
-      return releasedReservations;
-    });
-    const releasedReservations = deletion();
-
-    auditLog('order', order.id, order.order_num, 'order_delete', 'status', before, null, 'מחיקת הזמנה', req.auth?.sub || null, req.auth?.display_name || null);
-    wsBroadcast('order_deleted', { orderId: Number(order.id), orderNum: order.order_num });
-    res.json({ success: true, orderNum: order.order_num, releasedReservations });
+    res.status(409).json({error:'recycle_bin_required',message:'מחיקה מהרשימה מתבצעת באמצעות סל המחזור ואישור נוסף; מחיקה לצמיתות מחייבת סיסמת מנהל'});
   });
 
   return router;

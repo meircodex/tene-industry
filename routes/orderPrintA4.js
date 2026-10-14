@@ -209,7 +209,7 @@ router.get('/orders/:id/print-a4', requireAnyRole(['office', 'production', 'mana
 <html lang="${language}" dir="${textDirection}">
 <head>
 <meta charset="UTF-8">
-<title>${label('printA4', 'הדפסת A4')} – ${order.order_num}</title>
+<title>${label('printA4', 'גיליון הזמנה')} – ${order.order_num}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&family=Noto+Sans+Thai:wght@400;700;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -313,9 +313,9 @@ body[data-print-language="th"] tbody.diam-group .group-head td{text-align:left;}
 <body data-print-language="${language}">
 
 <div class="no-print">
-  <button class="btn-print" onclick="window.print()">🖨️ ${label('printA4', 'הדפס A4')}</button>
-  <button class="btn-print" onclick="IronBendDocExport.download({ button: this, filename: 'הדפסת A4 ${order.order_num}' })">⬇️ הורד PDF</button>
-  <button class="btn-print" onclick="IronBendDocExport.send({ button: this, filename: 'הדפסת A4 ${order.order_num}' })">📤 שלח</button>
+  <button class="btn-print" onclick="window.print()">🖨️ ${label('printA4', 'הדפס גיליון הזמנה')}</button>
+  <button class="btn-print" onclick="IronBendDocExport.download({ button: this, filename: 'גיליון הזמנה ${order.order_num}' })">⬇️ הורד PDF</button>
+  <button class="btn-print" onclick="IronBendDocExport.send({ button: this, filename: 'גיליון הזמנה ${order.order_num}' })">📤 שלח</button>
   <button class="btn-print" onclick="switchPrintLanguage('${thai ? 'he' : 'th'}')">${thai ? 'עברית' : 'ไทย'}</button>
   <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:#1a2332;cursor:pointer;">
     <input type="checkbox" ${splitByDiameter ? 'checked' : ''} onchange="toggleDiamSplit(this)">

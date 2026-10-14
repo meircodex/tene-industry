@@ -124,14 +124,14 @@ for (const language of ['he', 'th']) {
     const client = loadDocumentSending();
     client.click(client.context.printButtons, /openA4PrintDialog\(41,'send'\)/);
     const dialog = client.nodes.get('a4PrintDialog');
-    assert.match(dialog.innerHTML, /שליחת קובץ A4/);
+    assert.match(dialog.innerHTML, /שליחת גיליון הזמנה/);
     client.click(dialog.innerHTML, new RegExp(`'${language}', 'send'`));
     assert.equal(client.nodes.has('a4PrintDialog'), false);
     assert.equal(client.opened.length, 0, 'choosing a send language must not open the print-only flow');
     assert.equal(client.nodes.get('sendFileOverlay').classList.contains('show'), true);
     assert.equal(client.nodes.get('sendFileOrderMeta').textContent, 'הזמנה TEST-41');
-    const label = language === 'th' ? 'הזמנה A4 – תאילנדית' : 'הזמנה A4';
-    const filename = language === 'th' ? 'הזמנה-תאילנדית-TEST-41.pdf' : 'הזמנה-TEST-41.pdf';
+    const label = language === 'th' ? 'גיליון הזמנה – תאילנדית' : 'גיליון הזמנה';
+    const filename = language === 'th' ? 'גיליון-הזמנה-תאילנדית-TEST-41.pdf' : 'גיליון-הזמנה-TEST-41.pdf';
     assert.equal(client.nodes.get('sendFileDocument').children[0].textContent, label);
     assert.equal(client.run('sendDocumentFileName()'), filename);
 
@@ -192,5 +192,5 @@ test('changing the A4 send language replaces the previous document selection', (
     const url = new URL(client.opened.at(-1)[0], 'http://localhost');
     assert.equal(url.searchParams.get('lang'), language === 'th' ? 'th' : null);
   }
-  assert.equal(client.run('sendDocumentFileName()'), 'הזמנה-TEST-41.pdf');
+  assert.equal(client.run('sendDocumentFileName()'), 'גיליון-הזמנה-TEST-41.pdf');
 });
