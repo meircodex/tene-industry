@@ -20,6 +20,13 @@
 (function(global) {
   const NS = 'http://www.w3.org/2000/svg';
 
+  function signedDisplayAngle(value) {
+    if (global.IronBendDisplayUnits?.signedAngleDegrees) return global.IronBendDisplayUnits.signedAngleDegrees(value);
+    let angle = ((Number(value) % 360) + 360) % 360;
+    if (angle > 180 || (angle === 180 && Number(value) < 0)) angle -= 360;
+    return angle;
+  }
+
   // The shape data contract stores lengths in millimetres. Keep every visual
   // label in centimetres, matching the editor and the order text around it.
   function formatLengthCmFromMm(value) {
@@ -400,7 +407,7 @@
       });
 
       for (let i = 0; i < segs.length - 1; i++) {
-        const angle = Number((angles || [])[i]);
+        const angle = signedDisplayAngle((angles || [])[i]);
         if (!Number.isFinite(angle) || Math.abs(angle - 180) < 0.001) continue;
         const s1 = segs[i], s2 = segs[i + 1];
         const bx = s1.x2;
@@ -449,7 +456,8 @@
           text.setAttribute('font-family', 'Heebo, Arial, sans-serif');
           text.setAttribute('font-weight', '900');
           text.setAttribute('fill', '#c9621a');
-          text.textContent = String(Math.round(angle)) + '\u00B0';
+          text.setAttribute('direction', 'ltr');
+          text.textContent = (angle > 0 ? '+' : '') + String(Number(angle.toFixed(1))) + '\u00B0';
           g.appendChild(text);
           svg.appendChild(g);
         }

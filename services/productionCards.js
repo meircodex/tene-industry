@@ -1,4 +1,5 @@
 const { isTechnicalRecognitionNote } = require('./intakeWorkflow');
+const { signedAngleDegrees, formatSignedAngle } = require('../public/display-units');
 
 const REVIEW_NOTE_LABEL = '\u05d3\u05d5\u05e8\u05e9 \u05d0\u05d9\u05de\u05d5\u05ea \u05de\u05d5\u05dc \u05de\u05e7\u05d5\u05e8 \u05d4\u05e7\u05dc\u05d9\u05d8\u05d4';
 
@@ -185,7 +186,7 @@ function parseSegments(value) {
 }
 
 function isRightAngle(value) {
-  return Math.abs(Number(value) - 90) < 0.001;
+  return Math.abs(Math.abs(signedAngleDegrees(value)) - 90) < 0.001;
 }
 
 function normalizeAngleValue(value) {
@@ -194,26 +195,25 @@ function normalizeAngleValue(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Bend direction is encoded on a full 0-360 turn: -30 and 330 are the same
-// physical bend, so displayed values are normalized into [0,360).
+// Render signed angles without rewriting the stored machine geometry.
 function displayBendAngleDeg(value) {
   const n = normalizeAngleValue(value);
   if (n === null) return null;
-  return ((n % 360) + 360) % 360;
+  return signedAngleDegrees(n);
 }
 
 function isPrintableBendAngle(angle) {
   const n = displayBendAngleDeg(angle);
   if (n === null) return false;
   if (Math.abs(n) < 0.001) return false;
-  if (Math.abs(n - 180) < 0.001) return false;
+  if (Math.abs(Math.abs(n) - 180) < 0.001) return false;
   return true;
 }
 
 function angleText(angle) {
   const n = displayBendAngleDeg(angle);
   if (n === null) return '';
-  return (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, '')) + '°';
+  return formatSignedAngle(n);
 }
 
 function isOpenUShape(segments) {
@@ -360,6 +360,18 @@ function closedStirrupParts(segments) {
   if (!Array.isArray(segments) || segments.length < 4) return null;
   const lengths = segments.map(segment => Number(segment.length_mm || 0));
   if (lengths.some(length => length <= 0)) return null;
+  // Canonical source walk: closure, A, B, A, B, closure. Never sort lengths
+  // or mistake a closure tail for a body side. Opposite sides must agree and
+  // all three body corners must turn in the same direction.
+  if (segments.length === 6) {
+    const bodyAngles = segments.slice(1, 4).map(segment => signedAngleDegrees(segment.angle_deg));
+    if (bodyAngles.every(angle => isRightAngle(angle))
+      && bodyAngles.every(angle => angle === bodyAngles[0])
+      && Math.abs(lengths[1] - lengths[3]) <= 1
+      && Math.abs(lengths[2] - lengths[4]) <= 1) {
+      return { top: lengths[2], right: lengths[1], bottom: lengths[4], left: lengths[3], tailStart: lengths[0], tailEnd: lengths[5] };
+    }
+  }
   const rightAngles = segments.slice(0, Math.min(4, segments.length - 1))
     .filter(segment => segment.angle_deg != null)
     .every(segment => isRightAngle(segment.angle_deg));
@@ -414,7 +426,7 @@ function unitVector(from, to) {
 }
 
 function angleLabelSvg(text, x, y, color = '#c9621a') {
-  return '<text data-angle-label="1" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="' + color + '" stroke="white" stroke-width="3.4" paint-order="stroke fill" stroke-linejoin="round">' + escapeHtml(text) + '</text>';
+  return '<text data-angle-label="1" direction="ltr" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" text-anchor="middle" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="' + color + '" stroke="white" stroke-width="3.4" paint-order="stroke fill" stroke-linejoin="round">' + escapeHtml(text) + '</text>';
 }
 
 function angleLabelPosition(previous, corner, next, distance = 22) {

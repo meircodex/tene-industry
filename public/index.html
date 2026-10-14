@@ -15,7 +15,7 @@
 <script src="/display-units.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=81"></script>
+<script src="/shape-editor.js?v=82"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -3230,7 +3230,7 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
     return `<text x="${(midpoint[0] + nx * distance).toFixed(1)}" y="${(midpoint[1] + ny * distance).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="Heebo,Arial" font-weight="700" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(sides[index] / 10)}</text>`;
   }).join('');
   const bendMarks = points.slice(1, -1).map((vertex, index) => {
-    const angle = Number(angles[index]);
+    const angle = IronBendDisplayUnits.signedAngleDegrees(angles[index]);
     if (!Number.isFinite(angle) || Math.abs(angle - 180) < 0.5) return '';
     const previous = points[index];
     const next = points[index + 2];
@@ -3239,14 +3239,14 @@ function engineeringShapeSketchSvg(sides = [], angles = [], sourcePoints = null)
     const markerSize = Math.max(4.5, Math.min(8, Math.min(beforeLength, afterLength) * 0.18));
     const start = [vertex[0] + backX * markerSize, vertex[1] + backY * markerSize];
     const end = [vertex[0] + forwardX * markerSize, vertex[1] + forwardY * markerSize];
-    if (Math.abs(angle - 90) < 0.5) {
+    if (Math.abs(Math.abs(angle) - 90) < 0.5) {
       const elbow = [start[0] + forwardX * markerSize, start[1] + forwardY * markerSize];
       return `<path d="M${start[0].toFixed(1)} ${start[1].toFixed(1)}L${elbow[0].toFixed(1)} ${elbow[1].toFixed(1)}L${end[0].toFixed(1)} ${end[1].toFixed(1)}" fill="none" stroke="#70869a" stroke-width="1.15" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
     const bisectorLength = Math.hypot(backX + forwardX, backY + forwardY) || 1;
     const labelX = vertex[0] + ((backX + forwardX) / bisectorLength) * (markerSize + 10);
     const labelY = vertex[1] + ((backY + forwardY) / bisectorLength) * (markerSize + 10);
-    return `<path d="M${start[0].toFixed(1)} ${start[1].toFixed(1)}Q${vertex[0].toFixed(1)} ${vertex[1].toFixed(1)} ${end[0].toFixed(1)} ${end[1].toFixed(1)}" fill="none" stroke="#70869a" stroke-width="1.15" stroke-linecap="round"/><text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="Heebo,Arial" font-weight="700" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${orderSketchFormat(angle)}°</text>`;
+    return `<path d="M${start[0].toFixed(1)} ${start[1].toFixed(1)}Q${vertex[0].toFixed(1)} ${vertex[1].toFixed(1)} ${end[0].toFixed(1)} ${end[1].toFixed(1)}" fill="none" stroke="#70869a" stroke-width="1.15" stroke-linecap="round"/><text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9.5" font-family="Heebo,Arial" font-weight="700" fill="#40566b" stroke="#fff" stroke-width="2.4" paint-order="stroke fill">${IronBendDisplayUnits.formatSignedAngle(angle)}</text>`;
   }).join('');
   return `<svg class="engineering-shape-sketch" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="סקיצת צורה"><path d="${path}" fill="none" stroke="#42627b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>${bendMarks}${sideLabels}</svg>`;
 }
@@ -3267,6 +3267,9 @@ function itemPreviewSvg(item, sides, angles) {
   if (isRoundPileCageItem(item)) return roundPileCagePreviewSvg(item);
   if (isStandaloneRingItem(item)) return engineeringRingSketchSvg(item);
   if (sides.length) {
+    const geometry = window.IronBendShapeGeometry;
+    const stirrup = !isBenchBarItem(item) && geometry?.detectClosedStirrupParts?.(sides, angles);
+    if (stirrup) return '<svg class="engineering-shape-sketch" viewBox="0 0 300 260" width="180" height="96" role="img" aria-label="חישוק">' + geometry.renderClosedStirrupEditor2D(stirrup, sides, 300, 260) + '</svg>';
     const benchPoints = isBenchBarItem(item) && sides.length === 5 && typeof benchBarSVGPath === 'function'
       ? benchBarSVGPath(sides, 180, 96, 22).pts
       : null;

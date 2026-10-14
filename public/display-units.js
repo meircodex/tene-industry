@@ -21,6 +21,23 @@
     return number === null ? null : number * 10;
   }
 
+  // Presentation only: retain the stored 0..360 angle contract and direction.
+  // Do not convert an interior angle into a different (180-angle) convention.
+  function signedAngleDegrees(value) {
+    const number = finiteNumber(value);
+    if (number === null) return null;
+    let signed = ((number % 360) + 360) % 360;
+    if (signed > 180 || (signed === 180 && number < 0)) signed -= 360;
+    return signed === 0 ? 0 : signed;
+  }
+
+  function formatSignedAngle(value) {
+    const angle = signedAngleDegrees(value);
+    if (angle === null) return '—';
+    const rounded = Number(angle.toFixed(1));
+    return `${rounded > 0 ? '+' : ''}${rounded}°`;
+  }
+
   function formatNumber(value, options = {}) {
     const number = finiteNumber(value);
     if (number === null) return options.fallback ?? '—';
@@ -49,6 +66,8 @@
     finiteNumber,
     millimetersToCentimeters,
     centimetersToMillimeters,
+    signedAngleDegrees,
+    formatSignedAngle,
     formatNumber,
     formatLengthCmFromMm,
     formatSteelDiameterMm,

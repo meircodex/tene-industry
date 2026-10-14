@@ -40,6 +40,22 @@ function dimensionTagWidth(value, min = 44, max = 76) {
   return Math.max(min, Math.min(max, String(value).length * 6.4 + 16));
 }
 
+function signedDisplayAngle(value) {
+  if (window.IronBendDisplayUnits?.signedAngleDegrees) return window.IronBendDisplayUnits.signedAngleDegrees(value);
+  if (value == null || value === '' || !Number.isFinite(Number(value))) return null;
+  const number = Number(value);
+  let angle = ((number % 360) + 360) % 360;
+  if (angle > 180 || (angle === 180 && number < 0)) angle -= 360;
+  return angle === 0 ? 0 : angle;
+}
+
+function signedAngleLabel(value) {
+  const angle = signedDisplayAngle(value);
+  if (angle === null) return '—';
+  const rounded = Number(angle.toFixed(1));
+  return `${rounded > 0 ? '+' : ''}${rounded}°`;
+}
+
 function normalizeReadableLabelAngle(degrees) {
   let angle = ((Number(degrees) % 360) + 360) % 360;
   if (angle > 180) angle -= 360;
@@ -415,13 +431,21 @@ function isSimilarShapeDimension(a, b, tolerance = 0.12) {
 }
 
 function isRightBendAngle(angle) {
-  const a = Math.abs(Number(angle));
+  const a = Math.abs(signedDisplayAngle(angle));
   return Math.abs(a - 90) < 0.001;
 }
 
 function detectClosedStirrupParts(sides, angles) {
   const values = Array.isArray(sides) ? sides.map(Number) : [];
   if (values.length < 4 || values.some(v => !Number.isFinite(v) || v <= 0)) return null;
+  if (values.length === 6) {
+    const bodyAngles = (angles || []).slice(1, 4).map(signedDisplayAngle);
+    if (bodyAngles.length === 3 && bodyAngles.every(isRightBendAngle)
+      && bodyAngles.every(angle => angle === bodyAngles[0])
+      && Math.abs(values[1] - values[3]) <= 1 && Math.abs(values[2] - values[4]) <= 1) {
+      return { top: values[2], right: values[1], bottom: values[4], left: values[3], tailStart: values[0], tailEnd: values[5], sideMap: [2, 1, 4, 3], tailMap: [0, 5] };
+    }
+  }
   const checkedAngles = Array.isArray(angles) ? angles.slice(0, Math.min(4, values.length - 1)) : [];
   if (checkedAngles.length && !checkedAngles.every(isRightBendAngle)) return null;
 
@@ -723,7 +747,7 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
             fill="#ffffff" stroke="#d47a35" stroke-width="1.2" data-ang-click="${i-1}" style="cursor:pointer"/>
           <text x="${bx.toFixed(1)}" y="${(by - barW/2 - 10).toFixed(1)}" text-anchor="middle" font-size="10"
             font-family="Heebo,Arial" font-weight="800" fill="#c9621a"
-            data-ang-click="${i-1}" style="cursor:pointer">${angle}°</text>`;
+            data-ang-click="${i-1}" style="cursor:pointer">${signedAngleLabel(angle)}</text>`;
           bendLabels += `</g>`;
       }
     }
@@ -859,6 +883,8 @@ PolylineBarEngine.render = function(shape, w = 300, h = 260, opts = {}) {
   const angles = Array.isArray(shape?.angles) ? shape.angles.map(Number) : [];
   if (!sides.length) return '<text x="50%" y="50%" text-anchor="middle" fill="#7a93ab" font-size="12">אין צורה</text>';
   if (opts.view === '3d') return shape3DSVG(sides, angles, w, h, opts.diameter || 12, opts);
+  const stirrup = detectClosedStirrupParts(sides, angles);
+  if (stirrup) return `<g data-engine="PolylineBarEngine" data-family="bars">${renderClosedStirrupEditor2D(stirrup, sides, w, h, opts)}</g>`;
   const { path, pts } = shapeSVGPath(sides, angles, w, h, opts.padding || 24);
   const labelHtml = pts.slice(0, -1).map((p, i) => {
     const next = pts[i + 1];
@@ -869,7 +895,7 @@ PolylineBarEngine.render = function(shape, w = 300, h = 260, opts = {}) {
   const bends = pts.slice(1, -1).map((p, i) => {
     const angle = angles[i];
     if (angle == null || angle === 180) return '';
-    return `<text x="${p[0].toFixed(1)}" y="${(p[1] + 18).toFixed(1)}" text-anchor="middle" font-size="10" font-family="Heebo,Arial" font-weight="800" fill="#c9621a">${svgEscape(angle)}°</text>`;
+    return `<text x="${p[0].toFixed(1)}" y="${(p[1] + 18).toFixed(1)}" text-anchor="middle" font-size="10" font-family="Heebo,Arial" font-weight="800" fill="#c9621a">${svgEscape(signedAngleLabel(angle))}</text>`;
   }).join('');
   return `<g data-engine="PolylineBarEngine" data-family="bars"><path d="${path}" fill="none" stroke="#3d5e78" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>${labelHtml}${bends}</g>`;
 };
@@ -5284,7 +5310,7 @@ class ShapeEditorModal {
             <td>
               ${i === 0
                 ? `<span class="se-no-bend">&mdash;</span>`
-                : this._fieldShell({ icon:'↪', label:'פנייה', unit:'°', example:'לדוגמה 90', input:`<input class="se-input" type="number" min="-360" max="360" value="${az}" data-az="${i}" onfocus="window._seEditor._focusRow(${i}, true)" oninput="window._seEditor._setAzAngle(${i}, this.value)" onblur="window._seEditor._finalizeAngleInput(this, ${i}, 'az')">` })}
+                : this._fieldShell({ icon:'↪', label:'פנייה', unit:'°', example:'מ־180− עד 180+', input:`<input class="se-input" type="number" min="-180" max="180" value="${signedDisplayAngle(az)}" data-az="${i}" onfocus="window._seEditor._focusRow(${i}, true)" oninput="window._seEditor._setAzAngle(${i}, this.value)" onblur="window._seEditor._finalizeAngleInput(this, ${i}, 'az')">` })}
             </td>
             <td>
               ${this._fieldShell({ icon:'Z', label:'הטיית Z', unit:'°', example:'לדוגמה 0', input:`<input class="se-input" type="number" min="-90" max="90" value="${el}" data-el="${i}" onfocus="window._seEditor._focusRow(${i}, 'z')" oninput="window._seEditor._setElAngle(${i}, this.value)" onblur="window._seEditor._finalizeAngleInput(this, ${i}, 'el')">` })}
@@ -5297,7 +5323,7 @@ class ShapeEditorModal {
             <td><span class="se-seg-label">${letter}</span></td>
             <td class="se-length-cell">${this._fieldShell({ icon:'📏', label:'אורך', unit:'ס״מ', example:'לדוגמה 30', input:`<input class="se-input" type="number" min="1" max="2000" value="${sides[i] / 10}" data-side="${i}" onfocus="window._seEditor._focusRow(${i}, false)" oninput="window._seEditor._setSide(${i}, this.value)" onblur="window._seEditor._finalizeSideInput(this, ${i})">` })}</td>
             <td class="se-angle-cell ${i < angles.length ? '' : 'se-empty-cell'}">${i < angles.length
-              ? this._fieldShell({ icon:'∠', label:'זווית', unit:'°', example:'לדוגמה 90', input:`<input class="se-input" type="number" min="-360" max="360" value="${angles[i]}" data-angle="${i}" onfocus="window._seEditor._focusRow(${i}, true)" oninput="window._seEditor._setAngle(${i}, this.value)" onblur="window._seEditor._finalizeAngleInput(this, ${i}, 'bend')">` })
+              ? this._fieldShell({ icon:'∠', label:'זווית', unit:'°', example:'מ־180− עד 180+', input:`<input class="se-input" type="number" min="-180" max="180" value="${signedDisplayAngle(angles[i])}" data-angle="${i}" onfocus="window._seEditor._focusRow(${i}, true)" oninput="window._seEditor._setAngle(${i}, this.value)" onblur="window._seEditor._finalizeAngleInput(this, ${i}, 'bend')">` })
               : '<span class="se-no-bend">&mdash;</span>'}</td>
             <td>${sides.length > 1 ? `<button class="se-del-btn" onclick="window._seEditor._deleteSide(${i})">&times;</button>` : ''}</td>
           </tr>`;
@@ -5651,13 +5677,16 @@ class ShapeEditorModal {
   _finalizeAngleInput(input, i, kind) {
     if (!this.current || !input) return;
     const value = Number(input.value);
-    if (String(input.value ?? '').trim() && Number.isFinite(value)) return;
+    if (String(input.value ?? '').trim() && Number.isFinite(value)) {
+      if (kind !== 'el') input.value = String(signedDisplayAngle(value));
+      return;
+    }
     const stored = kind === 'az'
       ? this.current.azAngles?.[i]
       : kind === 'el'
         ? this.current.elAngles?.[i]
         : this.current.angles?.[i];
-    input.value = Number.isFinite(Number(stored)) ? String(stored) : '0';
+    input.value = Number.isFinite(Number(stored)) ? String(kind === 'el' ? stored : signedDisplayAngle(stored)) : '0';
   }
 
   _setElementName(val) {
@@ -5787,7 +5816,7 @@ class ShapeEditorModal {
       return;
     }
     input?.removeAttribute('aria-invalid');
-    const raw = Math.min(360, Math.max(-360, numeric));
+    const raw = signedDisplayAngle(numeric);
     // Negative input is the same bend on the full turn: -30 is stored as 330.
     const a = ((raw % 360) + 360) % 360;
     this.current.angles[i] = a;
@@ -5810,7 +5839,7 @@ class ShapeEditorModal {
       return;
     }
     input?.removeAttribute('aria-invalid');
-    const az = Math.min(360, Math.max(-360, Math.round(numeric)));
+    const az = signedDisplayAngle(Math.round(numeric));
     if (!this.current.azAngles) this.current.azAngles = Array(this.current.sides.length).fill(0);
     this.current.azAngles[i] = az;
     // ── Sync back to 2D angles (machine data) ──────────────────────────
@@ -5956,13 +5985,11 @@ class ShapeEditorModal {
     this._focusRow(i, true);
     // דאבל-קליק לעריכת זווית
     // ׳“׳׳‘׳-׳§׳׳™׳§ ׳׳¢׳¨׳™׳›׳× ׳–׳•׳•׳™׳×
-    const next = prompt('דאבל-קליק לעריכת זווית', this.current.angles[i]);
+    const next = prompt('זווית בין ‎-180° ל־‎+180°', signedDisplayAngle(this.current.angles[i]));
     if (next == null) return;
-    const val = Math.min(360, Math.max(-360, Number(next) || this.current.angles[i]));
-    this.current.angles[i] = val;
-    if (this.current.azAngles && i + 1 < this.current.azAngles.length) {
-      this.current.azAngles[i + 1] = -(180 - val);
-    }
+    if (!String(next).trim() || !Number.isFinite(Number(next))) return;
+    const val = signedDisplayAngle(Number(next));
+    this._setAngle(i, val);
     const inp = document.querySelector(`[data-angle="${i}"]`);
     if (inp) inp.value = val;
     this._renderTable();
@@ -6208,7 +6235,7 @@ class ShapeEditorModal {
       if (segs.length > 1) {
         for (let i = 0; i < segs.length - 1; i++) {
           const bx = segs[i].x2, by = segs[i].y2;
-          const angle = Number(angles[i]);
+          const angle = signedDisplayAngle(angles[i]);
           if (angles[i] === undefined || angle === 180) continue;
           const s1 = segs[i], s2 = segs[i + 1];
           const len1 = Math.hypot(s1.x2 - s1.x1, s1.y2 - s1.y1) || 1;
@@ -6237,7 +6264,7 @@ class ShapeEditorModal {
             const labelDist = r + 13;
             const tx = bx + bxOut * labelDist;
             const ty = by + byOut * labelDist;
-            const value = String(angle) + '\u00B0';
+            const value = signedAngleLabel(angle);
             const largeArc = Math.abs(angle) > 180 ? 1 : 0;
             const sweep = angle >= 0 ? 1 : 0;
             html += `<g data-se-focus="bar-angle-${i}" data-ang-click="${i}" style="cursor:pointer">
@@ -6433,6 +6460,8 @@ class ShapeEditorModal {
 // ── VIEW MODE TOGGLE (global, called from onclick) ────────────────
 window._seViewMode = '2d'; // default to precise 2D editing; 3D is optional review
 window.IronBendShapeGeometry = {
+  detectClosedStirrupParts,
+  renderClosedStirrupEditor2D,
   calcShapePoints,
   calcShapePoints3D,
   shapeSVGPath,

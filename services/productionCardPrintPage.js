@@ -729,7 +729,7 @@ function cardPlan() {
 
 // ── Build shape SVG string (client-side mirror of pcShapeSVG) ─────
 function isRightAngleValue(value) {
-  return Math.abs(Number(value) - 90) < 0.001;
+  return Math.abs(Math.abs(displayBendAngleDeg(value)) - 90) < 0.001;
 }
 
 function normalizeAngleValue(value) {
@@ -738,26 +738,28 @@ function normalizeAngleValue(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Bend direction is encoded on a full 0-360 turn: -30 and 330 are the same
-// physical bend, so displayed values are normalized into [0,360).
+// Presentation only. The stored machine angles retain their original values.
 function displayBendAngleDeg(value) {
   var n = normalizeAngleValue(value);
   if (n === null) return null;
-  return ((n % 360) + 360) % 360;
+  var angle = ((n % 360) + 360) % 360;
+  if (angle > 180 || (angle === 180 && n < 0)) angle -= 360;
+  return angle === 0 ? 0 : angle;
 }
 
 function isPrintableBendAngle(angle) {
   var n = displayBendAngleDeg(angle);
   if (n === null) return false;
   if (Math.abs(n) < 0.001) return false;
-  if (Math.abs(n - 180) < 0.001) return false;
+  if (Math.abs(Math.abs(n) - 180) < 0.001) return false;
   return true;
 }
 
 function angleText(angle) {
   var n = displayBendAngleDeg(angle);
   if (n === null) return '';
-  return (Math.abs(n - Math.round(n)) < 0.001 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, '')) + '°';
+  var rounded = Number(n.toFixed(1));
+  return (rounded > 0 ? '+' : '') + rounded + '°';
 }
 
 function isOpenUShapeClient(segments) {
@@ -1124,10 +1126,8 @@ function shapeSvgForCard(item, segments) {
   var name = String((item && (item.shape_name || item.shapeName || item.shape)) || '').toLowerCase();
   var type = String((item && (item.shapeType || item.shape_type)) || '').toLowerCase();
   var isHoop = /חישוק|closed[_ -]?stirrup|stirrup|hoop/.test(name + ' ' + type);
-  // Cached SVGs on older orders were generic bars and could swap the hoop's
-  // body sides with its two closure tails. Always regenerate a hoop card from
-  // the current machine sequence.
-  if (isHoop && cleanSegments.length) return generated;
+  // The server generates this SVG from current saved segments on every read.
+  // Do not replace it with another client-side interpretation of hoop tails.
   return item.shape_svg || generated;
 }
 

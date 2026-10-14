@@ -255,15 +255,15 @@ test('visual-only 3D preview does not use true-3D azimuth arrays', () => {
   assert.match(editor, /azAngles:\s+has3D \?/);
 });
 
-test('shape editor supports bend angles from -360 to 360 without quick angle buttons in 2D rows', () => {
+test('shape editor displays signed bend angles from -180 to 180 without quick angle buttons in 2D rows', () => {
   const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
 
   assert.match(editor, /data-angle="\$\{i\}"/);
-  assert.match(editor, /min="-360"/);
-  assert.match(editor, /max="360"/);
+  assert.match(editor, /min="-180"/);
+  assert.match(editor, /max="180"/);
   assert.match(editor, /const rawValue = String\(val \?\? ''\)\.trim\(\);/);
   assert.match(editor, /if \(!rawValue \|\| !Number\.isFinite\(numeric\)\)/);
-  assert.match(editor, /Math\.min\(360, Math\.max\(-360, numeric\)\)/);
+  assert.match(editor, /const raw = signedDisplayAngle\(numeric\)/);
   assert.doesNotMatch(editor, /<div class="se-angle-btns">/);
   assert.doesNotMatch(editor, /data-angle-value/);
 });
@@ -568,7 +568,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=81/);
+  assert.match(index, /shape-editor\.js\?v=82/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
@@ -826,7 +826,7 @@ test('ShapeEngineRouter renders ח 35/120/35 with PolylineBarEngine', () => {
   assert.match(svg, /M /);
   assert.match(svg, />35 ס״מ</);
   assert.match(svg, />120 ס״מ</);
-  assert.match(svg, />90°</);
+  assert.match(svg, />\+90°</);
 });
 
 test('ShapeEngineRouter renders Mesh 600x250 Ø8@20 as grid with MeshEngine', () => {

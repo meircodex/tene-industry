@@ -16,12 +16,12 @@
 <script src="/status-contracts-client.js"></script>
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
-<script src="/shape-renderer.js?v=4" defer></script>
+<script src="/shape-renderer.js?v=5" defer></script>
 <script src="/rebar-weights.js"></script>
 <script src="/straight-stock-cutting.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=81"></script>
+<script src="/shape-editor.js?v=82"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -2347,7 +2347,7 @@ function itemMachineSequence(item) {
   if (isRealSpiralItem(item)) {
     return `ספיראלה: קוטר ברזל ${IronBendDisplayUnits.formatSteelDiameterMm(item.diameter) || '-'}, קוטר ספיראלה ${IronBendDisplayUnits.formatLengthCmFromMm(item.spiral_diameter_mm) || '-'}, N=${item.spiral_turns || '-'}`;
   }
-  return segments.map((segment, idx) => `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)} | זווית אחרי: ${Number.isFinite(segment.angle_deg) ? segment.angle_deg : 180}°`).join(' · ');
+  return segments.map((segment, idx) => `צלע ${idx + 1}: ${IronBendDisplayUnits.formatLengthCmFromMm(segment.length_mm)} | זווית אחרי: \u2066${IronBendDisplayUnits.formatSignedAngle(Number.isFinite(segment.angle_deg) ? segment.angle_deg : 180)}\u2069`).join(' · ');
 }
 
 function renderDetailShapes() {
@@ -2829,10 +2829,9 @@ function buildDetailHTML(o, pkgs) {
       const sourceRowNumber = Number(item.source_row_number || 0) || null;
       const measuredWeight = actualWeight(item);
       const deviationPct = weightDeviationPct(item);
-      // Do not reuse a legacy cached SVG for hoops. It may have been produced
-      // before the tail/body convention was corrected; render2D below rebuilds
-      // the closed hoop from the current six-segment machine sequence.
-      const canonicalShapeSvg = encodeURIComponent(isClosedHoopItem(item) ? '' : (item.shape_svg || ''));
+      // All items, including hoops, use the fresh canonical server drawing.
+      // The fallback below is only for an item with no server-generated SVG.
+      const canonicalShapeSvg = encodeURIComponent(item.shape_svg || '');
       const pileAssembly = roundPileAssemblyHtml(item);
       const visualHtml = isRoundPileCageItem(item)
         ? `<div class="item-visual pile-cage-detail-visual" data-detail-pile-cage="1" onclick="openItemEdit(event, ${o.id}, ${item.id})" title="ערוך צורה">${roundPileCageDetailSvg(item)}</div>`

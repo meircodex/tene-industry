@@ -142,7 +142,7 @@ test('production card shape renderer keeps angled open stirrups inside a print-f
   assert.match(html, /preserveAspectRatio="xMidYMid meet"/);
   assert.match(html, /viewBox="0 0 260 140"/);
   assert.doesNotMatch(html, /viewBox="0 0 240 120"/);
-  assert.match(html, />45°</);
+  assert.match(html, />\+45°</);
 });
 
 
