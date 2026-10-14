@@ -430,6 +430,22 @@ test('production enforces order item ownership boundaries', async (t) => {
     assert.equal(zero.status,200);assert.equal((await zero.json()).total_weight,0);
   });
 
+  await t.test('QR cards and production progress cannot silently undo a shipment or erase completed quantities',async()=>{
+    const shipped=seedOrderWithItem('PB-SHIPPED-QR',statusContracts.ORDER_STATUS.SENT,statusContracts.ITEM_STATUS.SENT);
+    db.prepare('UPDATE items SET produced_qty=5 WHERE id=?').run(shipped.itemId);
+    const card=`${shipped.orderNum}|${shipped.itemId}`;
+    const backwards=await request(`/api/worker-card/${shipped.itemId}/status`,{method:'PATCH',headers,body:JSON.stringify({card,status:statusContracts.ITEM_STATUS.DONE})});
+    assert.equal(backwards.status,409);
+    const autoDone=await request(`/api/worker-card/${shipped.itemId}`,{method:'PATCH',headers,body:JSON.stringify({card,produced_qty:5})});
+    assert.equal(autoDone.status,409);
+    const erase=await request(`/api/worker-card/${shipped.itemId}`,{method:'PATCH',headers,body:JSON.stringify({card,produced_qty:0})});
+    assert.equal(erase.status,409);
+    const internal=await request(`/api/items/${shipped.itemId}`,{method:'PATCH',headers,body:JSON.stringify({produced_qty:0})});
+    assert.equal(internal.status,409);
+    const unchanged=db.prepare('SELECT produced_qty,status FROM items WHERE id=?').get(shipped.itemId);
+    assert.deepEqual(unchanged,{produced_qty:5,status:statusContracts.ITEM_STATUS.SENT});
+  });
+
   await t.test('last completed production item completes the order automatically', async () => {
     const approved = seedOrderWithItem('PB-AUTO-DONE', statusContracts.ORDER_STATUS.IN_PRODUCTION, statusContracts.ITEM_STATUS.IN_PRODUCTION);
     const response = await request(`/api/items/${approved.itemId}/status`, {
