@@ -13,6 +13,7 @@ module.exports = function createQrAccessRouter(deps) {
   const auditLog = required('auditLog', deps.auditLog);
 
   router.get('/qr-access/mode', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
     const mode = qrAccess.mode();
     res.json({ mode, open: mode === 'open', secure: mode === 'secure' });
   });

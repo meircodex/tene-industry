@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ironbend-v24';
+const CACHE_VERSION = 'ironbend-v25';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const API_CACHE     = `${CACHE_VERSION}-api`;
 
@@ -83,6 +83,12 @@ async function networkFirstAPI(request) {
     }
     return response;
   } catch {
+    // A scan acknowledgment must come from the server, never an offline copy.
+    if (url.pathname.startsWith('/api/worker-card') || url.pathname.startsWith('/api/qr-access')) {
+      return new Response(JSON.stringify({ error: 'scan_confirmation_unavailable', offline: true }), {
+        status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    }
     const cached = await caches.match(request);
     return cached ?? new Response(JSON.stringify({ offline: true, data: [] }), {
       headers: { 'Content-Type': 'application/json' }

@@ -10,6 +10,9 @@
     header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;gap:18px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:4;min-width:0}
     header h1{margin:0;font-size:24px}.brand{min-width:0}.brand small{display:block;letter-spacing:2px;color:#bce0ed;margin-bottom:3px}
     .live{display:flex;align-items:center;gap:8px;font-weight:700}.dot{width:11px;height:11px;border-radius:50%;background:#4fe083;box-shadow:0 0 0 5px #ffffff18}
+    .live[data-state="pending"] .dot{background:#facc15}.live[data-state="failed"] .dot,.live[data-state="unknown"] .dot{background:#fb923c}
+    .operation-status{max-width:1500px;margin:12px auto 0;padding:0 18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.operation-feedback{flex:1;min-width:0;border-radius:12px;padding:13px 15px;font-size:15px;line-height:1.5;font-weight:800;background:#e5edf5;border:1px solid #abc4d8;color:#163b56}.operation-feedback[data-state="success"]{background:#e5f5ed;border-color:#86c9a4;color:#14532d}.operation-feedback[data-state="failed"],.operation-feedback[data-state="unknown"]{background:#fff1e8;border-color:#eea169;color:#8b3211}.operation-retry{border:0;border-radius:10px;padding:13px 18px;background:#9a3412;color:#fff;font:inherit;font-weight:800;cursor:pointer}.operation-retry[hidden]{display:none}button:disabled{cursor:wait;opacity:.65}
+    body.scan-entry .operation-status{position:sticky;top:0;z-index:6;background:var(--bg);margin-top:0;padding-top:8px;padding-bottom:8px}body.scan-entry .original-work-card{scroll-margin-top:120px}
     .progress{background:#073653;padding:9px 20px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;color:#fff;position:sticky;top:67px;z-index:3}
     .scan-panel{max-width:1500px;margin:14px auto 0;padding:0 18px}.scan-box{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.scan-box input{width:100%;border:1px solid var(--line);border-radius:10px;padding:13px 12px;font-size:16px;font-weight:700;color:var(--ink);direction:ltr}.scan-box button{border:0;background:var(--teal);color:#fff;border-radius:10px;padding:13px 16px;font-size:14px;font-weight:800;cursor:pointer}.scan-hint{font-size:12px;color:#55737e;margin-top:6px}.scan-result{margin-top:8px;border-radius:12px;padding:10px 12px;font-size:13px;font-weight:800;display:none}.scan-result.ok{display:block;background:#e5f5f2;color:#0f5f56;border:1px solid #99d8cd}.scan-result.err{display:block;background:#fff7ed;color:#9a3412;border:1px solid #fdba74}
     .metric{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12px;font-weight:700}
@@ -79,10 +82,14 @@
 <link rel="stylesheet" href="/theme.css">
 </head>
 <body>
+  <section class="operation-status" aria-label="אישור קליטה מהמערכת">
+    <div id="operationFeedback" class="operation-feedback" data-state="pending" role="status" aria-live="assertive" aria-atomic="true">ממתין לאישור מהמערכת…</div>
+    <button id="operationRetry" class="operation-retry" type="button" hidden>נסה שוב</button>
+  </section>
   <section class="original-work-card" id="originalWorkCard" hidden aria-label="כרטיס העבודה המקורי"><h2>כרטיס העבודה המקורי</h2><div class="original-card-face" id="originalCardFace"></div></section>
   <header>
     <div class="brand"><small>טנא תעשיות · תחנת עובד</small><h1>דשבורד איסוף כרטיסים</h1></div>
-    <div class="live"><i class="dot"></i><span id="sync">מסנכרן</span></div>
+    <div class="live" data-state="pending"><i class="dot"></i><span id="sync">ממתין לאישור</span></div>
     <a class="queue-link" href="/production-queue.html" style="color:#fff;text-decoration:none;border:1px solid #ffffff55;border-radius:8px;padding:8px 11px;font-weight:700">תור ייצור</a>
   </header>
   <div class="progress" id="progress"></div>
@@ -108,10 +115,13 @@
     const state={items:[],selected:null,focusItemId:null,scanToken:null,originalCard:null};
     const ENTRY_PARAMS=new URLSearchParams(location.search);
     const SCAN_ENTRY=ENTRY_PARAMS.get('scan')==='1'||ENTRY_PARAMS.has('card')||ENTRY_PARAMS.has('item');
+    let pendingWrite=null;
+    let pendingLoad=false;
+    let unresolvedWrite=false;
     document.body.classList.toggle('scan-entry',SCAN_ENTRY);
     const ITEM_STATUS=(window.IronBendStatus&&window.IronBendStatus.ITEM_STATUS)||{WAITING:'ממתין',IN_PRODUCTION:'בייצור',DONE:'הושלם',DELIVERED:'סופק'};
     const publicWorkerCardToken=()=>state.scanToken||ENTRY_PARAMS.get('card')||ENTRY_PARAMS.get('item')||'';
-    const workerCardApi=(id,suffix='')=>SCAN_ENTRY?`/api/worker-card/${id}${suffix}`:`/api/items/${id}${suffix}`;
+    const workerCardApi=(id,suffix='')=>(SCAN_ENTRY||state.scanToken)?`/api/worker-card/${id}${suffix}`:`/api/items/${id}${suffix}`;
     const statusKey=s=>s===ITEM_STATUS.IN_PRODUCTION?'production':s===ITEM_STATUS.DONE?'done':s===ITEM_STATUS.DELIVERED?'supplied':'waiting';
     const statusText={waiting:'ממתין',production:'בייצור',done:'בוצע',supplied:'סופק'};
     const apiStatus={waiting:ITEM_STATUS.WAITING,production:ITEM_STATUS.IN_PRODUCTION,done:ITEM_STATUS.DONE,supplied:ITEM_STATUS.DELIVERED};
@@ -133,14 +143,72 @@
       }catch{}
       const clean=String(token||'').trim();
       const itemParam=/^\d+$/.test(clean)?Number(clean):null;
+      const legacy=clean.match(/^[^|\r\n]+\|(\d{1,12})$/);
       const match=clean.match(/-(\d{1,12})(?:-[A-Z]+[A-Z0-9]*)*(?:-C(\d+)OF(\d+))?$/i);
-      return {raw:value,token:clean,itemId:itemParam||(match?Number(match[1]):null),cardIndex:match&&match[2]?Number(match[2]):1,cardTotal:match&&match[3]?Number(match[3]):1};
+      return {raw:value,token:clean,itemId:itemParam||(legacy?Number(legacy[1]):null)||(match?Number(match[1]):null),cardIndex:match&&match[2]?Number(match[2]):1,cardTotal:match&&match[3]?Number(match[3]):1};
     }
     function scanFromLocation(){
       const params=new URLSearchParams(location.search);
       return parseCardToken(params.get('card')||params.get('item')||'');
     }
     function showScanResult(message,kind='ok'){const el=document.querySelector('#scanResult');if(!el)return;el.textContent=message;el.className=`scan-result ${kind}`;}
+    function showOperation(message,kind,retry=null){
+      const feedback=document.getElementById('operationFeedback');
+      feedback.textContent=message;
+      feedback.dataset.state=kind;
+      feedback.setAttribute('aria-busy',String(kind==='pending'));
+      const button=document.getElementById('operationRetry');
+      button.hidden=!retry;
+      button.onclick=retry?()=>retry():null;
+      document.querySelector('.live')?.setAttribute('data-state',kind);
+      document.getElementById('sync').textContent=kind==='success'?'אושר במערכת':kind==='pending'?'ממתין לאישור':'לא התקבל אישור';
+    }
+    function validReceipt(receipt,itemId,action){
+      return receipt&&Number.isInteger(receipt.id)&&receipt.id>0&&Number(receipt.item_id)===Number(itemId)
+        &&receipt.action===action&&typeof receipt.occurred_at==='string'&&Number.isFinite(Date.parse(receipt.occurred_at));
+    }
+    function receiptText(receipt){
+      return `אישור ${receipt.id} · ${new Date(receipt.occurred_at).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+    }
+    function workerErrorMessage(code){
+      return ({device_activation_required:'המכשיר אינו מאושר לסריקה. פתח את מסך הסריקה להפעלתו.',qr_permission_denied:'אין הרשאה לפעולה הזאת.',invalid_worker_card_token:'קוד הכרטיס אינו תקין.',not_found:'הכרטיס לא נמצא במערכת.',production_stopped_by_cancellation:'הייצור בכרטיס נעצר בעקבות ביטול.',item_not_released_to_production:'ההזמנה עדיין לא אושרה לייצור.',use_status_correction_route:'שינוי לאחור דורש תיקון מורשה במערכת.',production_quantity_correction_required:'הקטנת כמות שבוצעה דורשת תיקון מורשה.',produced_qty_exceeds_quantity:'הכמות שהוזנה גדולה מהכמות בכרטיס.',worker_request_conflict:'הפעולה כבר נשלחה עם נתונים אחרים. רענן את הכרטיס לפני עדכון נוסף.'})[code]||'לא התקבל אישור מהמערכת. הנתונים שהזנת נשארו במסך.';
+    }
+    async function workerRequest(url,options={}){
+      const controller=new AbortController();
+      let timer;
+      const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(Object.assign(new Error('לא התקבל אישור בזמן. ייתכן שהפעולה נקלטה; אפשר לבדוק ולנסות שוב.'),{uncertain:true}));},15000);});
+      try{
+        return await Promise.race([timeout,(async()=>{
+          const response=await fetch(url,{...options,cache:'no-store',signal:controller.signal});
+          let data;
+          try{data=await response.json();}catch(_){
+            if(!response.ok)throw Object.assign(new Error(workerErrorMessage()),{explicit:true});
+            throw Object.assign(new Error('לא התקבל אישור תקין מהמערכת. יש לבדוק ולנסות שוב.'),{uncertain:true});
+          }
+          if(!response.ok)throw Object.assign(new Error(workerErrorMessage(data?.error)),{explicit:true});
+          if(!data||data.offline)throw Object.assign(new Error('אין חיבור למערכת ולא התקבל אישור קליטה.'),{uncertain:true});
+          return data;
+        })()]);
+      }finally{clearTimeout(timer);}
+    }
+    async function loadScannedCard(parsed){
+      if(pendingLoad||pendingWrite)return;
+      if(!parsed?.itemId){showOperation('קוד הכרטיס אינו תקין. נסה לסרוק שוב.','failed');return;}
+      pendingLoad=true;
+      showOperation('הכרטיס זוהה. ממתין לאישור קליטה מהמערכת…','pending');
+      try{
+        const source=ENTRY_PARAMS.get('source')==='phone_camera'?'phone_camera':'in_app_scan';
+        const data=await workerRequest(`/api/worker-card?card=${encodeURIComponent(parsed.token)}&source=${source}&original=1`);
+        const item=Array.isArray(data.items)?data.items.find(row=>Number(row.id)===Number(parsed.itemId)):null;
+        if(!item||!validReceipt(data.scan_receipt,item.id,'opened'))throw Object.assign(new Error('לא התקבל אישור שהסריקה נרשמה. נסה שוב.'),{uncertain:true});
+        if(SCAN_ENTRY&&(!data.original_card||Number(data.original_card.item_id)!==Number(item.id)||typeof data.original_card.html!=='string'||!data.original_card.html.trim()))throw Object.assign(new Error(`הסריקה נרשמה במערכת. ${receiptText(data.scan_receipt)} כרטיס המקור אינו זמין. יש לבדוק את הקוד ולנסות שוב לפני תחילת ייצור.`),{explicit:true});
+        if(SCAN_ENTRY){state.items=[item];state.originalCard=data.original_card;}
+        else {const index=state.items.findIndex(row=>Number(row.id)===Number(item.id));if(index<0)state.items.push(item);else state.items[index]=item;}
+        focusScannedCard(parsed);
+        showOperation(`סריקת כרטיס ${item.order_num||''} / ${item.id} נקלטה במערכת. ${receiptText(data.scan_receipt)}`,'success');
+      }catch(error){showOperation(error.explicit?error.message:'לא התקבל אישור קליטה מהמערכת. בדוק את החיבור ונסה שוב.',error.explicit?'failed':'unknown',()=>loadScannedCard(parsed));}
+      finally{pendingLoad=false;}
+    }
     function focusScannedCard(parsed){
       if(!parsed||!parsed.itemId)return false;
       const item=state.items.find(row=>Number(row.id)===Number(parsed.itemId));
@@ -152,12 +220,11 @@
       if(input)input.value=parsed.token||String(item.id);
       render();
       requestAnimationFrame(()=>document.querySelector(SCAN_ENTRY?'#originalWorkCard':`[data-item-id="${item.id}"]`)?.scrollIntoView({behavior:'smooth',block:'start'}));
-      showScanResult(`נפתח כרטיס ${parsed.cardTotal>1?parsed.cardIndex+'/'+parsed.cardTotal+' · ':''}${item.order_num||item.order_id}`,'ok');
       return true;
     }
-    function openScannedCard(){
+    async function openScannedCard(){
       const parsed=parseCardToken(document.querySelector('#cardScanInput')?.value||'');
-      if(!focusScannedCard(parsed))showScanResult('לא נמצא כרטיס מתאים בתור הייצור. בדוק שההזמנה קיימת ושהקוד נסרק במלואו.','err');
+      return loadScannedCard(parsed);
     }
     function grouped(){const map=new Map();state.items.forEach(item=>{if(!map.has(item.order_id))map.set(item.order_id,{...item,items:[]});map.get(item.order_id).items.push(item)});return [...map.values()]}
     function allProgress(){
@@ -204,6 +271,7 @@
     }
     async function setWorkerOrderStatus(event,orderId){
       const order=grouped().find(row=>row.order_id===orderId),select=event.target,next=select.value;
+      if(pendingWrite||pendingLoad){if(order)select.value=order.order_status;return;}
       if(!order||next===order.order_status)return;
       if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״? זו פעולה על ההזמנה, לא רק על הכרטיס שנסרק.`)){select.value=order.order_status;return;}
       select.disabled=true;
@@ -236,8 +304,38 @@
       if(item.shape_svg)return item.shape_svg;
       return '<svg data-shape-kind="worker-canonical-missing" viewBox="0 0 360 190"><rect x="26" y="32" width="308" height="126" rx="12" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/><text class="detail" x="180" y="87" text-anchor="middle">אין תצוגת צורה</text><text class="measure" x="180" y="116" text-anchor="middle">נדרש shape_svg מהשרת</text></svg>';
     }
+    async function runWorkerWrite(operation){
+      if(pendingWrite||pendingLoad)return;
+      pendingWrite=operation;
+      const controls=Array.from(document.querySelectorAll('.worker-save,.worker-action,.worker-status-actions button,.unit-progress button,.worker-field input,.worker-field textarea,.order-work-controls select'));
+      const disabled=controls.map(control=>control.disabled);
+      controls.forEach(control=>{control.disabled=true;});
+      showOperation('שומר במערכת — ממתין לאישור…','pending');
+      try{
+        const data=await workerRequest(operation.url||workerCardApi(operation.id,operation.suffix||''),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(operation.payload)});
+        if(data.ok!==true||((SCAN_ENTRY||operation.payload.card)&&!validReceipt(data.receipt,operation.id,operation.action))||(data.item&&Number(data.item.id)!==Number(operation.id)))throw Object.assign(new Error('לא התקבל אישור שמירה תקין.'),{uncertain:true});
+        operation.apply(data);
+        unresolvedWrite=false;
+        render();
+        if(operation.preserveDraft){const draft=operation.preserveDraft;document.getElementById(`actual-weight-${operation.id}`).value=draft.weight;document.getElementById(`produced-qty-${operation.id}`).value=draft.quantity;document.getElementById(`production-note-${operation.id}`).value=draft.note;}
+        showOperation(`${operation.success||`נתוני העבודה בכרטיס ${operation.id} נשמרו במערכת.`}${data.receipt?' '+receiptText(data.receipt):''}`,'success');
+        return true;
+      }catch(error){
+        unresolvedWrite=true;
+        showOperation(error.explicit?error.message:'לא התקבל אישור שמירה. ייתכן שהעדכון נקלט; הנתונים נשארו במסך. לחץ נסה שוב כדי לקבל אישור.',error.explicit?'failed':'unknown',()=>{
+          if(operation.draft&&JSON.stringify(readWorkerDraft(operation.id))!==JSON.stringify(operation.draft)){
+            showOperation('הנתונים במסך השתנו. לחץ שמור כדי לשלוח את הנתונים החדשים.','failed');return;
+          }
+          return runWorkerWrite(operation);
+        });
+        return false;
+      }finally{controls.forEach((control,index)=>{control.disabled=disabled[index];});pendingWrite=null;}
+    }
+    function workerRequestId(){return window.crypto?.randomUUID?.()||`worker-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;}
+    function readWorkerDraft(id){return {weight:(document.getElementById(`actual-weight-${id}`)?.value||'').trim(),quantity:(document.getElementById(`produced-qty-${id}`)?.value||'').trim(),note:document.getElementById(`production-note-${id}`)?.value||''};}
     async function saveProductionFields(id,event){
       event&&event.stopPropagation();
+      if(pendingWrite||pendingLoad)return;
       const weightInput=document.getElementById(`actual-weight-${id}`);
       const qtyInput=document.getElementById(`produced-qty-${id}`);
       const noteInput=document.getElementById(`production-note-${id}`);
@@ -247,18 +345,22 @@
       const produced=Number(qtyText||0);
       const item=state.items.find(item=>item.id===id);
       const requested=item?requestedQty(item):0;
-      if((weightText&&!Number.isFinite(actual))||actual<0)return;
-      if((qtyText&&!Number.isFinite(produced))||produced<0||!Number.isInteger(produced))return;
-      if(qtyText&&requested&&produced>requested)return;
+      if((weightText&&!Number.isFinite(actual))||actual<0){showOperation('יש להזין משקל תקין שאינו שלילי.','failed');return;}
+      if((qtyText&&!Number.isFinite(produced))||produced<0||!Number.isInteger(produced)){showOperation('יש להזין כמות שלמה שאינה שלילית.','failed');return;}
+      if(qtyText&&requested&&produced>requested){showOperation('הכמות שהוזנה גדולה מהכמות בכרטיס.','failed');return;}
       const payload={note:noteInput?.value||''};
-      if(SCAN_ENTRY)payload.card=publicWorkerCardToken();
+      if(SCAN_ENTRY||state.scanToken){payload.card=publicWorkerCardToken();payload.request_id=workerRequestId();}
       if(weightText)payload.actual_weight_kg=actual;
       if(qtyText)payload.produced_qty=produced;
-      const r=await fetch(workerCardApi(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(r.ok){const item=state.items.find(item=>item.id===id);if(item){if(weightText){item.actual_weight_kg=actual;const target=targetWeight(item);item.weight_deviation_pct=target?((actual-target)/target)*100:null}if(qtyText)item.produced_qty=produced;item.note=payload.note}render()}
+      return runWorkerWrite({id,payload,action:'updated',draft:readWorkerDraft(id),apply(data){
+        const item=state.items.find(item=>item.id===id);if(!item)return;
+        if(data.item)Object.assign(item,data.item);
+        else {if(weightText){item.actual_weight_kg=actual;const target=targetWeight(item);item.weight_deviation_pct=target?((actual-target)/target)*100:null;}if(qtyText)item.produced_qty=produced;item.note=payload.note;if(data.status)item.status=data.status;}
+      }});
     }
     async function adjustProducedQty(id,delta,event){
       event&&event.stopPropagation();
+      if(pendingWrite||pendingLoad)return;
       const item=state.items.find(item=>item.id===id);
       if(!item)return;
       const requested=requestedQty(item);
@@ -267,9 +369,21 @@
       if(input)input.value=next||'';
       await saveProductionFields(id,event);
     }
-    async function setStatus(id,key){const payload={status:apiStatus[key]};if(SCAN_ENTRY)payload.card=publicWorkerCardToken();try{const r=await fetch(workerCardApi(id,'/status'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});if(!r.ok){const result=await r.json().catch(()=>({}));throw Error(result.message||result.error||'עדכון סטטוס הכרטיס נכשל');}await load();}catch(error){alert(error.message);}}
-    function selectOrder(id){state.selected=id;state.focusItemId=null;state.scanToken=null;render();document.querySelector('.panel').classList.add('mobile-hidden');document.querySelector('.stage').classList.remove('mobile-hidden')}
-    async function load(){try{const scanToken=publicWorkerCardToken();const url=SCAN_ENTRY?`/api/worker-card?card=${encodeURIComponent(scanToken)}&original=1`:'/api/production-queue?visual=1';const r=await fetch(url);if(SCAN_ENTRY&&r.status===403){location.replace('/scan.html?activation_required=1');return}if(!r.ok)throw Error(r.status);const data=await r.json();state.items=data.items||[];state.originalCard=data.original_card||null;document.querySelector('#sync').textContent='חי';const parsed=state.focusItemId?null:scanFromLocation();if(parsed&&parsed.itemId){if(!focusScannedCard(parsed)){render();showScanResult('הקוד נסרק, אבל הכרטיס לא נמצא בתור הייצור הנוכחי.','err')}}else render()}catch{document.querySelector('#sync').textContent='מתחבר מחדש';if(SCAN_ENTRY){state.items=[];state.originalCard=null;render();document.querySelector('#originalCardFace').innerHTML='<div class="empty">לא ניתן לטעון את כרטיס העבודה המקורי. יש לבדוק את הקוד או לרענן את הדף. לא ניתן להתחיל ייצור מכרטיס שלא נטען.</div>';}}}
+    async function setStatus(id,key){
+      if(pendingWrite||pendingLoad)return;
+      const payload={status:apiStatus[key]};
+      if(SCAN_ENTRY||state.scanToken){payload.card=publicWorkerCardToken();payload.request_id=workerRequestId();}
+      return runWorkerWrite({id,payload,url:workerCardApi(id,'/status'),suffix:'/status',action:'status_changed',preserveDraft:readWorkerDraft(id),success:`הסטטוס בכרטיס ${id} עודכן ל־${statusText[key]}.`,apply(data){const item=state.items.find(item=>item.id===id);if(item){if(data.item)Object.assign(item,data.item);else item.status=payload.status;}}});
+    }
+    function selectOrder(id){if(pendingWrite||pendingLoad)return;state.selected=id;state.focusItemId=null;state.scanToken=null;render();document.querySelector('.panel').classList.add('mobile-hidden');document.querySelector('.stage').classList.remove('mobile-hidden')}
+    async function load(){
+      if(SCAN_ENTRY)return loadScannedCard(parseCardToken(publicWorkerCardToken()));
+      if(pendingWrite||pendingLoad||unresolvedWrite)return;
+      pendingLoad=true;
+      try{const data=await workerRequest('/api/production-queue?visual=1');if(!Array.isArray(data.items))throw Error('invalid_queue');state.items=data.items;render();showOperation('תור הייצור עודכן מהמערכת. אפשר לסרוק כרטיס.','success');}
+      catch(_){showOperation('לא התקבל עדכון מהמערכת. בדוק את החיבור ונסה שוב.','unknown',load);}
+      finally{pendingLoad=false;}
+    }
     document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelector('.panel').classList.toggle('mobile-hidden',b.dataset.pane!=='panel');document.querySelector('.stage').classList.toggle('mobile-hidden',b.dataset.pane!=='stage')});
     function ws(){try{const socket=new WebSocket(window.IronBendAuth?.webSocketUrl?.('/')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);socket.onmessage=event=>{try{if(['item_status','item_progress','new_order','order_status'].includes(JSON.parse(event.data).type))load()}catch{}};socket.onclose=()=>setTimeout(ws,2000)}catch{}}
     load();if(!SCAN_ENTRY)ws();

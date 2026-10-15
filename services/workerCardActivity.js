@@ -1,4 +1,5 @@
 'use strict';
+const crypto = require('node:crypto');
 
 function positiveInteger(value) {
   const number = Number(value);
@@ -37,6 +38,15 @@ function createWorkerCardActivityService({ db }) {
       ON worker_card_activity(item_id, occurred_at DESC);
     CREATE INDEX IF NOT EXISTS idx_worker_card_activity_actor
       ON worker_card_activity(actor_user_id, occurred_at DESC);
+    CREATE TABLE IF NOT EXISTS worker_card_requests (
+      request_id TEXT PRIMARY KEY,
+      item_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      activity_id INTEGER NOT NULL,
+      response_json TEXT NOT NULL,
+      FOREIGN KEY(activity_id) REFERENCES worker_card_activity(id)
+    );
   `);
 
   const insertActivity = db.prepare(`
@@ -57,7 +67,7 @@ function createWorkerCardActivityService({ db }) {
     const itemId = positiveInteger(item?.id);
     if (!itemId || !['opened', 'status_changed', 'updated'].includes(action)) return null;
 
-    return insertActivity.run(
+    const inserted = insertActivity.run(
       itemId,
       positiveInteger(item?.order_id),
       textOrNull(item?.order_num, 120),
@@ -69,9 +79,45 @@ function createWorkerCardActivityService({ db }) {
       deviceName,
       JSON.stringify(details || {}),
     );
+    const receipt = db.prepare(`
+      SELECT id,item_id,action,strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) AS occurred_at
+      FROM worker_card_activity WHERE id=?
+    `).get(inserted.lastInsertRowid);
+    const request = requestIdentity(req, itemId, action);
+    if (request) receipt.request_id = request.id;
+    return receipt;
   }
 
-  return { record };
+  function requestIdentity(req, itemId, action) {
+    const id = req?.body?.request_id;
+    if (id === undefined) return null;
+    if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]{16,100}$/.test(id)) {
+      throw Object.assign(new Error('invalid_worker_request_id'), { status: 400 });
+    }
+    const body = Object.fromEntries(Object.keys(req.body).filter(key => key !== 'request_id').sort().map(key => [key, req.body[key]]));
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ itemId: Number(itemId), action, body })).digest('hex');
+    return { id, fingerprint };
+  }
+
+  function replay(req, itemId, action) {
+    const request = requestIdentity(req, itemId, action);
+    if (!request) return null;
+    const previous = db.prepare('SELECT * FROM worker_card_requests WHERE request_id=?').get(request.id);
+    if (!previous) return null;
+    if (previous.item_id !== Number(itemId) || previous.action !== action || previous.fingerprint !== request.fingerprint) {
+      throw Object.assign(new Error('worker_request_conflict'), { status: 409 });
+    }
+    return JSON.parse(previous.response_json);
+  }
+
+  function rememberResponse(req, itemId, action, response) {
+    const request = requestIdentity(req, itemId, action);
+    if (!request) return;
+    db.prepare(`INSERT INTO worker_card_requests (request_id,item_id,action,fingerprint,activity_id,response_json)
+      VALUES (?,?,?,?,?,?)`).run(request.id, Number(itemId), action, request.fingerprint, response.receipt.id, JSON.stringify(response));
+  }
+
+  return { record, replay, rememberResponse };
 }
 
 module.exports = { createWorkerCardActivityService };

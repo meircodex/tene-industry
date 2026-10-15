@@ -10,6 +10,7 @@
   <style>
     :root{--navy:#021a48;--navy-2:#0b3568;--orange:#df702d;--orange-dark:#bd5316;--ink:#17253d;--muted:#5d6b7d;--line:#dce3ec;--soft:#f2f5f9;--white:#fff;--green:#19714a}
     *{box-sizing:border-box}
+    [hidden]{display:none!important}
     body{margin:0;min-height:100vh;background:linear-gradient(155deg,#eef3f8 0%,#fff 48%,#fff4eb 100%);color:var(--ink);font-family:Heebo,"Segoe UI",Arial,sans-serif}
     .top{height:8px;background:linear-gradient(90deg,var(--navy),var(--orange))}
     main{width:min(920px,100%);margin:0 auto;padding:clamp(20px,5vw,52px) clamp(16px,4vw,32px) 40px}
@@ -24,6 +25,12 @@
     .cta{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:14px 25px;border-radius:14px;background:var(--orange);color:#fff;text-decoration:none;font-size:17px;font-weight:900;box-shadow:0 12px 25px #df702d3d;transition:transform .16s,background .16s}
     .cta:hover{background:var(--orange-dark);transform:translateY(-1px)}
     .cta:focus-visible{outline:4px solid #f6bd99;outline-offset:3px}
+    button.cta{border:0;font-family:inherit;cursor:pointer}
+    .scan-status{position:relative;background:#fff;border:1px solid var(--line);border-radius:22px;padding:32px 22px;text-align:center;box-shadow:0 24px 70px #021a4817}
+    .scan-status h1{font-size:clamp(25px,6vw,36px)}
+    .scan-status p{color:var(--muted);font-size:18px;line-height:1.65;margin:18px 0}
+    .scan-status[data-state="error"]{border-color:#c64035}
+    .work-card-routing .customer-content{display:none}
     .trust{position:relative;margin:25px auto 0;padding-top:18px;border-top:1px solid var(--line);max-width:620px;color:#526579;font-size:13px;line-height:1.6}
     .features{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:18px}
     .feature{background:#ffffffc7;border:1px solid var(--line);border-radius:17px;padding:18px;backdrop-filter:blur(8px)}
@@ -32,12 +39,91 @@
     footer{text-align:center;color:#7a8797;font-size:12px;margin-top:24px}
     @media(max-width:650px){.features{grid-template-columns:1fr}.feature{padding:15px}.cta{width:100%}.hero{border-radius:22px}}
   </style>
+  <script>
+    (() => {
+      const code = String(new URLSearchParams(location.search).get('code') || '').trim();
+
+      function isProductionCard(value) {
+        if (!value || value.length > 512 || /^TENE-ORDER-\d+$/i.test(value)) return false;
+        const legacy = value.match(/^[^|\r\n]+\|(\d{1,12})$/);
+        const printed = value.match(/^[A-Z0-9][A-Z0-9_-]*-(\d{1,12})(?:-[A-Z]+[A-Z0-9]*)*$/i);
+        const match = legacy || printed;
+        return Boolean(match && Number(match[1]) > 0);
+      }
+
+      function showCustomerPortal() {
+        // Public customer visits must not retain internal card data in history.
+        if (location.search) history.replaceState(null, '', '/customer-scan.html');
+        document.documentElement.classList.remove('work-card-routing');
+        const status = document.getElementById('workCardRouting');
+        if (status) status.hidden = true;
+      }
+
+      if (!isProductionCard(code)) {
+        showCustomerPortal();
+        return;
+      }
+
+      // Hide the portal before its markup is painted while the server decides
+      // whether an ordinary phone camera may open this production card.
+      document.documentElement.classList.add('work-card-routing');
+      document.addEventListener('DOMContentLoaded', () => {
+        const status = document.getElementById('workCardRouting');
+        const title = document.getElementById('workCardRoutingTitle');
+        const message = document.getElementById('workCardRoutingMessage');
+        const retry = document.getElementById('retryWorkCardRouting');
+        let checking = false;
+
+        async function openProductionCard() {
+          if (checking) return;
+          checking = true;
+          status.hidden = false;
+          status.dataset.state = 'waiting';
+          title.textContent = 'פותח כרטיס עבודה';
+          message.textContent = 'ממתין לאישור מהמערכת. יש להמתין לאישור קליטת הסריקה במסך כרטיס העבודה.';
+          retry.hidden = true;
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15000);
+          try {
+            const response = await fetch('/api/qr-access/mode', {
+              cache: 'no-store', credentials: 'same-origin', signal: controller.signal,
+            });
+            const access = await response.json();
+            if (!response.ok || !access || !['open', 'secure'].includes(access.mode)) {
+              throw new Error('invalid_qr_access_mode');
+            }
+            if (access.mode === 'secure') {
+              showCustomerPortal();
+              return;
+            }
+            location.replace('/worker-visual.html?scan=1&card=' + encodeURIComponent(code) + '&source=phone_camera');
+          } catch (_) {
+            status.dataset.state = 'error';
+            title.textContent = 'כרטיס העבודה עדיין לא נפתח';
+            message.textContent = 'לא ניתן לקבל אישור מהמערכת. הסריקה עדיין לא אושרה. בדוק את החיבור לאינטרנט ונסה שוב.';
+            retry.hidden = false;
+          } finally {
+            clearTimeout(timeout);
+            checking = false;
+          }
+        }
+
+        retry.addEventListener('click', openProductionCard);
+        openProductionCard();
+      }, { once: true });
+    })();
+  </script>
 </head>
 <body>
   <div class="top" aria-hidden="true"></div>
   <main>
     <img class="logo" src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל">
-    <section class="hero" aria-labelledby="welcomeTitle">
+    <section id="workCardRouting" class="scan-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <h1 id="workCardRoutingTitle">פותח כרטיס עבודה</h1>
+      <p id="workCardRoutingMessage">ממתין לאישור מהמערכת.</p>
+      <button id="retryWorkCardRouting" class="cta" type="button" hidden>נסה שוב</button>
+    </section>
+    <section class="hero customer-content" aria-labelledby="welcomeTitle">
       <div class="eyebrow">הגעתם דרך טופס של טנא</div>
       <h1 id="welcomeTitle">פורטל הלקוחות של טנא תעשיות</h1>
       <p class="lead">לקוחות חדשים יכולים להירשם, ולקוחות קיימים יכולים להיכנס כדי לשלוח הזמנות ולעקוב אחריהן במקום אחד.</p>
@@ -46,17 +132,12 @@
       </div>
       <p class="trust">הסריקה הציבורית אינה מציגה מספר הזמנה, כרטיס עבודה או נתוני ייצור. הכניסה לפורטל מאובטחת ומחייבת זיהוי לקוח.</p>
     </section>
-    <section class="features" aria-label="אפשרויות בפורטל">
+    <section class="features customer-content" aria-label="אפשרויות בפורטל">
       <div class="feature"><strong>הרשמה מהירה</strong><span>פתיחת חשבון לקוח באמצעות מספר טלפון ואימות.</span></div>
       <div class="feature"><strong>שליחת הזמנות</strong><span>הזנת פריטים, כמויות ופרטי אספקה ישירות לפורטל.</span></div>
       <div class="feature"><strong>מעקב במקום אחד</strong><span>צפייה בהזמנות ובמידע שהוגדר עבור חשבון הלקוח.</span></div>
     </section>
-    <footer>טנא תעשיות ברזל · שירות מקצועי ללקוחות</footer>
+    <footer class="customer-content">טנא תעשיות ברזל · שירות מקצועי ללקוחות</footer>
   </main>
-  <script>
-    // The internal code is for the approved work scanner only. Once a public
-    // camera opens this page, remove it from the visible address and history.
-    if (location.search) history.replaceState(null, '', '/customer-scan.html');
-  </script>
 </body>
 </html>

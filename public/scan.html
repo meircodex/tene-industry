@@ -155,21 +155,28 @@
       opening=true;
       stopScanner();
       setNotice('הקוד זוהה. בודק הרשאה בצד השרת…');
+      const controller=new AbortController();
+      let timeout;
+      const deadline=new Promise((_,reject)=>{timeout=setTimeout(()=>{controller.abort();reject(Error('scan_confirmation_timeout'));},15000);});
       try{
-        const response=await fetch('/api/qr-access/scan',{
-          method:'POST',headers:{'Content-Type':'application/json'},
+        const received=await Promise.race([deadline,(async()=>{const response=await fetch('/api/qr-access/scan',{
+          method:'POST',cache:'no-store',signal:controller.signal,headers:{'Content-Type':'application/json'},
           body:JSON.stringify({kind:parsed.kind,value:parsed.value,order_id:parsed.orderId||null,scanner_id:scannerId()}),
         });
         const result=await response.json().catch(()=>({}));
+        return {response,result};})()]);
+        const {response,result}=received;
         if(!response.ok){
           opening=false;
           if(response.status===403){accessMode='secure';document.getElementById('deviceGate').hidden=false;renderDeviceStatus({status:result.device_status||'unregistered'});}
-          setNotice(result.error==='qr_permission_denied'?'אין לעובד הרשאה לפעולה שב־QR הזה.':'המכשיר אינו מופעל. יש לפתוח את קישור ההפעלה האישי שנשלח בוואטסאפ.',true);
+          setNotice(response.status===403?(result.error==='qr_permission_denied'?'אין לעובד הרשאה לפעולה שב־QR הזה.':'המכשיר אינו מופעל. יש לפתוח את קישור ההפעלה האישי שנשלח בוואטסאפ.'):'לא התקבל אישור לפתיחת הכרטיס. בדוק את החיבור ונסה שוב.',true);
           return;
         }
-        setNotice('ההרשאה אושרה. פותח את המסך המתאים…');
+        if(result.allowed!==true||typeof result.target!=='string'||!/^\/(?:worker-visual|warehouse)\.html\?/.test(result.target))throw Error('scan_not_acknowledged');
+        setNotice('הקוד זוהה. פותח את הכרטיס וממתין לאישור קליטה…');
         location.href=result.target;
-      }catch(_){opening=false;setNotice('לא ניתן לבדוק את הסריקה כרגע. נסה שוב.',true);}
+      }catch(_){opening=false;setNotice('לא התקבל אישור קליטה מהמערכת. בדוק את החיבור ונסה שוב.',true);}
+      finally{clearTimeout(timeout);}
     }
     function scheduleScan(){
       if(scanTimer)clearTimeout(scanTimer);

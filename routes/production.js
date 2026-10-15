@@ -16,7 +16,12 @@ module.exports = function createProductionRouter(deps) {
   const requireRole = required('requireRole', deps.requireRole);
   const requireApprovedDevice = required('requireApprovedDevice', deps.requireApprovedDevice);
   const requireQrPermission = required('requireQrPermission', deps.requireQrPermission);
-  const wsBroadcast = required('wsBroadcast', deps.wsBroadcast);
+  const broadcastNow = required('wsBroadcast', deps.wsBroadcast);
+  let workerBroadcastQueue = null;
+  function wsBroadcast(...args) {
+    if (workerBroadcastQueue) workerBroadcastQueue.push(args);
+    else broadcastNow(...args);
+  }
   const modbus = required('modbus', deps.modbus);
   const statusContracts = required('statusContracts', deps.statusContracts);
   const MACHINE_STATES = required('MACHINE_STATES', deps.MACHINE_STATES);
@@ -184,7 +189,7 @@ module.exports = function createProductionRouter(deps) {
       return setOrderStatusIfChanged(item.order_id, ORDER_STATUS.IN_PRODUCTION);
     }
     if ([ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(nextItemStatus)) {
-      checkOrderComplete(item.order_id);
+      checkOrderComplete(item.order_id, wsBroadcast);
     }
     return null;
   }
@@ -196,6 +201,30 @@ module.exports = function createProductionRouter(deps) {
       item_ids: [item.id],
       actual_weight_kg: actualWeightKg,
     });
+  }
+
+  function workerCardWrite(handler) {
+    return (req, res, next) => {
+      res.set('Cache-Control', 'no-store');
+      let response;
+      const broadcasts = [];
+      const previousQueue = workerBroadcastQueue;
+      workerBroadcastQueue = broadcasts;
+      try {
+        response = db.transaction(() => handler(req, res))();
+      } catch (error) {
+        if ([400, 409].includes(error.status)) return res.status(error.status).json({ error: error.message });
+        console.error('[Worker card save]', error.message);
+        return res.status(500).json({ error: 'worker_card_save_failed' });
+      } finally {
+        workerBroadcastQueue = previousQueue;
+      }
+      // Delivery of a live notification is separate from the committed save.
+      for (const args of broadcasts) {
+        try { broadcastNow(...args); } catch (error) { console.error('[Worker card notification]', error.message); }
+      }
+      if (!res.headersSent && response) res.json(response);
+    };
   }
 
   function cardMaterialRequirement(card, reservationRows) {
@@ -381,19 +410,24 @@ module.exports = function createProductionRouter(deps) {
   }));
 
   router.get('/worker-card', requireQrPermission('production'), (req, res) => {
+    res.set('Cache-Control', 'no-store');
     const parsed = parseWorkerCardToken(req.query.card);
     if (!parsed?.itemId) return res.status(400).json({ error: 'invalid_worker_card_token' });
     const item = selectWorkerCardById(parsed.itemId);
     if (!item) return res.status(404).json({ error: 'not_found' });
-    workerCardActivity.record(req, item, 'opened', { source: 'worker_card_qr' });
     try {
       const original_card=req.query.original==='1'?buildWorkerOriginalCard(db,item,parsed.token):undefined;
-      res.set('Cache-Control','no-store').json({ items: [item], grouped: {},original_card });
-    } catch(error){res.status(error.statusCode||400).json({error:error.message});}
+      const source = ['phone_camera', 'in_app_scan'].includes(req.query.source) ? req.query.source : 'worker_card_qr';
+      const receipt = workerCardActivity.record(req, item, 'opened', { source });
+      res.json({ items: [item], grouped: {}, original_card, scan_receipt: receipt });
+    } catch(error){
+      if([400,404,409].includes(error.statusCode))return res.status(error.statusCode).json({error:error.message});
+      console.error('[Worker card open]',error.message);
+      res.status(500).json({error:'worker_card_open_failed'});
+    }
   });
 
-
-  router.patch('/worker-card/:id/status', requireQrPermission('production'), (req, res) => {
+  router.patch('/worker-card/:id/status', requireQrPermission('production'), workerCardWrite((req, res) => {
     const status = req.body?.status;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
     if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(status)) {
@@ -401,6 +435,8 @@ module.exports = function createProductionRouter(deps) {
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
+    const replay = workerCardActivity.replay(req, item.id, 'status_changed');
+    if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const updates = { status };
@@ -408,20 +444,24 @@ module.exports = function createProductionRouter(deps) {
     if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
     db.prepare(`UPDATE items SET status=?${status===ITEM_STATUS.IN_PRODUCTION&&!item.started_at?',started_at=?':''}${status===ITEM_STATUS.DONE?',completed_at=?':''} WHERE id=?`)
       .run(...Object.values(updates), req.params.id);
-    workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status });
+    const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status });
     const orderStatus = syncOrderStatusAfterItemStatus(item, status);
     const consumedReservations = status === ITEM_STATUS.DONE ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
-    res.json({ ok: true, order_status: orderStatus, consumedReservations });
-  });
+    const response = { ok: true, order_status: orderStatus, consumedReservations, receipt, item: selectWorkerCardById(item.id) };
+    workerCardActivity.rememberResponse(req, item.id, 'status_changed', response);
+    return response;
+  }));
 
-  router.patch('/worker-card/:id', requireQrPermission('production'), (req, res) => {
+  router.patch('/worker-card/:id', requireQrPermission('production'), workerCardWrite((req, res) => {
     const forbiddenFields = forbiddenProductionPatchFields(req.body);
     if (forbiddenFields.length) {
       return res.status(400).json({ error: 'non_production_fields_forbidden', fields: forbiddenFields });
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
+    const replay = workerCardActivity.replay(req, item.id, 'updated');
+    if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
     const { produced_qty, actual_weight_kg, note } = req.body || {};
     const fields = [], vals = [];
@@ -459,10 +499,9 @@ module.exports = function createProductionRouter(deps) {
       fields.push('weight_deviation_pct=?'); vals.push(deviationPct);
     }
     if (note !== undefined) { fields.push('note=?'); vals.push(note); }
-    if (!fields.length) return res.json({ ok: true });
-    vals.push(req.params.id);
+    if (fields.length) vals.push(req.params.id);
     db.transaction(() => {
-      db.prepare(`UPDATE items SET ${fields.join(',')} WHERE id=?`).run(...vals);
+      if (fields.length) db.prepare(`UPDATE items SET ${fields.join(',')} WHERE id=?`).run(...vals);
       if (actual_weight_kg !== undefined) {
         productionActuals.recordActualWeightChange(db, {
           itemId: Number(req.params.id),
@@ -487,15 +526,17 @@ module.exports = function createProductionRouter(deps) {
       wsBroadcast('item_status', { id: Number(req.params.id), status: nextItemStatus });
     }
     if (produced_qty !== undefined) wsBroadcast('item_progress', { id: Number(req.params.id), produced_qty: Number(produced_qty) });
-    workerCardActivity.record(req, item, 'updated', {
+    const receipt = workerCardActivity.record(req, item, 'updated', {
       from_status: item.status,
       to_status: nextItemStatus || item.status,
       produced_qty: produced_qty === undefined ? null : Number(produced_qty),
       actual_weight_kg: actual_weight_kg === undefined ? null : Number(actual_weight_kg),
       note_updated: note !== undefined,
     });
-    res.json({ ok: true, status: nextItemStatus });
-  });
+    const response = { ok: true, status: nextItemStatus, receipt, item: selectWorkerCardById(item.id) };
+    workerCardActivity.rememberResponse(req, item.id, 'updated', response);
+    return response;
+  }));
 
   // ── SCAN (QR) ─────────────────────────────────────────────────────
   router.post('/scan', requireAnyRole(['production', 'kiosk', 'manager', 'admin']), (req, res) => {

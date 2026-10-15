@@ -449,7 +449,7 @@ function listPage(query = {}, defaults = {}) {
 
 const generateOrderNum = createOrderNumberAllocator(db);
 
-function checkOrderComplete(orderId) {
+function checkOrderComplete(orderId, broadcast = wsBroadcast) {
   const pending = db.prepare(`
     SELECT COUNT(*) as c FROM items i
     JOIN pallets p ON i.pallet_id = p.id
@@ -462,7 +462,7 @@ function checkOrderComplete(orderId) {
     const changed = db.prepare("UPDATE orders SET status='הושלם – ממתין לאיסוף' WHERE id=? AND status NOT IN ('אספקה חלקית','בהעמסה','נשלחה','בדרך ללקוח','בעיה באספקה','סופק – אושר','בוטלה')").run(orderId);
     if (!changed.changes) return;
     const o = db.prepare('SELECT order_num FROM orders WHERE id=?').get(orderId);
-    wsBroadcast('order_complete', { orderId, orderNum: o?.order_num });
+    broadcast('order_complete', { orderId, orderNum: o?.order_num });
   }
 }
 
