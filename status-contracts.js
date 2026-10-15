@@ -103,14 +103,18 @@ function isValidOrderStatus(status) {
   return VALID_ORDER_STATUSES.includes(normalizeOrderStatus(status));
 }
 
-function isValidOrderTransition(from, to) {
+function isValidOrderTransition(from, to, { allowSkip = false } = {}) {
   const normalizedFrom = normalizeOrderStatus(from);
   const normalizedTo = normalizeOrderStatus(to);
+  if (allowSkip) return allowedOrderTransitions(normalizedFrom, { allowSkip }).includes(normalizedTo);
   if (!VALID_ORDER_TRANSITIONS[normalizedFrom]) return true;
   return VALID_ORDER_TRANSITIONS[normalizedFrom].includes(normalizedTo);
 }
 
-function allowedOrderTransitions(status) {
+function allowedOrderTransitions(status, { allowSkip = false } = {}) {
+  if (allowSkip && normalizeOrderStatus(status) !== ORDER_STATUS.CANCELLED) {
+    return VALID_ORDER_STATUSES.filter(value => value !== normalizeOrderStatus(status));
+  }
   return VALID_ORDER_TRANSITIONS[normalizeOrderStatus(status)] || [];
 }
 

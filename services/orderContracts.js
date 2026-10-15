@@ -288,27 +288,33 @@ function isOrderApprovalTransition(from, to) {
   );
 }
 
-function assertOrderStatusTransition({ from, to, role }) {
+function assertOrderStatusTransition({ from, to, role, allowSkip = false }) {
   const normalizedFrom = normalizeOrderStatus(from);
   const normalizedTo = normalizeOrderStatus(to);
   if (!isValidOrderStatus(normalizedTo)) {
     throw Object.assign(new Error('invalid order status'), { statusCode: 400, allowed: Object.values(ORDER_STATUS) });
   }
-  if (!isValidOrderTransition(normalizedFrom, normalizedTo)) {
+  if (!isValidOrderTransition(normalizedFrom, normalizedTo, { allowSkip })) {
     throw Object.assign(new Error('invalid order status transition'), {
       statusCode: 409,
       from: normalizedFrom,
       to: normalizedTo,
-      allowed: allowedOrderTransitions(normalizedFrom),
+      allowed: allowedOrderTransitions(normalizedFrom, { allowSkip }),
     });
   }
-  if (isOrderApprovalTransition(normalizedFrom, normalizedTo) && !canManagerApproveOrder(role)) {
+  // A manual skip out of an approval stage must record the same approval as
+  // the regular path; jumping directly to production cannot bypass it.
+  const isApproval = isOrderApprovalTransition(normalizedFrom, normalizedTo) ||
+    (allowSkip && normalizedTo === ORDER_STATUS.APPROVED_WAITING_PRODUCTION) || (allowSkip &&
+    [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(normalizedFrom) &&
+    ![ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL, ORDER_STATUS.CANCELLED].includes(normalizedTo));
+  if (isApproval && !canManagerApproveOrder(role)) {
     throw Object.assign(new Error('manager approval required'), { statusCode: 403 });
   }
   if (normalizedTo === ORDER_STATUS.LOADING && !['manager', 'admin'].includes(String(role || ''))) {
     throw Object.assign(new Error('manager or admin loading status required'), { statusCode: 403 });
   }
-  return { from: normalizedFrom, to: normalizedTo, isApproval: isOrderApprovalTransition(normalizedFrom, normalizedTo) };
+  return { from: normalizedFrom, to: normalizedTo, isApproval };
 }
 
 module.exports = {

@@ -614,7 +614,7 @@ const PRINT_DOCUMENTS = Object.freeze({
 const STATUS_CONTRACT = window.IronBendStatus || {};
 const ORDER_STATUS = STATUS_CONTRACT.ORDER_STATUS || {};
 const ITEM_STATUS = STATUS_CONTRACT.ITEM_STATUS || {};
-const allowedOrderTransitions = STATUS_CONTRACT.allowedOrderTransitions || (() => []);
+const allowedOrderTransitions = status => STATUS_CONTRACT.allowedOrderTransitions?.(status, { allowSkip: true }) || [];
 const ORDER_ACTION_LABELS = new Map([
   [ORDER_STATUS.APPROVED_WAITING_PRODUCTION, '✓ אשר'],
   [ORDER_STATUS.PRODUCTION_QUEUE, '▶ לתור'],
@@ -837,13 +837,23 @@ function actionBtns(o, stopProp = true, includePrints = true) {
   return `<div class="actions" onclick="event.stopPropagation()"><a class="btn-sm" href="/order-print.html?id=${o.id}&kind=print-a4" target="_blank" rel="noopener" title="הדפס גיליון הזמנה (A4)" aria-label="הדפס גיליון הזמנה ${escHtml(o.order_num)}">🖨️</a>${['office','manager','admin'].includes(role)?`<button class="btn-sm danger" onclick="deleteOrder(${o.id},${jsAttr(o.order_num)})" title="העבר לסל המחזור" aria-label="העבר את ${escHtml(o.order_num)} לסל המחזור">🗑️</button>`:''}</div>`;
 }
 
+function canSelectOrderStatus(o, status) {
+  const role = window.IronBendAuth?.currentUser().role;
+  if (!['office', 'production', 'manager', 'admin'].includes(role)) return false;
+  if (['manager', 'admin'].includes(role)) return true;
+  if (status === ORDER_STATUS.LOADING || status === ORDER_STATUS.APPROVED_WAITING_PRODUCTION) return false;
+  return ![ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(o.status) ||
+    [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL, ORDER_STATUS.CANCELLED].includes(status);
+}
+
 function orderStatusSelect(o) {
   const role=window.IronBendAuth?.currentUser().role;
   const canChange=['office','production','manager','admin'].includes(role),canPay=['office','manager','admin'].includes(role);
   const current=o.payment_status==='paid'?'__paid':o.status;
-  let options=o.payment_status==='paid'?[['__paid','שולם'],['__unpaid','בטל סימון שולם — תיקון']]:[[o.status,o.status],...allowedOrderTransitions(o.status).filter(s=>(s!==ORDER_STATUS.APPROVED_WAITING_PRODUCTION||['manager','admin'].includes(role))&&(s!==ORDER_STATUS.LOADING||['manager','admin'].includes(role))).map(s=>[s,s])];
+  let options=[o.status,...allowedOrderTransitions(o.status)].map(s=>[s,s]);
+  if(o.payment_status==='paid')options.push(['__paid','שולם'],['__unpaid','בטל סימון שולם — תיקון']);
   if(canPay&&o.payment_status!=='paid')options.push(['__paid','שולם — סימון ידני']);
-  return `<select class="order-status-select" aria-label="סטטוס הזמנה ${escHtml(o.order_num)}" onclick="event.stopPropagation()" onchange="changeListOrderStatus(event,${o.id})" ${!canChange||o.deleted_at||(o.payment_status==='paid'&&!canPay)?'disabled':''}>${options.map(([value,label])=>`<option value="${escHtml(value)}"${value===current?' selected':''}>${escHtml(label)}</option>`).join('')}</select>`;
+  return `<select class="order-status-select" aria-label="סטטוס הזמנה ${escHtml(o.order_num)}" onclick="event.stopPropagation()" onchange="changeListOrderStatus(event,${o.id})" ${!canChange||o.deleted_at?'disabled':''}>${options.map(([value,label])=>`<option value="${escHtml(value)}"${value===current?' selected':''}${(value.startsWith('__') ? !canPay : !canSelectOrderStatus(o,value))?' disabled':''}>${escHtml(label)}</option>`).join('')}</select>`;
 }
 
 async function changeListOrderStatus(event,id) {
@@ -2898,7 +2908,7 @@ function buildDetailHTML(o, pkgs) {
     <div class="d-title">🔁 עדכון סטטוס</div>
     <div class="status-actions">
       ${statuses.map(s => `<button class="status-btn${o.status===s?' cur':''}"
-        ${o.status===s?'disabled':''}
+        ${o.status===s||!canSelectOrderStatus(o,s)?'disabled':''}
         onclick="setStatusAndClose(${o.id},${jsAttr(s)})">${escHtml(s)}</button>`).join('')}
     </div>
   </div>`;

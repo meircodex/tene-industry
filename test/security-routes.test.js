@@ -625,13 +625,38 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal(item.total_length_mm, 47124);
     assert.equal(item.quantity, 2);
   });
-  await t.test('order contract requires manager approval and rejects draft-to-production', async () => {
+  await t.test('manual order skips preserve manager approval, audit and existing item data', async () => {
     const customerId = seedCustomer();
     const directProductionOrder = seedInternalOrder(customerId, 'ORDER-CONTRACT-SKIP');
+    const skipPalletId = db.prepare('INSERT INTO pallets(order_id,pallet_num) VALUES (?,1)').run(directProductionOrder).lastInsertRowid;
+    const skipItemId = db.prepare('INSERT INTO items(pallet_id,order_id,quantity,produced_qty,status,total_weight) VALUES (?,?,10,3,?,12.5)').run(skipPalletId, directProductionOrder, statusContracts.ITEM_STATUS.IN_PRODUCTION).lastInsertRowid;
+    const beforeItem = db.prepare('SELECT * FROM items WHERE id=?').get(skipItemId);
     let response = await request(`/api/orders/${directProductionOrder}/status`, {
       method: 'PATCH',
-      headers: authHeaders(manager),
+      headers: authHeaders(production),
       body: JSON.stringify({ status: statusContracts.ORDER_STATUS.IN_PRODUCTION }),
+    });
+    assert.equal(response.status, 403);
+    response = await request(`/api/orders/${directProductionOrder}/status`, {
+      method: 'PATCH', headers: authHeaders(manager),
+      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.IN_PRODUCTION }),
+    });
+    assert.equal(response.status, 200);
+    const skipped = db.prepare('SELECT status,approved_by,approved_at FROM orders WHERE id=?').get(directProductionOrder);
+    assert.equal(skipped.status, statusContracts.ORDER_STATUS.IN_PRODUCTION);
+    assert.ok(skipped.approved_by);
+    assert.ok(skipped.approved_at);
+    assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE entity_id=? AND action='manager_approval'").get(directProductionOrder));
+    for (const status of [statusContracts.ORDER_STATUS.DELIVERED_CONFIRMED, statusContracts.ORDER_STATUS.IN_PRODUCTION]) {
+      response = await request(`/api/orders/${directProductionOrder}/status`, {
+        method: 'PATCH', headers: authHeaders(manager), body: JSON.stringify({ status }),
+      });
+      assert.equal(response.status, 200);
+    }
+    assert.deepEqual(db.prepare('SELECT * FROM items WHERE id=?').get(skipItemId), beforeItem);
+    response = await request(`/api/orders/${directProductionOrder}/status`, {
+      method: 'PATCH', headers: authHeaders(manager),
+      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.DONE_WAITING_PICKUP, expected_status: statusContracts.ORDER_STATUS.PENDING_APPROVAL }),
     });
     assert.equal(response.status, 409);
 

@@ -1011,7 +1011,7 @@ module.exports = function createOrdersRouter(deps) {
     if (order.locked) return res.status(403).json({ error: 'הזמנה נעולה' });
     let transition;
     try {
-      transition = assertOrderStatusTransition({ from: order.status, to: requestedStatus, role: req.userRole });
+      transition = assertOrderStatusTransition({ from: order.status, to: requestedStatus, role: req.userRole, allowSkip: true });
     } catch (error) {
       return res.status(error.statusCode || 400).json({
         error: error.message,

@@ -78,7 +78,10 @@
     CANCELLED: 'בוטל',
   });
 
-  function allowedOrderTransitions(status) {
+  function allowedOrderTransitions(status, { allowSkip = false } = {}) {
+    if (allowSkip && status !== ORDER_STATUS.CANCELLED) {
+      return Object.values(ORDER_STATUS).filter(value => value !== status);
+    }
     return VALID_ORDER_TRANSITIONS[status] || [];
   }
 
