@@ -25,7 +25,7 @@ test('browser multipart form retains expected description while rebuilding chose
   const build=vm.runInNewContext('('+source+')',{FormData:MockFormData});
   const form={values:[['expected','תיאור המצב הרצוי'],['before','empty file'],['expected_image','empty file']],querySelectorAll:()=>[{dataset:{kind:'expected'},bugFiles:()=>[{name:'expected.png'}]}]};
   const result=build(form);assert.equal(result.get('expected')[0],'תיאור המצב הרצוי');assert.equal(result.get('expected')[1].name,'expected.png');assert.equal(result.get('expected_image'),undefined);
-  const html=fs.readFileSync(path.join(__dirname,'../public/bugs.html'),'utf8');assert.match(html,/textarea name="expected"/);assert.match(html,/type="file" name="expected_image"/);
+  const html=fs.readFileSync(path.join(__dirname,'../public/bugs.html'),'utf8');assert.match(html,/<textarea[^>]*name="expected"/);assert.doesNotMatch(html,/<input[^>]*type="file"[^>]*name="expected"/);
 });
 
 test('bug reports are persistent, additive and creation retries are idempotent',t=>{
@@ -74,7 +74,7 @@ test('images reject spoofed MIME, active content, oversize uploads; no partial w
   assert.equal(db.prepare('SELECT count(*) n FROM bug_reports').get().n,0);
   assert.throws(()=>validateFiles(Array(7).fill(image())),{status:413});
   assert.throws(()=>s.create(worker,body(),[image('after')]),{status:400});
-  assert.throws(()=>s.create(worker,{...body(),title:''},[]),{status:400});
+  assert.throws(()=>s.create(worker,{...body(),actual:''},[]),{status:400});
   assert.throws(()=>safePagePath('javascript:alert(1)'),{status:400});
   assert.throws(()=>safePagePath('https://attacker.test/orders.html'),{status:400});
   assert.equal(safePagePath('/orders.html?id=97&access_token=secret&x=y#token'),'/orders.html?id=97');

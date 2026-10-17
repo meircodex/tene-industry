@@ -1,48 +1,31 @@
 'use strict';
 (() => {
-  const $ = id => document.getElementById(id);
-  const labels = {new:'חדש',needs_info:'ממתין למידע',in_progress:'בטיפול',awaiting_confirmation:'תוקן — ממתין לאישור שלך',closed:'אושר ונסגר'};
-  const kinds = {before:'לפני — הבעיה',expected:'מקור / המצב הרצוי',after:'אחרי — התיקון'};
-  const esc = text => String(text ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const date = value => new Date(value).toLocaleString('he-IL');
-  const badge = (status,priority) => `<span class="badge ${esc(status)}">${esc(labels[status])}</span>${priority === 'urgent' ? ' <span class="badge urgent">דחוף</span>' : ''}`;
-  let reports = [], selected = null, busy = false, detailGeneration = 0, imageUrls = [], createUid = crypto.randomUUID();
-  function feedback(text, error = false) { $('feedback').textContent = text; $('feedback').classList.toggle('error',error); }
-  async function api(path, options) {
-    const response = await fetch('/api/bug-reports' + path, options);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'הפעולה נכשלה');
-    return data;
+  const $=id=>document.getElementById(id);
+  const labels={new:'חדש',needs_info:'ממתין למידע',in_progress:'בטיפול',awaiting_confirmation:'מחכה לבדיקה שלך',closed:'טופל ונסגר'};
+  const jobLabels={queued:'ממתין לסוכן',running:'הסוכן מטפל',needs_approval:'נדרש אישור לפני המשך',patch_ready:'תיקון קוד מוכן — טרם הועלה',fixed:'תוקן — מחכה לבדיקה שלך',failed:'הטיפול נעצר',cancelled:'הטיפול הועבר'};
+  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const date=value=>new Date(value).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+  const badge=(status,priority)=>`<span class="badge ${esc(status)}">${esc(labels[status]||status)}</span>${priority==='urgent'?' <span class="badge urgent">דחוף</span>':''}`;
+  let reports=[],selected=null,busy=false,detailGeneration=0,imageUrls=[],createUid=crypto.randomUUID(),dirty=false,resetPreview=null,annotation=null,annotationTarget=null;
+  function feedback(message,error=false){$('feedback').textContent=message;$('feedback').classList.toggle('error',error);}
+  async function api(path='',options){const response=await fetch('/api/bug-reports'+path,options);let data;try{data=await response.json();}catch{throw new Error('לא ניתן להתחבר כרגע. הפרטים שהקלדת נשארו בטופס.');}if(!response.ok)throw new Error(data.error||'הפעולה נכשלה');return data;}
+  const json=(body,method='POST')=>({method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  async function saving(action){if(busy)return;busy=true;const disabled=[...document.querySelectorAll('button,input,select,textarea')].map(el=>[el,el.disabled]);disabled.forEach(([el])=>el.disabled=true);try{await action();}catch(e){feedback(e.message,true);}finally{busy=false;disabled.forEach(([el,was])=>el.disabled=was);}}
+  function view(board){$('create-panel').hidden=board;$('board-panel').hidden=!board;for(const [id,active] of [['new-report',!board],['show-board',board]]){$(id).classList.toggle('active',active);$(id).setAttribute('aria-pressed',String(active));}}
+  function resetImages(){imageUrls.forEach(URL.revokeObjectURL);imageUrls=[];}
+  async function annotate(file,save){
+    const url=URL.createObjectURL(file),image=new Image();
+    try{image.src=url;await image.decode();annotation?.dispose();annotation=FaultAnnotation.create($('annotation-canvas'),image);annotationTarget=save;$('draw-color').value='#ef4444';document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool==='pen')));$('annotation-dialog').showModal();}catch{feedback('לא ניתן לפתוח את התמונה לסימון. נסה תמונה אחרת.',true);}finally{URL.revokeObjectURL(url);}
   }
-  function resetImages() { for (const u of imageUrls) URL.revokeObjectURL(u); imageUrls=[]; }
-  function setupUploads(root) {
-    root.querySelectorAll('.upload').forEach(zone => {
-      const input = zone.querySelector('input[type=file]'); let files = [], urls=[];
-      zone.tabIndex=0;
-      function render() {
-        urls.forEach(URL.revokeObjectURL); urls=[];
-        const previews=zone.querySelector('.previews'); previews.replaceChildren();
-        files.forEach((file,index) => {
-          const wrap=document.createElement('div'), img=document.createElement('img'), remove=document.createElement('button');
-          const url=URL.createObjectURL(file); urls.push(url); img.src=url; img.alt=file.name;
-          remove.type='button'; remove.textContent='הסר תמונה'; remove.onclick=()=>{files.splice(index,1);render();};
-          wrap.append(img,remove); previews.append(wrap);
-        });
-      }
-      function add(list) {
-        if (busy) return;
-        for(const f of list) {
-          if (!['image/png','image/jpeg','image/webp'].includes(f.type)) {feedback('אפשר לצרף רק PNG, JPG או WebP',true);continue;}
-          if(f.size>4*1024*1024 || files.length>=3){feedback('עד 3 תמונות לתיבה, כל תמונה עד 4 מ״ב',true);continue;}
-          files.push(f);
-        }
-        render(); input.value='';
-      }
-      input.onchange=()=>add(input.files);
-      zone.addEventListener('paste',e=>{const list=[...(e.clipboardData?.files || [])];if(list.length){e.preventDefault();add(list);}});
-      zone.addEventListener('dragover',e=>e.preventDefault());
-      zone.addEventListener('drop',e=>{e.preventDefault();add(e.dataTransfer.files);});
-      zone.bugFiles=()=>files.slice(); zone.clearBugFiles=()=>{files=[];render();}; zone.disposeBugFiles=()=>urls.forEach(URL.revokeObjectURL);
+  function setupUploads(root){
+    root.querySelectorAll('.upload').forEach(zone=>{
+      const input=zone.querySelector('input[type=file]');let files=[],urls=[];zone.tabIndex=0;
+      function render(){urls.forEach(URL.revokeObjectURL);urls=[];const previews=zone.querySelector('.previews');previews.replaceChildren();files.forEach((file,index)=>{
+        const wrap=document.createElement('div'),img=document.createElement('img'),actions=document.createElement('div'),draw=document.createElement('button'),remove=document.createElement('button');wrap.className='preview';actions.className='actions';const url=URL.createObjectURL(file);urls.push(url);img.src=url;img.alt='תמונה מצורפת: '+file.name;
+        draw.type='button';draw.textContent='צייר / סמן';draw.onclick=()=>annotate(file,replacement=>{files[index]=replacement;render();dirty=true;});remove.type='button';remove.textContent='הסר';remove.onclick=()=>{files.splice(index,1);render();dirty=true;};actions.append(draw,remove);wrap.append(img,actions);previews.append(wrap);
+      });}
+      function add(list){if(busy)return;for(const file of list){if(!['image/png','image/jpeg','image/webp'].includes(file.type)){feedback('אפשר לצרף תמונות JPG, PNG או WebP בלבד.',true);continue;}if(file.size>4*1024*1024||files.length>=3){feedback('אפשר לצרף עד 3 תמונות, כל אחת עד 4 מ״ב.',true);continue;}files.push(file);}render();input.value='';dirty=true;}
+      input.onchange=()=>add(input.files);zone.addEventListener('paste',e=>{const images=[...(e.clipboardData?.files||[])];if(images.length){e.preventDefault();add(images);}});zone.addEventListener('dragover',e=>e.preventDefault());zone.addEventListener('drop',e=>{e.preventDefault();add(e.dataTransfer.files);});zone.bugFiles=()=>files.slice();zone.clearBugFiles=()=>{files=[];render();};zone.disposeBugFiles=()=>urls.forEach(URL.revokeObjectURL);
     });
   }
   function formData(form) {
@@ -50,62 +33,46 @@
     form.querySelectorAll('.upload').forEach(zone=>zone.bugFiles().forEach(f=>data.append(zone.dataset.kind,f,f.name)));
     return data;
   }
-  async function saving(action) {
-    if(busy)return; busy=true;
-    document.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=true);
-    try { await action(); } catch(e){feedback(e.message,true);} finally {busy=false;document.querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=false);}
-  }
-  function renderList() {
-    const filter=$('filter').value, term=$('search').value.trim().toLowerCase();
-    const rows=reports.filter(r=>(filter==='all'||(filter==='open'?r.status!=='closed':r.status===filter)) && `${r.id} ${r.title} ${r.order_reference} ${r.item_reference}`.toLowerCase().includes(term));
-    $('list-summary').textContent=`${rows.length} דיווחים מוצגים · ${reports.filter(r=>r.status!=='closed').length} פתוחים${reports.length===500?' · מוצגים 500 הדיווחים האחרונים':''}`;
-    $('report-list').innerHTML=rows.map(r=>`<button class="report-card ${selected?.report.id===r.id?'selected':''}" data-id="${r.id}"><span>#${r.id}</span><strong>${esc(r.title)}</strong>${badge(r.status,r.priority)}<p class="muted">${r.order_reference?'הזמנה '+esc(r.order_reference)+' · ':''}${esc(r.created_by_name)}<br>${esc(date(r.updated_at))}</p></button>`).join('') || '<p class="muted">אין דיווחים בתצוגה הזו.</p>';
-    $('report-list').querySelectorAll('button').forEach(b=>b.onclick=()=>openReport(b.dataset.id).catch(e=>feedback(e.message,true)));
-  }
-  async function refreshList(){const data=await api('');reports=data.reports;renderList();}
-  function gallery(files){return files.length?`<div class="gallery">${files.map(f=>`<figure class="image-card"><button data-image="${f.id}" aria-label="הגדל ${esc(kinds[f.kind])}"><img data-file="${f.id}" alt="${esc(kinds[f.kind])}" loading="lazy"></button><figcaption>${esc(kinds[f.kind])} · ${esc(f.filename)}</figcaption></figure>`).join('')}</div>`:'';}
-  function disposeDetail(){ $('detail').querySelectorAll('.upload').forEach(z=>z.disposeBugFiles?.()); resetImages(); }
-  async function loadImages(data,generation){
-    for(const file of data.attachments){
-      try{
-        const response=await fetch(`/api/bug-reports/${data.report.id}/images/${file.id}`);
-        if(!response.ok)throw new Error('טעינת התמונה נכשלה');
-        const blob=await response.blob(); if(generation!==detailGeneration)return;
-        const url=URL.createObjectURL(blob);imageUrls.push(url);
-        $('detail').querySelectorAll(`[data-file="${file.id}"]`).forEach(img=>img.src=url);
-        $('detail').querySelectorAll(`[data-image="${file.id}"]`).forEach(btn=>btn.onclick=()=>{$('full-image').src=url;$('image-dialog').showModal();});
-      }catch(e){if(generation===detailGeneration)feedback(e.message,true);}
-    }
-  }
+  function renderList(){const filter=$('filter').value,term=$('search').value.trim().toLowerCase(),open=reports.filter(r=>r.status!=='closed').length;const rows=reports.filter(r=>(filter==='all'||(filter==='open'?r.status!=='closed':r.status===filter))&&`${r.id} ${r.title} ${r.order_reference} ${r.item_reference}`.toLowerCase().includes(term));$('open-count').textContent=open;$('list-summary').textContent=`${rows.length} תקלות מוצגות${reports.length===500?' · מתוך 500 האחרונות':''}`;$('report-list').innerHTML=rows.map(r=>`<button class="report-card ${selected?.report.id===r.id?'selected':''}" data-id="${r.id}"><span class="muted">תקלה #${r.id}</span><strong>${esc(r.title)}</strong>${badge(r.status,r.priority)}<p class="muted">${r.order_reference?'הזמנה '+esc(r.order_reference)+' · ':''}${esc(date(r.updated_at))}</p></button>`).join('')||'<p class="muted">אין תקלות בתצוגה הזו.</p>';$('report-list').querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>openReport(b.dataset.id).catch(e=>feedback(e.message,true)));}
+  async function refreshList(){const data=await api();reports=data.reports;renderList();$('agent-state').textContent=data.agent_online?'הסוכן מחובר':'הסוכן אינו מחובר · התקלות נשמרות בתור';$('agent-state').classList.toggle('online',data.agent_online);$('agent-settings').hidden=!data.can_manage;$('backup-settings').hidden=!data.can_reset;return data;}
+  function gallery(files){return files.length?`<div class="gallery">${files.map(f=>`<figure class="image-card"><button data-image="${f.id}" aria-label="הגדל תמונה"><img data-file="${f.id}" alt="${f.kind==='after'?'תוצאת הטיפול':'תמונת התקלה'}" loading="lazy"></button><figcaption>${esc(f.filename)}</figcaption></figure>`).join('')}</div>`:'';}
+  function disposeDetail(){$('detail').querySelectorAll('.upload').forEach(z=>z.disposeBugFiles?.());resetImages();}
+  async function loadImages(data,generation){for(const file of data.attachments){try{const response=await fetch(`/api/bug-reports/${data.report.id}/images/${file.id}`);if(!response.ok)throw new Error('טעינת תמונה נכשלה');const blob=await response.blob();if(generation!==detailGeneration)return;const url=URL.createObjectURL(blob);imageUrls.push(url);$('detail').querySelectorAll(`[data-file="${file.id}"]`).forEach(img=>img.src=url);$('detail').querySelectorAll(`[data-image="${file.id}"]`).forEach(button=>button.onclick=()=>{$('full-image').src=url;$('image-dialog').showModal();});}catch(e){if(generation===detailGeneration)feedback(e.message,true);}}}
   function renderDetail(data){
-    disposeDetail();selected=data;const r=data.report;
-    const created=data.events.find(e=>e.event_type==='created');
-    $('detail').innerHTML=`<div class="list-heading"><h2>#${r.id} · ${esc(r.title)}</h2><button id="copy-brief">העתק פרטי דיווח לצ׳אט</button></div>${badge(r.status,r.priority)}<p class="context">${r.order_reference?'הזמנה '+esc(r.order_reference)+' · ':''}${r.item_reference?'פריט '+esc(r.item_reference)+' · ':''}דווח על ידי ${esc(r.created_by_name)} · ${esc(date(r.created_at))}${r.page_path?`<br><a href="${esc(r.page_path)}">פתח את המסך שבו התגלתה הבעיה</a>`:''}</p>
-      <div class="two"><div><h3>מה לא טוב</h3><div class="prose">${esc(r.actual)}</div></div><div><h3>איך צריך להיות</h3><div class="prose">${esc(r.expected)}</div></div></div>${gallery(data.attachments.filter(f=>f.event_id===created?.id))}
-      ${r.resolution?`<section class="treatment"><h3>${r.status==='closed'?'התיקון שאושר':'התיקון האחרון שהוגש — יש לבדוק לפני אישור'}</h3><p>מטפל: ${esc(r.handler_name)}</p><div class="prose">${esc(r.resolution)}</div><p class="muted">גרסה / בדיקה: ${esc(r.resolution_reference||'לא צוין')}</p></section>`:''}
-      <h3 style="margin-top:24px">היסטוריית הטיפול והשיחה</h3>${data.events.map(e=>`<article class="event"><strong>${esc(e.actor_name)}</strong> · <span class="muted">${esc(date(e.created_at))}</span>${e.from_status!==e.to_status?`<p>${esc(labels[e.from_status])} ← ${esc(labels[e.to_status])}</p>`:''}<div class="prose">${esc(e.message)}</div>${e.resolution?`<p><strong>איך טופל · ${esc(e.handler_name)}</strong></p><div class="prose">${esc(e.resolution)}</div><p class="muted">${esc(e.resolution_reference)}</p>`:''}${e.event_type!=='created'?gallery(data.attachments.filter(f=>f.event_id===e.id)):''}</article>`).join('')}
-      <form id="comment-form"><h3>הוסף הודעה או תמונה</h3><label>הודעה<textarea name="message" maxlength="6000" placeholder="פרטים נוספים, תשובה לשאלה או מה עדיין לא תקין"></textarea></label><div class="upload" data-kind="before"><label>תמונות נוספות<input type="file" name="before" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><button class="primary" type="submit">הוסף לשיחה</button></form>
-      ${data.can_manage && ['new','needs_info','in_progress'].includes(r.status)?`<form id="treatment-form" class="treatment"><h3>טיפול בדיווח — מנהלים</h3><div class="actions"><button type="button" data-status="in_progress">התחל / המשך טיפול</button><button type="button" data-status="needs_info">בקש מידע נוסף</button></div><label>מי טיפל?<input name="handler_name" maxlength="100" required placeholder="שם המטפל"></label><label>איך טופל ומה נבדק?<textarea name="resolution" maxlength="6000" required></textarea></label><label>גרסת התוכנה / אסמכתת בדיקה<input name="resolution_reference" maxlength="300"></label><div class="upload" data-kind="after"><label>תמונה חדשה של התוצאה המתוקנת — חובה<input type="file" name="after" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><button type="submit" class="primary">תוקן — שלח לאישור המדווח</button></form>`:''}
-      ${r.status==='awaiting_confirmation'?`<section class="confirmation"><h3>בדיקה ואישור התיקון</h3><label>מה בדקת? האם התיקון מתאים?<textarea id="confirmation-message" maxlength="6000" placeholder="יש לכתוב אישור או להסביר מה עדיין לא תקין"></textarea></label><div class="actions"><button id="confirm-fix" class="primary">בדקתי — התיקון תקין, סגור דיווח</button><button id="reject-fix" class="danger">לא תקין — החזר לטיפול</button></div></section>`:''}
-      ${r.status==='closed'?'<button id="reopen-fix" class="danger">הבעיה חזרה — פתח מחדש</button>':''}`;
-    setupUploads($('detail'));renderList();
-    $('copy-brief').onclick=async()=>{try{await navigator.clipboard.writeText(`דיווח #${r.id}: ${r.title}\nמצב: ${labels[r.status]}\nהזמנה: ${r.order_reference} פריט: ${r.item_reference}\nמה לא טוב: ${r.actual}\nאיך צריך להיות: ${r.expected}\n${location.origin}/bugs.html?id=${r.id}\n${r.resolution?'תיקון שהוגש: '+r.resolution:''}`);feedback('פרטי הדיווח הועתקו. אפשר להדביק אותם בצ׳אט איתי.');}catch{feedback('לא ניתן להעתיק כרגע. שלח בצ׳אט את מספר הדיווח: '+r.id,true);}};
-    $('comment-form').onsubmit=e=>{e.preventDefault();const form=e.currentTarget;const body=formData(form);saveEvent(body);};
+    disposeDetail();selected=data;dirty=false;const r=data.report,created=data.events.find(e=>e.event_type==='created'),job=data.agent_jobs?.[0];$('detail').classList.remove('empty-state');
+    $('detail').innerHTML=`<div class="dialog-heading"><h2>תקלה #${r.id}</h2>${badge(r.status,r.priority)}</div><p class="context muted">${esc(r.created_by_name)} · ${esc(date(r.created_at))}${r.order_reference?' · הזמנה '+esc(r.order_reference):''}${r.item_reference?' · פריט '+esc(r.item_reference):''}${r.page_path?` · <a href="${esc(r.page_path)}">פתח את המסך</a>`:''}</p><div class="brief"><h3>תיאור התקלה</h3><div class="prose">${esc(r.actual)}</div></div><div class="brief"><h3>הישג נדרש</h3><div class="prose">${esc(r.expected)}</div></div>${gallery(data.attachments.filter(f=>f.event_id===created?.id))}
+      ${job?`<section class="agent-box"><h3>${esc(jobLabels[job.status])}</h3><p class="prose">${esc(job.summary||'התיאור והתמונות שמורים בתור. הסוכן יאסוף את התקלה כשהוא מחובר.')}</p>${job.reference?`<p class="muted">אסמכתה: ${esc(job.reference)}</p>`:''}${job.status==='needs_approval'?'<p>לא בוצע שינוי בנתוני ההזמנות. אפשר לאשר שינוי מסוים בהודעה ולתעד את הטיפול באמצעות משתמש מורשה.</p>':''}</section>`:''}
+      ${r.resolution?`<section class="treatment"><h3>איך טופל</h3><div class="prose">${esc(r.resolution)}</div><p class="muted">${esc(r.handler_name)}${r.resolution_reference?' · '+esc(r.resolution_reference):''}</p></section>`:''}
+      ${r.status==='awaiting_confirmation'?'<section class="confirmation"><h3>התיקון מחכה לבדיקה שלך</h3><label>תוצאת הבדיקה<textarea id="confirmation-message" maxlength="6000" placeholder="בדקתי והכל תקין / מה עדיין לא תקין"></textarea></label><div class="actions"><button id="confirm-fix" class="primary">בדקתי, תקין — סגור</button><button id="reject-fix">עדיין לא תקין</button></div></section>':''}
+      <form id="comment-form"><h3>עדכון או תשובה</h3><label class="sr-only" for="comment-message">עדכון</label><textarea id="comment-message" name="message" maxlength="6000" placeholder="פרטים נוספים, תשובה לסוכן או אישור לשינוי מסוים…"></textarea><div class="upload" data-kind="before"><label>צרף תמונות נוספות<input type="file" name="before" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><div class="actions"><button type="submit">שלח עדכון</button>${!['closed','awaiting_confirmation'].includes(r.status)&&!['queued','running'].includes(job?.status)?'<button id="request-agent" type="button">שלח לסוכן</button>':''}<button id="copy-brief" type="button">העתק לצ׳אט</button></div></form>
+      ${data.can_manage&&['new','needs_info','in_progress'].includes(r.status)?`<details class="treatment"><summary>דווח איך התקלה טופלה</summary><form id="treatment-form"><label>מי טיפל?<input name="handler_name" maxlength="100" required value="${esc(r.handler_name)}" placeholder="אני / שם המטפל / הסוכן"></label><label>איך טופל ומה נבדק?<textarea name="resolution" maxlength="6000" required></textarea></label><label>אסמכתה לבדיקה או לגרסה<input name="resolution_reference" maxlength="300" placeholder="לא חובה אם מצורפת תמונת תוצאה"></label><div class="upload" data-kind="after"><label>תמונת התוצאה<input type="file" name="after" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><div class="actions"><button type="submit" class="primary">טופל — שלח לבדיקה</button>${r.status!=='in_progress'?'<button type="button" data-status="in_progress">התחל טיפול ידני</button>':''}${r.status!=='needs_info'?'<button type="button" data-status="needs_info">בקש מידע נוסף</button>':''}</div></form></details>`:''}
+      ${r.status==='closed'?'<button id="reopen-fix" class="danger">התקלה חזרה — פתח מחדש</button>':''}
+      <details class="optional"><summary>כל היסטוריית הטיפול (${data.events.length})</summary>${data.events.map(e=>`<article class="event"><strong>${esc(e.actor_name)}</strong><p class="muted">${esc(date(e.created_at))}${e.from_status!==e.to_status?' · '+esc(labels[e.to_status]):''}</p><div class="prose">${esc(e.message)}</div>${e.resolution?`<h3>איך טופל</h3><div class="prose">${esc(e.resolution)}</div><p class="muted">${esc(e.resolution_reference)}</p>`:''}${e.event_type!=='created'?gallery(data.attachments.filter(f=>f.event_id===e.id)):''}</article>`).join('')}</details>`;
+    setupUploads($('detail'));renderList();$('detail').querySelectorAll('input,textarea').forEach(input=>input.addEventListener('input',()=>dirty=true));
+    $('comment-form').onsubmit=e=>{e.preventDefault();saveEvent(formData(e.currentTarget));};
     $('treatment-form')?.addEventListener('submit',e=>{e.preventDefault();const body=formData(e.currentTarget);body.set('status','awaiting_confirmation');saveEvent(body);});
-    $('detail').querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{if(b.dataset.status===r.status){feedback('הדיווח כבר במצב זה');return;}const message=prompt(b.dataset.status==='needs_info'?'איזה מידע חסר?':'מה מתוכנן במסגרת הטיפול?');if(message?.trim()){const body=new FormData();body.set('status',b.dataset.status);body.set('message',message);saveEvent(body);}});
-    function confirm(status){const message=$('confirmation-message').value.trim();if(!message){feedback('נא לכתוב מה בדקת או מה עדיין לא תקין',true);return;}const body=new FormData();body.set('status',status);body.set('message',message);saveEvent(body);}
-    if($('confirm-fix'))$('confirm-fix').onclick=()=>confirm('closed');
-    if($('reject-fix'))$('reject-fix').onclick=()=>confirm('in_progress');
-    if($('reopen-fix'))$('reopen-fix').onclick=()=>{const message=prompt('מה חזר או עדיין לא תקין? ההיסטוריה ותמונות התיקון הקודמות יישמרו.');if(message?.trim()){const body=new FormData();body.set('status','in_progress');body.set('message',message);saveEvent(body);}};
+    $('detail').querySelectorAll('[data-status]').forEach(button=>button.onclick=()=>{const message=$('comment-message').value.trim()||(button.dataset.status==='in_progress'?'הטיפול החל ידנית':'');if(!message){feedback('כתוב בשדה העדכון איזה מידע חסר.',true);$('comment-message').focus();return;}const body=new FormData();body.set('status',button.dataset.status);body.set('message',message);saveEvent(body);});
+    function confirm(status){const message=$('confirmation-message').value.trim();if(!message){feedback('כתוב מה בדקת או מה עדיין לא תקין.',true);return;}const body=new FormData();body.set('status',status);body.set('message',message);saveEvent(body);}
+    if($('confirm-fix'))$('confirm-fix').onclick=()=>confirm('closed');if($('reject-fix'))$('reject-fix').onclick=()=>confirm('in_progress');
+    if($('reopen-fix'))$('reopen-fix').onclick=()=>{const message=$('comment-message').value.trim();if(!message){feedback('כתוב בשדה העדכון מה חזר או עדיין לא תקין.',true);return;}const body=new FormData();body.set('status','in_progress');body.set('message',message);saveEvent(body);};
+    if($('request-agent'))$('request-agent').onclick=()=>saving(async()=>{const data=await api('/'+r.id+'/agent',json({version:r.version}));const generation=++detailGeneration;renderDetail(data);await refreshList();await loadImages(data,generation);feedback('התקלה נשלחה לסוכן.');});
+    $('copy-brief').onclick=async()=>{try{await navigator.clipboard.writeText(`תקלה #${r.id}\nתיאור: ${r.actual}\nהישג נדרש: ${r.expected}\n${location.origin}/bugs.html?id=${r.id}`);feedback('פרטי התקלה הועתקו לצ׳אט.');}catch{feedback('אפשר לשלוח בצ׳אט את מספר התקלה: '+r.id,true);}};
   }
-  async function openReport(id){if(busy)return;const generation=++detailGeneration;const data=await api('/'+encodeURIComponent(id));if(generation!==detailGeneration)return;renderDetail(data);history.replaceState(null,'','/bugs.html?id='+data.report.id);await loadImages(data,generation);}
-  function saveEvent(body){const id=selected.report.id;body.set('version',String(selected.report.version));saving(async()=>{const data=await api('/'+id+'/events',{method:'POST',body});const generation=++detailGeneration;renderDetail(data);await refreshList();feedback('העדכון נשמר בהיסטוריית הדיווח');await loadImages(data,generation);});}
-  $('new-report').onclick=()=>{$('create-panel').hidden=false;$('create-form').elements.title.focus();};
-  $('cancel-create').onclick=()=>{$('create-panel').hidden=true;};
-  $('create-form').onsubmit=e=>{e.preventDefault();const form=e.currentTarget,body=formData(form);body.set('request_uid',createUid);saving(async()=>{const data=await api('',{method:'POST',body});form.reset();form.querySelectorAll('.upload').forEach(z=>z.clearBugFiles());createUid=crypto.randomUUID();$('create-panel').hidden=true;const generation=++detailGeneration;renderDetail(data);history.replaceState(null,'','/bugs.html?id='+data.report.id);await refreshList();feedback('הדיווח נפתח ונשמר עם התמונות');await loadImages(data,generation);});};
-  $('refresh').onclick=()=>saving(async()=>{await refreshList();if(selected){const data=await api('/'+selected.report.id);const generation=++detailGeneration;renderDetail(data);await loadImages(data,generation);}feedback('הדיווחים עודכנו');});
-  $('search').oninput=renderList;$('filter').onchange=renderList;
+  async function openReport(id){if(busy)return;const generation=++detailGeneration,data=await api('/'+encodeURIComponent(id));if(generation!==detailGeneration)return;renderDetail(data);view(true);history.replaceState(null,'','/bugs.html?id='+data.report.id);await loadImages(data,generation);}
+  function saveEvent(body){const id=selected.report.id;body.set('version',String(selected.report.version));saving(async()=>{const data=await api('/'+id+'/events',{method:'POST',body});const generation=++detailGeneration;renderDetail(data);await refreshList();await loadImages(data,generation);feedback('העדכון נשמר.');});}
+  $('new-report').onclick=()=>{view(false);$('actual').focus();};$('show-board').onclick=()=>view(true);
+  $('create-form').onsubmit=e=>{e.preventDefault();const form=e.currentTarget,body=formData(form);body.set('request_uid',createUid);saving(async()=>{const data=await api('',{method:'POST',body});form.reset();form.querySelectorAll('.upload').forEach(z=>z.clearBugFiles());createUid=crypto.randomUUID();const generation=++detailGeneration;renderDetail(data);view(true);history.replaceState(null,'','/bugs.html?id='+data.report.id);await refreshList();await loadImages(data,generation);feedback('תקלה #'+data.report.id+' נשלחה ונשמרה.');});};
+  $('refresh').onclick=()=>saving(async()=>{await refreshList();if(selected){const data=await api('/'+selected.report.id);const generation=++detailGeneration;renderDetail(data);await loadImages(data,generation);}feedback('התצוגה עודכנה.');});$('search').oninput=renderList;$('filter').onchange=renderList;
   $('close-image').onclick=()=>{$('image-dialog').close();$('full-image').removeAttribute('src');};
-  setupUploads($('create-panel'));
-  refreshList().then(()=>{const id=new URLSearchParams(location.search).get('id');if(/^\d+$/.test(id||''))return openReport(id);}).catch(e=>feedback(e.message,true));
+  $('cancel-annotation').onclick=()=>$('annotation-dialog').close();$('annotation-dialog').addEventListener('close',()=>{annotation?.dispose();annotation=null;annotationTarget=null;});
+  document.querySelectorAll('[data-tool]').forEach(button=>button.onclick=()=>{annotation?.tool(button.dataset.tool);document.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));});$('draw-color').oninput=e=>annotation?.color(e.target.value);$('undo-drawing').onclick=()=>annotation?.undo();$('clear-drawing').onclick=()=>annotation?.clear();
+  $('save-annotation').onclick=async()=>{if(!annotationTarget)return;const save=annotationTarget;$('save-annotation').disabled=true;try{const blob=await new Promise(resolve=>$('annotation-canvas').toBlob(resolve,'image/jpeg',.9));if(!blob||blob.size>4*1024*1024)throw new Error('התמונה המסומנת גדולה מדי. נסה תמונה קטנה יותר.');save(new File([blob],'תמונה-מסומנת.jpg',{type:blob.type}));$('annotation-dialog').close();}catch(e){feedback(e.message,true);}finally{$('save-annotation').disabled=false;}};
+  async function loadConnections(){const data=await api('/agent-connections');$('connections').innerHTML=data.connections.map(c=>`<div class="connection-row"><div><strong>${esc(c.name)}</strong><p class="muted">${c.revoked_at?'החיבור בוטל':'תוקף עד '+esc(date(c.expires_at))}${c.last_seen_at?' · נראה לאחרונה '+esc(date(c.last_seen_at)):''}</p></div>${!c.revoked_at?`<button class="danger" data-revoke="${c.id}">בטל חיבור</button>`:''}</div>`).join('')||'<p class="muted">עדיין אין סוכן מחובר.</p>';$('connections').querySelectorAll('[data-revoke]').forEach(button=>button.onclick=()=>saving(async()=>{await api('/agent-connections/'+button.dataset.revoke,{method:'DELETE'});await loadConnections();feedback('חיבור הסוכן בוטל.');}));}
+  $('reload-connections').onclick=()=>saving(loadConnections);$('pair-agent').onclick=()=>saving(async()=>{const data=await api('/agent-connections',json({name:'סוכן התקלות'}));$('agent-token').value=data.token;$('pair-result').hidden=false;await loadConnections();feedback('נוצר חיבור מוגבל לתקלות, בתוקף לשבעה ימים. הסוכן יופיע כמחובר רק אחרי הפעלתו.');});
+  $('preview-reset').onclick=()=>saving(async()=>{resetPreview=await api('/reset-preview');$('reset-summary').textContent=`יימחקו ${resetPreview.report_count} דיווחים ו־${resetPreview.image_count} תמונות. קודם יישמר גיבוי פרטי.`;$('reset-form').hidden=false;});
+  $('reset-form').onsubmit=e=>{e.preventDefault();if(!resetPreview)return;saving(async()=>{const result=await api('/reset',json({...resetPreview,confirmation:$('reset-confirmation').value}));disposeDetail();selected=null;detailGeneration++;$('detail').innerHTML='<h2>הדיווחים הישנים נמחקו</h2><p>אפשר להתחיל לדווח במערכת החדשה.</p>';$('reset-form').hidden=true;$('reset-confirmation').value='';$('backup-result').innerHTML=`גיבוי #${Number(result.backup_id)} נשמר. <button id="download-backup">הורד גיבוי</button>`;$('download-backup').onclick=async()=>{try{const response=await fetch('/api/bug-reports/backups/'+result.backup_id);if(!response.ok)throw new Error('הורדת הגיבוי נכשלה');const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download=`faults-backup-${result.backup_id}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){feedback(e.message,true);}};await refreshList();feedback(`נמחקו ${result.removed_reports} דיווחים ו־${result.removed_images} תמונות. הגיבוי נשמר.`);});};
+  async function showBackups(){const data=await api('/backups');$('backup-list').innerHTML=data.backups.map(b=>`<div class="connection-row"><div>גיבוי #${b.id} · ${b.report_count} דיווחים<p class="muted">${esc(date(b.created_at))}${b.restored_at?' · שוחזר '+esc(date(b.restored_at)):''}</p></div><div class="actions"><button data-backup-download="${b.id}">הורד גיבוי</button>${!b.restored_at?`<button data-backup-restore="${b.id}">שחזר דיווחים</button>`:''}</div></div>`).join('')||'<p class="muted">עדיין אין גיבויים.</p>';$('backup-list').querySelectorAll('[data-backup-restore]').forEach(button=>button.onclick=()=>saving(async()=>{const result=await api('/backups/'+button.dataset.backupRestore+'/restore',json({}));await showBackups();await refreshList();feedback(`שוחזרו ${result.restored_reports} דיווחים. שום קריאה קיימת לא שונתה.`);}));$('backup-list').querySelectorAll('[data-backup-download]').forEach(button=>button.onclick=async()=>{try{const response=await fetch('/api/bug-reports/backups/'+button.dataset.backupDownload);if(!response.ok)throw new Error('הורדת גיבוי נכשלה');const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download=`faults-backup-${button.dataset.backupDownload}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){feedback(e.message,true);}});}
+  $('list-backups').onclick=()=>saving(showBackups);
+  setupUploads($('create-panel'));refreshList().then(()=>{const id=new URLSearchParams(location.search).get('id');if(/^\d+$/.test(id||''))return openReport(id);}).catch(e=>feedback(e.message,true));
+  setInterval(async()=>{if(busy||document.hidden)return;try{await refreshList();if(selected&&!dirty&&!$('board-panel').hidden){const data=await api('/'+selected.report.id);if(data.report.version!==selected.report.version){const generation=++detailGeneration;renderDetail(data);await loadImages(data,generation);}}}catch{/* Keep drafts and show connection failures on an explicit action. */}},20000);
 })();

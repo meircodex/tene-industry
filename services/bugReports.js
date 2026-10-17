@@ -36,7 +36,13 @@ function validateFiles(files = []) {
     } else if (b.length >= 20 && b[0] === 255 && b[1] === 216 && b[2] === 255 && b[b.length - 2] === 255 && b[b.length - 1] === 217) mime = 'image/jpeg';
     else if (b.length >= 30 && b.toString('ascii', 0, 4) === 'RIFF' && b.readUInt32LE(4) + 8 === b.length && b.toString('ascii', 8, 12) === 'WEBP' && ['VP8 ', 'VP8L', 'VP8X'].includes(b.toString('ascii', 12, 16))) mime = 'image/webp';
     if (!mime || file.mimetype !== mime || !['before','expected','after'].includes(file.fieldname)) fail(415, 'ניתן לצרף רק תמונות PNG, JPG או WebP תקינות');
-    return { kind: file.fieldname, filename: String(file.originalname || 'image').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 160), mime, data: b };
+    let name = String(file.originalname || 'image');
+    // Multipart filenames arrive as Latin-1 from Busboy; decode valid UTF-8 without corrupting genuine Unicode service inputs.
+    if (/^[\u0000-\u00ff]*$/.test(name)) {
+      const raw=Buffer.from(name,'latin1'), decoded=raw.toString('utf8');
+      if (!decoded.includes('\ufffd') && Buffer.from(decoded,'utf8').equals(raw)) name=decoded;
+    }
+    return { kind: file.fieldname, filename: name.split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g, '').slice(0, 160), mime, data: b };
   });
 }
 function createBugReportsService({ db }) {
@@ -50,7 +56,7 @@ function createBugReportsService({ db }) {
   }
   function detail(id, actor) {
     const report = read(id, actor);
-    return { report, can_manage: manager(actor), events: db.prepare('SELECT * FROM bug_report_events WHERE report_id=? ORDER BY id').all(report.id), attachments: db.prepare('SELECT id,report_id,event_id,kind,filename,mime_type,byte_size,created_at FROM bug_report_attachments WHERE report_id=? ORDER BY id').all(report.id) };
+    return { report, can_manage: manager(actor), agent_jobs: db.prepare('SELECT id,status,summary,reference,created_at,updated_at FROM fault_agent_jobs WHERE report_id=? ORDER BY id DESC').all(report.id), events: db.prepare('SELECT * FROM bug_report_events WHERE report_id=? ORDER BY id').all(report.id), attachments: db.prepare('SELECT id,report_id,event_id,kind,filename,mime_type,byte_size,created_at FROM bug_report_attachments WHERE report_id=? ORDER BY id').all(report.id) };
   }
   function capacity(id, files) {
     const size = files.reduce((s, f) => s + f.data.length, 0);
@@ -71,9 +77,10 @@ function createBugReportsService({ db }) {
     if (files.some(f => f.kind === 'after')) fail(400, 'תמונת תיקון מצרפים בשלב הטיפול');
     const uid = field(body.request_uid, 50, true);
     if (!/^[a-f0-9-]{36}$/i.test(uid)) fail(400, 'מזהה פעולה לא תקין');
-    const values = [field(body.title, 160, true), field(body.actual, 6000, true), field(body.expected, 6000, true), safePagePath(body.page_path), field(body.order_reference, 80), field(body.item_reference, 80), body.priority || 'normal'];
+    const actual = field(body.actual, 6000, true);
+    const values = [field(body.title || actual.slice(0, 100), 160, true), actual, field(body.expected, 6000, true), safePagePath(body.page_path), field(body.order_reference, 80), field(body.item_reference, 80), body.priority || 'normal'];
     if (!['low','normal','urgent'].includes(values[6])) fail(400, 'עדיפות לא תקינה');
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify(values)).update(JSON.stringify(files.map(f => [f.kind, f.filename, crypto.createHash('sha256').update(f.data).digest('hex')]))).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify(values)).update(body.request_agent === '1' ? 'agent-requested' : '').update(JSON.stringify(files.map(f => [f.kind, f.filename, crypto.createHash('sha256').update(f.data).digest('hex')]))).digest('hex');
     return db.transaction(() => {
       const previous = db.prepare('SELECT id,created_by,fingerprint FROM bug_reports WHERE request_uid=?').get(uid);
       if (previous) {
@@ -85,6 +92,7 @@ function createBugReportsService({ db }) {
       const report = read(id, actor);
       const eventId = event(report, actor, 'created', 'נפתח דיווח', 'new');
       attach(id, eventId, files);
+      if (body.request_agent === '1') db.prepare('INSERT INTO fault_agent_jobs(report_id) VALUES(?)').run(id);
       return detail(id, actor);
     })();
   }
@@ -105,21 +113,24 @@ function createBugReportsService({ db }) {
           resolution = field(body.resolution, 6000, true);
           reference = field(body.resolution_reference, 300);
           handler = field(body.handler_name, 100, true);
-          if (!files.some(f => f.kind === 'after')) fail(400, 'יש לצרף תמונה חדשה של התיקון והסבר כיצד טופל');
+          if (!files.some(f => f.kind === 'after') && !reference) fail(400, 'יש לצרף תמונת תוצאה או אסמכתת בדיקה לתיקון');
         }
-        if (next === 'closed' && (!resolution || !db.prepare("SELECT 1 FROM bug_report_attachments WHERE report_id=? AND kind='after'").get(report.id))) fail(400, 'אי אפשר לסגור ללא תיעוד תיקון');
+        if (next === 'closed' && (!resolution || (!reference && !db.prepare("SELECT 1 FROM bug_report_attachments WHERE report_id=? AND kind='after'").get(report.id)))) fail(400, 'אי אפשר לסגור ללא תיעוד תיקון');
       } else if (!message && !files.length) fail(400, 'נא לכתוב הודעה או לצרף תמונה');
       if (files.some(f => f.kind === 'after') && !(manager(actor) && next === 'awaiting_confirmation' && next !== report.status)) fail(403, 'תמונת תיקון מצורפת רק בהגשת תיקון לאישור');
       capacity(report.id, files);
       const eventId = event(report, actor, next === report.status ? 'comment' : 'status', message || 'תיקון הוגש לאישור', next, next === 'awaiting_confirmation' && next !== report.status ? resolution : '', next === 'awaiting_confirmation' ? reference : '', next === 'awaiting_confirmation' ? handler : '');
       attach(report.id, eventId, files);
+      // A manual treatment takes ownership; a late agent callback must not overwrite it.
+      if (next !== report.status) db.prepare("UPDATE fault_agent_jobs SET status='cancelled',lease_hash=NULL,lease_until=NULL,summary='הטיפול עודכן ידנית',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE report_id=? AND status IN ('queued','running')").run(report.id);
       db.prepare("UPDATE bug_reports SET status=?,resolution=?,resolution_reference=?,handler_name=?,version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?").run(next, resolution, reference, handler, report.id);
       return detail(report.id, actor);
     })();
   }
   function list(actor) {
     const rows = db.prepare(`SELECT id,title,priority,status,order_reference,item_reference,created_by_name,updated_at,version FROM bug_reports ${manager(actor) ? '' : 'WHERE created_by=?'} ORDER BY updated_at DESC,id DESC LIMIT 500`).all(...(manager(actor) ? [] : [actor.id]));
-    return { reports: rows, can_manage: manager(actor), limit: 500 };
+    const online = db.prepare("SELECT 1 FROM fault_agent_credentials WHERE revoked_at IS NULL AND expires_at > ? AND last_seen_at > ? LIMIT 1").get(new Date().toISOString(),new Date(Date.now()-90000).toISOString());
+    return { reports: rows, can_manage: manager(actor), can_reset: actor.role === 'admin', agent_online: Boolean(online), limit: 500 };
   }
   function attachment(id, attachmentId, actor) {
     const report = read(id, actor);

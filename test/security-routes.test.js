@@ -2003,10 +2003,11 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal((await request('/api/purchase-orders/1/receive', { method: 'PATCH', headers: authHeaders(office), body: emptyBody })).status, 403);
   });
 
-  await t.test('production mutation allows production but rejects office', async () => {
+  await t.test('manual status allows office while production quantity mutations still reject office', async () => {
     const body = JSON.stringify({ status: 'bad-status' });
     assert.equal((await request('/api/items/1/status', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body })).status, 401);
-    assert.equal((await request('/api/items/1/status', { method: 'PATCH', headers: authHeaders(office), body })).status, 403);
+    // Manual status changes were explicitly opened to office in dbd4db6; invalid data still fails validation.
+    assert.equal((await request('/api/items/1/status', { method: 'PATCH', headers: authHeaders(office), body })).status, 400);
     assert.notEqual((await request('/api/items/1/status', { method: 'PATCH', headers: authHeaders(production), body })).status, 401);
     assert.notEqual((await request('/api/items/1/status', { method: 'PATCH', headers: authHeaders(production), body })).status, 403);
     assert.notEqual((await request('/api/items/1/status', { method: 'PATCH', headers: authHeaders(kiosk), body })).status, 401);

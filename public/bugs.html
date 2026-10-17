@@ -1,26 +1,34 @@
 <!doctype html>
 <html lang="he" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>דיווחי באגים ותיקונים — IronBend</title><link rel="stylesheet" href="/bugs.css?v=1"><script src="/auth-client.js"></script><script src="/nav.js?v=bugs1" defer></script><script src="/bugs.js?v=1" defer></script></head>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>תקלות — IronBend</title>
+  <link rel="stylesheet" href="/bugs.css?v=2">
+  <script src="/auth-client.js"></script><script src="/nav.js?v=fault2" defer></script>
+  <script src="/fault-annotation.js?v=2" defer></script><script src="/bugs.js?v=2" defer></script>
+</head>
 <body>
 <main>
-  <header class="page-heading"><div><h1>דיווחי באגים ותיקונים</h1><p>מה לא תקין → איך צריך להיות → טיפול ותמונת תיקון → אישור שלך</p></div><button id="new-report" class="primary">+ דיווח חדש</button></header>
-  <p class="notice">כאן מרכזים את הדיווחים והשיחה על התיקון. כדי שאטפל בדיווח יחד איתך, שלח לי בצ׳אט את מספרו או השתמש ב״העתק פרטי דיווח לצ׳אט״. הדיווחים אינם נשלחים אוטומטית לבינה מלאכותית.</p>
+  <header class="page-heading"><div><p class="eyebrow">מרכז התקלות</p><h1>מה צריך לתקן?</h1><p class="muted">מדווחים בפשטות. רואים את הטיפול במקום אחד.</p></div><span id="agent-state" class="connection">בודק חיבור לסוכן…</span></header>
+  <nav class="view-tabs" aria-label="תצוגת תקלות"><button id="new-report" class="active" aria-pressed="true">דיווח תקלה</button><button id="show-board" aria-pressed="false">טיפול ומעקב <span id="open-count">0</span></button></nav>
   <div id="feedback" role="status" aria-live="polite"></div>
-  <section id="create-panel" class="panel" hidden>
-    <h2>דיווח חדש</h2>
+  <section id="create-panel" class="panel compose">
     <form id="create-form">
-      <label>כותרת קצרה<input name="title" maxlength="160" required placeholder="לדוגמה: המספר מכסה את סימון הכיפוף"></label>
-      <div class="two"><label>מה לא טוב בפועל?<textarea name="actual" maxlength="6000" required></textarea></label><label>איך זה צריך להיות?<textarea name="expected" maxlength="6000" required></textarea></label></div>
-      <div class="four"><label>מספר הזמנה<input name="order_reference" maxlength="80" placeholder="לדוגמה: 097"></label><label>מספר פריט<input name="item_reference" maxlength="80" placeholder="לדוגמה: 4, 7"></label><label>קישור למסך בתוכנה<input name="page_path" maxlength="2000" placeholder="/orders.html?id=97" dir="ltr"></label><label>עדיפות<select name="priority"><option value="normal">רגילה</option><option value="urgent">דחופה — מפריעה לעבודה</option><option value="low">נמוכה</option></select></label></div>
-      <div class="two"><div class="upload" data-kind="before"><label>תמונות הבעיה — לפני התיקון<input type="file" name="before" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div><div class="upload" data-kind="expected"><label>תמונת מקור / איך צריך להיות<input type="file" name="expected_image" accept="image/png,image/jpeg,image/webp" multiple></label><div class="previews"></div></div></div>
-      <p class="muted">אפשר לבחור תמונות, לגרור אותן לתיבה, או ללחוץ בתיבה ולהדביק צילום מסך (Ctrl+V). עד 3 תמונות לתיבה, 4 מ״ב לתמונה.</p>
-      <div class="actions"><button type="submit" class="primary">שלח דיווח</button><button type="button" id="cancel-create">בטל</button></div>
+      <label for="actual">תיאור התקלה <span class="required">*</span></label><textarea id="actual" name="actual" maxlength="6000" required placeholder="מה לא עובד? מה קרה כשניסית?"></textarea>
+      <label for="expected">הישג נדרש <span class="required">*</span></label><textarea id="expected" name="expected" maxlength="6000" required placeholder="מה צריך לקרות אחרי התיקון?"></textarea>
+      <div class="upload" data-kind="before"><label for="problem-images">תמונות</label><p class="muted">אפשר לצלם, לבחור תמונות או להדביק צילום מסך. אחר כך אפשר לצייר ולסמן.</p><input id="problem-images" type="file" name="before" accept="image/png,image/jpeg,image/webp" multiple><div class="previews"></div></div>
+      <details class="optional"><summary>פרטים נוספים (לא חובה)</summary><div class="two"><label>מספר הזמנה<input name="order_reference" maxlength="80" inputmode="numeric"></label><label>מספר פריט<input name="item_reference" maxlength="80"></label></div><label>המסך שבו זה קרה<input name="page_path" maxlength="2000" placeholder="/orders.html?id=87" dir="ltr"></label><label>עדיפות<select name="priority"><option value="normal">רגילה</option><option value="urgent">דחופה — העבודה נעצרת</option><option value="low">אפשר בהמשך</option></select></label></details>
+      <label class="checkline"><input type="checkbox" name="request_agent" value="1" checked>שלח לסוכן התקלות לטיפול אוטומטי</label><p id="create-agent-hint" class="muted">שינוי בנתוני הזמנות לא יבוצע ללא אישור שלך. התקלה תישמר גם כשהסוכן אינו מחובר.</p>
+      <div class="actions"><button type="submit" class="primary">שלח תקלה ←</button></div>
     </form>
   </section>
-  <div class="workspace">
-    <aside class="panel"><div class="list-heading"><h2>הדיווחים</h2><button id="refresh">רענן</button></div><label>חיפוש<input id="search" type="search" placeholder="כותרת, הזמנה או מספר דיווח"></label><label>מצב טיפול<select id="filter"><option value="open">כל הפתוחים</option><option value="all">כל הדיווחים והארכיון</option><option value="new">חדש</option><option value="needs_info">ממתין למידע</option><option value="in_progress">בטיפול</option><option value="awaiting_confirmation">תוקן — ממתין לאישור</option><option value="closed">אושר ונסגר</option></select></label><p id="list-summary" class="muted"></p><div id="report-list"></div></aside>
-    <section id="detail" class="panel"><p>בחר דיווח כדי לראות תמונות, שיחה ותיעוד טיפול.</p></section>
-  </div>
+  <section id="board-panel" hidden>
+    <div class="board-tools"><div><h2>הטיפול בתקלות</h2><p class="muted">מה דווח, מה נעשה ומה עדיין מחכה לך.</p></div><button id="refresh">רענן</button></div>
+    <div class="workspace"><aside class="panel"><label class="sr-only" for="search">חיפוש תקלות</label><input id="search" type="search" placeholder="חיפוש תקלה או הזמנה…"><label class="sr-only" for="filter">מצב טיפול</label><select id="filter"><option value="open">כל התקלות הפתוחות</option><option value="all">כל התקלות</option><option value="new">חדש</option><option value="in_progress">בטיפול</option><option value="needs_info">ממתין למידע</option><option value="awaiting_confirmation">מחכה לבדיקה שלי</option><option value="closed">טופל ונסגר</option></select><p id="list-summary" class="muted"></p><div id="report-list"></div></aside><section id="detail" class="panel empty-state"><h2>כל הטיפול, במקום אחד</h2><p class="muted">בחר תקלה כדי לראות את התמונות, להוסיף פרטים או לדווח איך טופלה.</p></section></div>
+  </section>
+  <details id="agent-settings" class="panel settings" hidden><summary>ניהול חיבור הסוכן והדיווחים הישנים</summary><p class="muted">חיבור הסוכן מוגבל לקריאות שירות בלבד. הוא לא מקנה גישה להזמנות או להגדרות המערכת.</p><div class="actions"><button id="pair-agent">חבר סוכן</button><button id="reload-connections">רענן חיבורים</button></div><div id="connections"></div><div id="pair-result" hidden><p>המפתח מוצג פעם אחת. יש לשמור אותו בהגדרות הסוכן המקומי, לא בצ׳אט ולא בקוד.</p><input id="agent-token" readonly dir="ltr" aria-label="מפתח חיבור סוכן"><p class="muted">פקודת ההפעלה והוראות ההתקנה נמצאות ב־docs/fault-desk.md.</p></div><hr><h3>מחיקת הדיווחים הישנים</h3><p class="muted">הדיווחים והתמונות יוסרו מהמסך. קודם יישמר גיבוי פרטי, הנגיש למנהל מערכת בלבד.</p><button id="preview-reset" class="danger">בדוק מה יימחק</button><form id="reset-form" hidden><p id="reset-summary"></p><label>להמשך, כתוב: מחיקת התקלות הישנות<input id="reset-confirmation" autocomplete="off" required></label><button class="danger" type="submit">שמור גיבוי ומחק את הדיווחים הישנים</button></form><p id="backup-result"></p></details>
+  <details id="backup-settings" class="panel settings" hidden><summary>גיבויים ושחזור דיווחים</summary><p class="muted">שחזור מוסיף את הקריאות והתמונות מהגיבוי, במספרים חדשים. הוא אינו דורס קריאות קיימות ואינו מפעיל מחדש עבודות סוכן ישנות.</p><button id="list-backups">הצג גיבויים</button><div id="backup-list"></div></details>
 </main>
-<dialog id="image-dialog"><button id="close-image" aria-label="סגור תמונה">סגור ×</button><img id="full-image" alt="תמונת דיווח מוגדלת"></dialog>
+<dialog id="image-dialog"><div class="dialog-heading"><h2>תמונת התקלה</h2><button id="close-image" aria-label="סגור תמונה">סגור ×</button></div><img id="full-image" alt="תמונת דיווח מוגדלת"></dialog>
+<dialog id="annotation-dialog" aria-labelledby="annotation-title"><div class="dialog-heading"><div><h2 id="annotation-title">סמן על התמונה</h2><p class="muted">בחר כלי וסמן עם האצבע או העכבר.</p></div><button id="cancel-annotation" type="button">בטל ×</button></div><div class="annotation-tools" role="toolbar" aria-label="כלי סימון"><button type="button" data-tool="pen" aria-pressed="true">עיפרון</button><button type="button" data-tool="arrow" aria-pressed="false">חץ</button><button type="button" data-tool="rect" aria-pressed="false">מסגרת</button><label>צבע<input id="draw-color" type="color" value="#ef4444"></label><button type="button" id="undo-drawing">בטל סימון אחרון</button><button type="button" id="clear-drawing">נקה סימונים</button></div><div class="canvas-wrap"><canvas id="annotation-canvas" aria-label="תמונה לציור ולסימון"></canvas></div><div class="actions"><button id="save-annotation" class="primary" type="button">שמור סימונים</button></div><p class="muted">הסימונים יישמרו כחלק מהתמונה שתצורף לתקלה.</p></dialog>
 </body></html>
