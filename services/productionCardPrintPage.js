@@ -319,14 +319,15 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 .pc-weight-chip.bad{color:#991b1b;background:#fef2f2;border-color:#fecaca;}
 
 /* ── Cards ── */
+/* Keep the 5mm safe area inside each A4 sheet so direct print and PDF export agree. */
 .cards-pages{display:flex;flex-direction:column;gap:12mm;align-items:center;}
-.cards-page{width:210mm;height:297mm;background:#fff;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.14);}
-.cards-grid{display:grid;grid-template-columns:repeat(2,105mm);grid-template-rows:repeat(4,74.25mm);grid-auto-rows:74.25mm;gap:0;align-items:stretch;justify-content:start;width:210mm;height:297mm;margin:0;background:#fff;}
-.prod-card{width:105mm;height:74.25mm;margin:0;background:#fff;border:0.25mm solid #1a2332;border-radius:0;
+.cards-page{width:210mm;height:297mm;padding:5mm;background:#fff;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.14);}
+.cards-grid{display:grid;grid-template-columns:repeat(2,100mm);grid-template-rows:repeat(4,71.75mm);grid-auto-rows:71.75mm;gap:0;align-items:stretch;justify-content:start;width:200mm;height:287mm;margin:0;background:#fff;}
+.prod-card{width:100mm;height:71.75mm;margin:0;background:#fff;
   overflow:hidden;page-break-inside:avoid;break-inside:avoid;display:flex;flex-direction:column;
-  font-size:8px;box-shadow:none;position:relative;}
-.prod-card.pile-cage-master-card{border:0.6mm solid #1a2332;background:#fff;}
-.prod-card.pile-cage-component-card{border-style:dashed;}
+  font-size:8px;box-shadow:none;position:relative;border:0!important;}
+.prod-card.pile-cage-master-card{background:#fff;border:0!important;}
+.prod-card.pile-cage-component-card{border:0!important;}
 .prod-card>:not(.pc-print-face):not(.pc-screen-tools):not(.pc-pick){display:none!important;}
 /* Card picking — tap a card to include or exclude it, like picking photos. */
 .pc-pick{position:absolute;top:1.5mm;right:1.5mm;z-index:4;width:6.4mm;height:6.4mm;border-radius:50%;
@@ -345,16 +346,16 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 .pc-screen-tools button:hover{background:#c9621a;}
 .pc-split-state{display:inline-flex;align-items:center;border-radius:5px;background:#fff3d7;border:1px solid #ffd6a0;color:#8a4b00;padding:3px 6px;font-size:10px;font-weight:900;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.12);}
 .pc-print-face{display:grid;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
-.pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
-.pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:13.5px;font-weight:900;line-height:1;background:#1a2332;color:#fff;}
+.pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
+.pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:13.5px;font-weight:900;line-height:1;background:#fff;color:#000;border:0!important;}
 .pc-print-head-meta{display:flex;align-items:center;justify-content:flex-end;gap:2.5mm;min-width:0;flex:1;}
 .pc-print-customer{min-width:0;font-size:12px;font-weight:900;line-height:1.1;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pc-print-diameter{font-size:13.5px;font-weight:900;white-space:nowrap;}
-.pc-print-ref{min-height:11mm;padding:1.25mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:12.5px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;}
+.pc-print-ref{min-height:11mm;padding:1.25mm 3mm;font-size:12.5px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
 .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
 .pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
-.pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;border-top:0.25mm solid #1a2332;font-size:11px;font-weight:900;text-align:center;}
-.pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;border-left:0.25mm solid #1a2332;white-space:nowrap;overflow:hidden;}
+.pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;font-size:11px;font-weight:900;text-align:center;border:0!important;}
+.pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border:0!important;}
 .pc-print-bottom span:first-child{border-left:0;}
 .pc-print-qr-panel{display:grid;align-items:center;justify-items:center;width:27mm;height:100%;overflow:hidden;background:transparent;}
 .pc-print-qr-code{width:22mm;height:22mm;display:flex;align-items:center;justify-content:center;transform:translate(-1.5mm,0);}
@@ -428,51 +429,50 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   body.preview-locked .cards-pages{display:none!important;}
   body.preview-locked .print-blocked-page{display:flex!important;width:210mm;height:297mm;align-items:center;justify-content:center;text-align:center;font-family:'Heebo',Arial,sans-serif;font-size:18px;font-weight:900;color:#1a2332;padding:20mm;}
   .cards-pages{display:block!important;margin:0!important;padding:0!important;direction:ltr!important;width:210mm!important;}
-  .cards-page{width:210mm!important;height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important;box-shadow:none!important;break-after:page;page-break-after:always;position:relative!important;left:0!important;}
+  .cards-page{width:210mm!important;height:297mm!important;margin:0!important;padding:5mm!important;overflow:hidden!important;box-shadow:none!important;break-after:page;page-break-after:always;position:relative!important;left:0!important;}
   .cards-page:last-child{break-after:auto;page-break-after:auto;}
   .cards-grid{
     display:grid!important;
-    grid-template-columns:repeat(2, 105mm);
-    grid-template-rows:repeat(4, 74.25mm);
-    grid-auto-rows:74.25mm;
+    grid-template-columns:repeat(2, 100mm);
+    grid-template-rows:repeat(4, 71.75mm);
+    grid-auto-rows:71.75mm;
     gap:0;
     align-items:stretch;
     justify-content:start;
   }
-  .cards-grid{break-before:auto;page-break-before:auto;height:297mm!important;width:210mm!important;}
-  .prod-card{border:0.25mm solid #1a2332!important;border-radius:0!important;overflow:hidden!important;box-sizing:border-box!important;width:105mm!important;height:74.25mm!important;}
+  .cards-grid{break-before:auto;page-break-before:auto;height:287mm!important;width:200mm!important;}
+  .prod-card{overflow:hidden!important;box-sizing:border-box!important;width:100mm!important;height:71.75mm!important;border:0!important;}
   .pc-pick{display:none!important;}
   .prod-card[data-picked="0"]{display:none!important;}
   .cards-page[data-empty-page="1"]{display:none!important;}
   .pc-screen-tools{display:none!important;}
   .prod-card>:not(.pc-print-face){display:none!important;}
   .pc-print-face{display:grid!important;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
-  .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;border-right:0.25mm solid #1a2332;overflow:hidden;direction:ltr;}
-  .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;border-bottom:0.25mm solid #1a2332;font-size:14px;font-weight:900;line-height:1;background:#1a2332!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
+  .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:14px;font-weight:900;line-height:1;background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:0!important;}
   .pc-print-customer{font-size:12.5px!important;}
   .pc-print-diameter{font-size:14px!important;}
-  .pc-print-ref{min-height:11mm;padding:1.25mm 3mm;border-bottom:0.25mm solid #d8dee8;font-size:13px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;}
+  .pc-print-ref{min-height:11mm;padding:1.25mm 3mm;font-size:13px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
   .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
   .pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
-  .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;border-top:0.25mm solid #1a2332;font-size:13px;font-weight:900;text-align:center;}
-  .pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;border-left:0.25mm solid #1a2332;white-space:nowrap;overflow:hidden;}
+  .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;font-size:13px;font-weight:900;text-align:center;border:0!important;}
+  .pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border:0!important;}
   .pc-print-bottom span:first-child{border-left:0;}
   .pc-print-qr-panel{display:grid;align-items:center;justify-items:center;width:27mm;height:100%;overflow:hidden;background:transparent!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .pc-print-qr-code{width:22mm;height:22mm;display:flex;align-items:center;justify-content:center;transform:translate(-1.5mm,0);}
   .pc-print-qr-code canvas,.pc-print-qr-code img{width:22mm!important;height:22mm!important;display:block;}
   .pc-print-status{width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-top:0.25mm solid #1a2332;font-size:10px;font-weight:900;letter-spacing:0;text-align:center;line-height:1.1;background:#1a2332!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .prod-card{
-    width:105mm!important;
-    height:74.25mm!important;
+    width:100mm!important;
+    height:71.75mm!important;
     margin:0!important;
     box-shadow:none;
     break-inside:avoid;
     page-break-inside:avoid;
-    border-width:1px;
-    border-radius:2px;
     font-size:8px;
+    border:0!important;
   }
-  .prod-card{border:0.25mm solid #1a2332!important;border-radius:0!important;overflow:hidden!important;}
+  .prod-card{overflow:hidden!important;border:0!important;}
   .pc-head{padding:3px 5px 2px;border-bottom-width:1px;}
   .pc-title{font-size:9px;line-height:1.1;}
   .pc-date{font-size:7px;margin-top:0;}

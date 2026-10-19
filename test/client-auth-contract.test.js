@@ -163,7 +163,7 @@ test('production card split does not add a generic split master card', () => {
   assert.match(productionCardsRoute, /pc-split-hotspot/);
   assert.match(productionCardsRoute, /data-split-menu-open/);
   assert.doesNotMatch(productionCardsRoute, /\\u05e4\\u05e6\\u05dc \\u05dc-2/);
-  assert.match(productionCardsRoute, /grid-template-columns:repeat\(2,105mm\)/);
+  assert.match(productionCardsRoute, /grid-template-columns:repeat\(2,100mm\)/);
   assert.match(productionCardsRoute, /cards-pages/);
   assert.match(productionCardsRoute, /cards-page/);
   assert.match(productionCardsRoute, /renderA4CardPages/);
@@ -171,9 +171,9 @@ test('production card split does not add a generic split master card', () => {
   assert.match(productionCardsRoute, /index % 8 === 0/);
   assert.match(productionCardsRoute, /page-break-after:always/);
   assert.match(productionCardsRoute, /width:210mm/);
-  assert.match(productionCardsRoute, /grid-template-columns:repeat\(2, 105mm\)/);
-  assert.match(productionCardsRoute, /grid-auto-rows:74\.25mm/);
-  assert.match(productionCardsRoute, /height:74\.25mm!important/);
+  assert.match(productionCardsRoute, /grid-template-columns:repeat\(2, 100mm\)/);
+  assert.match(productionCardsRoute, /grid-auto-rows:71\.75mm/);
+  assert.match(productionCardsRoute, /height:71\.75mm!important/);
   assert.match(productionCardsRoute, /pc-print-face/);
   assert.match(productionCardsRoute, /grid-template-columns:minmax\(0,1fr\) 27mm/);
   assert.match(productionCardsRoute, /pc-print-qr-code/);

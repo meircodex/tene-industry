@@ -97,14 +97,23 @@ test('production print page renders fixed A4 cards without order summary and wit
   assert.match(html, /data-split-menu-open/);
   assert.doesNotMatch(html, /\\u05e4\\u05e6\\u05dc \\u05dc-2/);
   assert.match(html, /Math\.min\(2, Number\(cardSplits\[item\.id\]/);
-  assert.match(html, /grid-template-columns:repeat\(2,105mm\)/);
+  assert.match(html, /grid-template-columns:repeat\(2,100mm\)/);
   assert.match(html, /width:210mm/);
   assert.match(html, /pile-cage-master-card/);
   assert.doesNotMatch(html, /כרטיסיית מאסטר/);
   assert.doesNotMatch(html, /cards\.masterCard/);
   assert.match(html, /@page\{size:A4 portrait;margin:0!important;\}/);
-  assert.match(html, /grid-template-columns:repeat\(2, 105mm\)/);
-  assert.match(html, /grid-auto-rows:74\.25mm/);
+  assert.match(html, /grid-template-columns:repeat\(2, 100mm\)/);
+  assert.match(html, /grid-auto-rows:71\.75mm/);
+  assert.match(html, /\.cards-page\{[^}]*padding:5mm;/);
+  assert.match(html, /\.cards-page\{[^}]*padding:5mm!important;/);
+  assert.match(html, /\.cards-grid\{[^}]*height:287mm!important;width:200mm!important;/);
+  for (const rule of html.matchAll(/\.(?:prod-card|pc-print-main|pc-print-head|pc-print-ref|pc-print-bottom)(?: span)?\{([^}]*)\}/g)) {
+    assert.match(rule[1], /border:0!important;/, 'card borders must stay absent in both screen/PDF export and direct print');
+  }
+  for (const rule of html.matchAll(/\.pc-print-head\{([^}]*)\}/g)) {
+    assert.match(rule[1], /background:#fff(?:!important)?;color:#000(?:!important)?;/);
+  }
   assert.match(html, /grid-template-columns:minmax\(0,1fr\) 27mm/);
   assert.match(html, /pc-print-face\{[^}]*width:100%;height:100%/);
   assert.match(html, /pc-print-qr-code/);
