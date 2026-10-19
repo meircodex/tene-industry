@@ -1,0 +1,5 @@
+html #annotation-dialog{width:100vw;height:100dvh;max-width:100vw;max-height:100dvh;border:0;border-radius:0;margin:0;padding:16px;overflow:hidden}
+html #annotation-dialog[open]{display:flex;flex-direction:column;gap:8px}
+html .annotation-tools{margin:0}
+@media(max-width:650px){html #annotation-dialog{padding:8px}}
+@media(max-height:550px){#annotation-dialog .annotation-tools{flex-wrap:nowrap;overflow-x:auto;max-height:62px;min-height:48px}#annotation-dialog .annotation-tools>*{flex-shrink:0}#annotation-dialog .dialog-heading h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#annotation-dialog .dialog-heading{min-height:36px}#annotation-dialog .document-tools{flex-wrap:nowrap;overflow:auto}#annotation-dialog .document-tools button{white-space:nowrap;padding:4px 7px;font-size:12px}#annotation-dialog #editor-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#annotation-dialog #canvas-wrap{min-height:65px}html #annotation-dialog{overflow:auto}}

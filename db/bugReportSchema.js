@@ -57,5 +57,8 @@ function ensureBugReportSchema(db) {
       restored_count INTEGER NOT NULL, restored_at TEXT NOT NULL
     );
   `);
+  const columns = new Set(db.prepare('PRAGMA table_info(bug_report_attachments)').all().map(c => c.name));
+  if (!columns.has('annotations')) db.exec("ALTER TABLE bug_report_attachments ADD COLUMN annotations TEXT NOT NULL DEFAULT '{}'");
+  if (!columns.has('removed_at')) db.exec('ALTER TABLE bug_report_attachments ADD COLUMN removed_at TEXT');
 }
 module.exports = { ensureBugReportSchema };

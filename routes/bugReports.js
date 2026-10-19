@@ -9,7 +9,7 @@ function createBugReportsRouter({ db, requireRole }) {
   const router = express.Router();
   const service = createBugReportsService({ db });
   const agent = createFaultAgentService({ db });
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4*1024*1024, files:6, fields:14, fieldSize:24000, parts:20 } }).fields([{name:'before',maxCount:3},{name:'expected',maxCount:3},{name:'after',maxCount:3}]);
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 4*1024*1024, files:6, fields:18, fieldSize:650000, parts:24 } }).fields([{name:'before',maxCount:3},{name:'expected',maxCount:3},{name:'after',maxCount:3}]);
   const mutations = rateLimit({ windowMs:60000, limit:25, standardHeaders:true, legacyHeaders:false });
   const actor = req => ({ id:String(req.userId), role:req.userRole, name:String(req.auth.display_name || req.auth.displayName || req.auth.name || req.auth.username || req.userRole).slice(0,120) });
   const files = req => Object.values(req.files || {}).flat();
@@ -44,13 +44,15 @@ function createBugReportsRouter({ db, requireRole }) {
   router.post('/bug-reports/backups/:id/restore',requireRole('admin'),mutations,run((req,res)=>res.json(agent.restore(actor(req),req.params.id))));
   router.get('/bug-reports/backups/:id',requireRole('admin'),run((req,res)=>res.type('application/json').attachment(`faults-backup-${req.params.id}.json`).send(agent.backup(actor(req),req.params.id))));
   router.get('/bug-reports', requireRole('viewer'), run((req,res) => res.json(service.list(actor(req)))));
+  router.get('/bug-reports/pdf-assets/:asset',requireRole('viewer'),run((req,res)=>{const assets={'pdf.mjs':'pdfjs-dist/build/pdf.mjs','pdf.worker.mjs':'pdfjs-dist/build/pdf.worker.mjs'};const asset=Object.hasOwn(assets,req.params.asset)&&assets[req.params.asset];if(!asset)return res.status(404).end();res.type('text/javascript').sendFile(require.resolve(asset));}));
   router.get('/bug-reports/:id', requireRole('viewer'), run((req,res) => res.json(service.detail(req.params.id,actor(req)))));
   router.post('/bug-reports', requireRole('viewer'), mutations, multipart, run((req,res) => res.status(201).json(service.create(actor(req),req.body,files(req)))));
   router.post('/bug-reports/:id/events', requireRole('viewer'), mutations, multipart, run((req,res) => res.json(service.update(req.params.id,actor(req),req.body,files(req)))));
+  router.patch('/bug-reports/:id/images/:imageId', requireRole('viewer'),mutations,run((req,res)=>res.json(service.editAttachment(req.params.id,req.params.imageId,actor(req),req.body))));
   router.post('/bug-reports/:id/agent',requireRole('viewer'),mutations,run((req,res)=>res.json(agent.enqueue(req.params.id,actor(req),req.body.version))));
   router.get('/bug-reports/:id/images/:imageId', requireRole('viewer'), run((req,res) => {
     const f = service.attachment(req.params.id,req.params.imageId,actor(req));
-    res.set({'Content-Type':f.mime_type,'X-Content-Type-Options':'nosniff','Content-Disposition':`inline; filename*=UTF-8''${encodeURIComponent(f.filename)}`}).send(f.data);
+    res.set({'Content-Type':f.mime_type,'X-Content-Type-Options':'nosniff','Content-Disposition':`${f.mime_type.startsWith('image/')?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(f.filename)}`}).send(f.data);
   }));
   return router;
 }

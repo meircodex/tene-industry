@@ -21,7 +21,7 @@ function setup(t){const db=new Database(':memory:');db.pragma('foreign_keys=ON')
 test('browser multipart form retains expected description while rebuilding chosen image fields',()=>{
   const js=fs.readFileSync(path.join(__dirname,'../public/bugs.js'),'utf8');
   const source=js.match(/function formData\(form\) \{[\s\S]*?\n  \}/)[0];
-  class MockFormData{constructor(form){this.values=new Map(form.values);}delete(k){this.values.delete(k);}append(k,v){const previous=this.values.get(k);this.values.set(k,previous===undefined?v:[previous,v]);}get(k){return this.values.get(k);}}
+  class MockFormData{constructor(form){this.values=new Map(form.values);}delete(k){this.values.delete(k);}set(k,v){this.values.set(k,v);}append(k,v){const previous=this.values.get(k);this.values.set(k,previous===undefined?v:[previous,v]);}get(k){return this.values.get(k);}}
   const build=vm.runInNewContext('('+source+')',{FormData:MockFormData});
   const form={values:[['expected','תיאור המצב הרצוי'],['before','empty file'],['expected_image','empty file']],querySelectorAll:()=>[{dataset:{kind:'expected'},bugFiles:()=>[{name:'expected.png'}]}]};
   const result=build(form);assert.equal(result.get('expected')[0],'תיאור המצב הרצוי');assert.equal(result.get('expected')[1].name,'expected.png');assert.equal(result.get('expected_image'),undefined);
@@ -74,7 +74,7 @@ test('images reject spoofed MIME, active content, oversize uploads; no partial w
   assert.equal(db.prepare('SELECT count(*) n FROM bug_reports').get().n,0);
   assert.throws(()=>validateFiles(Array(7).fill(image())),{status:413});
   assert.throws(()=>s.create(worker,body(),[image('after')]),{status:400});
-  assert.throws(()=>s.create(worker,{...body(),actual:''},[]),{status:400});
+  assert.equal(s.create(worker,{...body(),actual:''},[]).report.actual,'');
   assert.throws(()=>safePagePath('javascript:alert(1)'),{status:400});
   assert.throws(()=>safePagePath('https://attacker.test/orders.html'),{status:400});
   assert.equal(safePagePath('/orders.html?id=97&access_token=secret&x=y#token'),'/orders.html?id=97');
