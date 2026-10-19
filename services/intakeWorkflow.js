@@ -20,7 +20,7 @@ function normalizeReviewNotes(notes) {
       message: String(note.message || 'Review required'),
       value: note.value === undefined ? null : note.value,
       source: note.source || 'intake',
-      item_index: Number.isFinite(Number(note.item_index)) ? Number(note.item_index) : null,
+      item_index: note.item_index !== null && note.item_index !== undefined && Number.isInteger(Number(note.item_index)) ? Number(note.item_index) : null,
     }));
 }
 
@@ -72,14 +72,20 @@ function buildStructuredReviewNotes(parsed = {}, options = {}) {
   }
 
   (parsed.items || []).forEach((item, index) => {
+    for (const note of normalizeReviewNotes(item.review_notes || item.reviewNotes)) {
+      pushReviewNote(notes, { ...note, scope: 'item', item_index: index });
+    }
+    for (const field of Array.isArray(item.uncertain_fields) ? item.uncertain_fields : []) {
+      pushReviewNote(notes, { scope: 'item', item_index: index, field, code: 'uncertain_field', message: `Recognition requires review: ${field}`, source: 'recognition' });
+    }
     const itemNote = String(item.note || item.notes || '');
-    const quantity = Number(item.qty ?? item.quantity);
+    const quantity = Number(item.quantity ?? item.qty);
     const diameter = Number(item.diameter);
     const shape = item.shapeName || item.shape_name || item.shape || item.shapeId || '';
-    if (!(quantity > 0) || hasUncertainty(item.quantity_note || item.quantityNote || itemNote)) {
+    if (!(quantity > 0) || hasUncertainty(item.quantity_note || item.quantityNote) || (/quantity|qty|כמות/i.test(itemNote) && hasUncertainty(itemNote))) {
       pushReviewNote(notes, { scope: 'item', item_index: index, field: 'quantity', code: quantity > 0 ? 'uncertain_quantity' : 'missing_quantity', message: quantity > 0 ? 'Quantity requires review.' : 'Quantity was not confidently identified.', value: Number.isFinite(quantity) ? quantity : null, source: 'intake' });
     }
-    if (!SUPPORTED_DIAMETERS.has(diameter) || hasUncertainty(item.diameter_note || item.diameterNote || itemNote)) {
+    if (!SUPPORTED_DIAMETERS.has(diameter) || hasUncertainty(item.diameter_note || item.diameterNote) || (/diameter|Ø|קוטר/i.test(itemNote) && hasUncertainty(itemNote))) {
       pushReviewNote(notes, { scope: 'item', item_index: index, field: 'diameter', code: SUPPORTED_DIAMETERS.has(diameter) ? 'uncertain_diameter' : 'invalid_diameter', message: SUPPORTED_DIAMETERS.has(diameter) ? 'Diameter requires review.' : 'Diameter is missing or not supported.', value: Number.isFinite(diameter) ? diameter : null, source: 'intake' });
     }
     if (!shape || hasUncertainty(item.shape_note || item.shapeNote || item.shape_description || item.shapeDescription || itemNote)) {
@@ -385,20 +391,24 @@ function applyOcrShapeSnapshotMapping(item = {}, normalized = {}) {
 
 function normalizeIntakeItem(item = {}) {
   const reviewNotes = normalizeReviewNotes(item.review_notes || item.reviewNotes);
+  const sourceItemNumber = firstTextValue(item.source_item_number, item.sourceItemNumber, item.item_number, item.original_row_number) || null;
+  const sourceRowNumber = Number(item.source_row_number || item.sourceRowNumber) || null;
   const structElement = intakeItemElementName(item);
   const note = intakeItemNote(item);
   const spiral = normalizeOcrSpiralItem(item);
   if (spiral.isSpiral) {
-    const length = Number(item.length ?? item.total_length_mm) || spiral.totalLengthMm;
-    const qty = Number(item.qty ?? item.quantity ?? 1);
+    const length = Number(item.total_length_mm ?? item.length) || spiral.totalLengthMm;
+    const qty = Number(item.quantity ?? item.qty ?? 0);
     const normalized = {
+      source_item_number: sourceItemNumber,
+      source_row_number: sourceRowNumber,
       diameter: Number(item.diameter),
       length,
       sides: [],
       angles: [],
       qty,
       shapeId: item.shapeId || item.shape || 'spiral',
-      shapeName: item.shapeName || item.shape_name || item.shape || 'spiral',
+      shapeName: item.shape_name || item.shapeName || item.shape || 'spiral',
       spiralDiameterMm: spiral.spiralDiameterMm,
       spiralTurns: spiral.turns,
       spiral_diameter_mm: spiral.spiralDiameterMm,
@@ -415,28 +425,30 @@ function normalizeIntakeItem(item = {}) {
     return normalized;
   }
   const sourceSegments = Array.isArray(item.segments) ? item.segments : [];
-  const sourceSides = Array.isArray(item.sides) && item.sides.length
-    ? item.sides
-    : sourceSegments.map(segment => segment.length_mm ?? segment.lengthMm ?? segment.length);
+  const sourceSides = Array.isArray(item.segments)
+    ? sourceSegments.map(segment => segment.length_mm ?? segment.lengthMm ?? (segment.length_cm != null ? Number(segment.length_cm) * 10 : segment.length))
+    : (Array.isArray(item.sides) ? item.sides : []);
   const sides = sourceSides.map(Number).filter(length => Number.isFinite(length) && length > 0);
-  const fallbackLength = Number(item.length ?? item.total_length_mm ?? 0);
+  const fallbackLength = Number(item.total_length_mm ?? item.length_mm ?? item.length ?? (item.total_length_cm != null ? Number(item.total_length_cm) * 10 : 0));
   if (!sides.length && fallbackLength > 0) sides.push(fallbackLength);
   const length = fallbackLength || sides.reduce((sum, side) => sum + side, 0);
-  const sourceAngles = Array.isArray(item.angles) && item.angles.length
-    ? item.angles
-    : sourceSegments.map(segment => segment.angle_deg ?? segment.angleDeg ?? segment.angle);
+  const sourceAngles = Array.isArray(item.segments)
+    ? sourceSegments.map(segment => segment.angle_deg ?? segment.angleDeg ?? segment.angle)
+    : (Array.isArray(item.angles) ? item.angles : []);
   const angles = sourceAngles.length
     ? sourceAngles.map(Number).filter(Number.isFinite).slice(0, Math.max(0, sides.length - 1))
     : Array(Math.max(0, sides.length - 1)).fill(90);
-  const qty = Number(item.qty ?? item.quantity ?? 1);
+  const qty = Number(item.quantity ?? item.qty ?? 0);
   const normalized = {
+    source_item_number: sourceItemNumber,
+    source_row_number: sourceRowNumber,
     diameter: Number(item.diameter),
     length,
     sides,
     angles,
     qty,
     shapeId: item.shapeId || item.shape || (sides.length === 3 ? 's3' : 's1'),
-    shapeName: item.shapeName || item.shape || (sides.length === 3 ? 'U - anchor' : 'straight'),
+    shapeName: item.shape_name || item.shapeName || item.shape || (sides.length === 3 ? 'U - anchor' : 'straight'),
     note,
     structElement,
     struct_element: structElement,
@@ -699,6 +711,29 @@ function distributeSurplusToEndSegments(sourceSegments, reportedLengthMm) {
   };
 }
 
+function intakeApprovalErrors(parsed = {}) {
+  const errors = [];
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  if (!items.length) errors.push({ field: 'items', message: 'לא זוהו פריטים להזמנה' });
+  items.forEach((source, index) => {
+    const item = normalizeIntakeItem(source || {});
+    const add = (field, message) => errors.push({ item_index: index, field, message: `שורה ${index + 1}: ${message}` });
+    if (!Number.isSafeInteger(item.qty) || item.qty <= 0) add('quantity', 'יש להשלים כמות שלמה וחיובית');
+    if (!SUPPORTED_DIAMETERS.has(item.diameter)) add('diameter', 'יש לבחור קוטר ברזל תקין');
+    if (!Number.isFinite(item.length) || item.length <= 0) add('total_length_mm', 'יש להשלים אורך');
+    const shape = firstTextValue(source?.shape_name, source?.shapeName, source?.shape, source?.shapeId);
+    if ((!shape && !source?.sides?.length && !source?.segments?.length) || /^(unknown|unidentified|לא ידוע)$/i.test(shape)) add('shape_name', 'יש לזהות את הצורה');
+    const spiral = normalizeOcrSpiralItem(source || {});
+    if (spiral.isSpiral) {
+      if (!(spiral.spiralDiameterMm > 0 && spiral.turns > 0)) add('shape_name', 'יש להשלים קוטר וסיבובים של הספירלה');
+    } else if (shape && !isStraightOcrShape(source) && !/^(s1|straight_bar)$/i.test(shape) && item.sides.length < 2 && item.shape_review_status !== 'ready') {
+      add('shape_name', 'חסרות מידות לצורה המכופפת');
+    }
+    if (item.requires_shape_edit || item.shapeSnapshot?.validation?.valid === false) add('shape_name', 'יש לבדוק ולהשלים את הצורה');
+  });
+  return errors;
+}
+
 function buildIntakeOrderPayload(parsed = {}, {
   source = 'intake',
   customerOverride = null,
@@ -736,6 +771,7 @@ function buildIntakeOrderPayload(parsed = {}, {
 }
 
 module.exports = {
+  intakeApprovalErrors,
   buildIntakeOrderPayload,
   buildOrderImportPreview,
   buildStructuredReviewNotes,

@@ -342,6 +342,7 @@ body[data-page="intake"] #seOverlay{z-index:980}
 <body data-page="intake">
 <script src="/safe-dom.js"></script>
 <script src="/display-units.js?v=2"></script>
+<script src="/intake-confidence.js?v=1"></script>
 <script src="/auth-client.js"></script>
 <script src="/rebar-weights.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
@@ -503,12 +504,7 @@ function resetIntakeCompareZoom() {
 }
 
 function confidenceFor(parsed, path) {
-  const maps = [parsed.confidence, parsed.confidence_map, parsed.field_confidence, parsed.confidenceByField];
-  for (const map of maps) {
-    const value = map && (map[path] ?? map[path.split('.').pop()]);
-    if (typeof value === 'number') return value;
-  }
-  return null;
+  return IronBendIntakeConfidence.forPath(parsed, path);
 }
 
 function isLowConfidence(parsed, path, value) {
@@ -520,14 +516,12 @@ function isLowConfidence(parsed, path, value) {
 }
 
 function confidenceRatio(parsed, path, value) {
-  const confidence = confidenceFor(parsed || {}, path);
-  if (typeof confidence === 'number') return Math.max(0, Math.min(1, confidence > 1 ? confidence / 100 : confidence));
-  if (value === undefined || value === null || value === '') return 0.35;
-  return isLowConfidence(parsed || {}, path, value) ? 0.55 : 0.92;
+  return confidenceFor(parsed || {}, path);
 }
 
 function confidenceDisplay(parsed, path, value) {
-  return Math.round(confidenceRatio(parsed, path, value) * 100) + '%';
+  const score = confidenceRatio(parsed, path, value);
+  return score === null ? 'אין ציון זיהוי' : Math.round(score * 100) + '%';
 }
 
 function sourcePathLabel(path) {
@@ -922,6 +916,23 @@ function currentOcrItemFromFields(index) {
   if (operatorReviewedAt) item.operator_reviewed_at = operatorReviewedAt.value.trim();
   if (segments) item.segments = parseSegmentsText(segments.value);
   if (note) item.note = note.value.trim();
+  return syncOcrItemAliases(item);
+}
+
+// Review fields are canonical. Keep legacy aliases synchronized so a corrected
+// quantity/length/shape cannot be overwritten by the original PDF parser values.
+function syncOcrItemAliases(item) {
+  if (item.quantity !== undefined) item.qty = item.quantity;
+  if (item.total_length_mm !== undefined) {
+    item.length = item.total_length_mm;
+    item.length_mm = item.total_length_mm;
+    item.total_length_cm = Number(item.total_length_mm) / 10;
+  }
+  if (item.shape_name !== undefined) item.shapeName = item.shape_name;
+  if (Array.isArray(item.segments)) {
+    item.sides = item.segments.map(segment => Number(segment.length_mm));
+    item.angles = item.segments.slice(0, -1).map(segment => Number(segment.angle_deg));
+  }
   return item;
 }
 
@@ -1376,6 +1387,7 @@ function toggleOcrRowReviewMenu(event, index) {
 
 async function setOcrItemReviewStatus(index, key) {
   closeOcrRowReviewMenus();
+  if (key === 'verified' && ocrItemMissingFields(currentOcrItemFromFields(index)).length) return toast('יש להשלים קוטר, אורך וכמות לפני אישור השורה', true);
   const reviewedAt = new Date().toISOString();
   if (key === 'verified') {
     setOcrHiddenItemField(index, 'review_status', 'accepted');
@@ -1394,7 +1406,7 @@ async function setOcrItemReviewStatus(index, key) {
     setOcrHiddenItemField(index, 'operator_reviewed_at', reviewedAt);
   }
   const updated = currentOcrItemFromFields(index);
-  const action = key === 'verified' ? { key:'verified', label:'\u05de\u05d0\u05d5\u05e9\u05e8', pct:100 } : key === 'missing' ? { key:'missing', label:'\u05d7\u05e1\u05e8 / \u05dc\u05d0 \u05ea\u05e7\u05d9\u05df', pct:0 } : { key:'review', label:'\u05d3\u05d5\u05e8\u05e9 \u05d1\u05d3\u05d9\u05e7\u05d4', pct: ocrActionState(activeCompareOriginal || {}, updated, index).pct };
+  const action = ocrActionState(activeCompareOriginal || {}, updated, index);
   applyOcrRowVisualState(index, action);
   refreshOcrStatusSummary();
   const summary = document.getElementById('ocrCorrectionSummary');
@@ -1412,6 +1424,7 @@ if (!window.ocrRowReviewMenuListenersAttached) {
 function verifyOcrItem(index) {
   const current = currentOcrItemFromFields(index);
   const alreadyApproved = ocrOperatorApproved(current);
+  if (!alreadyApproved && ocrItemMissingFields(current).length) return toast('יש להשלים קוטר, אורך וכמות לפני אישור השורה', true);
   if (alreadyApproved) {
     clearOcrItemOperatorApproval(index);
   } else {
@@ -1436,7 +1449,8 @@ function ocrItemConfidenceCell(parsed, item, index) {
     ['shape_name', item.shape_name || item.shapeName || item.shape || item.type],
   ];
   const scores = paths.map(([field, value]) => confidenceRatio(parsed, `items.${index}.${field}`, value));
-  const score = scores.length ? scores.reduce((sum, value) => sum + value, 0) / scores.length : 0.75;
+  if (scores.some(value => value === null)) return '<div class="ocr-confidence-cell">אין ציון זיהוי</div>';
+  const score = Math.min(...scores);
   const pct = Math.round(score * 100);
   return `<div class="ocr-confidence-cell ${pct < 75 ? 'ocr-confidence-low' : ''}" onclick="highlightOcrSource('items.${index}.confidence')"><div>${pct}%</div><div class="ocr-confidence-bar"><span style="width:${pct}%"></span></div></div>`;
 }
@@ -1681,6 +1695,7 @@ function readCorrectedParsed() {
   document.querySelectorAll('[data-item-index]').forEach(input => {
     const index = Number(input.dataset.itemIndex);
     const field = input.dataset.itemField;
+    if (!field || !Number.isInteger(index)) return;
     parsed.items[index] = parsed.items[index] || {};
     if (field === 'segments') parsed.items[index].segments = parseSegmentsText(input.value);
     else if (field === 'total_length_mm') parsed.items[index][field] = IronBendDisplayUnits.centimetersToMillimeters(input.value) || 0;
@@ -1688,6 +1703,7 @@ function readCorrectedParsed() {
     else parsed.items[index][field] = String(input.value ?? '').trim();
   });
   parsed.items = parsed.items.map(item => {
+    syncOcrItemAliases(item);
     if (!isSpiralOcrItem(item)) return item;
     return {
       ...item,
@@ -2229,16 +2245,25 @@ function ensureOfficialOcrHeader() {
 function uniqueOptions(values) {
   return [...new Set((values || []).map(value => String(value || '').trim()).filter(Boolean))];
 }
+function ocrItemMissingFields(item = {}) {
+  const missing = [];
+  const diameter = Number(item.diameter ?? item.diameter_mm);
+  const quantity = Number(item.qty ?? item.quantity ?? item.pcs);
+  const length = Number(item.total_length_mm ?? item.length_mm ?? item.length);
+  if (![6,8,10,12,14,16,18,20,22,25,28,32,36,40].includes(diameter)) missing.push('קוטר');
+  if (!Number.isSafeInteger(quantity) || quantity <= 0) missing.push('כמות');
+  if (!Number.isFinite(length) || length <= 0) missing.push('אורך');
+  return missing;
+}
 function ocrActionState(parsed, item, index) {
-  const values = [item.diameter ?? item.diameter_mm, item.total_length_mm ?? item.length_mm ?? item.length, item.qty ?? item.quantity ?? item.pcs, item.shape_name || item.shapeName || item.shape || item.type];
-  const score = Math.round(values.map((value, offset) => confidenceRatio(parsed, 'items.' + index + '.' + ['diameter','total_length_mm','quantity','shape_name'][offset], value)).reduce((a,b)=>a+b,0) / 4 * 100);
+  const score = IronBendIntakeConfidence.itemScore(parsed, index);
+  const missing = ocrItemMissingFields(item);
+  if (missing.length) return { key:'missing', label:'חסר / לא תקין: ' + missing.join(', '), pct:score };
+  if (ocrOperatorApproved(item)) return { key:'verified', label:'מאושר', pct:score };
   const operatorStatus = String(item?.operator_review_status || item?.manual_review_status || item?.review_status || '').trim().toLowerCase();
-  if (ocrOperatorApproved(item)) return { key:'verified', label:'\u05de\u05d0\u05d5\u05e9\u05e8', pct:100 };
-  if (['missing', 'invalid', 'rejected', 'not_ok', 'not-valid'].includes(operatorStatus)) return { key:'missing', label:'\u05d7\u05e1\u05e8 / \u05dc\u05d0 \u05ea\u05e7\u05d9\u05df', pct:score };
-  if (['review', 'needs_review', 'pending'].includes(operatorStatus)) return { key:'review', label:'\u05d3\u05d5\u05e8\u05e9 \u05d1\u05d3\u05d9\u05e7\u05d4', pct:score };
-  const missing = !values[0] || !values[1] || !values[2];
-  if (missing) return { key:'missing', label:'\u05d7\u05e1\u05e8', pct:score };
-  return { key:'review', label:'\u05d6\u05d5\u05d4\u05d4 ' + score + '%', pct:score };
+  if (['missing', 'invalid', 'rejected', 'not_ok', 'not-valid'].includes(operatorStatus)) return { key:'missing', label:'חסר / לא תקין', pct:score };
+  const uncertain = (item.review_notes || []).length || (item.uncertain_fields || []).length || ['review', 'needs_review', 'pending'].includes(operatorStatus);
+  return { key:'review', label:uncertain ? 'דורש בדיקה' : score === null ? 'לבדיקה מול המקור' : 'זוהה ' + score + '%', pct:score };
 }
 function ocrStatusSummary(parsed) {
   const items = Array.isArray(parsed.items) ? parsed.items : [];
@@ -2391,7 +2416,7 @@ function handleOcrConfidenceClick(el) { highlightOcrSource(el.dataset.sourceFiel
 function ocrItemConfidenceCell(parsed, item, index) {
   const action = ocrActionState(parsed, item, index);
   const cls = action.key === 'verified' ? '' : action.key;
-  return '<div class="ocr-confidence-cell" data-source-field="items.' + index + '.confidence" onclick="handleOcrConfidenceClick(this)"><span class="ocr-status-dot ' + cls + '"></span>' + action.pct + '%</div>';
+  return '<div class="ocr-confidence-cell" data-source-field="items.' + index + '.confidence" onclick="handleOcrConfidenceClick(this)"><span class="ocr-status-dot ' + cls + '"></span>' + (action.pct === null ? 'אין ציון זיהוי' : action.pct + '%') + '</div>';
 }
 function handleOfficialOcrShapeClick(button) {
   const index = Number(button.dataset.itemIndex);
@@ -2420,18 +2445,20 @@ function ocrItemTableRowHtml(parsed, item, index) {
 }
 function verifyAllVisibleOcrItems() {
   const reviewedAt = new Date().toISOString();
-  document.querySelectorAll('.ocr-review-table tbody tr:not([style*="display: none"])').forEach(row => {
+  let skipped = 0;
+  document.querySelectorAll('.ocr-review-table tbody tr').forEach(row => {
+    if (!row.getClientRects().length) return;
     const match = String(row.id || '').match(/_(\d+)$/);
     if (!match) return;
     const index = Number(match[1]);
+    if (ocrItemMissingFields(currentOcrItemFromFields(index)).length) { skipped++; return; }
     setOcrHiddenItemField(index, 'review_status', 'accepted');
     setOcrHiddenItemField(index, 'operator_review_status', 'accepted');
     setOcrHiddenItemField(index, 'operator_approved', '1');
     setOcrHiddenItemField(index, 'operator_reviewed_at', reviewedAt);
+    applyOcrRowVisualState(index, ocrActionState(activeCompareOriginal || {}, currentOcrItemFromFields(index), index));
   });
-  document.querySelectorAll('.ocr-review-table tbody tr:not([style*="display: none"])').forEach(row => { row.classList.remove('needs-review', 'missing'); row.classList.add('verified'); });
-  document.querySelectorAll('.ocr-review-table tbody tr:not([style*="display: none"]) .ocr-status-pill').forEach(button => { button.className = 'ocr-status-pill verified'; button.textContent = 'מאושר'; });
-  document.querySelectorAll('.ocr-review-table tbody tr:not([style*="display: none"]) .ocr-row-approve').forEach(button => { button.className = 'ocr-row-approve verified'; button.title = 'אושר'; });
+  if (skipped) toast('יש להשלים נתונים ב־' + skipped + ' שורות לפני אישורן', true);
   refreshOcrStatusSummary();
   scheduleIntakeDraftSave();
 }
@@ -2618,7 +2645,7 @@ async function intakeApprove(id, options = {}) {
   const row = intakeRows.find(item => item.id === id);
   const selected = selectedCustomers[id] || row?.customer_match?.customer;
   const parsed = activeCompareId === id ? readCorrectedParsed() : (row ? parsedOf(row) : {});
-  if (!selected && !confirm('׳׳ ׳©׳•׳™׳ ׳׳§׳•׳— ׳§׳™׳™׳. ׳׳™׳¦׳•׳¨ ׳׳§׳•׳— ׳—׳“׳© ׳׳₪׳™ ׳”׳₪׳¢׳ ׳•׳—?')) return;
+  if (!selected && !confirm('לא שויך לקוח קיים. ליצור לקוח חדש לפי פרטי ההזמנה שזוהו?')) return;
   if (!(parsed.items || []).length) {
     toast('Cannot approve without extracted items. Edit the table or correct the OCR text first.', true);
     return;
@@ -2629,15 +2656,20 @@ async function intakeApprove(id, options = {}) {
     body: JSON.stringify({ ...(selected ? { customer_id: selected.id } : {}), parsed_data: parsed }),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.success) return toast(result.error || 'Approval failed', true);
+  if (!response.ok || !result.success) {
+    const issue = result.errors?.[0];
+    if (issue && Number.isInteger(issue.item_index)) highlightOcrSource('items.' + issue.item_index + '.' + issue.field);
+    return toast(result.error || 'אישור ההזמנה נכשל', true);
+  }
   selectedCustomers[id] = null;
   intakeRows = intakeRows.filter(row => row.id !== id);
   closeIntakeCompare();
   renderIntakeQueue();
-  toast(`Order ${result.orderNum || result.orderId || ''} created`);
+  toast('הזמנה ' + (result.orderNum || result.orderId || '') + ' נוצרה');
   if (options.printCards && result.orderId) {
     window.open('/order-print.html?id=' + encodeURIComponent(result.orderId) + '&kind=print-cards', '_blank', 'noopener');
   }
+  if (result.orderId) openLinkedOrder(result.orderId);
 }
 async function intakeReject(id) {
   if (!confirm('לדחות את הפנייה הזו?')) return;

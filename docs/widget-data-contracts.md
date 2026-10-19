@@ -67,4 +67,7 @@ After dashboard KPIs, extend contracts to:
 3. print cards/A4 production documents,
 4. inventory stock badges,
 5. finance KPIs,
-6. OCR/intake confidence badges.
+6. OCR/intake confidence badges (implemented as `intakeRecognitionConfidence`):
+   source numeric scores only, absent scores shown as unknown; row score uses the
+   minimum of the four core fields when all are provided. Operator approval is
+   independent of recognition confidence.

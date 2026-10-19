@@ -91,7 +91,7 @@ function detectDocumentType({ text = '', tokens = [] } = {}) {
 
 function detectParsingProfile({ text = '', tokens = [] } = {}) {
   const content = `${text}\n${tokens.map(token => token.text).join(' ')}`.toLowerCase();
-  if (/tassa|טסה|הספדה|dp2|easybar|רטוק|טומ/.test(content)) {
+  if (/tassa|טסה|\bdp2\b|easybar/.test(content)) {
     return {
       id: 'tassa_easybar_bending_schedule',
       confidence: 0.92,
@@ -363,7 +363,7 @@ function parseSteelDocument(input = {}) {
   const text = String(input.text || input.fullText || '');
   const documentType = detectDocumentType({ text, tokens });
   const profile = detectParsingProfile({ text, tokens });
-  const parsed = profile.id === 'tassa_easybar_bending_schedule' || tokens.length
+  const parsed = profile.id === 'tassa_easybar_bending_schedule'
     ? parseTassaEasybar(tokens, input)
     : { items: [], row_reconstruction: [] };
   const reviewNotes = [];

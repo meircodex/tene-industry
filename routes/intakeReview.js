@@ -307,13 +307,21 @@ module.exports = function createIntakeReviewRouter(deps) {
         phone: body.customer_phone || null,
         email: body.customer_email || null,
       } : null;
+      const validationErrors = intakeWorkflow.intakeApprovalErrors(parsed);
+      if (validationErrors.length) {
+        return res.status(422).json({ success: false, code: 'intake_incomplete', error: validationErrors.map(entry => entry.message).join('\n'), errors: validationErrors });
+      }
       const duplicate = findSourceIdentityDuplicate(db, 'intake_log', row, { excludeId: row.id });
       if (duplicate) {
         return res.status(409).json(sourceIdentityConflictPayload('intake', duplicate));
       }
+      const payload = intakeToOrderPayload(parsed, row.source || 'intake', customerOverride, row.raw_content || '');
+      if (!payload.customer?.name || payload.customer.name === 'Unidentified customer') {
+        return res.status(422).json({ success: false, code: 'intake_incomplete', error: 'יש לבחור לקוח או להשלים את שם הלקוח לפני יצירת הזמנה', errors: [{ field: 'customer_name' }] });
+      }
       const approve = db.transaction(() => {
         saveCorrectionExample(row, originalParsed, parsed);
-        const result = createOrderFromPayload(intakeToOrderPayload(parsed, row.source || 'intake', customerOverride, row.raw_content || ''));
+        const result = createOrderFromPayload(payload);
         db.prepare('UPDATE intake_log SET status=?,order_id=?,parsed_data=? WHERE id=?').run('approved', result.orderId, JSON.stringify(parsed), row.id);
         return result;
       });

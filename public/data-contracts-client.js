@@ -4,6 +4,14 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    intakeRecognitionConfidence: {
+      screen: 'intake.html',
+      owner: 'Intake / AI',
+      source: { api: '/api/intake/log', fields: ['parsed_data.items[].field_confidence', 'parsed_data.items[].fields', 'parsed_data.confidence'] },
+      meaning: 'Only source-provided numeric recognition confidence. Missing scores are unknown, never a default percentage. Row score is the minimum of diameter, length, quantity and shape, only when all four are available. Operator approval is a separate state.',
+      consumers: ['ocrItemConfidenceCell', 'confidenceDisplay'],
+      risk: 'D1',
+    },
     kpiOrdersToday: {
       screen: 'dashboard.html',
       owner: 'Dashboard / Orders',

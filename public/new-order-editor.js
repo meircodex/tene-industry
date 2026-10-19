@@ -731,7 +731,7 @@
     input.id = 'quickOrderImportInput';
     input.type = 'file';
     input.hidden = true;
-    input.accept = 'image/*,.pdf,.csv,.txt';
+    input.accept = 'image/*,.pdf,.csv,.tsv,.txt';
     input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (file) handleQuickOrderImportFile(file, input);
@@ -750,7 +750,7 @@
   function isQuickCsvFile(file) {
     const name = String(file?.name || '').toLowerCase();
     const type = String(file?.type || '').toLowerCase();
-    return name.endsWith('.csv') || name.endsWith('.txt') || type.includes('csv') || type.includes('text/plain');
+    return name.endsWith('.csv') || name.endsWith('.tsv') || name.endsWith('.txt') || type.includes('csv') || type.includes('tab-separated') || type.includes('text/plain');
   }
 
   function handleQuickOrderImportFile(file, input) {
@@ -818,9 +818,10 @@
   function validateIntakeRow(row = {}) {
     const normalized = normalizeIntakeRow(row);
     const missing = [];
-    if (!(normalized.diameter > 0)) missing.push('חסר קוטר');
-    if (!(normalized.quantity > 0)) missing.push('חסרה כמות');
-    if (!(normalized.length > 0)) missing.push('חסר אורך');
+    if (![6,8,10,12,14,16,18,20,22,25,28,32,36,40].includes(normalized.diameter)) missing.push('קוטר לא תקין');
+    if (!Number.isSafeInteger(normalized.quantity) || normalized.quantity <= 0) missing.push('חסרה כמות שלמה וחיובית');
+    if (!Number.isFinite(normalized.length) || normalized.length <= 0) missing.push('חסר אורך');
+    if (!/^(straight(?: bar|_bar)?|s1|מוט ישר|ישר)$/i.test(normalized.shape)) missing.push('צורה מכופפת מחייבת מידות — יש להעלות PDF או תמונה לבדיקה');
     return { ok: missing.length === 0, message: missing.join(', ') || 'תקין', row: normalized };
   }
 
@@ -862,6 +863,8 @@
       const raw = {};
       headers.forEach((header, index) => { raw[header] = cells[index] || ''; });
       return normalizeIntakeRow({
+        sourceItemNumber: rowValue(raw, SOURCE_ITEM_NUMBER_ALIASES),
+        sourceRowNumber: rowValue(raw, SOURCE_ROW_NUMBER_ALIASES),
         elementName: rowValue(raw, STRUCT_ELEMENT_ALIASES),
         shape: rowValue(raw, ['צורה', 'shape', 'shapeName', 'shape_name']),
         diameter: rowValue(raw, ['קוטר', 'diameter', 'barDiameter', 'barDiameterMm']),
@@ -876,6 +879,12 @@
     const reader = new FileReader();
     reader.onload = () => {
       const rows = parseIntakeCsvText(reader.result || '');
+      const issues = rows.map((row, index) => ({ ...validateIntakeRow(row), line: index + 2 })).filter(row => !row.ok);
+      if (issues.length) {
+        showQuickImportMessage(`הקובץ לא נוסף: ${issues.length} שורות דורשות תיקון. שורה ${issues[0].line}: ${issues[0].message}`);
+        if (input) input.value = '';
+        return;
+      }
       const added = addIntakeRowsToOrder(rows, { silentInvalid: true });
       if (added > 0) showQuickImportMessage(`${added} שורות נוספו להזמנה`);
       else showQuickImportMessage('CSV בסיסי יטופל בשלב הבא. אפשר להוסיף צורה ידנית.');
@@ -889,12 +898,16 @@
   }
 
   async function importQuickOcrFile(file, input) {
+    if (input?.disabled) return;
     const documentType = document.getElementById('ocrDocumentType')?.value || 'order';
     if (typeof window.routeNonOrderOcrDocument === 'function' && window.routeNonOrderOcrDocument(documentType)) {
       if (input) input.value = '';
       return;
     }
     try {
+      if (input) input.disabled = true;
+      saveActiveDraftNow({ silent: true });
+      showQuickImportMessage('קורא את הקובץ ומכין הזמנה לבדיקה...');
       if (typeof window.ensureOcrSession === 'function') {
         const hasSession = await window.ensureOcrSession();
         if (!hasSession) throw new Error('OCR_AUTH_REQUIRED');
@@ -906,13 +919,13 @@
       const fetcher = window.IronBendAuth?.fetch ? window.IronBendAuth.fetch.bind(window.IronBendAuth) : fetch;
       const response = await fetcher('/api/analyze-image?save_to_intake=true', { method: 'POST', body: fd });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.code || data.error || 'OCR_FAILED');
-      const items = data?.parsed?.items || data?.items || [];
-      if (Array.isArray(items) && items.length) {
-        const added = addIntakeRowsToOrder(items.map(item => normalizeIntakeRow(item)), { silentInvalid: true });
-        showQuickImportMessage(added > 0 ? `${added} שורות נוספו להזמנה` : 'OCR הסתיים, אבל לא נמצאו שורות תקינות להוספה.');
+      if (response.status === 409 && data.code === 'source_identity_conflict' && data.conflict?.existingId) {
+        window.location.href = data.conflict.orderId
+          ? '/orders.html?id=' + encodeURIComponent(data.conflict.orderId)
+          : window.intakeReviewUrl(data.conflict.existingId);
         return;
       }
+      if (!response.ok) throw new Error(data.code || data.error || 'OCR_FAILED');
       const intakeId = data.intakeId || data.intake_id || data.id || null;
       if (intakeId && typeof window.intakeReviewUrl === 'function') {
         window.location.href = window.intakeReviewUrl(intakeId);
@@ -928,7 +941,7 @@
           : 'OCR לא זמין כרגע. אפשר להשתמש ב+ הוסף צורה.';
       showQuickImportMessage(message || 'OCR לא זמין כרגע. אפשר להשתמש ב+ הוסף צורה.');
     } finally {
-      if (input) input.value = '';
+      if (input) { input.value = ''; input.disabled = false; }
     }
   }
 

@@ -1,11 +1,13 @@
 const router = require('express').Router();
 const axios = require('axios');
+const { createHash } = require('node:crypto');
 const steelDocumentParser = require('../services/steelDocumentParser');
 const { extractPdfWordsFromBuffer } = require('../services/pdfWordExtractor');
 const { spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
 const {
   findSourceIdentityDuplicate,
   sourceIdentityConflictError,
+  sourceIdentityConflictPayload,
   sourceIdentityFromRequest,
 } = require('../services/importSourceIdentity');
 
@@ -63,8 +65,15 @@ module.exports = function createIntakeRouter(deps) {
     return 'order';
   }
 
+  function uploadIdentity(req) {
+    return sourceIdentityFromRequest(req, 'ocr') || (shouldSaveToIntake(req) && req.file ? {
+      source_system: 'ocr_file',
+      external_id: createHash('sha256').update(req.file.buffer).digest('hex'),
+    } : null);
+  }
+
   function saveAnalysisToIntake(req, payload) {
-    const identity = sourceIdentityFromRequest(req, 'ocr');
+    const identity = uploadIdentity(req);
     const duplicate = findSourceIdentityDuplicate(db, 'intake_log', identity);
     if (duplicate) throw sourceIdentityConflictError('intake', duplicate);
     const originalMime = req.file.mimetype || 'application/octet-stream';
@@ -131,6 +140,12 @@ module.exports = function createIntakeRouter(deps) {
           : 'מחירון ברזל נקלט דרך מודול מחירונים, לא דרך הזמנה חדשה.',
       });
     }
+    const identity = uploadIdentity(req);
+    if (shouldSaveToIntake(req)) {
+      const duplicate = findSourceIdentityDuplicate(db, 'intake_log', identity);
+      if (duplicate) return res.status(409).json(sourceIdentityConflictPayload('intake', duplicate));
+    }
+    let completePdfTable = null;
     if (mime === 'application/pdf') {
       try {
         const pdfText = await extractPdfWordsFromBuffer(req.file.buffer);
@@ -139,7 +154,9 @@ module.exports = function createIntakeRouter(deps) {
           pages: pdfText.pages,
           fileName: req.file.originalname || 'order.pdf',
         });
-        if (steelPdfParsed.metrics?.rows_detected > 0 && steelPdfParsed.metrics?.usable_rows > 0) {
+        if (steelPdfParsed.metrics?.rows_detected > 0 && steelPdfParsed.metrics?.usable_rows > 0
+            && steelPdfParsed.metrics.usable_rows === steelPdfParsed.metrics.rows_detected) {
+          completePdfTable = steelPdfParsed;
           const payload = intakeWorkflow.withStructuredReviewNotes({
             ...steelPdfParsed,
             success: true,
@@ -149,13 +166,16 @@ module.exports = function createIntakeRouter(deps) {
             delivery_date: steelPdfParsed.delivery_date || null,
             delivery_address: steelPdfParsed.delivery_address || null,
             notes: steelPdfParsed.review_notes?.map(note => note.message).filter(Boolean).join(' ') || null,
-          }, { sourceIdentity: sourceIdentityFromRequest(req, 'ocr') });
-          if (shouldSaveToIntake(req)) {
-            payload.intakeId = saveAnalysisToIntake(req, payload);
+          }, { sourceIdentity: identity });
+          // Keep the deterministic rows, but read the document header when AI is
+          // available so office staff do not have to retype customer/site/date.
+          if (!getOpenAiApiKey()) {
+            if (shouldSaveToIntake(req)) payload.intakeId = saveAnalysisToIntake(req, payload);
+            return res.json(payload);
           }
-          return res.json(payload);
         }
       } catch (pdfErr) {
+        if (pdfErr.payload) return res.status(pdfErr.statusCode || 409).json(pdfErr.payload);
         console.warn('[intake/analyze-image] PDF table parser fallback:', pdfErr.message);
       }
     }
@@ -280,11 +300,19 @@ module.exports = function createIntakeRouter(deps) {
   - Put uncertainty in note, but do not encode spiral parameters only in note.
   For bent shapes, use one segment per visible side from the sketch. angle_deg is the interior angle after that segment; use 90 for a square bend. Validate that the sum of visible shape sides matches total_length_cm when applicable. For straight bars, keep segments=[] and do not return a 180 angle.
   Return JSON that matches the requested schema only.`;
+    const recognitionSchema = completePdfTable ? {
+      ...schema,
+      properties: Object.fromEntries(Object.entries(schema.properties).filter(([key]) => key !== 'items')),
+      required: schema.required.filter(key => key !== 'items'),
+    } : schema;
+    const recognitionPrompt = completePdfTable
+      ? 'Read only the header of this customer steel order. Extract the customer (not the factory/supplier), phone, order reference, delivery site/address and delivery date exactly as shown. Never invent a missing value; return null. Do not extract the item table; it has already been parsed. Return the requested JSON only.'
+      : prompt;
     try {
       const response = await require('axios').post('https://api.openai.com/v1/responses', {
         model: getSetting('OPENAI_MODEL') || 'gpt-5.4-mini',
-        input: [{ role: 'user', content: [{ type: 'input_text', text: prompt }, attachment] }],
-        text: { format: { type: 'json_schema', name: 'ironbend_order', strict: true, schema } },
+        input: [{ role: 'user', content: [{ type: 'input_text', text: recognitionPrompt }, attachment] }],
+        text: { format: { type: 'json_schema', name: 'ironbend_order', strict: true, schema: recognitionSchema } },
       }, {
         headers: { Authorization: `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
         timeout: 60000,
@@ -293,7 +321,7 @@ module.exports = function createIntakeRouter(deps) {
         .flatMap(entry => entry.content || [])
         .find(entry => entry.type === 'output_text')?.text;
       const parsedDocument = JSON.parse(text || '{}');
-      const items = (parsedDocument.items || []).map(item => {
+      const items = completePdfTable ? completePdfTable.items : (parsedDocument.items || []).map(item => {
         const spiral = intakeWorkflow.normalizeOcrSpiralItem(item);
         if (spiral.isSpiral) {
           const reportedLength = (Number(item.total_length_cm) || 0) * 10;
@@ -365,6 +393,7 @@ module.exports = function createIntakeRouter(deps) {
       });
       if (!items.length) return res.status(422).json({ error: 'No steel rows were recognized' });
       const payload = intakeWorkflow.withStructuredReviewNotes({
+        ...(completePdfTable || {}),
         success: true,
         document_type: parsedDocument.document_type || null,
         supplier_order_num: parsedDocument.supplier_order_num || null,
@@ -374,7 +403,7 @@ module.exports = function createIntakeRouter(deps) {
         delivery_address: parsedDocument.delivery_address || null,
         notes: parsedDocument.notes || null,
         items,
-      }, { sourceIdentity: sourceIdentityFromRequest(req, 'ocr') });
+      }, { sourceIdentity: identity });
       if (shouldSaveToIntake(req)) {
         payload.intakeId = saveAnalysisToIntake(req, payload);
       }

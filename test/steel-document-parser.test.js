@@ -56,6 +56,7 @@ test('steel document parser maps drawing value 20 to shape context, not quantity
 
 test('steel document parser keeps low confidence fields as structured review notes', () => {
   const parsed = parseSteelDocument({
+    text: 'TASSA DP2',
     tokens: [
       { text: '1', page: 1, x0: 575, x1: 582, top: 150, bottom: 160 },
       { text: '450', page: 1, x0: 350, x1: 370, top: 150, bottom: 160 },
@@ -83,11 +84,21 @@ test('steel document parser reconstructs rows by coordinates, not OCR token orde
     { text: '20', page: 1, x0: 308, x1: 320, top: 144, bottom: 154 },
   ];
   const rows = reconstructTassaRows(tokens);
-  const parsed = parseSteelDocument({ tokens });
+  const parsed = parseSteelDocument({ tokens, text: 'TASSA DP2' });
 
   assert.equal(rows.length, 1);
   assert.equal(parsed.items[0].item_number, '1');
   assert.equal(parsed.items[0].quantity, 51);
   assert.equal(parsed.items[0].diameter, 8);
   assert.equal(parsed.items[0].total_length_cm, 690);
+});
+
+test('unknown positioned PDF layouts are not interpreted as TASSA tables', () => {
+  const fixture = loadOrder105Fixture();
+  const { normalizeTokens } = require('../services/steelDocumentParser');
+  const tokens = normalizeTokens(fixture).filter(token => !/tassa|טסה|dp2|easybar/i.test(token.text));
+  const parsed = parseSteelDocument({ tokens });
+  assert.equal(parsed.parsing_profile.id, 'generic_steel_table');
+  assert.equal(parsed.items.length, 0);
+  assert.equal(parsed.metrics.usable_rows, 0);
 });
