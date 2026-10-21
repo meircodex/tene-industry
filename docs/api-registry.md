@@ -144,3 +144,7 @@ Security posture values:
 3. Keep local/prod server startup paths aligned so old copies cannot run on `localhost:3100`.
 4. Add stable `JWT_SECRET` deployment requirement for every production/staging environment.
 5. Keep route families in module-owned `routes/*.js` files, and require an explicit permission contract before adding any new route.
+
+## Item status correction (2026-10-21)
+
+`GET /api/items/:id/status-correction-preview` belongs to Production; production/kiosk/warehouse/office/manager/admin can inspect. `PATCH /api/items/:id/status` accepts a stale-state preview and an explicit unshipped-certificate cancellation mode, restricted to office/manager/admin. See [contract](item-status-correction.md).

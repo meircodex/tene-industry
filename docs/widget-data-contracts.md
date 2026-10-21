@@ -71,3 +71,7 @@ After dashboard KPIs, extend contracts to:
    source numeric scores only, absent scores shown as unknown; row score uses the
    minimum of the four core fields when all are provided. Operator approval is
    independent of recognition confidence.
+
+## Item correction preview
+
+`itemStatusCorrection` in `public/data-contracts-client.js` owns the orders dialog shipment explanation. The preview is authoritative for linked certificates, documented quantities and every affected line; only explicit cancellation releases document quantities. Work status never erases production or physical shipment history.

@@ -4,6 +4,7 @@ const productionCards = require('../services/productionCards');
 const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
 const { consumeReservationsForProduction, calculateMaterialStockPosition, normalizeMaterialType } = require('../services/inventoryReservation');
 const { expandProductionCardsForOrder } = require('../services/productionCardPrintPage');
+const { itemStatusCorrectionPreview, cancelUnshippedCertificatesForCorrection, reopenOrderAfterItemCorrection, isBackwardItemStatus, isPreviouslyReopenedItem } = require('../services/itemStatusCorrection');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/production missing dependency: ${name}`);
@@ -639,6 +640,13 @@ module.exports = function createProductionRouter(deps) {
     res.json({ success: true, producedQty: liveCounter, actualWaste });
   });
 
+  router.get('/items/:id/status-correction-preview', requireAnyRole(['production', 'kiosk', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-store');
+      res.json(itemStatusCorrectionPreview(db, Number(req.params.id), req.query.status));
+    } catch (error) { res.status(error.status || 409).json({ error: error.message }); }
+  });
+
   router.patch('/items/:id/status', requireAnyRole(['production', 'kiosk', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
     const { status } = req.body;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
@@ -656,17 +664,33 @@ module.exports = function createProductionRouter(deps) {
     `).get(req.params.id);
     if (!item) return res.status(404).json({ error: 'not found' });
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
+    if (statusContracts.normalizeOrderStatus(item.order_status) === ORDER_STATUS.CANCELLED) return res.status(409).json({ error: 'ההזמנה בוטלה; נדרש טיפול בביטול לפני חזרה לעבודה' });
+    if (req.body.expected_status !== undefined && req.body.expected_status !== item.status) return res.status(409).json({ error: 'סטטוס הפריט עודכן בינתיים. יש לפתוח מחדש את התיקון' });
     if (!productionWritableItemStatuses.has(status)) return res.status(400).json({ error: 'invalid production status' });
     const stages = [ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED];
-    const beforeStage = stages.indexOf(item.status);
     const afterStage = stages.indexOf(status);
-    const backwards = (afterStage >= 0 && afterStage < beforeStage) || (beforeStage >= 2 && afterStage < 0);
+    const backwards = isBackwardItemStatus(item.status, status);
     const correctionReason = String(req.body.correction_reason || '').trim();
     if (backwards && correctionReason.length < 3) return res.status(409).json({ error: 'יש להזין סיבת תיקון להחזרת סטטוס לאחור' });
-    if (status === ITEM_STATUS.IN_PRODUCTION && !backwards && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
+    const correctionMode = req.body.correction_mode || 'keep_documents';
+    if (!['keep_documents', 'cancel_unshipped_certificate'].includes(correctionMode)) return res.status(400).json({ error: 'סוג תיקון לא תקין' });
+    if (correctionMode === 'cancel_unshipped_certificate' && !backwards) return res.status(409).json({ error: 'ביטול תעודה זמין רק בהחזרה לשלב קודם' });
+    const previouslyReopened = status === ITEM_STATUS.IN_PRODUCTION && isPreviouslyReopenedItem(db, item);
+    const resumeFromHold = item.status === ITEM_STATUS.ON_HOLD && productionOrderGateStatuses.has(statusContracts.normalizeOrderStatus(item.order_status));
+    if (status === ITEM_STATUS.IN_PRODUCTION && !backwards && !previouslyReopened && !resumeFromHold && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const completed = afterStage >= stages.indexOf(ITEM_STATUS.DONE);
     const now = new Date().toISOString();
-    db.transaction(() => {
+    let orderStatus = null, cancelledCertificates = [];
+    try { db.transaction(() => {
+      if (req.body.correction_fingerprint) {
+        const preview = itemStatusCorrectionPreview(db, item.id, status);
+        if (preview.fingerprint !== req.body.correction_fingerprint) throw Object.assign(new Error('הפריט או התעודה השתנו; יש לפתוח מחדש את התיקון'), { status: 409 });
+      }
+      if (correctionMode === 'cancel_unshipped_certificate') {
+        cancelledCertificates = cancelUnshippedCertificatesForCorrection(db, { itemId: item.id, status,
+          fingerprint: req.body.correction_fingerprint, reason: correctionReason, role: req.userRole || req.auth?.role,
+          userId: req.auth?.sub, userName: req.auth?.display_name });
+      }
       db.prepare(`UPDATE items SET status=?,started_at=?,completed_at=?,produced_qty=? WHERE id=?`).run(
         status, afterStage >= 1 ? (item.started_at || now) : item.started_at,
         completed ? (item.completed_at || now) : (backwards ? null : item.completed_at),
@@ -674,14 +698,18 @@ module.exports = function createProductionRouter(deps) {
       db.prepare('INSERT INTO audit_log (entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,notes,user_id,user_name) VALUES (?,?,?,?,?,?,?,?,?,?)').run(
         'item', item.id, item.order_num, backwards ? 'item_status_correction' : 'item_status_change', 'status', item.status, status,
         correctionReason || (completed ? 'אישור שלבים מצטבר — כמות הפריט יוצרה; תעודות משלוח קיימות אינן מתבטלות' : ''), req.auth?.sub || null, req.auth?.display_name || null);
-    })();
-    let orderStatus = syncOrderStatusAfterItemStatus(item, status);
-    if (backwards && statusContracts.normalizeOrderStatus(item.order_status) === ORDER_STATUS.DONE_WAITING_PICKUP) {
-      orderStatus = setOrderStatusIfChanged(item.order_id, status === ITEM_STATUS.WAITING ? ORDER_STATUS.PRODUCTION_QUEUE : ORDER_STATUS.IN_PRODUCTION);
+      if (backwards || previouslyReopened) orderStatus = reopenOrderAfterItemCorrection(db, item, status, {
+        reason: correctionReason, userId: req.auth?.sub, userName: req.auth?.display_name });
+    })(); } catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
+    if (!backwards && !previouslyReopened) orderStatus = syncOrderStatusAfterItemStatus(item, status);
+    if (orderStatus || cancelledCertificates.length) wsBroadcast('order_status', { id: item.order_id,
+      status: db.prepare('SELECT status FROM orders WHERE id=?').get(item.order_id).status, orderNum: item.order_num });
+    for (const cancellation of cancelledCertificates) {
+      for (const restored of cancellation.restored_items) if (Number(restored.id) !== Number(item.id)) wsBroadcast('item_status', { id: restored.id, status: restored.status });
     }
     const consumedReservations = completed ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
-    res.json({ ok: true, order_status: orderStatus, consumedReservations });
+    res.json({ ok: true, order_status: orderStatus, consumedReservations, cancelled_certificate_ids: cancelledCertificates.map(note => note.note_id) });
   });
 
   router.patch('/items/:id', requireAnyRole(['production', 'kiosk', 'warehouse', 'manager', 'admin']), (req, res) => {

@@ -147,3 +147,5 @@ Current code-only roles that need reconciliation:
 - Tests prove low-level roles cannot perform manager/admin actions.
 - Customer portal tests prove OTP is required before phone bootstrap token issue, token rotate/revoke invalidates old links, unauthenticated order creation is rejected, and a customer cannot read or mutate another customer's orders.
 - Settings and database routes cannot be accessed through spoofed headers.
+
+Item correction preview uses the item-status operational role guard (production/kiosk/warehouse/office/manager/admin). Cancelling an unshipped source certificate through the status endpoint additionally requires office/manager/admin and an unchanged preview.

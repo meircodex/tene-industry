@@ -983,6 +983,7 @@ test('production execution API routes are split out of the server monolith', () 
     "router.get('/production-queue'",
     "router.get('/production-events'",
     "router.patch('/items/:id/status'",
+    "router.get('/items/:id/status-correction-preview'",
   ]) {
     assert.ok(route.includes(routeSnippet), routeSnippet);
   }

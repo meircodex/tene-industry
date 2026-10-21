@@ -621,3 +621,5 @@ module-governance foundation:
 5. Portal Agent: separate internal driver/worker screens from external portal
    sessions and document the final auth mode.
 
+
+Production owns `services/itemStatusCorrection.js` and `/api/items/:id/status-correction-preview`, orchestrating the existing Orders certificate cancellation service without modifying document snapshots.

@@ -4,6 +4,14 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    itemStatusCorrection: {
+      screen: 'orders.html',
+      owner: 'Production',
+      source: { api: '/api/items/:id/status-correction-preview', fields: ['current_status', 'target_status', 'documented_qty', 'certificates', 'can_cancel_certificates', 'fingerprint'] },
+      meaning: 'Correction preview separates work status from documented shipment quantities. Unshipped certificate cancellation is explicit and applies to every item on the complete document. Production quantities and inventory history remain unchanged.',
+      consumers: ['correctionShipmentEffect'],
+      risk: 'D3',
+    },
     intakeRecognitionConfidence: {
       screen: 'intake.html',
       owner: 'Intake / AI',

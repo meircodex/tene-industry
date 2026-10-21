@@ -254,6 +254,11 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .edit-title{font-size:18px;font-weight:900;color:var(--text)}
 .edit-body{padding:16px;overflow:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .edit-field{display:flex;flex-direction:column;gap:5px}
+#correctionShipmentFields[hidden],#correctionShipmentEffect[hidden]{display:none}
+#correctionReasonOverlay .edit-body{grid-template-columns:minmax(0,1fr);min-width:0;min-height:0}
+#correctionReasonOverlay .edit-field{min-width:0}
+#correctionReasonOverlay select,#correctionReasonOverlay textarea{min-width:0;width:100%;box-sizing:border-box}
+#correctionReasonOverlay textarea{direction:rtl;text-align:right}
 .edit-field label{font-size:11px;font-weight:900;color:var(--dim)}
 .edit-field input,.edit-field textarea,.edit-field select{border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-family:inherit;font-size:14px;background:#f8fafc;color:var(--text)}
 .edit-field textarea{min-height:110px;resize:vertical;direction:ltr;text-align:left}
@@ -555,6 +560,14 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
     <div class="edit-body">
       <div class="edit-note" id="correctionReasonInfo">הפעולה תישלח לשרת לבדיקה מול הרשאת הניהול הקיימת ותירשם ביומן הביקורת.</div>
       <div class="edit-note" id="correctionReasonProductionInfo">החזרת סטטוס פריט לאחור אינה מבטלת תעודת מקור שכבר הופקה, ואינה מוחקת כמויות שיוצרו או תנועות מלאי.</div>
+      <div class="edit-field edit-wide" id="correctionShipmentFields" hidden>
+        <label for="correctionShipmentMode">תעודת המשלוח</label>
+        <select id="correctionShipmentMode" onchange="renderItemCorrectionEffect()">
+          <option value="keep_documents">החזרה לעבודה — התעודה נשארת תקפה</option>
+          <option value="cancel_unshipped_certificate">הסחורה לא יצאה — ביטול התעודה לצורך תיקון</option>
+        </select>
+      </div>
+      <div class="edit-note" id="correctionShipmentEffect" hidden aria-live="polite"></div>
       <div class="edit-field edit-wide"><label for="correctionReasonInput">סיבת התיקון</label><textarea id="correctionReasonInput" minlength="3" maxlength="1000" required></textarea></div>
     </div>
     <div class="edit-actions"><button type="submit" class="edit-save">המשך לתיקון</button><button type="button" class="edit-cancel" onclick="cancelCorrectionReason()">ביטול</button></div>
@@ -1047,19 +1060,33 @@ async function setStatus(id, status, expectedStatus) {
   return true;
 }
 
+const pendingItemStatusChanges = new Set();
 async function setItemStatusFromOrder(orderId, itemId, status) {
+  if (pendingItemStatusChanges.has(itemId)) return false;
+  pendingItemStatusChanges.add(itemId);
+  try {
   const item = (currentDetailOrder?.pallets || []).flatMap(p => p.items || []).find(row => Number(row.id) === Number(itemId));
   const stages = ['ממתין', 'בייצור', 'הושלם', 'הועמס', 'נשלח', 'סופק'];
   const backwards = item && ((stages.indexOf(status) >= 0 && stages.indexOf(status) < stages.indexOf(item.status)) || (stages.indexOf(item.status) >= 2 && stages.indexOf(status) < 0));
   let correctionReason = '';
+  let correctionMode = 'keep_documents';
+  let correctionFingerprint;
   if (backwards) {
-    correctionReason = await requestCorrectionReason();
-    if (!correctionReason?.trim()) { await openDetail(orderId); return false; }
+    const previewResponse = await fetch(`/api/items/${itemId}/status-correction-preview?status=${encodeURIComponent(status)}`);
+    const preview = await previewResponse.json();
+    if (!previewResponse.ok) throw new Error(preview.error || 'לא ניתן לבדוק את התיקון');
+    const correction = await requestCorrectionReason({ title: `החזרה מ־${preview.current_status} ל־${status}`,
+      info: 'מצב ההזמנה יתעדכן יחד עם הפריט, וניתן יהיה להמשיך לעבוד. הכמויות שיוצרו נשמרות.', itemCorrection: preview });
+    if (!correction) { await openDetail(orderId); return false; }
+    correctionReason = correction.reason;
+    correctionMode = correction.mode;
+    correctionFingerprint = preview.fingerprint;
   } else if (['הושלם','הועמס','נשלח','סופק'].includes(status) && stages.indexOf(status) > stages.indexOf(item?.status)) {
     if (!confirm('הסטטוס ' + status + ' מאשר גם את שלבי העבודה הקודמים לכל כמות הפריט. האם לאשר?')) { await openDetail(orderId); return false; }
   }
   const response = await fetch(`/api/items/${itemId}/status`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, correction_reason: correctionReason })
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status,
+      expected_status: item?.status, correction_reason: correctionReason, correction_mode: correctionMode, correction_fingerprint: correctionFingerprint })
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok === false) {
@@ -1070,6 +1097,11 @@ async function setItemStatusFromOrder(orderId, itemId, status) {
   await fetchOrders();
   await openDetail(orderId);
   return true;
+  } catch (error) {
+    alert(error.message || 'עדכון סטטוס הפריט נכשל');
+    await openDetail(orderId);
+    return false;
+  } finally { pendingItemStatusChanges.delete(itemId); }
 }
 
 function newCancellationIdempotencyKey() {
@@ -1833,6 +1865,21 @@ async function copyDocumentName() {
   }
 }
 
+let activeItemCorrectionPreview = null;
+function renderItemCorrectionEffect() {
+  const preview = activeItemCorrectionPreview;
+  if (!preview) return;
+  const cancel = document.getElementById('correctionShipmentMode').value === 'cancel_unshipped_certificate';
+  const notes = preview.certificates || [];
+  const ids = notes.map(note => note.id).join(', ');
+  const affected = new Set(notes.flatMap(note => note.affected_items || []).map(item => item.id)).size;
+  document.getElementById('correctionShipmentEffect').textContent = cancel
+    ? `תעודות ${ids} יישמרו כמבוטלות. הכמויות של כל ${affected} הפריטים בתעודות ישתחררו לתעודה חדשה, גם אם שינית סטטוס של פריט אחד בלבד. דיווחי הייצור והמלאי נשמרים.`
+    : notes.length
+      ? `תעודות ${ids} נשארות תקפות. ${preview.documented_qty} יחידות מתועדות במשלוח; החזרה לעבודה לא מאפשרת לשלוח אותן שוב. ${!preview.can_cancel_certificates ? (notes.find(note => note.blocked_reason)?.blocked_reason || 'נדרש אימות היסטוריית התעודה לפני ביטולה.') : ''}`
+      : 'הפריט יחזור לשלב שנבחר. דיווחי ייצור ואספקה קודמים נשמרים ביומן.';
+}
+
 function requestCorrectionReason() {
   const options=arguments[0] || {};
   const overlay = document.getElementById('correctionReasonOverlay');
@@ -1840,6 +1887,13 @@ function requestCorrectionReason() {
   document.getElementById('correctionReasonTitle').textContent=options.title || 'סיבת תיקון לאחר תחילת ייצור';
   document.getElementById('correctionReasonInfo').textContent=options.info || 'הפעולה תישלח לשרת לבדיקה מול הרשאת הניהול הקיימת ותירשם ביומן הביקורת.';
   document.getElementById('correctionReasonProductionInfo').hidden=Boolean(options.title);
+  activeItemCorrectionPreview = options.itemCorrection || null;
+  const shipmentMode = document.getElementById('correctionShipmentMode');
+  shipmentMode.value = 'keep_documents';
+  document.getElementById('correctionShipmentFields').hidden = !activeItemCorrectionPreview?.certificates?.length;
+  document.getElementById('correctionShipmentEffect').hidden = !activeItemCorrectionPreview;
+  shipmentMode.querySelector('option[value="cancel_unshipped_certificate"]').disabled = !activeItemCorrectionPreview?.can_cancel_certificates || !['office','manager','admin'].includes(window.IronBendAuth?.currentUser()?.role);
+  if (activeItemCorrectionPreview) renderItemCorrectionEffect();
   input.value = '';
   overlay.classList.add('show');
   requestAnimationFrame(() => input.focus());
@@ -1850,6 +1904,7 @@ function resolveCorrectionReason(value) {
   document.getElementById('correctionReasonOverlay').classList.remove('show');
   const resolve = correctionReasonResolve;
   correctionReasonResolve = null;
+  activeItemCorrectionPreview = null;
   if (resolve) resolve(value);
 }
 
@@ -1857,7 +1912,7 @@ function submitCorrectionReason(event) {
   event.preventDefault();
   const value = document.getElementById('correctionReasonInput').value.trim();
   if (value.length < 3) return;
-  resolveCorrectionReason(value);
+  resolveCorrectionReason(activeItemCorrectionPreview ? { reason: value, mode: document.getElementById('correctionShipmentMode').value } : value);
 }
 
 function cancelCorrectionReason() { resolveCorrectionReason(null); }
