@@ -633,7 +633,6 @@ const ORDER_ACTION_LABELS = new Map([
   [ORDER_STATUS.IN_PRODUCTION, '▶ ייצור'],
   [ORDER_STATUS.DONE_WAITING_PICKUP, '✓ הושלם'],
   [ORDER_STATUS.LOADING, '🚛 העמסה'],
-  [ORDER_STATUS.PARTIAL_DELIVERY, '🚚 אספקה חלקית'],
   [ORDER_STATUS.ON_THE_WAY, '🚚 בדרך'],
   [ORDER_STATUS.SENT, '📤 נשלחה'],
   [ORDER_STATUS.DELIVERED_CONFIRMED, '✓ סופק'],
@@ -648,7 +647,6 @@ const ORDER_STATUS_FILTERS = [
   { label: 'בייצור', status: ORDER_STATUS.IN_PRODUCTION },
   { label: 'הושלמו', status: ORDER_STATUS.DONE_WAITING_PICKUP },
   { label: 'בהעמסה', status: ORDER_STATUS.LOADING },
-  { label: 'אספקה חלקית', status: ORDER_STATUS.PARTIAL_DELIVERY },
 ];
 const QUOTE_STATUS_FILTERS = [
   { label: 'הכל', status: '' },
@@ -807,13 +805,11 @@ function orderItemStatusKey(item, orderStatus) {
   return 'waiting';
 }
 function deliveryProgressBadge(o) {
-  const progress = o.delivery_progress;
-  if (!progress || !progress.shipped_unit_count) return '';
-  const partial = progress.remaining_unit_count > 0;
-  return `<span class="badge s-approved" style="margin:4px" title="מצב האספקה נפרד מסטטוס הייצור">${partial ? 'אספקה חלקית' : 'נשלחה במלואה'} · ${progress.shipped_item_count} מתוך ${progress.total_item_count} פריטים${progress.partially_shipped_item_count ? ` · ${progress.partially_shipped_item_count} פריטים נשלחו בחלקם` : ''} · ${progress.shipped_unit_count} מתוך ${progress.total_unit_count} יח׳</span>`;
+  const summary = window.IronBendOrderWorkspace.deliverySummary(o.delivery_progress);
+  return summary ? `<span class="badge s-approved" style="margin:4px" title="מספר שורות הפריטים בהזמנה; מצב האספקה נפרד מסטטוס העבודה">${escHtml(summary)}</span>` : '';
 }
 function primaryOrderStatusLabel(o) {
-  return o.status === ORDER_STATUS.PARTIAL_DELIVERY && o.delivery_progress?.production_status ? o.delivery_progress.production_status : o.status;
+  return window.IronBendOrderWorkspace.primaryStatus(o);
 }
 function orderStatusPanel(o) {
   const currentStatus = String(primaryOrderStatusLabel(o) || ORDER_STATUS.PENDING_APPROVAL || 'ממתינה לאישור');
@@ -850,6 +846,7 @@ function actionBtns(o, stopProp = true, includePrints = true) {
 }
 
 function canSelectOrderStatus(o, status) {
+  if (status === ORDER_STATUS.PARTIAL_DELIVERY) return false;
   const role = window.IronBendAuth?.currentUser().role;
   if (!['office', 'production', 'manager', 'admin'].includes(role)) return false;
   if (['manager', 'admin'].includes(role)) return true;
@@ -861,8 +858,9 @@ function canSelectOrderStatus(o, status) {
 function orderStatusSelect(o) {
   const role=window.IronBendAuth?.currentUser().role;
   const canChange=['office','production','manager','admin'].includes(role),canPay=['office','manager','admin'].includes(role);
-  const current=o.payment_status==='paid'?'__paid':o.status;
-  let options=[o.status,...allowedOrderTransitions(o.status)].map(s=>[s,s]);
+  const workStatus=primaryOrderStatusLabel(o);
+  const current=o.payment_status==='paid'?'__paid':workStatus;
+  let options=[...new Set([workStatus,...allowedOrderTransitions(o.status)])].filter(s=>s!==ORDER_STATUS.PARTIAL_DELIVERY).map(s=>[s,s]);
   if(o.payment_status==='paid')options.push(['__paid','שולם'],['__unpaid','בטל סימון שולם — תיקון']);
   if(canPay&&o.payment_status!=='paid')options.push(['__paid','שולם — סימון ידני']);
   return `<select class="order-status-select" aria-label="סטטוס הזמנה ${escHtml(o.order_num)}" onclick="event.stopPropagation()" onchange="changeListOrderStatus(event,${o.id})" ${!canChange||o.deleted_at?'disabled':''}>${options.map(([value,label])=>`<option value="${escHtml(value)}"${value===current?' selected':''}${(value.startsWith('__') ? !canPay : !canSelectOrderStatus(o,value))?' disabled':''}>${escHtml(label)}</option>`).join('')}</select>`;
@@ -2975,13 +2973,14 @@ function buildDetailHTML(o, pkgs) {
   </div>`;
 
   // ── Status
-  const statuses = [o.status, ...allowedOrderTransitions(o.status)]
+  const workStatus = primaryOrderStatusLabel(o);
+  const statuses = [workStatus, ...allowedOrderTransitions(o.status)]
     .filter((status, index, list) => status && status !== ORDER_STATUS.CANCELLED && list.indexOf(status) === index);
   const statusSec = `<div class="d-section">
     <div class="d-title">🔁 עדכון סטטוס</div>
     <div class="status-actions">
-      ${statuses.map(s => `<button class="status-btn${o.status===s?' cur':''}"
-        ${o.status===s||!canSelectOrderStatus(o,s)?'disabled':''}
+      ${statuses.map(s => `<button class="status-btn${workStatus===s?' cur':''}"
+        ${workStatus===s||!canSelectOrderStatus(o,s)?'disabled':''}
         onclick="setStatusAndClose(${o.id},${jsAttr(s)})">${escHtml(s)}</button>`).join('')}
     </div>
   </div>`;

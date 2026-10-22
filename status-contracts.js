@@ -108,9 +108,9 @@ function isValidOrderTransition(from, to, { allowSkip = false } = {}) {
 
 function allowedOrderTransitions(status, { allowSkip = false } = {}) {
   if (allowSkip && normalizeOrderStatus(status) !== ORDER_STATUS.CANCELLED) {
-    return VALID_ORDER_STATUSES.filter(value => value !== normalizeOrderStatus(status));
+    return VALID_ORDER_STATUSES.filter(value => value !== normalizeOrderStatus(status) && value !== ORDER_STATUS.PARTIAL_DELIVERY);
   }
-  return VALID_ORDER_TRANSITIONS[normalizeOrderStatus(status)] || [];
+  return (VALID_ORDER_TRANSITIONS[normalizeOrderStatus(status)] || []).filter(value => value !== ORDER_STATUS.PARTIAL_DELIVERY);
 }
 
 function isValidItemStatus(status) {

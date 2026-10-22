@@ -14,6 +14,8 @@ The contract answers:
 
 ## Current Registry
 
+`orderItemSummary` counts order item rows, not quantities within rows. Notes and the detail badge use the same summary, distinguish fully shipped from partially shipped rows, and preserve operator notes. Partial delivery is shipment information and is excluded from manual status choices; existing partial orders display their projected work stage.
+
 `orderStatusCorrection` describes the Orders rollback dialog: the affected-item count comes from the server preview, excludes cancelled/stopped items, and accompanies explicit document choices. `itemStatusCorrection` continues to describe individual item rollback. Both preserve production quantities and history.
 
 The first registry lives in:

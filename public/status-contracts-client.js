@@ -79,9 +79,9 @@
   function allowedOrderTransitions(status, { allowSkip = false } = {}) {
     status = normalizeOrderStatus(status);
     if (allowSkip && status !== ORDER_STATUS.CANCELLED) {
-      return Object.values(ORDER_STATUS).filter(value => value !== status);
+      return Object.values(ORDER_STATUS).filter(value => value !== status && value !== ORDER_STATUS.PARTIAL_DELIVERY);
     }
-    return VALID_ORDER_TRANSITIONS[status] || [];
+    return (VALID_ORDER_TRANSITIONS[status] || []).filter(value => value !== ORDER_STATUS.PARTIAL_DELIVERY);
   }
 
   window.IronBendStatus = Object.freeze({

@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    orderItemSummary: {
+      screen: 'orders.html', owner: 'Orders',
+      source: { api: '/api/orders', fields: ['status', 'delivery_progress.production_status', 'delivery_progress.total_item_count', 'delivery_progress.shipped_item_count', 'delivery_progress.partially_shipped_item_count'] },
+      meaning: 'Order notes and delivery badge count item rows, never pieces or produced quantities. Fully and partially shipped rows are separate. Partial delivery is derived shipment information, not a selectable work status; existing partial orders display their projected production stage.',
+      consumers: ['order-notes', 'order-status-select', 'deliveryProgressBadge'], risk: 'D0',
+    },
     workerLoadingStatus: {
       screen: 'worker-visual.html', owner: 'Production',
       source: { api: '/api/worker-card/:id/status', fields: ['item.status', 'item.order_status', 'receipt'] },

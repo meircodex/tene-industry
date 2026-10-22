@@ -76,7 +76,9 @@ test('manual status choices allow skips and corrections with matching browser/se
       assert.throws(() => assertOrderStatusTransition({ from, to: ORDER_STATUS.IN_PRODUCTION, role: 'admin', allowSkip: true }), { statusCode: 409 });
       continue;
     }
-    for (const to of Object.values(ORDER_STATUS).filter(value => value !== from)) {
+    assert.ok(!choices.includes(ORDER_STATUS.PARTIAL_DELIVERY));
+    assert.throws(() => assertOrderStatusTransition({ from, to: ORDER_STATUS.PARTIAL_DELIVERY, role: 'admin', allowSkip: true }), { statusCode: 409 });
+    for (const to of Object.values(ORDER_STATUS).filter(value => value !== from && value !== ORDER_STATUS.PARTIAL_DELIVERY)) {
       assert.equal(isValidOrderTransition(from, to, { allowSkip: true }), true, `${from} -> ${to}`);
       assertOrderStatusTransition({ from, to, role: 'admin', allowSkip: true });
     }
@@ -99,18 +101,34 @@ test('order dropdown keeps all stages visible for pending, supplied and paid ord
   const vm = require('node:vm');
   const source = fs.readFileSync(require.resolve('../public/orders.html'), 'utf8');
   const fragment = source.slice(source.indexOf('function canSelectOrderStatus('), source.indexOf('async function changeListOrderStatus('));
-  const context = { ORDER_STATUS, allowedOrderTransitions: status => allowedOrderTransitions(status, { allowSkip: true }), escHtml: value => String(value), window: { IronBendAuth: { currentUser: () => ({ role: 'admin' }) } } };
+  const context = { ORDER_STATUS, primaryOrderStatusLabel: require('../public/order-workspace').primaryStatus, allowedOrderTransitions: status => allowedOrderTransitions(status, { allowSkip: true }), escHtml: value => String(value), window: { IronBendAuth: { currentUser: () => ({ role: 'admin' }) } } };
   vm.createContext(context);
   vm.runInContext(fragment, context);
   for (const status of [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.PARTIAL_DELIVERY, ORDER_STATUS.DELIVERED_CONFIRMED]) {
     for (const payment_status of ['unpaid', 'paid']) {
       const html = context.orderStatusSelect({ id: 86, order_num: 'TEST', status, payment_status });
-      for (const option of Object.values(ORDER_STATUS)) assert.ok(html.includes(`value="${option}"`), `${status}/${payment_status}: ${option}`);
+      for (const option of Object.values(ORDER_STATUS).filter(value => value !== ORDER_STATUS.PARTIAL_DELIVERY)) assert.ok(html.includes(`value="${option}"`), `${status}/${payment_status}: ${option}`);
+      assert.ok(!html.includes(ORDER_STATUS.PARTIAL_DELIVERY));
     }
   }
   context.window.IronBendAuth.currentUser = () => ({ role: 'office' });
   assert.equal(context.canSelectOrderStatus({ status: ORDER_STATUS.PENDING_APPROVAL }, ORDER_STATUS.IN_PRODUCTION), false);
   assert.equal(context.canSelectOrderStatus({ status: ORDER_STATUS.PRODUCTION_QUEUE }, ORDER_STATUS.DONE_WAITING_PICKUP), true);
+});
+
+test('partial shipment displays the work stage and item counts without unit quantities', () => {
+  const ui = require('../public/order-workspace');
+  const order = { status: ORDER_STATUS.PARTIAL_DELIVERY, general_notes: 'להתקשר לפני הגעה', delivery_progress: {
+    production_status: ORDER_STATUS.IN_PRODUCTION, total_item_count: 31, shipped_item_count: 16,
+    partially_shipped_item_count: 2, shipped_unit_count: 646, total_unit_count: 917, remaining_unit_count: 271,
+  } };
+  assert.equal(ui.primaryStatus(order), ORDER_STATUS.IN_PRODUCTION);
+  assert.equal(ui.rowTone(order), 'production');
+  assert.deepEqual(ui.notes(order), ['נשלחו במלואם 16 מתוך 31 פריטים · 2 פריטים נשלחו בחלקם', 'להתקשר לפני הגעה']);
+  assert.equal(ui.deliverySummary({ total_item_count: 3, shipped_item_count: 0 }), '3 פריטים בהזמנה');
+  assert.equal(ui.deliverySummary({ total_item_count: 3, shipped_item_count: 3 }), 'נשלחו במלואם 3 מתוך 3 פריטים');
+  assert.equal(ui.primaryStatus({ status: ORDER_STATUS.PARTIAL_DELIVERY, delivery_progress: { production_status: ORDER_STATUS.PENDING_APPROVAL } }), ORDER_STATUS.PRODUCTION_QUEUE);
+  assert.equal(ui.primaryStatus({ status: ORDER_STATUS.PENDING_APPROVAL }), ORDER_STATUS.PENDING_APPROVAL);
 });
 
 
