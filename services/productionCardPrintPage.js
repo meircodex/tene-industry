@@ -345,7 +345,7 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 .pc-screen-tools button{border:0;border-radius:5px;background:#1a2332;color:#fff;padding:4px 7px;font-family:inherit;font-size:10px;font-weight:900;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,0.18);}
 .pc-screen-tools button:hover{background:#c9621a;}
 .pc-split-state{display:inline-flex;align-items:center;border-radius:5px;background:#fff3d7;border:1px solid #ffd6a0;color:#8a4b00;padding:3px 6px;font-size:10px;font-weight:900;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.12);}
-.pc-print-face{display:grid;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
+.pc-print-face{display:grid;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;padding-block:7.5mm;background:#fff;direction:ltr;}
 .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
 .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:13.5px;font-weight:900;line-height:1;background:#fff;color:#000;border:0!important;}
 .pc-print-head-meta{display:flex;align-items:center;justify-content:flex-end;gap:2.5mm;min-width:0;flex:1;}
@@ -447,7 +447,7 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .cards-page[data-empty-page="1"]{display:none!important;}
   .pc-screen-tools{display:none!important;}
   .prod-card>:not(.pc-print-face){display:none!important;}
-  .pc-print-face{display:grid!important;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;background:#fff;direction:ltr;}
+  .pc-print-face{display:grid!important;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;padding-block:7.5mm!important;background:#fff;direction:ltr;}
   .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
   .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:14px;font-weight:900;line-height:1;background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:0!important;}
   .pc-print-customer{font-size:12.5px!important;}

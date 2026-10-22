@@ -115,7 +115,8 @@ test('production print page renders fixed A4 cards without order summary and wit
     assert.match(rule[1], /background:#fff(?:!important)?;color:#000(?:!important)?;/);
   }
   assert.match(html, /grid-template-columns:minmax\(0,1fr\) 27mm/);
-  assert.match(html, /pc-print-face\{[^}]*width:100%;height:100%/);
+  assert.match(html, /pc-print-face\{[^}]*width:100%;height:100%;padding-block:7\.5mm/);
+  assert.match(html, /pc-print-face\{[^}]*padding-block:7\.5mm!important/);
   assert.match(html, /pc-print-qr-code/);
   assert.match(html, /data-worker-card-code/);
   assert.match(html, /var PUBLIC_SCAN_BASE = "https:\/\/portal\.example"/);
