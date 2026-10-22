@@ -27,6 +27,7 @@ const { rateLimit } = require('express-rate-limit');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
 const { createHistoricalProductionReconciliationService } = require('../services/historicalProductionReconciliation');
+const { orderStatusCorrectionPreview, applyOrderStatusCorrection } = require('../services/orderStatusCorrection');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/orders missing dependency: ${name}`);
@@ -534,7 +535,12 @@ module.exports = function createOrdersRouter(deps) {
     const params = [];
     const where = [];
     try { where.push(bucketCondition(req.query.bucket)); } catch(error) { return res.status(400).json({error:error.message}); }
-    if (status) { where.push('o.status = ?'); params.push(normalizeOrderStatus(status)); }
+    if (status) {
+      const normalized = normalizeOrderStatus(status);
+      if (normalized === ORDER_STATUS.PRODUCTION_QUEUE) {
+        where.push('o.status IN (?,?)'); params.push(normalized, 'אושרה – ממתין לייצור');
+      } else { where.push('o.status = ?'); params.push(normalized); }
+    }
     if (date) { where.push('DATE(o.delivery_date)=?'); params.push(date); }
     if (priority) { where.push('o.priority = ?'); params.push(priority); }
     if (where.length) sql += ' WHERE ' + where.join(' AND ');
@@ -542,6 +548,7 @@ module.exports = function createOrdersRouter(deps) {
     params.push(page.limit, page.offset);
     const rows = db.prepare(sql).all(...params);
     for (const order of rows) {
+      order.status = normalizeOrderStatus(order.status);
       const items = db.prepare('SELECT i.* FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=? ORDER BY i.id').all(order.id);
       order.delivery_progress = buildDeliveryCertificateProgress(db, order.id, items);
     }
@@ -663,6 +670,7 @@ module.exports = function createOrdersRouter(deps) {
       p.items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); });
     });
     order.pallets = pallets;
+    order.status = normalizeOrderStatus(order.status);
     // One computed-on-read projection serves current and historical orders.
     // It never rewrites an order and keeps overlapping kg services separate
     // from piece-based work such as chairs and rings.
@@ -993,6 +1001,15 @@ module.exports = function createOrdersRouter(deps) {
     }
   });
 
+  router.get('/orders/:id/status-correction-preview', requireAnyRole(['office', 'production', 'manager', 'admin']), (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const preview = orderStatusCorrectionPreview(db, req.params.id, req.query.status);
+      assertOrderStatusTransition({ from: preview.current_status, to: preview.target_status, role: req.userRole, allowSkip: true });
+      res.json(preview);
+    } catch (error) { res.status(error.status || error.statusCode || 400).json({ error: error.message }); }
+  });
+
   router.patch('/orders/:id/status', requireAnyRole(['office', 'production', 'manager', 'admin']), (req, res) => {
     const { status, userId, userName } = req.body;
     if (!status) return res.status(400).json({ error: 'חסר סטטוס' });
@@ -1000,7 +1017,7 @@ module.exports = function createOrdersRouter(deps) {
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
     if (!order) return res.status(404).json({ error: 'לא נמצא' });
     if (order.deleted_at) return res.status(409).json({error:'יש לשחזר את ההזמנה מסל המחזור לפני שינוי סטטוס'});
-    if (req.body.expected_status !== undefined && req.body.expected_status !== order.status) return res.status(409).json({error:'סטטוס ההזמנה עודכן בינתיים. יש לרענן לפני שינוי'});
+    if (req.body.expected_status !== undefined && normalizeOrderStatus(req.body.expected_status) !== normalizeOrderStatus(order.status)) return res.status(409).json({error:'סטטוס ההזמנה עודכן בינתיים. יש לרענן לפני שינוי'});
     if (requestedStatus === ORDER_STATUS.CANCELLED) {
       return res.status(409).json({
         error: 'cancellation_review_required',
@@ -1022,20 +1039,33 @@ module.exports = function createOrdersRouter(deps) {
     }
     const old = order.status;
     const approvedAt = transition.isApproval ? new Date().toISOString() : null;
-    db.prepare(
-      'UPDATE orders SET status=?, workspace_version=workspace_version+1, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
-    ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
+    let correction = null, requiresCorrection = false;
+    try { db.transaction(() => {
+      const preview = orderStatusCorrectionPreview(db, order.id, requestedStatus);
+      requiresCorrection = preview.requires_correction;
+      if (requiresCorrection) {
+        correction = applyOrderStatusCorrection(db, preview, { fingerprint: req.body.correction_fingerprint,
+          reason: req.body.correction_reason, mode: req.body.correction_mode, role: req.userRole,
+          userId: req.userId, userName: req.auth?.display_name });
+      } else if (req.body.correction_fingerprint && req.body.correction_fingerprint !== preview.fingerprint) {
+        throw Object.assign(new Error('ההזמנה השתנתה; יש לפתוח מחדש את התיקון'), { status: 409 });
+      }
+      db.prepare(
+        'UPDATE orders SET status=?, workspace_version=workspace_version+1, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
+      ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
+      auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, req.body.correction_reason || null, req.userId || userId || null, req.auth?.display_name || userName || null);
+      if (transition.isApproval) {
+        auditLog('order', order.id, order.order_num, 'manager_approval', 'approved_by', null, req.userId || userId || null, null, req.userId || userId || null, req.auth?.display_name || userName || null);
+      }
+    })(); } catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
     const releasedReservations = { order_id: order.id, released: 0 };
-    auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, null, req.userId || userId || null, req.auth?.display_name || userName || null);
-    if (transition.isApproval) {
-      auditLog('order', order.id, order.order_num, 'manager_approval', 'approved_by', null, req.userId || userId || null, null, req.userId || userId || null, req.auth?.display_name || userName || null);
-    }
+    for (const item of correction?.corrected_items || []) wsBroadcast('item_status', { id: item.id, status: item.status });
     wsBroadcast('order_status', { id: order.id, status: requestedStatus, orderNum: order.order_num });
-    if (order.customer_id) {
+    if (order.customer_id && !requiresCorrection) {
       const c = db.prepare('SELECT phone FROM customers WHERE id=?').get(order.customer_id);
       if (c?.phone) intake.notifyOrderStatus(c.phone, order.order_num, requestedStatus).catch(() => {});
     }
-    res.json({ success: true, releasedReservations });
+    res.json({ success: true, releasedReservations, ...(correction || {}) });
   });
 
   router.post('/orders/:orderId/items', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
@@ -1255,6 +1285,7 @@ module.exports.manifest = {
     { event: 'order_quote_created' },
     { event: 'order_quote_converted' },
     { event: 'order_status' },
+    { event: 'item_status' },
     { event: 'order_updated' },
     { event: 'order_review' },
     { event: 'order_item_updated' },

@@ -18,7 +18,7 @@ into a universal event/audit model.
 | `order_complete` | Orders / Production | Order completion helper | Should be formal order lifecycle event. |
 | `new_order` | Orders | Order creation/import/portal/BVBS | Multiple producers; needs source/channel field. |
 | `order_status` | Orders | Status approval/update routes | Must be audited and state-machine checked. |
-| `item_status` | Orders / Production | Item status route | Must be tied to order production state. |
+| `item_status` | Orders / Production | Item status route and transactional order rollback | Order rollback emits each corrected item only after the transaction commits. |
 | `alert` | Platform Core | Alert routes/helper | Should also become persisted alert/event. |
 | `driver_location` | Delivery | Driver location update | External portal auth needed. |
 | `delivery_depart` | Delivery | Delivery depart route | Delivery state machine. |

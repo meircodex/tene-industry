@@ -63,9 +63,9 @@ function customerStatusFromOrder(order = {}) {
     customerStatus = CUSTOMER_STATUS.DELIVERED;
   } else if (raw === ORDER_STATUS.DONE_WAITING_PICKUP || raw === ORDER_STATUS.ON_THE_WAY || hasAny(raw, ['מוכן לאספקה', 'מוכנה לאספקה', 'בדרך'])) {
     customerStatus = CUSTOMER_STATUS.READY_FOR_DELIVERY;
-  } else if (raw === ORDER_STATUS.PRODUCTION_QUEUE || raw === ORDER_STATUS.IN_PRODUCTION || hasAny(raw, ['בתור ייצור', 'בייצור'])) {
+  } else if (raw === ORDER_STATUS.IN_PRODUCTION || hasAny(raw, ['בייצור'])) {
     customerStatus = CUSTOMER_STATUS.IN_PRODUCTION;
-  } else if (raw === ORDER_STATUS.APPROVED_WAITING_PRODUCTION || hasAny(raw, ['אושרה', 'מאושר'])) {
+  } else if (raw === ORDER_STATUS.PRODUCTION_QUEUE || hasAny(raw, ['אושרה', 'מאושר'])) {
     customerStatus = CUSTOMER_STATUS.APPROVED;
   } else if (raw === ORDER_STATUS.PENDING_APPROVAL || hasAny(raw, ['ממתינה לאישור', 'נשלחה לבדיקה', 'ממתין לאישור'])) {
     customerStatus = CUSTOMER_STATUS.SUBMITTED_REVIEW;

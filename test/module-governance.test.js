@@ -361,6 +361,7 @@ test('core order API routes are split out of the server monolith', () => {
   assert.match(route, /router\.post\('\/order-imports\/preview'/);
   assert.match(route, /router\.post\('\/orders'/);
   assert.match(route, /router\.patch\('\/orders\/:id\/status'/);
+  assert.ok(route.includes("router.get('/orders/:id/status-correction-preview'"));
   assert.match(route, /auditLog\('order'/);
   assert.match(route, /wsBroadcast\('new_order'/);
   assert.match(server, /createOrdersRouter/);

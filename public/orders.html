@@ -629,7 +629,6 @@ const ORDER_STATUS = STATUS_CONTRACT.ORDER_STATUS || {};
 const ITEM_STATUS = STATUS_CONTRACT.ITEM_STATUS || {};
 const allowedOrderTransitions = status => STATUS_CONTRACT.allowedOrderTransitions?.(status, { allowSkip: true }) || [];
 const ORDER_ACTION_LABELS = new Map([
-  [ORDER_STATUS.APPROVED_WAITING_PRODUCTION, '✓ אשר'],
   [ORDER_STATUS.PRODUCTION_QUEUE, '▶ לתור'],
   [ORDER_STATUS.IN_PRODUCTION, '▶ ייצור'],
   [ORDER_STATUS.DONE_WAITING_PICKUP, '✓ הושלם'],
@@ -645,7 +644,7 @@ const ORDER_STATUS_FILTERS = [
   { label: 'הכל', status: '' },
   { label: 'פורטל · לאישור לקוח', status: PORTAL_AWAITING_CUSTOMER_APPROVAL },
   { label: 'ממתינות משרד', status: ORDER_STATUS.PENDING_APPROVAL },
-  { label: 'אושרו', status: ORDER_STATUS.APPROVED_WAITING_PRODUCTION },
+  { label: 'בתור ייצור', status: ORDER_STATUS.PRODUCTION_QUEUE },
   { label: 'בייצור', status: ORDER_STATUS.IN_PRODUCTION },
   { label: 'הושלמו', status: ORDER_STATUS.DONE_WAITING_PICKUP },
   { label: 'בהעמסה', status: ORDER_STATUS.LOADING },
@@ -854,7 +853,7 @@ function canSelectOrderStatus(o, status) {
   const role = window.IronBendAuth?.currentUser().role;
   if (!['office', 'production', 'manager', 'admin'].includes(role)) return false;
   if (['manager', 'admin'].includes(role)) return true;
-  if (status === ORDER_STATUS.LOADING || status === ORDER_STATUS.APPROVED_WAITING_PRODUCTION) return false;
+  if (status === ORDER_STATUS.LOADING) return false;
   return ![ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(o.status) ||
     [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL, ORDER_STATUS.CANCELLED].includes(status);
 }
@@ -878,7 +877,7 @@ async function changeListOrderStatus(event,id) {
       if(!reason?.trim()||!confirm(paid?'לסמן את ההזמנה כשולמה ולהעביר להזמנות סגורות? זהו סימון ידני בלבד — אינו מפיק קבלה ואינו משנה את הנהלת החשבונות.':'לאשר תיקון של סימון התשלום? סטטוס הייצור והאספקה יישאר ללא שינוי.'))return;
       const response=await fetch(`/api/orders/${id}/payment`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,payment_status:paid?'paid':'unpaid',reason})});const data=await response.json();if(!response.ok)throw new Error(data.error);await fetchOrders();
     } else if(next===ORDER_STATUS.CANCELLED)await openCancellationReview(event,id);
-    else if(confirm(`לשנות את סטטוס ${order.order_num} ל״${next}״?${next===ORDER_STATUS.DELIVERED_CONFIRMED?' ההזמנה תעבור ללשונית הזמנות שסופקו.':''}`))await setStatus(id,next,order.status);
+    else await setStatus(id,next,order.status);
   }catch(error){alert(error.message||'עדכון הסטטוס נכשל');}
   finally {applyFilter();}
 }
@@ -1038,11 +1037,28 @@ function openConvertedQuoteOrder(orderId) {
 }
 
 // ── Status update ──────────────────────────────────────────────────────
+const pendingOrderStatusChanges = new Set();
 async function setStatus(id, status, expectedStatus) {
+  if (pendingOrderStatusChanges.has(id)) return false;
+  pendingOrderStatusChanges.add(id);
+  try {
+  const previewResponse = await fetch(`/api/orders/${id}/status-correction-preview?status=${encodeURIComponent(status)}`);
+  const preview = await previewResponse.json();
+  if (!previewResponse.ok) throw new Error(preview.error || 'לא ניתן לבדוק את שינוי הסטטוס');
+  let correction = null;
+  if (preview.requires_correction) {
+    const affectedText = preview.affected_items.length === 1 ? 'פריט אחד יוחזר' : `${preview.affected_items.length} פריטים יוחזרו`;
+    const loadingInfo = preview.cancelled_loading_session_ids.length ? ' ההעמסה הפעילה תבוטל ותיפתח מחדש בהמשך; הסריקות נשמרות בהיסטוריה.' : '';
+    correction = await requestCorrectionReason({ title: `החזרת ההזמנה ל״${status}״`,
+      info: `${affectedText} ל״${preview.target_item_status || status}״ יחד עם ההזמנה. הכמויות שיוצרו נשמרות.${loadingInfo}`,
+      defaultReason: 'תיקון סטטוס שנבחר בטעות', itemCorrection: preview });
+    if (!correction) return false;
+  } else if (!confirm(`לשנות את סטטוס ההזמנה ל״${status}״?${status === ORDER_STATUS.DELIVERED_CONFIRMED ? ' ההזמנה תעבור ללשונית הזמנות שסופקו.' : ''}`)) return false;
   const response = await fetch(`/api/orders/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, expected_status: expectedStatus })
+    body: JSON.stringify({ status, expected_status: expectedStatus ?? preview.current_status,
+      correction_fingerprint: preview.fingerprint, correction_reason: correction?.reason, correction_mode: correction?.mode })
   });
   const result = await response.json().catch(() => ({}));
   if (response.status === 401 || response.status === 403) {
@@ -1058,6 +1074,8 @@ async function setStatus(id, status, expectedStatus) {
   }
   await fetchOrders();
   return true;
+  } catch (error) { alert(error.message || 'עדכון סטטוס נכשל'); return false; }
+  finally { pendingOrderStatusChanges.delete(id); }
 }
 
 const pendingItemStatusChanges = new Set();
@@ -1874,10 +1892,10 @@ function renderItemCorrectionEffect() {
   const ids = notes.map(note => note.id).join(', ');
   const affected = new Set(notes.flatMap(note => note.affected_items || []).map(item => item.id)).size;
   document.getElementById('correctionShipmentEffect').textContent = cancel
-    ? `תעודות ${ids} יישמרו כמבוטלות. הכמויות של כל ${affected} הפריטים בתעודות ישתחררו לתעודה חדשה, גם אם שינית סטטוס של פריט אחד בלבד. דיווחי הייצור והמלאי נשמרים.`
+    ? `תעודות ${ids} יישמרו כמבוטלות. הכמויות של כל ${affected} הפריטים בתעודות ישתחררו לתעודה חדשה. דיווחי הייצור והמלאי נשמרים.`
     : notes.length
       ? `תעודות ${ids} נשארות תקפות. ${preview.documented_qty} יחידות מתועדות במשלוח; החזרה לעבודה לא מאפשרת לשלוח אותן שוב. ${!preview.can_cancel_certificates ? (notes.find(note => note.blocked_reason)?.blocked_reason || 'נדרש אימות היסטוריית התעודה לפני ביטולה.') : ''}`
-      : 'הפריט יחזור לשלב שנבחר. דיווחי ייצור ואספקה קודמים נשמרים ביומן.';
+      : 'החזרה לשלב שנבחר תשמור את דיווחי הייצור והאספקה הקודמים ביומן.';
 }
 
 function requestCorrectionReason() {
@@ -1894,7 +1912,7 @@ function requestCorrectionReason() {
   document.getElementById('correctionShipmentEffect').hidden = !activeItemCorrectionPreview;
   shipmentMode.querySelector('option[value="cancel_unshipped_certificate"]').disabled = !activeItemCorrectionPreview?.can_cancel_certificates || !['office','manager','admin'].includes(window.IronBendAuth?.currentUser()?.role);
   if (activeItemCorrectionPreview) renderItemCorrectionEffect();
-  input.value = '';
+  input.value = options.defaultReason || '';
   overlay.classList.add('show');
   requestAnimationFrame(() => input.focus());
   return new Promise(resolve => { correctionReasonResolve = resolve; });

@@ -18,7 +18,7 @@ const { ORDER_STATUS, ITEM_STATUS } = require('../status-contracts');
 
 let baseUrl;
 
-function seedCard(name, orderStatus = ORDER_STATUS.APPROVED_WAITING_PRODUCTION, itemStatus = ITEM_STATUS.WAITING) {
+function seedCard(name, orderStatus = ORDER_STATUS.PRODUCTION_QUEUE, itemStatus = ITEM_STATUS.WAITING) {
   const orderNum = `RECEIPT-${name}`;
   const customerId = db.prepare('INSERT INTO customers (name) VALUES (?)').run('Receipt test customer').lastInsertRowid;
   const orderId = db.prepare(`

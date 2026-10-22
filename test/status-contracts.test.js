@@ -11,14 +11,14 @@ const {
 } = require('../status-contracts');
 
 test('order status aliases normalize to canonical values', () => {
-  assert.equal(normalizeOrderStatus('אושרה'), ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
-  assert.equal(normalizeOrderStatus('מאושר'), ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+  assert.equal(normalizeOrderStatus('אושרה'), ORDER_STATUS.PRODUCTION_QUEUE);
+  assert.equal(normalizeOrderStatus('מאושר'), ORDER_STATUS.PRODUCTION_QUEUE);
   assert.equal(normalizeOrderStatus('סופק'), ORDER_STATUS.DELIVERED_CONFIRMED);
   assert.equal(normalizeOrderStatus('בוטל'), ORDER_STATUS.CANCELLED);
 });
 test('english order status aliases normalize for legacy integrations', () => {
-  assert.equal(normalizeOrderStatus('approved'), ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
-  assert.equal(normalizeOrderStatus('approved_waiting_production'), ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+  assert.equal(normalizeOrderStatus('approved'), ORDER_STATUS.PRODUCTION_QUEUE);
+  assert.equal(normalizeOrderStatus('approved_waiting_production'), ORDER_STATUS.PRODUCTION_QUEUE);
   assert.equal(normalizeOrderStatus('planned'), ORDER_STATUS.PRODUCTION_QUEUE);
   assert.equal(normalizeOrderStatus('production_queue'), ORDER_STATUS.PRODUCTION_QUEUE);
   assert.equal(normalizeOrderStatus('in_production'), ORDER_STATUS.IN_PRODUCTION);
@@ -26,7 +26,7 @@ test('english order status aliases normalize for legacy integrations', () => {
 
 test('order status transitions accept valid moves and reject invalid skips', () => {
   assert.equal(
-    isValidOrderTransition(ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.APPROVED_WAITING_PRODUCTION),
+    isValidOrderTransition(ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.PRODUCTION_QUEUE),
     true
   );
   assert.equal(
@@ -88,7 +88,9 @@ test('manual status choices allow skips and corrections with matching browser/se
     }
   }
   assert.throws(() => assertOrderStatusTransition({ from: ORDER_STATUS.IN_PRODUCTION, to: ORDER_STATUS.LOADING, role: 'production', allowSkip: true }), { statusCode: 403 });
-  assert.throws(() => assertOrderStatusTransition({ from: ORDER_STATUS.IN_PRODUCTION, to: ORDER_STATUS.APPROVED_WAITING_PRODUCTION, role: 'office', allowSkip: true }), { statusCode: 403 });
+  assert.equal(assertOrderStatusTransition({ from: ORDER_STATUS.IN_PRODUCTION, to: ORDER_STATUS.PRODUCTION_QUEUE, role: 'office', allowSkip: true }).isApproval, false);
+  assert.equal(normalizeOrderStatus('אושרה – ממתין לייצור'), ORDER_STATUS.PRODUCTION_QUEUE);
+  assert.ok(!Object.values(ORDER_STATUS).includes('אושרה – ממתין לייצור'));
   assert.throws(() => assertOrderStatusTransition({ from: ORDER_STATUS.IN_PRODUCTION, to: 'bad-status', role: 'admin', allowSkip: true }), { statusCode: 400 });
 });
 
@@ -108,7 +110,7 @@ test('order dropdown keeps all stages visible for pending, supplied and paid ord
   }
   context.window.IronBendAuth.currentUser = () => ({ role: 'office' });
   assert.equal(context.canSelectOrderStatus({ status: ORDER_STATUS.PENDING_APPROVAL }, ORDER_STATUS.IN_PRODUCTION), false);
-  assert.equal(context.canSelectOrderStatus({ status: ORDER_STATUS.APPROVED_WAITING_PRODUCTION }, ORDER_STATUS.DONE_WAITING_PICKUP), true);
+  assert.equal(context.canSelectOrderStatus({ status: ORDER_STATUS.PRODUCTION_QUEUE }, ORDER_STATUS.DONE_WAITING_PICKUP), true);
 });
 
 

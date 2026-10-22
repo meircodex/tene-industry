@@ -58,6 +58,7 @@ Security posture values:
 | --- | --- | --- | --- |
 | `/api/customers*` | Orders / CRM | auth-required; writes office/manager/admin | Protected; still needs CRM vs portal-token ownership cleanup. |
 | `/api/orders*` | Orders | auth-required; writes role-gated | Protected; keep expanding workflow-specific tests. |
+| `/api/orders/:id/status-correction-preview` | Orders | office/production/manager/admin | Read-only, no-store preview of item rollback, active loading and certificate choices; fingerprint guards the existing status PATCH. |
 | `/api/order-imports/*` | Orders | role-required: office/manager/admin | Protected; approval changes production data and must remain audited. |
 | `/api/items*` | Orders / Production | auth-required; writes role-gated | Protected; shared ownership with Production still needs clean module boundary. |
 | `/api/shapes*` | Catalog | auth-required; writes manager/admin | Protected; shape library is product catalog data, not order workflow ownership. |

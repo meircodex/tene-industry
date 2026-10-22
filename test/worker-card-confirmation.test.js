@@ -361,3 +361,22 @@ test('editing an uncertain draft blocks its old retry and a new save sends a new
   assert.equal(updated.note, 'עריכה חדשה שלא שייכת לבקשה הקודמת');
   assert.equal(f.item.note, updated.note);
 });
+
+
+test('phone fourth status action persists loaded and offers no delivered command', async () => {
+  const f = fixture(async (_url, options) => {
+    const body = JSON.parse(options.body);
+    return response({ok:true,receipt:receipt('status_changed'),item:{id:42,status:body.status}});
+  });
+  await f.context.setStatus(42, 'loaded');
+  const payload = JSON.parse(f.requests[0].options.body);
+  assert.equal(payload.status, 'הועמס');
+  assert.equal(payload.expected_status, 'ממתין');
+  assert.equal(f.item.status, 'הועמס');
+  assert.equal(f.run("apiStatus.delivered"), undefined);
+  assert.equal(f.run("apiStatus.supplied"), undefined);
+  assert.equal(f.run("statusKey('הועמס')"), 'loaded');
+  assert.equal(f.run("statusText.loaded"), 'הועמס');
+  assert.match(html, /\['waiting','production','done','loaded'\]/);
+  assert.doesNotMatch(html, /supplied\(item\)/, 'order shipping state cannot hide a corrected item work state');
+});

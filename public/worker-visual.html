@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>דשבורד איסוף כרטיסים – IronBend</title>
   <style>
-    :root{--navy:#0b4262;--blue:#0c567a;--teal:#17766d;--ink:#072e49;--line:#c8dce6;--bg:#edf5f7;--soft:#f8fcfd;--wait:#b56c14;--done:#467c3b;--supplied:#625194}
+    :root{--navy:#0b4262;--blue:#0c567a;--teal:#17766d;--ink:#072e49;--line:#c8dce6;--bg:#edf5f7;--soft:#f8fcfd;--wait:#b56c14;--done:#467c3b;--loaded:#625194}
     *{box-sizing:border-box}html{min-width:0}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif;direction:rtl;min-width:0;overflow-x:hidden}
     header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;gap:18px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:4;min-width:0}
     header h1{margin:0;font-size:24px}.brand{min-width:0}.brand small{display:block;letter-spacing:2px;color:#bce0ed;margin-bottom:3px}
@@ -25,11 +25,11 @@
     .stage{min-width:0}.order-head{background:var(--blue);color:#fff;border-radius:14px;padding:14px 16px;margin-bottom:14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .order-head h2{font-size:21px;margin:0}.order-head span{display:block;margin-top:4px;font-size:13px;color:#d8f2fa}.order-head .badge{background:#ffffff22;border-radius:20px;padding:7px 12px;font-weight:700}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;min-width:0}.card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0;box-shadow:0 10px 26px rgba(7,46,73,.08)}.card.scanned{border-color:var(--teal);box-shadow:0 0 0 4px #17766d22,0 12px 26px #063a4f18}.card.scanned .card-head{background:#e8f7f4}.card.scanned::before{content:'כרטיס נסרק';display:block;background:var(--teal);color:#fff;font-weight:900;text-align:center;padding:7px 10px}
-    .card-head{background:#f6fbfc;padding:12px 14px;display:grid;gap:10px;min-width:0;border-bottom:1px solid #d9e9ef}.worker-card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}.worker-card-title b{font-size:20px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.worker-status-pill{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;background:#fff;color:var(--ink);border:1px solid var(--line);white-space:nowrap}.worker-status-pill.production{background:#fff7ed;border-color:#fdba74;color:#9a3412}.worker-status-pill.done{background:#ecfdf5;border-color:#86efac;color:#166534}.worker-status-pill.supplied{background:#f4f0ff;border-color:#c4b5fd;color:#4c1d95}.worker-card-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.worker-metric{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;min-width:0}.worker-metric span{display:block;color:#55737e;font-size:11px;font-weight:800}.worker-metric strong{display:block;margin-top:2px;color:var(--ink);font-size:22px;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .card-head{background:#f6fbfc;padding:12px 14px;display:grid;gap:10px;min-width:0;border-bottom:1px solid #d9e9ef}.worker-card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}.worker-card-title b{font-size:20px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.worker-status-pill{border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;background:#fff;color:var(--ink);border:1px solid var(--line);white-space:nowrap}.worker-status-pill.production{background:#fff7ed;border-color:#fdba74;color:#9a3412}.worker-status-pill.done{background:#ecfdf5;border-color:#86efac;color:#166534}.worker-status-pill.loaded{background:#f4f0ff;border-color:#c4b5fd;color:#4c1d95}.worker-card-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.worker-metric{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center;min-width:0}.worker-metric span{display:block;color:#55737e;font-size:11px;font-weight:800}.worker-metric strong{display:block;margin-top:2px;color:var(--ink);font-size:22px;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .drawing{height:245px;padding:8px 8px 2px;background:#fff;position:relative}.drawing svg{width:100%;height:100%;display:block}.shape{fill:none;stroke:#0c5475;stroke-width:5;stroke-linecap:round;stroke-linejoin:round}.angle{fill:none;stroke:#0c5475;stroke-width:4}.measure{fill:#062c46;font-size:15px;font-weight:700}.detail{fill:#79510a;font-size:13px;font-weight:700}.shape-scale-note{position:absolute;left:8px;bottom:7px;border:1px solid var(--line);background:#ffffffde;border-radius:999px;padding:4px 8px;color:#55737e;font-size:10px;font-weight:700}
-    .worker-primary-actions{padding:10px 12px;background:#fff;display:grid;grid-template-columns:1fr;gap:8px}.worker-action{border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:12px;padding:14px 12px;font-size:16px;font-weight:900;cursor:pointer}.worker-action.waiting{background:var(--teal);border-color:var(--teal)}.worker-action.production{background:var(--done);border-color:var(--done)}.worker-action.done,.worker-action.supplied{background:#fff;color:#55737e;border-color:var(--line)}
+    .worker-primary-actions{padding:10px 12px;background:#fff;display:grid;grid-template-columns:1fr;gap:8px}.worker-action{border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:12px;padding:14px 12px;font-size:16px;font-weight:900;cursor:pointer}.worker-action.waiting{background:var(--teal);border-color:var(--teal)}.worker-action.production{background:var(--done);border-color:var(--done)}.worker-action.done,.worker-action.loaded{background:#fff;color:#55737e;border-color:var(--line)}
     .worker-inline-panel{border-top:1px solid #e3eef2;background:#f8fcfd;padding:10px 12px 12px;display:grid;gap:10px}.worker-inline-title{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#31566a;font-size:13px;font-weight:900}.worker-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;align-items:end}.worker-field{display:grid;gap:4px;min-width:0}.worker-field label{font-size:10px;font-weight:800;color:#55737e}.worker-field input,.worker-field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 7px;font-size:14px;font-weight:700;color:var(--ink);background:#fff}.worker-field textarea{min-height:38px;resize:vertical;font-size:12px}.worker-field.note-field{grid-column:span 2}.worker-save{border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:8px;padding:9px 10px;font-weight:900;cursor:pointer}.unit-progress{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:7px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:7px}.unit-progress button{border:1px solid var(--teal);background:#fff;color:var(--teal);border-radius:8px;padding:8px 10px;font-weight:900;cursor:pointer}.unit-progress button.plus{background:var(--teal);color:#fff}.unit-progress strong{text-align:center;font-size:14px}.weight-chip{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 7px;font-size:14px;font-weight:900;text-align:center;min-height:35px}.weight-chip.warn{border-color:#f59e0b;background:#fff7ed;color:#9a3412}.weight-chip.bad{border-color:#dc2626;background:#fef2f2;color:#991b1b}
-    .worker-status-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.worker-status-actions button{padding:9px 4px;border:1px solid #b8cfd8;border-radius:9px;background:#fff;color:var(--ink);font-size:11px;font-weight:800;cursor:pointer}.worker-status-actions button.active{background:var(--teal);color:#fff;border-color:var(--teal)}.worker-status-actions button.done.active{background:var(--done)}.worker-status-actions button.supplied.active{background:var(--supplied)}.meta{font-size:11px;color:#55737e;display:flex;gap:8px;justify-content:space-between}
+    .worker-status-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.worker-status-actions button{padding:9px 4px;border:1px solid #b8cfd8;border-radius:9px;background:#fff;color:var(--ink);font-size:11px;font-weight:800;cursor:pointer}.worker-status-actions button.active{background:var(--teal);color:#fff;border-color:var(--teal)}.worker-status-actions button.done.active{background:var(--done)}.worker-status-actions button.loaded.active{background:var(--loaded)}.meta{font-size:11px;color:#55737e;display:flex;gap:8px;justify-content:space-between}
     .empty{background:#fff;border:1px dashed var(--line);padding:38px;border-radius:14px;text-align:center;color:#567784}
     body.scan-entry .queue-link,body.scan-entry .scan-panel,body.scan-entry .tabs,body.scan-entry .panel{display:none!important}
     body.scan-entry .columns{display:block}
@@ -119,16 +119,15 @@
     let pendingLoad=false;
     let unresolvedWrite=false;
     document.body.classList.toggle('scan-entry',SCAN_ENTRY);
-    const ITEM_STATUS=(window.IronBendStatus&&window.IronBendStatus.ITEM_STATUS)||{WAITING:'ממתין',IN_PRODUCTION:'בייצור',DONE:'הושלם',DELIVERED:'סופק'};
+    const ITEM_STATUS=(window.IronBendStatus&&window.IronBendStatus.ITEM_STATUS)||{WAITING:'ממתין',IN_PRODUCTION:'בייצור',DONE:'הושלם',LOADED:'הועמס',SENT:'נשלח',DELIVERED:'סופק'};
     const publicWorkerCardToken=()=>state.scanToken||ENTRY_PARAMS.get('card')||ENTRY_PARAMS.get('item')||'';
     const workerCardApi=(id,suffix='')=>(SCAN_ENTRY||state.scanToken)?`/api/worker-card/${id}${suffix}`:`/api/items/${id}${suffix}`;
-    const statusKey=s=>s===ITEM_STATUS.IN_PRODUCTION?'production':s===ITEM_STATUS.DONE?'done':s===ITEM_STATUS.DELIVERED?'supplied':'waiting';
-    const statusText={waiting:'ממתין',production:'בייצור',done:'בוצע',supplied:'סופק'};
-    const apiStatus={waiting:ITEM_STATUS.WAITING,production:ITEM_STATUS.IN_PRODUCTION,done:ITEM_STATUS.DONE,supplied:ITEM_STATUS.DELIVERED};
+    const statusKey=s=>s===ITEM_STATUS.IN_PRODUCTION?'production':s===ITEM_STATUS.DONE?'done':s===ITEM_STATUS.LOADED?'loaded':s===ITEM_STATUS.SENT?'sent':s===ITEM_STATUS.DELIVERED?'delivered':'waiting';
+    const statusText={waiting:'ממתין',production:'בייצור',done:'בוצע',loaded:'הועמס',sent:'נשלח',delivered:'סופק'};
+    const apiStatus={waiting:ITEM_STATUS.WAITING,production:ITEM_STATUS.IN_PRODUCTION,done:ITEM_STATUS.DONE,loaded:ITEM_STATUS.LOADED};
     const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const segments=item=>{try{return JSON.parse(item.segments||'[]')}catch{return[]}};
     const total=item=>Number(item.total_length_mm)||segments(item).reduce((n,s)=>n+Number(s.length_mm||0),0);
-    const supplied=o=>/סופק|נשלח/.test(o.order_status||'');
     function parseCardToken(raw){
       const value=String(raw||'').trim();
       if(!value)return null;
@@ -171,7 +170,7 @@
       return `אישור ${receipt.id} · ${new Date(receipt.occurred_at).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
     }
     function workerErrorMessage(code){
-      return ({device_activation_required:'המכשיר אינו מאושר לסריקה. פתח את מסך הסריקה להפעלתו.',qr_permission_denied:'אין הרשאה לפעולה הזאת.',invalid_worker_card_token:'קוד הכרטיס אינו תקין.',not_found:'הכרטיס לא נמצא במערכת.',production_stopped_by_cancellation:'הייצור בכרטיס נעצר בעקבות ביטול.',item_not_released_to_production:'ההזמנה עדיין לא אושרה לייצור.',use_status_correction_route:'שינוי לאחור דורש תיקון מורשה במערכת.',production_quantity_correction_required:'הקטנת כמות שבוצעה דורשת תיקון מורשה.',produced_qty_exceeds_quantity:'הכמות שהוזנה גדולה מהכמות בכרטיס.',worker_request_conflict:'הפעולה כבר נשלחה עם נתונים אחרים. רענן את הכרטיס לפני עדכון נוסף.'})[code]||'לא התקבל אישור מהמערכת. הנתונים שהזנת נשארו במסך.';
+      return ({device_activation_required:'המכשיר אינו מאושר לסריקה. פתח את מסך הסריקה להפעלתו.',qr_permission_denied:'אין הרשאה לפעולה הזאת.',invalid_worker_card_token:'קוד הכרטיס אינו תקין.',not_found:'הכרטיס לא נמצא במערכת.',production_stopped_by_cancellation:'הייצור בכרטיס נעצר בעקבות ביטול.',item_not_released_to_production:'ההזמנה עדיין לא אושרה לייצור.',use_status_correction_route:'שינוי לאחור דורש תיקון מורשה במערכת.',production_quantity_correction_required:'הקטנת כמות שבוצעה דורשת תיקון מורשה.',produced_qty_exceeds_quantity:'הכמות שהוזנה גדולה מהכמות בכרטיס.',worker_loading_status_only:'בסריקה מסמנים הועמס; אישור מסירה מתועד דרך המשלוח.',worker_status_changed:'הסטטוס השתנה במכשיר אחר. רענן את הכרטיס ונסה שוב.',worker_request_conflict:'הפעולה כבר נשלחה עם נתונים אחרים. רענן את הכרטיס לפני עדכון נוסף.'})[code]||'לא התקבל אישור מהמערכת. הנתונים שהזנת נשארו במסך.';
     }
     async function workerRequest(url,options={}){
       const controller=new AbortController();
@@ -229,8 +228,8 @@
     function grouped(){const map=new Map();state.items.forEach(item=>{if(!map.has(item.order_id))map.set(item.order_id,{...item,items:[]});map.get(item.order_id).items.push(item)});return [...map.values()]}
     function allProgress(){
       const orders=grouped(),selectedOrder=orders.find(o=>o.order_id===state.selected),items=selectedOrder?selectedOrder.items:state.items,totalItems=items.length||1;
-      const counts={waiting:0,production:0,done:0,supplied:0};
-      items.forEach(i=>counts[supplied(i)?'supplied':statusKey(i.status)]++);
+      const counts={waiting:0,production:0,done:0,loaded:0};
+      items.forEach(i=>{const key=statusKey(i.status);counts[['sent','delivered'].includes(key)?'loaded':key]++;});
       document.querySelector('#progress').innerHTML=Object.keys(counts).map(k=>{
         const pct=Math.round(counts[k]*100/totalItems);
         return `<div class="metric"><span>${statusText[k]}</span><span class="bar"><i style="width:${pct}%"></i></span><b>${counts[k]} · ${pct}%</b></div>`
@@ -251,31 +250,37 @@
       document.querySelector('#cards').innerHTML=order&&visibleItems.length?visibleItems.map((item,index)=>card(item,index)).join(''):order?'<div class="empty">הכרטיס שנסרק לא נמצא בהזמנה הפתוחה</div>':'<div class="empty">אין הזמנה פתוחה</div>';
     }
     function card(item,index){
-      const key=supplied(item)?'supplied':statusKey(item.status);
+      const key=statusKey(item.status);
       const scanned=Number(item.id)===Number(state.focusItemId);
       const mainKey=key==='waiting'?'production':key==='production'?'done':key;
       const mainText=key==='waiting'?'התחל ייצור':key==='production'?'סיים כרטיס':statusText[key];
-      const disabled=key==='done'||key==='supplied'?' disabled':'';
+      const disabled=['done','loaded','sent','delivered'].includes(key)?' disabled':'';
       const cardTitle=scanned&&state.scanToken?esc(state.scanToken):index+1;
       if(SCAN_ENTRY)return `<article class="card scanned" data-item-id="${item.id}">${inlineProductionPanel(item,key)}</article>`;
       return `<article class="card ${scanned?'scanned':''}" data-item-id="${item.id}"><div class="card-head"><div class="worker-card-title"><b>כרטיס ${cardTitle}</b><span class="worker-status-pill ${key}">${statusText[key]}</span></div><div class="worker-card-summary"><div class="worker-metric"><span>כמות</span><strong>${Number(item.quantity)||0} יח׳</strong></div><div class="worker-metric"><span>קוטר ברזל</span><strong>${esc(IronBendDisplayUnits.formatSteelDiameterMm(item.diameter))}</strong></div><div class="worker-metric"><span>אורך</span><strong>${esc(IronBendDisplayUnits.formatLengthCmFromMm(total(item)))}</strong></div></div></div><div class="drawing">${drawing(item)}<span class="shape-scale-note">תצוגה קריאה</span></div><div class="worker-primary-actions"><button class="worker-action ${key}" onclick="setStatus(${item.id},'${mainKey}')" ${disabled}>${mainText}</button></div>${inlineProductionPanel(item,key)}</article>`
     }
     function workerOrderControls(order,item){
-      const key=supplied(item)?'supplied':statusKey(item.status),next=key==='waiting'?'production':key==='production'?'done':key;
+      const key=statusKey(item.status),next=key==='waiting'?'production':key==='production'?'done':key;
       const text=key==='waiting'?'התחל ייצור':key==='production'?'סיים כרטיס':statusText[key];
       const role=window.IronBendAuth?.currentUser()?.role||'';
       const canChange=['office','production','manager','admin'].includes(role);
-      const transitions=(window.IronBendStatus?.allowedOrderTransitions(order.order_status)||[]).filter(status=>status!=='בוטלה'&&(status!=='אושרה – ממתין לייצור'||['manager','admin'].includes(role))&&(status!=='בהעמסה'||['manager','admin'].includes(role)));
+      const transitions=(window.IronBendStatus?.allowedOrderTransitions(order.order_status)||[]).filter(status=>status!=='בוטלה'&&(status!=='בתור ייצור'||['manager','admin'].includes(role))&&(status!=='בהעמסה'||['manager','admin'].includes(role)));
       const options=[order.order_status,...(canChange?transitions:[])].filter(Boolean);
-      return `<div class="order-work-controls"><button type="button" class="worker-action ${key}" onclick="setStatus(${item.id},'${next}')" ${['done','supplied'].includes(key)?'disabled':''}><span class="start-icon" aria-hidden="true">${key==='waiting'?'▶':key==='production'?'✓':'●'}</span><span>${text}</span></button><label for="workerOrderStatus">סטטוס הזמנה<select id="workerOrderStatus" onchange="setWorkerOrderStatus(event,${order.order_id})" ${canChange?'':'disabled'}>${options.map(status=>`<option value="${esc(status)}">${esc(status)}</option>`).join('')}</select></label>${canChange?'':'<div class="order-permission-note">שינוי סטטוס ההזמנה דורש התחברות עם הרשאה מתאימה. עדכון הכרטיס זמין לפי הרשאת הסריקה.</div>'}<div class="order-work-context">${esc(order.order_num)} · ${esc(order.customer_name||'')}</div></div>`;
+      return `<div class="order-work-controls"><button type="button" class="worker-action ${key}" onclick="setStatus(${item.id},'${next}')" ${['done','loaded','sent','delivered'].includes(key)?'disabled':''}><span class="start-icon" aria-hidden="true">${key==='waiting'?'▶':key==='production'?'✓':'●'}</span><span>${text}</span></button><label for="workerOrderStatus">סטטוס הזמנה<select id="workerOrderStatus" onchange="setWorkerOrderStatus(event,${order.order_id})" ${canChange?'':'disabled'}>${options.map(status=>`<option value="${esc(status)}">${esc(status)}</option>`).join('')}</select></label>${canChange?'':'<div class="order-permission-note">שינוי סטטוס ההזמנה דורש התחברות עם הרשאה מתאימה. עדכון הכרטיס זמין לפי הרשאת הסריקה.</div>'}<div class="order-work-context">${esc(order.order_num)} · ${esc(order.customer_name||'')}</div></div>`;
     }
     async function setWorkerOrderStatus(event,orderId){
       const order=grouped().find(row=>row.order_id===orderId),select=event.target,next=select.value;
       if(pendingWrite||pendingLoad){if(order)select.value=order.order_status;return;}
       if(!order||next===order.order_status)return;
-      if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״? זו פעולה על ההזמנה, לא רק על הכרטיס שנסרק.`)){select.value=order.order_status;return;}
       select.disabled=true;
-      try{const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status})});const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.error||'עדכון סטטוס ההזמנה נכשל');await load();}catch(error){alert(error.message);select.value=order.order_status;select.disabled=false;}
+      try{
+        const check=await fetch(`/api/orders/${orderId}/status-correction-preview?status=${encodeURIComponent(next)}`),preview=await check.json();
+        if(!check.ok)throw Error(preview.error||'לא ניתן לבדוק את שינוי הסטטוס');
+        const effect=preview.requires_correction?` ${preview.affected_items.length} פריטים יוחזרו לשלב ${preview.target_item_status||next}. הכמויות ותעודות המשלוח נשמרות.${preview.cancelled_loading_session_ids.length?' ההעמסה הפעילה תבוטל ותישמר בהיסטוריה.':''}`:'';
+        if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״?${effect}`)){select.value=order.order_status;select.disabled=false;return;}
+        const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status,correction_fingerprint:preview.fingerprint,correction_reason:'תיקון סטטוס מתחנת עבודה',correction_mode:'keep_documents'})});
+        const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.error||'עדכון סטטוס ההזמנה נכשל');await load();
+      }catch(error){alert(error.message);select.value=order.order_status;select.disabled=false;}
     }
     function targetWeight(item){return Number(item.weight ?? item.total_weight ?? 0)||0}
     function actualWeight(item){return Number(item.actual_weight_kg ?? 0)||0}
@@ -298,7 +303,7 @@
       const pctText=pct==null?'—':`${pct>0?'+':''}${pct.toFixed(1)}%`;
       const note=esc(item.note||'');
       const unitProgress=isUnitProgressItem(item)?`<div class="unit-progress"><button type="button" onclick="adjustProducedQty(${item.id},-1,event)">-</button><strong>${produced}/${requested||'?'} יחידות הושלמו</strong><button class="plus" type="button" onclick="adjustProducedQty(${item.id},1,event)">+ יחידה</button></div>`:'';
-      return `<div class="worker-inline-panel" onclick="event.stopPropagation()"><div class="worker-inline-title"><span>עדכון עבודה</span><span>${esc(item.machine||'ללא מכונה')}</span></div><div class="worker-fields"><div class="worker-field"><label>יוצר</label><input id="produced-qty-${item.id}" type="number" min="0" max="${requested||''}" step="1" value="${produced||''}" placeholder="יח׳"></div><div class="worker-field"><label>משקל רצוי</label><div class="weight-chip">${fmtWeight(target)}</div></div><div class="worker-field"><label>משקל מצוי</label><input id="actual-weight-${item.id}" type="number" min="0" step="0.01" value="${actual||''}" placeholder="ק״ג"></div><div class="worker-field"><label>סטייה</label><div class="weight-chip ${cls}">${esc(pctText)}</div></div>${unitProgress}<div class="worker-field note-field"><label>הערה</label><textarea id="production-note-${item.id}" rows="1" placeholder="הערת ייצור">${note}</textarea></div><button class="worker-save" onclick="saveProductionFields(${item.id},event)">שמור</button></div><div class="worker-status-actions">${['waiting','production','done','supplied'].map(k=>`<button class="${k==='done'?'done ':''}${k==='supplied'?'supplied ':''}${k===key?'active':''}" onclick="setStatus(${item.id},'${k}')">${statusText[k]}</button>`).join('')}</div><div class="meta"><span>${key==='supplied'?'סופק':statusText[key]}</span><span>${esc(item.shape_name||'צורה')}</span></div></div>`;
+      return `<div class="worker-inline-panel" onclick="event.stopPropagation()"><div class="worker-inline-title"><span>עדכון עבודה</span><span>${esc(item.machine||'ללא מכונה')}</span></div><div class="worker-fields"><div class="worker-field"><label>יוצר</label><input id="produced-qty-${item.id}" type="number" min="0" max="${requested||''}" step="1" value="${produced||''}" placeholder="יח׳"></div><div class="worker-field"><label>משקל רצוי</label><div class="weight-chip">${fmtWeight(target)}</div></div><div class="worker-field"><label>משקל מצוי</label><input id="actual-weight-${item.id}" type="number" min="0" step="0.01" value="${actual||''}" placeholder="ק״ג"></div><div class="worker-field"><label>סטייה</label><div class="weight-chip ${cls}">${esc(pctText)}</div></div>${unitProgress}<div class="worker-field note-field"><label>הערה</label><textarea id="production-note-${item.id}" rows="1" placeholder="הערת ייצור">${note}</textarea></div><button class="worker-save" onclick="saveProductionFields(${item.id},event)">שמור</button></div><div class="worker-status-actions">${['waiting','production','done','loaded'].map(k=>`<button class="${k==='done'?'done ':''}${k==='loaded'?'loaded ':''}${k===key?'active':''}" onclick="setStatus(${item.id},'${k}')">${statusText[k]}</button>`).join('')}</div><div class="meta"><span>${statusText[key]}</span><span>${esc(item.shape_name||'צורה')}</span></div></div>`;
     }
     function drawing(item){
       if(item.shape_svg)return item.shape_svg;
@@ -371,7 +376,9 @@
     }
     async function setStatus(id,key){
       if(pendingWrite||pendingLoad)return;
-      const payload={status:apiStatus[key]};
+      if(!apiStatus[key])return;
+      const item=state.items.find(row=>row.id===id);
+      const payload={status:apiStatus[key],expected_status:item?.status,correction_reason:'תיקון סטטוס בסריקת כרטיס'};
       if(SCAN_ENTRY||state.scanToken){payload.card=publicWorkerCardToken();payload.request_id=workerRequestId();}
       return runWorkerWrite({id,payload,url:workerCardApi(id,'/status'),suffix:'/status',action:'status_changed',preserveDraft:readWorkerDraft(id),success:`הסטטוס בכרטיס ${id} עודכן ל־${statusText[key]}.`,apply(data){const item=state.items.find(item=>item.id===id);if(item){if(data.item)Object.assign(item,data.item);else item.status=payload.status;}}});
     }

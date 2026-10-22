@@ -492,8 +492,9 @@ module.exports = function createReportsRouter(deps) {
     const todayRange = productionActuals.dayRange(today);
     const doneStatus = statusContracts.ITEM_STATUS.DONE;
     const queueOrderStatuses = [
-      statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
+      'אושרה – ממתין לייצור',
       statusContracts.ORDER_STATUS.PRODUCTION_QUEUE,
+      statusContracts.ORDER_STATUS.PARTIAL_DELIVERY,
       statusContracts.ORDER_STATUS.IN_PRODUCTION,
     ];
     const response = (title, subtitle, entries, summary = {}) => res.json({

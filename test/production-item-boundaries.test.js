@@ -170,7 +170,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('production card measured weight writes one daily actual-output delta', async () => {
-    const approved = seedOrderWithItem('PB-ACTUAL-CARD-WEIGHT', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-ACTUAL-CARD-WEIGHT', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const response = await request(`/api/orders/${approved.orderId}/production-card-weight`, {
       method: 'PATCH',
       headers,
@@ -193,7 +193,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('production item patch rejects non-production fields and preserves owned data', async () => {
-    const approved = seedOrderWithItem('PB-APPROVED-PATCH', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-APPROVED-PATCH', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const before = db.prepare('SELECT quantity,segments,shape_snapshot_json,total_weight,package_id,zone FROM items WHERE id=?').get(approved.itemId);
     const response = await request(`/api/items/${approved.itemId}`, {
       method: 'PATCH',
@@ -223,7 +223,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('partial produced quantity starts released item without completing the order', async () => {
-    const approved = seedOrderWithItem('PB-PARTIAL-UNIT-PROGRESS', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-PARTIAL-UNIT-PROGRESS', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const response = await request(`/api/items/${approved.itemId}`, {
       method: 'PATCH',
       headers,
@@ -264,7 +264,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('produced quantity cannot exceed requested quantity', async () => {
-    const approved = seedOrderWithItem('PB-OVER-UNIT-PROGRESS', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-OVER-UNIT-PROGRESS', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const response = await request(`/api/items/${approved.itemId}`, {
       method: 'PATCH',
       headers,
@@ -281,7 +281,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   await t.test('secure-mode worker card requires an activated device', async () => {
     db.prepare(`INSERT INTO settings (key,value,updated_at) VALUES ('QR_ACCESS_MODE','secure',CURRENT_TIMESTAMP)
       ON CONFLICT(key) DO UPDATE SET value='secure',updated_at=CURRENT_TIMESTAMP`).run();
-    const approved = seedOrderWithItem('PB-PUBLIC-WORKER-CARD', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-PUBLIC-WORKER-CARD', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const card = `${approved.orderNum}-${String(approved.itemId).padStart(6, '0')}`;
     assert.equal((await request(`/api/worker-card?card=${encodeURIComponent(card)}`)).status, 403);
     const withoutDevice = await request(`/api/worker-card?card=${encodeURIComponent(card)}`, {
@@ -349,7 +349,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('approved-device worker card rejects mismatched tokens and non-production fields', async () => {
-    const approved = seedOrderWithItem('PB-PUBLIC-WORKER-FORBID', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-PUBLIC-WORKER-FORBID', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const wrongCard = `OTHER-${String(approved.itemId + 1).padStart(6, '0')}`;
     const mismatch = await request(`/api/worker-card/${approved.itemId}`, {
       method: 'PATCH',
@@ -370,7 +370,7 @@ test('production enforces order item ownership boundaries', async (t) => {
     assert.ok(body.fields.includes('quantity'));
   });
   await t.test('production item patch still allows production-owned execution fields', async () => {
-    const approved = seedOrderWithItem('PB-APPROVED-PRODUCTION', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-APPROVED-PRODUCTION', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const response = await request(`/api/items/${approved.itemId}`, {
       method: 'PATCH',
       headers,
@@ -386,7 +386,7 @@ test('production enforces order item ownership boundaries', async (t) => {
   });
 
   await t.test('item status update moves approved order into production automatically', async () => {
-    const approved = seedOrderWithItem('PB-AUTO-IN-PRODUCTION', statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedOrderWithItem('PB-AUTO-IN-PRODUCTION', statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     const response = await request(`/api/items/${approved.itemId}/status`, {
       method: 'PATCH',
       headers,

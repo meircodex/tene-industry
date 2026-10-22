@@ -34,7 +34,6 @@ module.exports = function createProductionRouter(deps) {
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
 
   const productionOrderGateStatuses = new Set([
-    ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
     ORDER_STATUS.PRODUCTION_QUEUE,
     ORDER_STATUS.IN_PRODUCTION,
     ORDER_STATUS.PARTIAL_DELIVERY,
@@ -147,7 +146,10 @@ module.exports = function createProductionRouter(deps) {
       LEFT JOIN customers c ON o.customer_id=c.id
       WHERE i.id=?
     `).get(itemId);
-    if (item) item.shape_svg = productionCards.itemShapeSvg(item);
+    if (item) {
+      item.shape_svg = productionCards.itemShapeSvg(item);
+      item.order_status = statusContracts.normalizeOrderStatus(item.order_status);
+    }
     return item;
   }
 
@@ -184,7 +186,6 @@ module.exports = function createProductionRouter(deps) {
     if (!item?.order_id) return null;
     const orderStatus = statusContracts.normalizeOrderStatus(item.order_status);
     if (nextItemStatus === ITEM_STATUS.IN_PRODUCTION && (
-      orderStatus === ORDER_STATUS.APPROVED_WAITING_PRODUCTION ||
       orderStatus === ORDER_STATUS.PRODUCTION_QUEUE
     )) {
       return setOrderStatusIfChanged(item.order_id, ORDER_STATUS.IN_PRODUCTION);
@@ -431,23 +432,38 @@ module.exports = function createProductionRouter(deps) {
   router.patch('/worker-card/:id/status', requireQrPermission('production'), workerCardWrite((req, res) => {
     const status = req.body?.status;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
-    if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(status)) {
-      return res.status(400).json({ error: 'invalid public production status' });
-    }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
     const replay = workerCardActivity.replay(req, item.id, 'status_changed');
     if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
+    if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED].includes(status)) {
+      return res.status(400).json({ error: 'worker_loading_status_only' });
+    }
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
-    if (status === ITEM_STATUS.IN_PRODUCTION && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
+    if (statusContracts.normalizeOrderStatus(item.order_status) === ORDER_STATUS.CANCELLED) return sendCancellationStoppedError(res, item);
+    if (req.body.expected_status !== undefined && req.body.expected_status !== item.status) return res.status(409).json({ error: 'worker_status_changed' });
+    const backwards = isBackwardItemStatus(item.status, status);
+    const previouslyReopened = status === ITEM_STATUS.IN_PRODUCTION && isPreviouslyReopenedItem(db, item);
+    const pendingApproval = [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(statusContracts.normalizeOrderStatus(item.order_status));
+    if (status === ITEM_STATUS.IN_PRODUCTION && (pendingApproval || (!backwards && !previouslyReopened && !isProductionGateOpen(item)))) return sendProductionGateError(res, item);
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
     if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
     db.prepare(`UPDATE items SET status=?${status===ITEM_STATUS.IN_PRODUCTION&&!item.started_at?',started_at=?':''}${status===ITEM_STATUS.DONE?',completed_at=?':''} WHERE id=?`)
       .run(...Object.values(updates), req.params.id);
-    const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status });
-    const orderStatus = syncOrderStatusAfterItemStatus(item, status);
-    const consumedReservations = status === ITEM_STATUS.DONE ? consumeProductionReservations(item) : { consumed: 0 };
+    const correctionReason = 'תיקון סטטוס בסריקת כרטיס';
+    if (backwards) {
+      if ([ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION].includes(status)) db.prepare('UPDATE items SET completed_at=NULL WHERE id=?').run(item.id);
+      db.prepare(`INSERT INTO audit_log(entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,notes,user_id,user_name)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run('item', item.id, item.order_num, 'item_status_correction', 'status', item.status,
+          status, correctionReason, req.userId || null, req.auth?.display_name || req.qrAccess?.actor_name || null);
+    }
+    const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status, correction: backwards });
+    const orderStatus = backwards || previouslyReopened
+      ? reopenOrderAfterItemCorrection(db, item, status, { reason: correctionReason, userId: req.userId, userName: req.auth?.display_name || req.qrAccess?.actor_name })
+      : syncOrderStatusAfterItemStatus(item, status);
+    if (orderStatus && (backwards || previouslyReopened)) wsBroadcast('order_status', { id: item.order_id, status: orderStatus, orderNum: item.order_num });
+    const consumedReservations = status === ITEM_STATUS.DONE && !backwards ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
     const response = { ok: true, order_status: orderStatus, consumedReservations, receipt, item: selectWorkerCardById(item.id) };
     workerCardActivity.rememberResponse(req, item.id, 'status_changed', response);
@@ -484,7 +500,7 @@ module.exports = function createProductionRouter(deps) {
       if (!Number.isFinite(producedQty) || producedQty < 0 || !Number.isInteger(producedQty)) return res.status(400).json({ error: 'invalid produced_qty' });
       if (requestedQty > 0 && producedQty > requestedQty) return res.status(400).json({ error: 'produced_qty_exceeds_quantity', quantity: requestedQty });
       fields.push('produced_qty=?'); vals.push(producedQty);
-      if (requestedQty > 0 && producedQty >= requestedQty && item.status !== ITEM_STATUS.DONE) {
+      if (requestedQty > 0 && producedQty >= requestedQty && ![ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(item.status)) {
         if (!addStatusUpdate(ITEM_STATUS.DONE)) return;
       } else if (producedQty > 0 && item.status === ITEM_STATUS.WAITING) {
         if (!addStatusUpdate(ITEM_STATUS.IN_PRODUCTION)) return;
@@ -839,11 +855,11 @@ module.exports = function createProductionRouter(deps) {
   router.get('/production-queue', requireAnyRole(['production', 'kiosk', 'office', 'manager', 'admin']), (req, res) => {
     const { machine } = req.query;
     const visibleItemStatuses = req.query.visual === '1'
-      ? "('ממתין','בייצור','הושלם','סופק')"
+      ? "('ממתין','בייצור','הושלם','הועמס','נשלח','סופק')"
       : "('ממתין','בייצור')";
     const visibleOrderStatuses = req.query.visual === '1'
-      ? "('אושרה – ממתין לייצור','בתור ייצור','בייצור','הושלם – ממתין לאיסוף','נשלחה','סופק – אושר')"
-      : "('אושרה – ממתין לייצור','בתור ייצור','בייצור')";
+      ? "('אושרה – ממתין לייצור','בתור ייצור','בייצור','אספקה חלקית','הושלם – ממתין לאיסוף','בהעמסה','נשלחה','בדרך ללקוח','בעיה באספקה','סופק – אושר')"
+      : "('אושרה – ממתין לייצור','בתור ייצור','בייצור','אספקה חלקית')";
     let q = `
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
@@ -866,7 +882,7 @@ module.exports = function createProductionRouter(deps) {
     if (machine) { q += ' AND i.machine=?'; params.push(machine); }
     q += ' ORDER BY i.machine, priority_score DESC, o.delivery_date ASC, i.diameter ASC';
     const items = db.prepare(q).all(...params);
-    items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); });
+    items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); item.order_status = statusContracts.normalizeOrderStatus(item.order_status); });
 
     // Group by machine
     const grouped = {};

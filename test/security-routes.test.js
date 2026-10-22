@@ -324,7 +324,7 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.ok(db.prepare('SELECT id FROM orders WHERE id=?').get(pendingOrderId), 'legacy DELETE must not permanently remove an order without a password');
 
     const approvedOrderId = seedInternalOrder(customerId, 'ORDER-DELETE-OFFICE-APPROVED');
-    db.prepare('UPDATE orders SET status=? WHERE id=?').run(statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION, approvedOrderId);
+    db.prepare('UPDATE orders SET status=? WHERE id=?').run(statusContracts.ORDER_STATUS.PRODUCTION_QUEUE, approvedOrderId);
     assert.equal((await request(`/api/orders/${approvedOrderId}`, { method: 'DELETE', headers: authHeaders(office) })).status, 409);
 
     const departedOrderId = seedInternalOrder(customerId, 'ORDER-DELETE-OFFICE-DEPARTED');
@@ -648,8 +648,9 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.ok(skipped.approved_at);
     assert.ok(db.prepare("SELECT 1 FROM audit_log WHERE entity_id=? AND action='manager_approval'").get(directProductionOrder));
     for (const status of [statusContracts.ORDER_STATUS.DELIVERED_CONFIRMED, statusContracts.ORDER_STATUS.IN_PRODUCTION]) {
+      const preview = await (await request(`/api/orders/${directProductionOrder}/status-correction-preview?status=${encodeURIComponent(status)}`, { headers: authHeaders(manager) })).json();
       response = await request(`/api/orders/${directProductionOrder}/status`, {
-        method: 'PATCH', headers: authHeaders(manager), body: JSON.stringify({ status }),
+        method: 'PATCH', headers: authHeaders(manager), body: JSON.stringify({ status, correction_fingerprint: preview.fingerprint, correction_reason: 'תיקון סטטוס הזמנה' }),
       });
       assert.equal(response.status, 200);
     }
@@ -664,18 +665,18 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     response = await request(`/api/orders/${approvalOrder}/status`, {
       method: 'PATCH',
       headers: authHeaders(production),
-      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION }),
+      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.PRODUCTION_QUEUE }),
     });
     assert.equal(response.status, 403);
 
     response = await request(`/api/orders/${approvalOrder}/status`, {
       method: 'PATCH',
       headers: authHeaders(manager),
-      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION }),
+      body: JSON.stringify({ status: statusContracts.ORDER_STATUS.PRODUCTION_QUEUE }),
     });
     assert.equal(response.status, 200);
     const updated = db.prepare('SELECT status,approved_by,approved_at,stable_order_id FROM orders WHERE id=?').get(approvalOrder);
-    assert.equal(updated.status, statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    assert.equal(updated.status, statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     assert.ok(updated.approved_by);
     assert.ok(updated.approved_at);
     assert.equal(updated.stable_order_id, 'ORDER-CONTRACT-APPROVE');
@@ -1035,7 +1036,7 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
   await t.test('portal inbox persists ownership and handling, excludes approved orders and scopes source downloads', async () => {
     const customerId = seedPortalCustomer('Inbox Customer', '0500000995', 'inbox-legacy');
     const pending = seedPortalOrder(customerId,'INBOX-1');
-    const approved = seedPortalOrder(customerId,'INBOX-APPROVED',statusContracts.ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+    const approved = seedPortalOrder(customerId,'INBOX-APPROVED',statusContracts.ORDER_STATUS.PRODUCTION_QUEUE);
     assert.equal((await request('/api/portal-requests')).status,401);
     assert.equal((await request('/api/portal-requests',{headers:authHeaders(production)})).status,403);
     const initial = await (await request('/api/portal-requests',{headers:authHeaders(office)})).json();

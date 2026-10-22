@@ -2,7 +2,6 @@
   const ORDER_STATUS = Object.freeze({
     PENDING_APPROVAL: 'ממתינה לאישור',
     CUSTOMER_PENDING_APPROVAL: 'ממתינה לאישור לקוח',
-    APPROVED_WAITING_PRODUCTION: 'אושרה – ממתין לייצור',
     PRODUCTION_QUEUE: 'בתור ייצור',
     IN_PRODUCTION: 'בייצור',
     DONE_WAITING_PICKUP: 'הושלם – ממתין לאיסוף',
@@ -17,16 +16,11 @@
 
   const VALID_ORDER_TRANSITIONS = Object.freeze({
     [ORDER_STATUS.PENDING_APPROVAL]: [
-      ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
+      ORDER_STATUS.PRODUCTION_QUEUE,
       ORDER_STATUS.CANCELLED,
     ],
     [ORDER_STATUS.CUSTOMER_PENDING_APPROVAL]: [
-      ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
-      ORDER_STATUS.CANCELLED,
-    ],
-    [ORDER_STATUS.APPROVED_WAITING_PRODUCTION]: [
       ORDER_STATUS.PRODUCTION_QUEUE,
-      ORDER_STATUS.IN_PRODUCTION,
       ORDER_STATUS.CANCELLED,
     ],
     [ORDER_STATUS.PRODUCTION_QUEUE]: [
@@ -78,7 +72,12 @@
     CANCELLED: 'בוטל',
   });
 
+  function normalizeOrderStatus(status) {
+    return status === 'אושרה – ממתין לייצור' ? ORDER_STATUS.PRODUCTION_QUEUE : status;
+  }
+
   function allowedOrderTransitions(status, { allowSkip = false } = {}) {
+    status = normalizeOrderStatus(status);
     if (allowSkip && status !== ORDER_STATUS.CANCELLED) {
       return Object.values(ORDER_STATUS).filter(value => value !== status);
     }
@@ -90,5 +89,6 @@
     VALID_ORDER_TRANSITIONS,
     ITEM_STATUS,
     allowedOrderTransitions,
+    normalizeOrderStatus,
   });
 })();

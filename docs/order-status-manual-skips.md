@@ -1,5 +1,7 @@
 # Manual order status choices — 2026-10-15
 
+Updated 2026-10-22: the redundant approved/waiting status is now a compatibility alias for production queue. Backward order corrections also reconcile advanced items and active loading through a reviewed transactional operation. See [Unified order rollback](order-status-rollback-20261022.md); the historical status-only behavior below is superseded for corrections.
+
 - Owner: Orders; shared status contract is a dependency.
 - Scope: existing order status selector, detail actions, status contract and PATCH /api/orders/:id/status.
 - Behavior: manual order updates offer every canonical status and permit skips/corrections. Automatic lifecycle transitions retain their existing sequential contract.

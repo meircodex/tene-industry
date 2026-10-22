@@ -4,6 +4,20 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    workerLoadingStatus: {
+      screen: 'worker-visual.html', owner: 'Production',
+      source: { api: '/api/worker-card/:id/status', fields: ['item.status', 'item.order_status', 'receipt'] },
+      meaning: 'Phone work actions are waiting, production, done and loaded. Loaded is an item state eligible for delivery certificate issue, never confirmation of customer delivery. Backward corrections reconcile the order while keeping shipment documents and production quantities.',
+      consumers: ['worker-status-actions', 'worker-status-pill'], risk: 'D1',
+    },
+    orderStatusCorrection: {
+      screen: 'orders.html',
+      owner: 'Orders',
+      source: { api: '/api/orders/:id/status-correction-preview', fields: ['current_status', 'target_status', 'affected_items', 'cancelled_loading_session_ids', 'certificates', 'can_cancel_certificates', 'fingerprint'] },
+      meaning: 'Returning an order caps advanced active item stages in one transaction. Counts, payment and history remain. Active loading is cancelled with its scan history retained. Certificate cancellation is an explicit optional choice.',
+      consumers: ['correctionReasonInfo', 'correctionShipmentEffect'],
+      risk: 'D1',
+    },
     itemStatusCorrection: {
       screen: 'orders.html',
       owner: 'Production',

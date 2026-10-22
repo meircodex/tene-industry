@@ -65,7 +65,6 @@ module.exports = function createProductionCardsRouter(deps) {
   const settingsService = deps.settingsService || null;
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
   const productionCardOrderGateStatuses = new Set([
-    ORDER_STATUS.APPROVED_WAITING_PRODUCTION,
     ORDER_STATUS.PRODUCTION_QUEUE,
     ORDER_STATUS.IN_PRODUCTION,
   ]);

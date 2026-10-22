@@ -15,9 +15,9 @@ const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('customer portal maps internal statuses to customer-facing labels', () => {
-  const approved = customerStatusFromOrder({ status: ORDER_STATUS.APPROVED_WAITING_PRODUCTION });
+  const approved = customerStatusFromOrder({ status: ORDER_STATUS.PRODUCTION_QUEUE });
   assert.equal(approved.customer_status, 'approved');
-  assert.notEqual(approved.customer_status_label, ORDER_STATUS.APPROVED_WAITING_PRODUCTION);
+  assert.notEqual(approved.customer_status_label, ORDER_STATUS.PRODUCTION_QUEUE);
   assert.equal(approved.customer_status_label, 'אושרה');
 
   const pendingInternal = projectPortalOrder({ id: 1, order_num: 'HZ-1', status: ORDER_STATUS.PENDING_APPROVAL }, { caps: {} });
@@ -80,7 +80,7 @@ test('customer portal does not use note as element name fallback', () => {
 
 test('customer portal order detail returns safe pallets/items and no raw internal status', () => {
   const detail = projectPortalOrderDetail(
-    { id: 7, order_num: 'HZ-7', status: ORDER_STATUS.APPROVED_WAITING_PRODUCTION, portal_price: 999 },
+    { id: 7, order_num: 'HZ-7', status: ORDER_STATUS.PRODUCTION_QUEUE, portal_price: 999 },
     [{ id: 1, pallet_num: 1, items: [{ id: 10, status: 'פנימי', machine: 'B', production_qty: 3, total_weight: 11 }] }],
     [],
     { caps: { seePrice: false } }

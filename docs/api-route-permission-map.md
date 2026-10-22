@@ -37,6 +37,7 @@ Directly protected route groups today:
 | Order reads/documents | `/api/orders`, `/api/orders/:id`, `/api/orders/:id/print-cards`, `/api/orders/:id/print-a4`, `/api/orders/:id/delivery-certificate` | read: `office/production/sales/manager/admin`; documents by operational role |
 | Intake and BVBS | `/api/analyze-image`, `/api/intake/image`, `/api/intake/email/poll`, `/api/intake/log`, `/api/intake/parse-text`, `/api/intake/training*`, `/api/bvbs/*` | office/manager/admin for parse/log/file flows; manager/admin for training writes |
 | Order lifecycle | `/api/orders/:id/status` | `requireAnyRole(['office', 'production', 'manager', 'admin'])` |
+| Order rollback preview | `/api/orders/:id/status-correction-preview` | `requireAnyRole(['office', 'production', 'manager', 'admin'])`; manager approval still required to leave approval stages |
 | Order lock/ERP | `/api/orders/:id/lock`, `/api/orders/:id/unlock`, `/api/priority/sync/:orderId` | `requireRole('manager')` |
 | Production setup/read | `/api/workers`, `/api/workers/:id`, `/api/machines`, `/api/machines/:id`, `/api/machines/:id/config`, `/api/machines/:id/state-log`, `/api/machines/oee` | reads use production/maintenance/office/manager/admin by data surface; setup writes use manager/admin |
 | Production station actions | `/api/machines/:id/send-params`, `/api/machines/:id/complete`, `/api/scan`, `/api/machines/:id/end-of-day`, `/api/items/:id/status` | `requireAnyRole(['production', 'kiosk', 'manager', 'admin'])` |

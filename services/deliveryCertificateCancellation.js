@@ -1,7 +1,7 @@
 'use strict';
 const {deliverySelectionFingerprint,buildDeliveryCertificateProgress} = require('./deliveryCertificateProgress');
 function fail(message,status=409) { throw Object.assign(new Error(message),{status}); }
-function cancellationPreview(db,orderId,noteId) {
+function cancellationPreview(db,orderId,noteId,{ignoreActiveLoading=false}={}) {
   const note=db.prepare('SELECT * FROM delivery_notes WHERE id=? AND order_id=?').get(noteId,orderId);
   const order=db.prepare('SELECT * FROM orders WHERE id=?').get(orderId);
   if(!note || !order) fail('תעודה לא נמצאה בהזמנה',404);
@@ -10,7 +10,7 @@ function cancellationPreview(db,orderId,noteId) {
   // that cancelling their PDF reverses a physical warehouse movement.
   if(!String(note.note_num||'').startsWith('CERT-') || note.delivery_id || note.signed_by || note.signature_data || note.delivered_at || note.driver_id) fail('תעודה זו קשורה למשלוח מחסן או לאישור מסירה; נדרש תיקון המשלוח המקושר לפני ביטול');
   if(db.prepare('SELECT 1 FROM delivery_note_orders WHERE delivery_note_id=?').get(noteId)) fail('תעודה משותפת דורשת תיקון המשלוח המקושר');
-  if(db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active'").get(orderId)) fail('יש העמסה פעילה במחסן; יש לסיים או לבטל אותה לפני תיקון תעודה');
+  if(!ignoreActiveLoading && db.prepare("SELECT 1 FROM order_loading_sessions WHERE order_id=? AND status='active'").get(orderId)) fail('יש העמסה פעילה במחסן; יש לסיים או לבטל אותה לפני תיקון תעודה');
   if(db.prepare('SELECT 1 FROM invoices WHERE order_id=?').get(orderId)) fail('קיימת חשבונית מקושרת להזמנה; נדרש טיפול בחיוב לפני ביטול התעודה');
   if(db.prepare("SELECT 1 FROM export_log WHERE entity_type IN ('delivery_note','delivery-notes') AND entity_id=?").get(noteId)) fail('התעודה יוצאה למערכת אחרת; נדרש טיפול במסמך המקושר לפני ביטול');
   let snapshot,packages;

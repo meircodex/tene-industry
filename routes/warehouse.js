@@ -389,7 +389,7 @@ function multiOrderLoadingState(db, groupUid) {
            s.delivery_note_id,o.customer_id,o.status AS order_status,o.delivery_address
     FROM order_loading_sessions s
     JOIN orders o ON o.id=s.order_id
-    WHERE s.loading_group_uid=? AND s.scan_unit='production_card'
+    WHERE s.loading_group_uid=? AND s.scan_unit='production_card' AND s.status<>'cancelled'
     ORDER BY s.id
   `).all(groupUid);
   if (!sessions.length) return null;
@@ -399,7 +399,7 @@ function multiOrderLoadingState(db, groupUid) {
            s.order_id,s.order_num
     FROM order_loading_session_cards c
     JOIN order_loading_sessions s ON s.id=c.session_id
-    WHERE s.loading_group_uid=? AND s.scan_unit='production_card'
+    WHERE s.loading_group_uid=? AND s.scan_unit='production_card' AND s.status<>'cancelled'
     ORDER BY s.id,c.id
   `).all(groupUid);
   const loaded = cards.filter(card => card.state === 'loaded');

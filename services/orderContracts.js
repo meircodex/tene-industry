@@ -282,7 +282,7 @@ function canManagerApproveOrder(role) {
 function isOrderApprovalTransition(from, to) {
   const normalizedFrom = normalizeOrderStatus(from);
   const normalizedTo = normalizeOrderStatus(to);
-  return normalizedTo === ORDER_STATUS.APPROVED_WAITING_PRODUCTION && (
+  return normalizedTo === ORDER_STATUS.PRODUCTION_QUEUE && (
     normalizedFrom === ORDER_STATUS.PENDING_APPROVAL ||
     normalizedFrom === ORDER_STATUS.CUSTOMER_PENDING_APPROVAL
   );
@@ -305,7 +305,7 @@ function assertOrderStatusTransition({ from, to, role, allowSkip = false }) {
   // A manual skip out of an approval stage must record the same approval as
   // the regular path; jumping directly to production cannot bypass it.
   const isApproval = isOrderApprovalTransition(normalizedFrom, normalizedTo) ||
-    (allowSkip && normalizedTo === ORDER_STATUS.APPROVED_WAITING_PRODUCTION) || (allowSkip &&
+    (allowSkip &&
     [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(normalizedFrom) &&
     ![ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL, ORDER_STATUS.CANCELLED].includes(normalizedTo));
   if (isApproval && !canManagerApproveOrder(role)) {

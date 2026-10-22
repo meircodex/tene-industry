@@ -14,6 +14,8 @@ The contract answers:
 
 ## Current Registry
 
+`orderStatusCorrection` describes the Orders rollback dialog: the affected-item count comes from the server preview, excludes cancelled/stopped items, and accompanies explicit document choices. `itemStatusCorrection` continues to describe individual item rollback. Both preserve production quantities and history.
+
 The first registry lives in:
 
 - `public/data-contracts-client.js`
