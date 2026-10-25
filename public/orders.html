@@ -15,6 +15,7 @@
 <script src="/display-units.js?v=2"></script>
 <script src="/status-contracts-client.js"></script>
 <script src="/order-workspace.js?v=1"></script>
+<script src="/order-item-filters.js?v=1"></script>
 <link rel="stylesheet" href="/orders-workspace.css?v=1">
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
@@ -1560,6 +1561,7 @@ async function openDetail(id) {
   requestAnimationFrame(() => {
     renderDetailShapes();
     syncPrintCardSelection();
+    window.IronBendOrderItemFilters.mount(document.getElementById('detailBody'), o);
   });
   history.replaceState(null, '', `?id=${id}`);
 }
@@ -3075,7 +3077,7 @@ function buildDetailHTML(o, pkgs) {
         ${pileAssembly}
       </div>`;
     }).join('');
-    return `<div style="margin-bottom:12px">
+    return `<div data-order-pallet style="margin-bottom:12px">
       <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:6px">📦 משטח ${pi+1} — ${totalW.toFixed(0)} ק"ג | ${pct}%</div>
       <div class="prog-bar" style="margin-bottom:8px"><div class="prog-fill" style="width:${pct}%"></div></div>
       ${items||'<div style="color:var(--muted);font-size:12px;padding:4px 0">אין פריטים</div>'}
@@ -3084,6 +3086,14 @@ function buildDetailHTML(o, pkgs) {
 
   const itemsSec = `<div class="d-section">
     <div class="d-title" style="justify-content:space-between"><span>📦 פריטים לייצור</span><button class="review-btn primary" onclick="openAddItem(event, ${o.id})">➕ הוסף להזמנה</button></div>
+    <div class="detail-item-filters" role="group" aria-label="סינון פריטי ההזמנה">
+      <label>קוטר<select id="detailItemDiameterFilter" aria-label="סינון לפי קוטר"></select></label>
+      <label>מצב ייצור / סטטוס<select id="detailItemStatusFilter" aria-label="סינון לפי סטטוס"></select></label>
+      <button type="button" class="review-btn" id="detailItemFilterReset">נקה סינון</button>
+      <div id="detailItemProductionSummary" class="detail-item-summary" aria-live="polite"></div>
+      <div id="detailItemFilterCount" class="detail-item-filter-count" aria-live="polite"></div>
+    </div>
+    <div id="detailItemFilterEmpty" class="detail-item-empty" hidden>אין פריטים שמתאימים לסינון שנבחר.</div>
     ${palletsHtml||'<div style="color:var(--muted);font-size:13px">אין פריטים</div>'}
   </div>`;
 
@@ -3112,6 +3122,7 @@ function buildDetailHTML(o, pkgs) {
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }
 function closeDetailPanel() {
+  window.IronBendOrderItemFilters.reset();
   document.getElementById('detailOverlay').classList.remove('show');
   history.replaceState(null, '', '/orders.html');
 }

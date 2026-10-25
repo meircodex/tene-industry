@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    orderItemFilters: {
+      screen: 'orders.html', owner: 'Orders',
+      source: { api: '/api/orders/:id', fields: ['pallets[].items[].id', 'pallets[].items[].diameter', 'pallets[].items[].status', 'pallets[].items[].cancelled_at'] },
+      meaning: 'Diameter and status intersect to filter item rows. Diameter summary counts active rows: done/loaded/sent/delivered are completed, other active rows remain to produce; cancelled rows are separate. Counts never sum piece quantities. Filters preserve original row numbers, documents and order totals.',
+      consumers: ['detailItemDiameterFilter', 'detailItemStatusFilter', 'detailItemProductionSummary', 'detailItemFilterCount'], risk: 'D0',
+    },
     orderItemSummary: {
       screen: 'orders.html', owner: 'Orders',
       source: { api: '/api/orders', fields: ['status', 'delivery_progress.production_status', 'delivery_progress.total_item_count', 'delivery_progress.shipped_item_count', 'delivery_progress.partially_shipped_item_count'] },

@@ -14,6 +14,8 @@ The contract answers:
 
 ## Current Registry
 
+`orderItemFilters` filters the order's existing item rows by diameter and exact status or completed/remaining production group. The diameter summary counts active item rows, not units: done, loaded, sent and delivered are completed; cancelled rows are counted separately. It retains the diameter totals when narrowing the status, so completed versus remaining stays visible. Filtering does not change documents, printing scope, stored status, row numbering or order totals.
+
 `orderItemSummary` counts order item rows, not quantities within rows. Notes and the detail badge use the same summary, distinguish fully shipped from partially shipped rows, and preserve operator notes. Partial delivery is shipment information and is excluded from manual status choices; existing partial orders display their projected work stage.
 
 `orderStatusCorrection` describes the Orders rollback dialog: the affected-item count comes from the server preview, excludes cancelled/stopped items, and accompanies explicit document choices. `itemStatusCorrection` continues to describe individual item rollback. Both preserve production quantities and history.
