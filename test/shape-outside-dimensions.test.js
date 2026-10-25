@@ -58,8 +58,33 @@ test('100/16/9 step has 16 above the upright and 9 to its right without label co
   const reversedPoints=bodyPoints(reversed);
   assert.ok(reversedPoints[1][0]>reversedPoints[3][0],'the return hook remains on the right');
   const outside=units.diagramDimensionPositions(reversedPoints,['9','16','100']);
-  assert.ok(outside[0].x>Math.max(...reversedPoints.map(p=>p[0])),'9 is outside to the right');
-  assert.ok(outside[1].y<Math.min(...reversedPoints.map(p=>p[1])),'16 is above the upright');
+  assert.equal(outside[0].x, (reversedPoints[0][0]+reversedPoints[1][0])/2, '9 stays centered on its horizontal side');
+  assert.equal(outside[1].y, (reversedPoints[1][1]+reversedPoints[2][1])/2, '16 stays centered on its upright');
+  assert.ok(outside[1].x>Math.max(...reversedPoints.map(p=>p[0])), 'upright dimension is outside to the right');
+});
+
+test('return bend dimensions stay centered outside their own sides in either direction', () => {
+  for (const depth of [10, 25]) {
+    for (const points of [ [[0,0],[100,0],[100,depth],[0,depth]], [[0,depth],[100,depth],[100,0],[0,0]], [[100,0],[0,0],[0,depth],[100,depth]] ]) {
+      const labels = units.diagramDimensionPositions(points, ['100', String(depth), '100']);
+      const center = points.reduce((sum,p)=>[sum[0]+p[0]/4,sum[1]+p[1]/4],[0,0]);
+      labels.forEach((label,i) => {
+        const dx=points[i+1][0]-points[i][0],dy=points[i+1][1]-points[i][1];
+        const offset=[label.x-label.mid[0],label.y-label.mid[1]];
+        assert.ok(Math.abs(offset[0]*dx+offset[1]*dy)<0.001, 'no shift along the side');
+        assert.ok(offset[0]*(label.mid[0]-center[0])+offset[1]*(label.mid[1]-center[1])>0, 'outward from the shape');
+      });
+    }
+    const svg=cards.itemShapeSvg(item([1000,depth*10,1000],[90,90]));
+    const points=bodyPoints(svg);
+    const labels = [...svg.matchAll(/data-side-dimension="(\d+)"[\s\S]*?<text data-length-label="1" x="([\d.-]+)" y="([\d.-]+)"/g)];
+    assert.equal(labels.length, 3);
+    for(const match of labels) {
+      const i=Number(match[1]),x=Number(match[2]),y=Number(match[3]);
+      const a=points[i],b=points[i+1];
+      assert.ok(Math.abs((x-(a[0]+b[0])/2)*(b[0]-a[0])+(y-(a[1]+b[1])/2)*(b[1]-a[1]))<1);
+    }
+  }
 });
 test('editor draft uses the same orientation and outside placement without changing its data contract',()=>{
   const context=vm.createContext({window:{IronBendDisplayUnits:units},console,localStorage:{getItem:()=>null}});

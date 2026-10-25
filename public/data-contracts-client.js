@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    shapeSideDimensions: {
+      screen: 'orders.html', owner: 'Production Cards',
+      source: { api: '/api/orders/:id', fields: ['pallets[].items[].shape_svg', 'pallets[].items[].segments'] },
+      meaning: 'Canonical side lengths are displayed in centimeters, centered on the outward perpendicular through their own side midpoint. Collision avoidance moves labels outward, never along the side or to a different corner. Rendering does not change stored geometry.',
+      consumers: ['item-visual', 'production-card', 'shape-editor'], risk: 'D0',
+    },
     orderItemFilters: {
       screen: 'orders.html', owner: 'Orders',
       source: { api: '/api/orders/:id', fields: ['pallets[].items[].id', 'pallets[].items[].diameter', 'pallets[].items[].status', 'pallets[].items[].cancelled_at'] },

@@ -89,9 +89,6 @@
     const center = [xs.reduce((a,b)=>a+b,0)/xs.length,ys.reduce((a,b)=>a+b,0)/ys.length];
     const horizontal = points.slice(1).map((p,i)=>Math.abs(p[1]-points[i][1])<0.1 ? Math.abs(p[0]-points[i][0]) : 0);
     const maxHorizontal = Math.max(...horizontal,0);
-    const returnHook = points.length===4 && horizontal[0]>0 && horizontal[2]>0 && Math.abs(points[2][0]-points[1][0])<0.1;
-    const longHookSide = horizontal[0]>horizontal[2]?0:2;
-    const hookRight = returnHook && Math.abs(points[1][0]-bounds.right)<=Math.abs(points[1][0]-bounds.left);
     const result = [];
     const intersects = (box,a,b) => {
       let lo=0,hi=1;
@@ -116,8 +113,8 @@
         ny=shortContinuation?-1:ny>=0?1:-1;nx=0;
         y=ny<0?bounds.top-distance:bounds.bottom+distance;
       } else if(Math.abs(dx)<0.1){nx=nx>=0?1:-1;ny=0;x=nx<0?bounds.left-distance:bounds.right+distance;}
-      if(returnHook && i===1){nx=0;ny=-1;x=mid[0];y=bounds.top-distance;}
-      if(returnHook && i!==1 && i!==longHookSide){nx=hookRight?1:-1;ny=0;x=hookRight?bounds.right+distance:bounds.left-distance;y=mid[1];}
+      // Keep the label on the perpendicular through its own side's midpoint.
+      // Return bends use the same rule; never move a side's value to a corner.
       const halfWidth=Math.max(9,String(texts[i]??'').length*3.7+3),halfHeight=9;
       const boxAt=(px,py)=>({left:px-halfWidth,right:px+halfWidth,top:py-halfHeight,bottom:py+halfHeight});
       for(let attempt=0;attempt<8;attempt++) {
