@@ -293,7 +293,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .prog-bar{height:3px;background:rgba(0,0,0,0.06);border-radius:2px;margin-top:4px;}
 .prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s;}
 .print-btns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
-.print-action-pair{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;min-width:0;}
+.print-action-pair{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;}
 .print-btn{display:inline-flex;align-items:center;gap:7px;padding:10px 18px;
   justify-content:center;text-decoration:none;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;color:#fff;
   border:1px solid transparent;box-shadow:0 8px 22px rgba(2,26,72,0.12);transition:transform .16s ease,box-shadow .16s ease;}
@@ -2956,9 +2956,9 @@ function buildDetailHTML(o, pkgs) {
   const deliveryProgress = o.delivery_progress || { total_item_count: 0, loaded_item_count: 0, remaining_item_count: 0, certificates: [] };
   const loadedItemCount = deliveryProgress.loaded_item_count;
   const prints = `<div class="print-btns">
-    <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'print-cards')">📤 שלח קובץ</button></div>
-    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">📄 גיליון הזמנה</button><button type="button" class="send-file-btn" onclick="event.stopPropagation();openA4PrintDialog(${o.id},'send')">📤 שלח קובץ</button></div>
-    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — ללא תעודה ${deliveryProgress.certificate_remaining_item_count ?? deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a><button type="button" class="send-file-btn" onclick="openSendFile(event,${o.id},'delivery-certificate')">📤 שלח קובץ</button></div>
+    <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a></div>
+    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">📄 גיליון הזמנה</button></div>
+    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — ללא תעודה ${deliveryProgress.certificate_remaining_item_count ?? deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
     <div class="print-action-pair"><button type="button" class="print-btn cutting" onclick="openStraightStockCutting(event,${o.id})">✂️ תוכנית חיתוך ממוטות</button></div>
     <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">📋 תעודה חלקית — הועמסו ${loadedItemCount} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
     ${issuedDeliveryDocumentsHtml(o, deliveryProgress)}
