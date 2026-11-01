@@ -13,6 +13,8 @@ Source files:
 
 ## Current Code Snapshot
 
+`/api/operations/order-drafts*`: office/manager/admin. Delivery preview and order selection also allow warehouse; official issuance/cancellation require office/manager/admin. Delivery document reads additionally allow driver. Every endpoint retains the Orders module boundary and existing JWT enforcement. No new persistent access is provisioned.
+
 Automated scan of active API sources found:
 
 - `server.js` intentionally keeps only `GET /api/health`.

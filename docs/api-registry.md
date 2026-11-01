@@ -27,6 +27,8 @@ Security posture values:
 
 ## Platform Core
 
+Orders owns `/api/operations/*` in `routes/orders.js`: authenticated proposal, versioned approval, selected-order delivery preview, immutable consolidated issuance/reprint and guarded cancellation. `scripts/order-operations-client.js` uses an existing user Bearer JWT; it creates no agent credential. Preview never issues a document; only an explicit POST approval mutates business records.
+
 | Route Family | Module | Expected Security | Current Concern |
 | --- | --- | --- | --- |
 | `/api/auth/login` | Platform Core | public with rate limit | Present. |

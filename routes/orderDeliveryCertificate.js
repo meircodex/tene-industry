@@ -135,6 +135,7 @@ router.get('/orders/:id/delivery-certificate', requireAnyRole(['office', 'wareho
   if (req.query.note_id) {
     issuedNote = db.prepare('SELECT dn.* FROM delivery_notes dn LEFT JOIN delivery_note_orders dno ON dno.delivery_note_id=dn.id AND dno.order_id=? WHERE dn.id=? AND (dn.order_id=? OR dno.order_id=?)').get(order.id, req.query.note_id, order.id, order.id);
     if (!issuedNote) return res.status(404).send('תעודה לא נמצאה בהזמנה');
+    if(db.prepare('SELECT 1 FROM consolidated_delivery_operations WHERE note_id=?').get(issuedNote.id))return res.redirect('/api/operations/delivery-notes/'+issuedNote.id+'/print');
     cancelledNote = db.prepare('SELECT * FROM delivery_note_cancellations WHERE note_id=?').get(issuedNote.id);
     // Existing truck notes already have a snapshot-aware, read-only print route.
     // In particular never reconstruct legacy partial packages from current rows.
