@@ -83,3 +83,16 @@ After dashboard KPIs, extend contracts to:
 ## Item correction preview
 
 `itemStatusCorrection` in `public/data-contracts-client.js` owns the orders dialog shipment explanation. The preview is authoritative for linked certificates, documented quantities and every affected line; only explicit cancellation releases document quantities. Work status never erases production or physical shipment history.
+
+## Inventory daily view (pending approved UI integration, 2026-11-08)
+
+Inventory owns the display. `/api/procurement/plan` supplies kg groups with
+`physical_stock_kg`, `backlog_kg`, `incoming_kg`, `recommended_purchase_kg`,
+`legacy_preallocated_kg` and `requires_specification_review`. A kg group is a
+diameter/supply-form planning estimate; it must not claim interchangeability of
+length, grade or standard. Physical stock includes audited count adjustments.
+`mesh_groups` uses exact mesh specifications and `physical_units`, `required_units`,
+`incoming_units`, `available_units`, `recommended_purchase_units`. Whole sheets
+are never added to kg totals. Sorting/filtering changes presentation only.
+The editable export uses the operator's final rows, not stale recommendation
+quantities, and does not write to purchase or inventory tables.

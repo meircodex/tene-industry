@@ -1,4 +1,5 @@
 'use strict';
+const { materialOnHand } = require('./materialBalance');
 
 const crypto = require('node:crypto');
 
@@ -60,7 +61,7 @@ function suggestFifoLots(db, { material_requirement_id }) {
   let remaining = kg(requirement.required_kg);
   const lines = [];
   for (const row of suggestionRows(db, requirement)) {
-    const free = kg(Number(row.weight_received || 0) - Number(row.weight_used || 0) - Number(row.weight_scrapped || 0) - activeAllocatedForLot(db, row.id));
+    const free = kg(materialOnHand(row) - activeAllocatedForLot(db, row.id));
     const allocatedKg = kg(Math.min(Math.max(0, free), remaining));
     if (allocatedKg > 0) lines.push({ raw_material_id: row.id, allocated_kg: allocatedKg });
     remaining = kg(Math.max(0, remaining - allocatedKg));
@@ -88,7 +89,7 @@ function confirmAllocationPlan(db, input = {}) {
       const lot = db.prepare(`SELECT * FROM raw_material WHERE id=? AND active=1
         AND COALESCE(verification_status,'approved')='approved'`).get(line.rawMaterialId);
       if (!lot || Number(lot.diameter) !== Number(requirement.diameter) || String(lot.material_type || 'coil') !== requirement.material_type) fail('invalid_allocation_lot');
-      const free = kg(Number(lot.weight_received || 0) - Number(lot.weight_used || 0) - Number(lot.weight_scrapped || 0) - activeAllocatedForLot(db, lot.id));
+      const free = kg(materialOnHand(lot) - activeAllocatedForLot(db, lot.id));
       if (line.allocatedKg > free) fail('over_allocation');
     }
     const result = db.prepare(`INSERT INTO allocation_plans_v2
@@ -223,4 +224,4 @@ function planHasConsumedLines(db, planId) {
     WHERE l.allocation_plan_id=? GROUP BY l.id HAVING SUM(CASE WHEN e.event_type='consumption' THEN c.consumed_kg ELSE -c.consumed_kg END)>0 LIMIT 1`).get(planId);
 }
 
-module.exports = { MaterialAllocationPlanningError, suggestFifoLots, confirmAllocationPlan, reconcileAllocationPlan, releaseAllocationPlan, getAllocationPlan };
+module.exports = { activeAllocatedForLot, MaterialAllocationPlanningError, suggestFifoLots, confirmAllocationPlan, reconcileAllocationPlan, releaseAllocationPlan, getAllocationPlan };

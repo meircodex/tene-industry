@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pendingReceipts = require('../services/pendingRawMaterialReceiptV2');
 const { calculatePurchaseRecommendations } = require('../services/inventoryReservation');
+const { planInventory } = require('../services/inventoryPlanning');
 const { projectMaterialCoverageV2 } = require('../services/materialCoverageProjectionV2');
 
 function required(name, value) {
@@ -53,6 +54,18 @@ module.exports = function createProcurementRouter(deps) {
     res.json({ id: r.lastInsertRowid });
   });
 
+  router.post('/procurement/purchase-draft/export', requireAnyRole(['office', 'manager', 'admin']), (req,res) => {
+    try {
+      const result=require('../services/purchaseDraftExport').exportPurchaseDraft(db,req.body);
+      res.setHeader('Content-Type','text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition',`attachment; filename="${result.filename}"`);
+      res.send(result.content);
+    } catch(error){res.status(error.statusCode||400).json({error:error.code||error.message});}
+  });
+  router.get('/procurement/plan', requireAnyRole(['warehouse', 'office', 'finance', 'manager', 'admin']), (req,res) => {
+    try { res.json({...planInventory(db,req.query),mesh_groups:require('../services/meshInventory').planMesh(db,req.query)}); }
+    catch(error) {res.status(400).json({error:error.code||error.message});}
+  });
   router.get('/procurement/recommendations', requireAnyRole(['warehouse', 'office', 'finance', 'manager', 'admin']), (req, res) => {
     try {
       const recommendation = calculatePurchaseRecommendations(db, {
@@ -81,6 +94,16 @@ module.exports = function createProcurementRouter(deps) {
     const seq = db.prepare('SELECT COUNT(*)+1 as n FROM purchase_orders').get().n;
     const num = 'PO-' + new Date().getFullYear() + '-' + String(seq).padStart(4, '0');
     const { supplier_id, diameter, material_type, quantity_ton, price_per_ton, expected_date, notes, created_by, status } = req.body;
+    if(material_type==='mesh') {
+      try {
+        const mesh=require('../services/meshInventory');
+        const spec=mesh.meshSpecification(req.body.specification),quantity=Number(req.body.quantity_units),price=Number(req.body.unit_price||0);
+        if(!Number.isSafeInteger(quantity)||quantity<=0||!Number.isFinite(price)||price<0)return res.status(400).json({error:'invalid_mesh_purchase_quantity'});
+        const result=db.prepare('INSERT INTO purchase_orders(po_num,supplier_id,material_type,quantity_units,specification_key,specification_json,unit_price,total_amount,expected_date,status,notes,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+          .run(num,supplier_id||null,'mesh',quantity,spec.specification_key,JSON.stringify(spec.specification),price,quantity*price,expected_date||'',status||'pending',notes||'',req.auth.sub);
+        return res.json({id:result.lastInsertRowid,po_num:num});
+      }catch(error){return res.status(error.statusCode||400).json({error:error.code||error.message});}
+    }
     const total = (quantity_ton || 0) * (price_per_ton || 0);
     const r = db.prepare(`
       INSERT INTO purchase_orders
@@ -107,6 +130,18 @@ module.exports = function createProcurementRouter(deps) {
     const { heat_number, certificate_num, received_weight, notes } = req.body;
     const po = db.prepare('SELECT * FROM purchase_orders WHERE id=?').get(req.params.id);
     if (!po) return res.status(404).json({ error: 'not found' });
+    if(po.material_type==='mesh') {
+      try {
+        const mesh=require('../services/meshInventory');
+        const quantity=Number(req.body.received_units??po.quantity_units);
+        const receipt=db.transaction(()=>{
+          const result=mesh.receiptDraft(db,{specification:JSON.parse(po.specification_json),quantity_units:quantity,supplier_id:po.supplier_id,delivery_note_num:req.body.delivery_note_num||po.po_num,idempotency_key:req.body.idempotency_key||`mesh-po-receive:${po.id}`,actor_id:req.auth.sub});
+          db.prepare("UPDATE purchase_orders SET status='הגיע',received_units=?,received_at=CURRENT_TIMESTAMP WHERE id=?").run(quantity,po.id);
+          return result;
+        }).immediate();
+        return res.json({ok:true,receipt_id:receipt.id,status:receipt.status,stock_unit:'units'});
+      }catch(error){return res.status(error.statusCode||400).json({error:error.code||error.message});}
+    }
     const actualWeight = received_weight || (po.quantity_ton * 1000);
     let receipt = null;
     const receive = db.transaction(() => {

@@ -7,6 +7,10 @@ into a universal event/audit model.
 
 ## Current Realtime Event Types
 
+`inventory_changed` is emitted by Inventory after approved kg/sheet counts, approved
+receipts and consumption retries, and by Production after completion consumption. Its payload identifies the count, receipt or
+item; consumers reload their own module-owned read model.
+
 | Event Type | Owner Module | Current Producer Context | Notes |
 | --- | --- | --- | --- |
 | `machines_state` | Production | WebSocket connection initial state | Snapshot, not business event. |

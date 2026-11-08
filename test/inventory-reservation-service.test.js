@@ -248,14 +248,14 @@ test('consumeReservationsForProduction consumes matching reservations and stores
   assert.deepEqual(result, {
     order_id: 401,
     item_ids: [31, 32, 999],
-    consumed: 2,
+    consumed: 1,
     actual_weight_kg: 160.457,
   });
 
   const rows = db.prepare('SELECT order_id,item_id,reserved_kg,status FROM inventory_reservations ORDER BY id').all();
   assert.deepEqual(rows, [
     { order_id: 401, item_id: 31, reserved_kg: 160.457, status: 'consumed' },
-    { order_id: 401, item_id: 32, reserved_kg: 160.457, status: 'consumed' },
+    { order_id: 401, item_id: 32, reserved_kg: 75, status: 'released' },
     { order_id: 401, item_id: 33, reserved_kg: 25, status: 'consumed' },
     { order_id: 402, item_id: 34, reserved_kg: 50, status: 'active' },
   ]);

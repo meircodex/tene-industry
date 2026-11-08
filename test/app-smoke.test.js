@@ -346,36 +346,28 @@ test('core app smoke loads critical screens and authenticated APIs', async (t) =
     headers: authHeaders(admin),
     body: JSON.stringify({
       customer: { name: 'Stock Smoke', phone: '050-9000000' },
-      order: { channel: 'manual', totalWeight: 4, inventoryAllocationPolicy: 'auto_fifo' },
+      order: { channel: 'manual', totalWeight: 4 },
       pallets: [{ totalWeight: 4, items: [{ shapeId: 's1', shapeName: 'straight', diameter: 12, length: 1000, qty: 4 }] }],
     }),
   });
   assert.equal(stockOrder.status, 200);
   const stockOrderBody = await stockOrder.json();
   const usedAfterOrder = db.prepare('SELECT weight_used FROM raw_material WHERE id=?').get(approvedMaterialId).weight_used;
-  assert.ok(usedAfterOrder > 0, 'order should consume matching inventory by default');
-  const usageRow = db.prepare('SELECT * FROM raw_material_usage WHERE order_id=?').get(stockOrderBody.orderId);
-  assert.equal(usageRow.raw_material_id, approvedMaterialId);
-
+  assert.equal(usedAfterOrder, 0, 'order reserves demand without consuming physical stock');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM raw_material_usage WHERE order_id=?').get(stockOrderBody.orderId).n, 0);
   const shortageOrder = await request('/api/orders', {
     method: 'POST',
     headers: authHeaders(admin),
     body: JSON.stringify({
       customer: { name: 'Shortage Smoke', phone: '050-9000001' },
-      order: { channel: 'manual', totalWeight: 10, inventoryAllocationPolicy: 'auto_fifo' },
+      order: { channel: 'manual', totalWeight: 10 },
       pallets: [{ totalWeight: 10, items: [{ shapeId: 's2', shapeName: 'straight', diameter: 32, length: 1000, qty: 10 }] }],
     }),
   });
   assert.equal(shortageOrder.status, 200);
   const shortageBody = await shortageOrder.json();
-  assert.equal(shortageBody.inventoryShortages.length, 1);
-  assert.equal(shortageBody.inventoryShortages[0].diameter, 32);
-  const shortageAlert = db.prepare('SELECT * FROM alerts WHERE type=? AND order_id=?').get('inventory_shortage', shortageBody.orderId);
-  assert.ok(shortageAlert, 'stock shortage should create an alert');
-  const procurementRequest = db.prepare('SELECT * FROM purchase_orders WHERE id=?').get(shortageBody.inventoryShortages[0].purchase_order_id);
-  assert.equal(procurementRequest.status, 'inventory_shortage');
-  assert.equal(procurementRequest.diameter, 32);
-  assert.ok(procurementRequest.quantity_ton > 0, 'procurement request should include required purchase quantity');
+  assert.deepEqual(shortageBody.inventoryShortages, []);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM purchase_orders WHERE status='inventory_shortage'").get().n, 0, 'demand does not create automatic purchase orders');
   const manualIntake = await request('/api/intake/parse-text', {
     method: 'POST',
     headers: authHeaders(admin),

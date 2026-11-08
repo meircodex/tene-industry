@@ -256,9 +256,11 @@ function buildRawMaterialReconciliationReport(db, options = {}) {
   const generated = clock();
   const generatedAt = generated instanceof Date ? generated.toISOString() : new Date(generated).toISOString();
 
+  const hasAdjustment=db.pragma('table_info(raw_material)').some(c=>c.name==='stock_adjustment_kg');
   const rawMaterials = db.prepare(`
     SELECT id, diameter, COALESCE(material_type, 'coil') AS material_type,
            COALESCE(weight_received, 0) AS weight_received,
+           ${hasAdjustment ? 'COALESCE(stock_adjustment_kg,0)' : '0'} AS stock_adjustment_kg,
            COALESCE(weight_used, 0) AS weight_used,
            COALESCE(weight_scrapped, 0) AS weight_scrapped,
            COALESCE(active, 1) AS active
@@ -336,6 +338,7 @@ function buildRawMaterialReconciliationReport(db, options = {}) {
       materialType: normalizedMaterialType,
       rawMaterialIds: [],
       receivedKg: 0,
+      stockAdjustmentKg: 0,
       legacyUsedCounterKg: 0,
       usageRowsKg: 0,
       scrappedCounterKg: 0,
@@ -383,6 +386,7 @@ function buildRawMaterialReconciliationReport(db, options = {}) {
     const currentStock = stock(row.diameter, row.material_type);
     currentStock.rawMaterialIds.push(row.id);
     currentStock.receivedKg += Number(row.weight_received || 0);
+    currentStock.stockAdjustmentKg += Number(row.stock_adjustment_kg || 0);
     currentStock.legacyUsedCounterKg += Number(row.weight_used || 0);
     currentStock.scrappedCounterKg += Number(row.weight_scrapped || 0);
   }
@@ -583,6 +587,7 @@ function buildRawMaterialReconciliationReport(db, options = {}) {
     const lotUsages = usagesByLot.get(row.id) || [];
     const observedBalance = calculateObservedRawMaterialBalance({
       receivedKg: row.weight_received,
+      stockAdjustmentKg: row.stock_adjustment_kg,
       legacyUsedCounterKg: row.weight_used,
       usageRowsKg: lotUsages.reduce((sum, usage) => sum + Number(usage.weight_used || 0), 0),
       scrappedCounterKg: row.weight_scrapped,

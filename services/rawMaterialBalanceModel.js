@@ -70,11 +70,14 @@ function normalizeObservedInput(input) {
 
 function calculateObservedRawMaterialBalance(input) {
   const observed = normalizeObservedInput(input);
+  const stockAdjustmentKg=Number(input.stockAdjustmentKg||0);
+  if(!Number.isFinite(stockAdjustmentKg))throw new RangeError('invalid_raw_material_quantity:stockAdjustmentKg');
+  if(stockAdjustmentKg)observed.stockAdjustmentKg=roundKg(stockAdjustmentKg);
   const counterPhysicalOnHand = roundKg(
-    observed.receivedKg - observed.legacyUsedCounterKg - observed.scrappedCounterKg
+    observed.receivedKg + stockAdjustmentKg - observed.legacyUsedCounterKg - observed.scrappedCounterKg
   );
   const usageRowPhysicalOnHand = roundKg(
-    observed.receivedKg - observed.usageRowsKg - observed.scrappedCounterKg
+    observed.receivedKg + stockAdjustmentKg - observed.usageRowsKg - observed.scrappedCounterKg
   );
   const reservationAwareAvailableFromCounter = roundKg(
     counterPhysicalOnHand - observed.activeReservedKg

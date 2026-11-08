@@ -1,19 +1,9 @@
+const { materialOnHandSql } = require('./materialBalance');
 const { itemShapeMetrics } = require('./shapeSnapshot');
 
-const MATERIAL_TYPES = new Set(['coil', 'straight', 'bent']);
+const MATERIAL_TYPES = new Set(['coil', 'straight', 'bent', 'mesh']);
 
 const DEFAULT_ACTIVE_RESERVATION_STATUSES = ['active'];
-
-const CLOSED_PURCHASE_ORDER_STATUSES = new Set([
-  'cancelled',
-  'canceled',
-  'closed',
-  'done',
-  'complete',
-  'completed',
-  'received',
-  'arrived',
-]);
 
 function normalizeMaterialType(value) {
   const materialType = String(value || '').trim();
@@ -100,7 +90,7 @@ function calculatePhysicalStockKg(db, { diameter, material_type }) {
   const hasVerificationStatus = tableColumns(db, 'raw_material').has('verification_status');
   const row = db.prepare(`
     SELECT COALESCE(SUM(
-      COALESCE(weight_received, 0) - COALESCE(weight_used, 0) - COALESCE(weight_scrapped, 0)
+      ${materialOnHandSql(db)}
     ), 0) AS physicalStockKg
     FROM raw_material
     WHERE active=1
@@ -166,7 +156,7 @@ function calculateReservedKg(db, {
 
 function isOpenPurchaseOrderStatus(status) {
   const normalized = String(status || '').trim().toLowerCase();
-  return !CLOSED_PURCHASE_ORDER_STATUSES.has(normalized);
+  return require('./inventoryPlanning').CONFIRMED_INCOMING.has(normalized);
 }
 
 function calculateIncomingKg(db, { diameter, material_type }) {
@@ -196,28 +186,40 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
     return { order_id: orderId, inserted: 0, reservedKg: 0, reservations: [] };
   }
 
+  const modern = tableColumns(db, 'inventory_reservations').has('consumption_mode');
+  if(modern&&Number(db.prepare('SELECT inventory_lifecycle_version FROM orders WHERE id=?').get(orderId)?.inventory_lifecycle_version)===2)throw Object.assign(new Error('v2_requires_material_requirement_flow'),{statusCode:409});
   const insertReservation = db.prepare(`
     INSERT INTO inventory_reservations
-      (order_id, item_id, diameter, material_type, reserved_kg, status, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      (order_id, item_id, diameter, material_type, reserved_kg, status, created_at, updated_at${modern ? ', consumption_mode, preferred_raw_material_id' : ''})
+    VALUES (?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP${modern ? ", 'on_completion', ?" : ''})
   `);
 
   const insertAll = db.transaction(rows => {
     const reservations = [];
 
     for (const item of rows) {
+      if ((item.material_type||item.materialType)==='mesh') {
+        require('./meshInventory').reserveMesh(db,{order_id:orderId,item_id:reservationItemId(item),specification:item.mesh_specification,quantity_units:item.quantity_units||item.quantity});
+        continue;
+      }
+
       const diameter = normalizeDiameter(item.diameter ?? item.diameterMm ?? item.barDiameter ?? item.barDiameterMm);
       const material_type = normalizeMaterialType(item.material_type ?? item.materialType);
       const reservedKg = reservationWeightKg(item);
 
       if (reservedKg <= 0) continue;
 
+      if (modern && reservationItemId(item)) {
+        const prior = db.prepare("SELECT status FROM inventory_reservations WHERE order_id=? AND item_id=? AND consumption_mode='on_completion' AND status IN ('active','consumed')").get(orderId,reservationItemId(item));
+        if (prior) throw Object.assign(new Error('item_already_reserved_or_consumed'), {statusCode:409});
+      }
       const result = insertReservation.run(
         orderId,
         reservationItemId(item),
         diameter,
         material_type,
-        reservedKg
+        reservedKg,
+        ...(modern ? [item.preferred_raw_material_id || null] : [])
       );
 
       reservations.push({
@@ -253,9 +255,10 @@ function releaseReservationsForItems(db, { item_ids } = {}) {
     UPDATE inventory_reservations
     SET status='released', updated_at=CURRENT_TIMESTAMP
     WHERE item_id IN (${placeholders(itemIds)})
-      AND status <> 'released'
+      AND status = 'active'
   `).run(...itemIds);
 
+  if(tableExists(db,'inventory_mesh_demands')) db.prepare(`UPDATE inventory_mesh_demands SET status='released' WHERE status='active' AND item_id IN (${placeholders(itemIds)})`).run(...itemIds);
   return { item_ids: itemIds, released: result.changes || 0 };
 }
 
@@ -266,55 +269,36 @@ function releaseAllReservationsForOrder(db, { order_id } = {}) {
     UPDATE inventory_reservations
     SET status='released', updated_at=CURRENT_TIMESTAMP
     WHERE order_id=?
-      AND status <> 'released'
+      AND status = 'active'
   `).run(orderId);
 
+  if(tableExists(db,'inventory_mesh_demands')) db.prepare("UPDATE inventory_mesh_demands SET status='released' WHERE status='active' AND order_id=?").run(orderId);
   return { order_id: orderId, released: result.changes || 0 };
 }
 function consumeReservationsForProduction(db, { order_id, item_ids, actual_weight_kg } = {}) {
-  const orderId = order_id === undefined || order_id === null || order_id === ''
-    ? null
-    : normalizeOrderId(order_id);
+  const orderId = order_id === undefined || order_id === null || order_id === '' ? null : normalizeOrderId(order_id);
   const itemIds = normalizeItemIds(item_ids);
   const actualWeightKg = actualProductionWeightKg(actual_weight_kg);
-
-  if (!orderId && !itemIds.length) {
-    throw Object.assign(new Error('order_id or item_ids is required for consuming reservations'), { statusCode: 400 });
-  }
-
-  const where = ["status <> 'consumed'"];
-  const params = [];
-
-  if (orderId) {
-    where.push('order_id=?');
-    params.push(orderId);
-  }
-
-  if (itemIds.length) {
-    where.push(`item_id IN (${placeholders(itemIds)})`);
-    params.push(...itemIds);
-  }
-
-  const setClauses = ["status='consumed'", 'updated_at=CURRENT_TIMESTAMP'];
-  const setParams = [];
-
-  if (actualWeightKg !== null) {
-    setClauses.splice(1, 0, 'reserved_kg=?');
-    setParams.push(actualWeightKg);
-  }
-
-  const result = db.prepare(`
-    UPDATE inventory_reservations
-    SET ${setClauses.join(', ')}
-    WHERE ${where.join(' AND ')}
-  `).run(...setParams, ...params);
-
-  return {
-    order_id: orderId,
-    item_ids: itemIds,
-    consumed: result.changes || 0,
-    actual_weight_kg: actualWeightKg,
-  };
+  if (!orderId && !itemIds.length) throw Object.assign(new Error('order_id or item_ids is required for consuming reservations'), {statusCode:400});
+  const where=["status='active'"], params=[];
+  if (orderId) {where.push('order_id=?');params.push(orderId);}
+  if (itemIds.length) {where.push(`item_id IN (${placeholders(itemIds)})`);params.push(...itemIds);}
+  return db.transaction(() => {
+    const rows=db.prepare(`SELECT * FROM inventory_reservations WHERE ${where.join(' AND ')}`).all(...params);
+    if (actualWeightKg!==null && rows.length>1) throw Object.assign(new Error('actual_weight_requires_single_reservation'),{statusCode:400});
+    let consumed=0;const pending=[];
+    for (const row of rows) {
+      if (row.consumption_mode==='on_completion') {
+        const result=require('./inventoryCompletion').consumeCompletionReservation(db,row,actualWeightKg);
+        consumed+=result.consumed;if(result.pending)pending.push(result.pending);
+      } else {
+        // Historical order creation may already have charged raw_material_usage.
+        consumed+=db.prepare("UPDATE inventory_reservations SET status='consumed',reserved_kg=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='active'").run(actualWeightKg??row.reserved_kg,row.id).changes;
+      }
+    }
+    if(tableExists(db,'inventory_mesh_demands')) {const mesh=require('./meshInventory').consumeMesh(db,{orderId,itemIds});consumed+=mesh.consumed;pending.push(...mesh.pending);}
+    return {order_id:orderId,item_ids:itemIds,consumed,actual_weight_kg:actualWeightKg,...(pending.length?{pending}: {})};
+  }).immediate();
 }
 function calculateMaterialStockPosition(db, input = {}) {
   const diameter = normalizeDiameter(input.diameter);
@@ -331,7 +315,7 @@ function calculateMaterialStockPosition(db, input = {}) {
   const availableKg = roundKg(physicalStockKg - reservedKg);
   const shortageKg = roundKg(Math.max(0, -availableKg));
   const incomingKg = calculateIncomingKg(db, { diameter, material_type });
-  const recommendedPurchaseKg = roundKg(Math.max(0, shortageKg - incomingKg + safetyStockKg));
+  const recommendedPurchaseKg = roundKg(Math.max(0, reservedKg + safetyStockKg - physicalStockKg - incomingKg));
 
   return {
     diameter,
@@ -346,6 +330,13 @@ function calculateMaterialStockPosition(db, input = {}) {
 }
 
 function calculatePurchaseRecommendations(db, { diameter, material_type } = {}) {
+  if(tableColumns(db,'inventory_reservations').has('consumption_mode')) {
+    normalizeDiameter(diameter);
+    const row=require('./inventoryPlanning').planInventory(db,{diameter,material_type:normalizeMaterialType(material_type)}).groups[0];
+    const physicalStockKg=row?.physical_stock_kg||0,reservedKg=row?.backlog_kg||0,incomingKg=row?.incoming_kg||0;
+    return {physicalStockKg,reservedKg,availableKg:roundKg(physicalStockKg-reservedKg),incomingKg,shortageKg:roundKg(Math.max(0,reservedKg-physicalStockKg)),recommendedPurchaseKg:row?.recommended_purchase_kg||0};
+  }
+
   const position = calculateMaterialStockPosition(db, { diameter, material_type });
   return {
     physicalStockKg: position.physicalStockKg,

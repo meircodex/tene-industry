@@ -1,4 +1,5 @@
 'use strict';
+const { materialOnHand } = require('./materialBalance');
 
 const crypto = require('node:crypto');
 
@@ -105,14 +106,14 @@ function consumedForAllocationLine(db, lineId) {
 
 function validateApprovalLine(db, report, line) {
   const allocation = db.prepare(`SELECT l.*,p.status AS plan_status,p.material_requirement_id,r.active,r.verification_status,
-      r.weight_received,r.weight_used,r.weight_scrapped
+      r.weight_received,r.weight_used,r.weight_scrapped,r.stock_adjustment_kg
     FROM allocation_plan_lines_v2 l JOIN allocation_plans_v2 p ON p.id=l.allocation_plan_id
     JOIN raw_material r ON r.id=l.raw_material_id WHERE l.id=?`).get(line.allocation_plan_line_id);
   if (!allocation || allocation.raw_material_id !== line.raw_material_id || allocation.material_requirement_id !== report.material_requirement_id
     || allocation.status !== 'active' || allocation.plan_status !== 'active' || Number(allocation.active) !== 1
     || String(allocation.verification_status || 'approved') !== 'approved') fail('invalid_consumption_allocation');
   const allocationFree = kg(Number(allocation.allocated_kg) - consumedForAllocationLine(db, allocation.id));
-  const lotFree = kg(Number(allocation.weight_received) - Number(allocation.weight_used) - Number(allocation.weight_scrapped));
+  const lotFree = kg(materialOnHand(allocation));
   if (line.consumed_kg > allocationFree) fail('consumption_exceeds_allocation');
   if (line.consumed_kg > lotFree) fail('consumption_exceeds_lot');
   return allocation;
