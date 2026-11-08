@@ -2,6 +2,8 @@
 
 Shared shape catalogue (2026-11-08): read through `GET /api/shape-definitions` for office/sales/production/manager/admin; create/update shared definitions and billing defaults for manager/admin, matching existing catalogue management access. Version conflicts cannot silently overwrite another editor's changes. Public/customer sessions do not gain catalogue-management access. Saving errors remain visible in the editor; local storage is not used as a success fallback for a failed shared save.
 
+Built-in revision endpoint `PUT /api/shape-definitions/builtin/:id` uses the same manager/admin restriction. The GET response reports `permissions.canManage` for the edit/save/configuration controls; UI controls default to hidden when permission is unknown or loading fails. Normal order dimension entry remains available to authorized order operators.
+
 Working role decision: see `docs/role-model-decision.md`.
 
 Source-of-truth registry required by Volume 10. Current roles are defined in

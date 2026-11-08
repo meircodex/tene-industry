@@ -4,6 +4,9 @@
   else root.IronBendShapeCommercial = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
+  // Customer-facing SKU is independent of legacy internal shape identifiers.
+  const BUILTIN_CODES = Object.freeze({s1:'1',s2:'2',s3:'3',s4:'4',s5:'5',s6:'6',s7:'7',s8:'8',s9:'9',s10:'10',s11:'11',s13:'12',s14:'13',s15:'14',s16:'15',mesh1:'16','round-pile-cage':'17',spiral1:'18',ring1:'19','lift-package':'20'});
+  const numericItemCode = value => /^[0-9]{1,40}$/.test(String(value ?? ''));
   const LINE_DEFINITIONS = Object.freeze([
     { key: 'processed_rebar_kg', section: 'material', label: 'ברזל', unit: 'kg' },
     { key: 'smooth_rebar_kg', section: 'material', label: 'ברזל חלק', unit: 'kg' },
@@ -77,5 +80,5 @@
         value: line.unit === 'kg' ? Number(weightKg) || 0 : Number(quantity) || 0 };
     });
   }
-  return { LINE_DEFINITIONS, POLICY_LINES, normalizePolicy, defaultPolicy, steelFinish, resolvedLines, explain };
+  return { BUILTIN_CODES, numericItemCode, LINE_DEFINITIONS, POLICY_LINES, normalizePolicy, defaultPolicy, steelFinish, resolvedLines, explain };
 });

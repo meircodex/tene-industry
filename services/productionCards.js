@@ -245,56 +245,6 @@ function proportionalPrintSides(sides) {
 
 // כשצלע מאוחרת רצה בדיוק על גבי צלע קודמת (מוט מקופל אחורה על עצמו),
 // הן מצוירות קו-על-קו ואי אפשר להבחין ביניהן בשרטוט.
-function overlappingCoverIndex(points, scale) {
-  let EPS = Math.max(1e-9, scale * 0.002);
-  for (let i = 1; i < points.length - 1; i++) {
-    let a = points[i], b = points[i + 1];
-    let dx = b[0] - a[0], dy = b[1] - a[1];
-    let len = Math.sqrt(dx * dx + dy * dy);
-    if (!len) continue;
-    dx /= len; dy /= len;
-    for (let j = 0; j < i; j++) {
-      let c = points[j], d = points[j + 1];
-      let ex = d[0] - c[0], ey = d[1] - c[1];
-      let elen = Math.sqrt(ex * ex + ey * ey);
-      if (!elen) continue;
-      ex /= elen; ey /= elen;
-      if (Math.abs(dx * ey - dy * ex) > 0.02) continue;
-      if (Math.abs((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) > EPS) continue;
-      let t0 = (c[0] - a[0]) * dx + (c[1] - a[1]) * dy;
-      let t1 = (d[0] - a[0]) * dx + (d[1] - a[1]) * dy;
-      if (Math.max(t0, t1) <= EPS || Math.min(t0, t1) >= len - EPS) continue;
-      return { covering: i, victim: j };
-    }
-  }
-  return null;
-}
-
-// חישוקים וכל צורה סגורה שחוזרת לנקודת ההתחלה - לא בתחום הכלל הזה.
-function isClosedHoopOutline(points, scale) {
-  if (!points || points.length < 4 || !scale) return false;
-  let first = points[0], last = points[points.length - 1];
-  return Math.sqrt(Math.pow(last[0] - first[0], 2) + Math.pow(last[1] - first[1], 2)) < scale * 0.35;
-}
-
-// קיצור ויזואלי בלבד של הצלע הצמודה לצלע הקצרה שנדרסת, כדי שהשתיים ייפרדו.
-// המידות המודפסות נשענות על sides המקורי ולא מושפעות.
-const OVERLAP_SEPARATION_RATIO = 0.10;
-function separateOverlappingSides(visualSides, angles) {
-  if (!visualSides || visualSides.length < 3) return visualSides;
-  let max = Math.max.apply(null, visualSides.concat([0]));
-  let shapePoints = calcShapePoints(visualSides, angles || []);
-  if (isClosedHoopOutline(shapePoints, max)) return visualSides;
-  let hit = overlappingCoverIndex(shapePoints, max);
-  if (!hit) return visualSides;
-  let legIndex = hit.victim > 0 ? hit.victim - 1 : hit.victim + 1;
-  if (legIndex < 0 || legIndex >= visualSides.length) return visualSides;
-  let adjusted = visualSides.slice();
-  let leg = adjusted[legIndex];
-  adjusted[legIndex] = Math.max(leg * 0.5, leg - max * OVERLAP_SEPARATION_RATIO);
-  return adjusted;
-}
-
 function calcShapePoints(sides, angles) {
   const points = [[0, 0]];
   let direction = 0;
@@ -347,58 +297,8 @@ function normalizeShapePointsBaseBottom(points, opts = {}) {
 }
 
 function closedStirrupParts(segments) {
-  if (!Array.isArray(segments) || segments.length < 4) return null;
-  const lengths = segments.map(segment => Number(segment.length_mm || 0));
-  if (lengths.some(length => length <= 0)) return null;
-  // Canonical source walk: closure, A, B, A, B, closure. Never sort lengths
-  // or mistake a closure tail for a body side. Opposite sides must agree and
-  // all three body corners must turn in the same direction.
-  if (segments.length === 6) {
-    const bodyAngles = segments.slice(1, 4).map(segment => signedAngleDegrees(segment.angle_deg));
-    if (bodyAngles.every(angle => isRightAngle(angle))
-      && bodyAngles.every(angle => angle === bodyAngles[0])
-      && Math.abs(lengths[1] - lengths[3]) <= 1
-      && Math.abs(lengths[2] - lengths[4]) <= 1) {
-      return { top: lengths[2], right: lengths[1], bottom: lengths[4], left: lengths[3], tailStart: lengths[0], tailEnd: lengths[5] };
-    }
-  }
-  const checkedAngles = segments.slice(0, Math.min(4, segments.length - 1))
-    .filter(segment => segment.angle_deg != null)
-    .map(segment => signedAngleDegrees(segment.angle_deg));
-  const rightAngles = checkedAngles.every(isRightAngle)
-    && checkedAngles.every(angle => angle === checkedAngles[0]);
-  if (!rightAngles) return null;
-
-  if (segments.length >= 5) {
-    // Imported hoop rows use: side, closure excess, side, closure excess,
-    // side, side. The two inner segments are the closure excesses; the first
-    // and last segments are the matching body side (e.g. 25/10/50/10/50/25).
-    const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
-    const hasSmallTails = isSimilarDimension(tailStart, tailEnd || tailStart);
-    if (
-      hasSmallTails &&
-      isSimilarDimension(sideA, sideB || sideA) &&
-      isSimilarDimension(horizontalA, horizontalB)
-    ) {
-      return {
-        top: horizontalA,
-        right: sideA,
-        bottom: horizontalB,
-        left: sideB || sideA,
-        tailStart,
-        tailEnd,
-      };
-    }
-  }
-
-  const [top, right, bottom, left] = lengths;
-  if (isSimilarDimension(top, bottom) && isSimilarDimension(right, left)) {
-    return { top, right, bottom, left, tailStart: lengths[4] || 0, tailEnd: 0 };
-  }
-
-  return null;
+  return require('../public/display-units').rectangularLoopParts(segments.map(s=>Number(s.length_mm)),segments.map(s=>s.angle_deg));
 }
-
 
 function displayLengthCm(value) {
   const cm = (Number(value) || 0) / 10;
@@ -877,13 +777,8 @@ function closedStirrupSvg(parts) {
   const vertical = Math.max(parts.left || 0, parts.right || 0, 1);
   const maxBoxW = 126;
   const maxBoxH = 90;
-  const rawRatio = horizontal / vertical;
-  const boxW = rawRatio >= 1
-    ? maxBoxW
-    : Math.max(54, Math.min(maxBoxW, maxBoxH * rawRatio));
-  const boxH = rawRatio >= 1
-    ? Math.max(54, Math.min(maxBoxH, maxBoxW / rawRatio))
-    : maxBoxH;
+  const scale = Math.min(maxBoxW/horizontal,maxBoxH/vertical);
+  const boxW = horizontal*scale,boxH=vertical*scale;
   const x = (width - boxW) / 2 - 10;
   const y = (height - boxH) / 2 + 4;
   const right = x + boxW;
@@ -891,21 +786,8 @@ function closedStirrupSvg(parts) {
   const midX = x + boxW / 2;
   const midY = y + boxH / 2;
   const path = `M ${x.toFixed(1)},${y.toFixed(1)} L ${right.toFixed(1)},${y.toFixed(1)} L ${right.toFixed(1)},${bottom.toFixed(1)} L ${x.toFixed(1)},${bottom.toFixed(1)} Z`;
-  const marker = Math.min(28, Math.max(14, Math.min(boxW, boxH) * 0.28));
-  const markerX = right - marker;
-  const markerY = y + marker;
-  const markerPath = `M ${markerX.toFixed(1)},${y.toFixed(1)} L ${markerX.toFixed(1)},${markerY.toFixed(1)} L ${right.toFixed(1)},${markerY.toFixed(1)}`;
-
   let svg = `<path d="${path}" fill="none" stroke="#1a2332" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`;
   svg += `<path d="${path}" fill="none" stroke="#3a5070" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`;
-  svg += `<path data-stirrup-marker="overlap" d="${markerPath}" fill="none" stroke="#1a2332" stroke-width="4" stroke-linecap="square" stroke-linejoin="miter"/>`;
-  svg += `<path d="${markerPath}" fill="none" stroke="#3a5070" stroke-width="1.4" stroke-linecap="square" stroke-linejoin="miter"/>`;
-  if (parts.tailStart > 0) {
-    svg += `<text data-tail-dim="1" x="${(markerX - 6).toFixed(1)}" y="${(y + marker / 2).toFixed(1)}" text-anchor="end" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailStart))}</text>`;
-  }
-  if (parts.tailEnd > 0) {
-    svg += `<text data-tail-dim="1" x="${((markerX + right) / 2).toFixed(1)}" y="${(markerY + 13).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="11" font-family="Heebo,Arial" font-weight="900" fill="#1a2332" stroke="white" stroke-width="2.4" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(displayLengthCm(parts.tailEnd))}</text>`;
-  }
 
   [
     { x: midX, y: y - 18, value: parts.top },
@@ -987,7 +869,7 @@ function shapeSvg(segmentsRaw, opts = {}) {
 
     const sides = segments.map(segment => Number(segment.length_mm || 0));
     const angles = segments.map(segment => segment.angle_deg);
-    const visualSides = separateOverlappingSides(proportionalPrintSides(sides), angles);
+    const visualSides = require('../public/display-units').overlappingSegments(calcShapePoints(sides,angles)).length ? sides : proportionalPrintSides(sides);
     const points = normalizeShapePointsBaseBottom(calcShapePoints(visualSides, angles), opts);
 
     const xs = points.map(point => point[0]);

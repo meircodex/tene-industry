@@ -38,7 +38,7 @@ test('editing a signed angle round trips to the same canonical stored geometry',
   assert.equal(modal.current.angles[0], 329.3);
 });
 
-test('both source hoops in order 91 use an upright rectangle, not a rotated generic polygon', () => {
+test('source hoops keep every actual tail length and bend instead of an inferred overlap marker', () => {
   const context = editorContext();
   for (const [sides, angles] of [
     [[100,500,800,500,800,100],[329.3,270,270,270,300.7]],
@@ -48,17 +48,16 @@ test('both source hoops in order 91 use an upright rectangle, not a rotated gene
     const item = {shape_name:'חישוק',diameter:12,quantity:208,total_length_mm:sides.reduce((a,b)=>a+b,0),segments:JSON.stringify(sides.map((length_mm,i)=>({length_mm,angle_deg:angles[i]??0})))};
     const frozen = JSON.stringify(item);
     const svg = cards.itemShapeSvg(item);
-    assert.match(svg, /data-shape-kind="closed-stirrup"/);
-    assert.match(svg, /data-stirrup-marker="overlap"/);
+    assert.match(svg, /data-shape-kind="generic-bar"/);
+    assert.doesNotMatch(svg, /data-stirrup-marker="overlap"/);
+    assert.equal((svg.match(/data-side-dimension=/g)||[]).length,6);
     assert.doesNotMatch(svg, /270°|329\.3°|rotate\(/);
     assert.equal(JSON.stringify(item), frozen);
     const detected = context.detectClosedStirrupParts(sides, angles);
-    assert.equal(detected.tailStart, sides[0]);
-    assert.equal(detected.tailEnd, sides[5]);
-    assert.equal(detected.right, sides[1]);
-    assert.equal(detected.top, sides[2]);
+    assert.equal(detected,null);
     const preview = context.PolylineBarEngine.render({sides,angles},300,260);
-    assert.match(preview,/data-shape-kind="closed-stirrup"/);
+    assert.match(preview,/data-engine="PolylineBarEngine"/);
+    assert.equal((preview.match(/data-side-dimension=/g)||[]).length,6);
   }
 });
 

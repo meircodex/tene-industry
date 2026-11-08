@@ -77,29 +77,7 @@
   }
 
   function closedStirrupParts(sides, angles) {
-    if (!Array.isArray(sides) || sides.length < 4) return null;
-    const lengths = sides.map(n => Number(n) || 0);
-    if (lengths.some(n => n <= 0)) return null;
-    const checkedAngles = (angles || []).slice(0, Math.min(4, lengths.length - 1));
-    if (checkedAngles.length && !checkedAngles.every(isRightAngle)) return null;
-
-    if (lengths.length >= 5) {
-      const [sideA, tailStart, horizontalA, tailEnd, horizontalB, sideB] = lengths;
-      if (
-        isSimilarDimension(tailStart, tailEnd || tailStart) &&
-        isSimilarDimension(sideA, sideB || sideA) &&
-        isSimilarDimension(horizontalA, horizontalB)
-      ) {
-        return { top: horizontalA, right: sideA, bottom: horizontalB, left: sideB || sideA, tailStart, tailEnd };
-      }
-    }
-
-    const [top, right, bottom, left] = lengths;
-    if (isSimilarDimension(top, bottom) && isSimilarDimension(right, left)) {
-      return { top, right, bottom, left, tailStart: lengths[4] || 0, tailEnd: 0 };
-    }
-
-    return null;
+    return window.IronBendDisplayUnits?.rectangularLoopParts(sides,angles) || null;
   }
 
   function addShapeText(svg, text, x, y, attrs) {
@@ -124,8 +102,8 @@
     const maxBoxW = Math.max(66, W - 86);
     const maxBoxH = Math.max(58, H - 62);
     const ratio = horizontal / vertical;
-    const boxW = ratio >= 1 ? maxBoxW : Math.max(58, Math.min(maxBoxW, maxBoxH * ratio));
-    const boxH = ratio >= 1 ? Math.max(58, Math.min(maxBoxH, maxBoxW / ratio)) : maxBoxH;
+    const boxW = Math.min(maxBoxW,maxBoxH*ratio);
+    const boxH = boxW/ratio;
     const x = (W - boxW) / 2 - 10;
     const y = (H - boxH) / 2 + 4;
     const right = x + boxW;
@@ -159,19 +137,6 @@
     bar.setAttribute('stroke-linecap', 'round');
     bar.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(bar);
-
-    const markerSize = Math.min(30, Math.max(14, Math.min(boxW, boxH) * 0.28));
-    const markerX = right - markerSize;
-    const markerY = y + markerSize;
-    const marker = document.createElementNS(NS, 'path');
-    marker.setAttribute('data-stirrup-marker', 'overlap');
-    marker.setAttribute('d', `M ${right.toFixed(1)},${y.toFixed(1)} L ${markerX.toFixed(1)},${y.toFixed(1)} L ${markerX.toFixed(1)},${markerY.toFixed(1)} L ${right.toFixed(1)},${markerY.toFixed(1)}`);
-    marker.setAttribute('stroke', '#1a2533');
-    marker.setAttribute('stroke-width', Math.max(3, strokeW));
-    marker.setAttribute('fill', 'none');
-    marker.setAttribute('stroke-linecap', 'square');
-    marker.setAttribute('stroke-linejoin', 'miter');
-    svg.appendChild(marker);
 
     if (opts.showDimensions) {
       const midX = x + boxW / 2;
@@ -261,7 +226,7 @@
       return;
     }
 
-    const displaySides = readableDisplaySides(sides, opts);
+    const displaySides = sides;
     const rawPts = computePoints(displaySides, angles || []);
     const {pts}  = fitPoints(rawPts, W, H, pad);
 

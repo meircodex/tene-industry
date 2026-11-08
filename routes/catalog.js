@@ -368,8 +368,12 @@ If a value is uncertain, still return the row with a note. Never invent prices t
   });
 
   const savedShapeCatalog = createSavedShapeCatalog(db);
-  router.get('/shape-definitions', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (_req, res) => {
-    res.json({ entries: savedShapeCatalog.list() });
+  router.get('/shape-definitions', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (req, res) => {
+    res.json({ entries: savedShapeCatalog.list(), permissions: { canManage: ['manager','admin'].includes(req.userRole) } });
+  });
+  router.put('/shape-definitions/builtin/:id', requireAnyRole(['manager', 'admin']), (req,res) => {
+    const result = savedShapeCatalog.updateBuiltin(req.params.id,req.body);
+    res.status(result.status).json(result);
   });
   router.post('/shape-definitions', requireAnyRole(['manager', 'admin']), (req, res) => {
     const result = savedShapeCatalog.create(req.body || {});

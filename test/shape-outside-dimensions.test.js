@@ -33,7 +33,8 @@ test('U bridge label is below the base; closure lengths remain independent',()=>
   assert.ok(label && Number(label[1])>78);
   assert.match(svg,/font-size="12"/);
   const hoop=cards.itemShapeSvg(item([80,500,800,500,800,100],[135,90,90,90,135]));
-  assert.match(hoop,/data-shape-kind="closed-stirrup"/);
+  assert.match(hoop,/data-shape-kind="generic-bar"/);
+  assert.equal((hoop.match(/data-side-dimension=/g)||[]).length,6);
   assert.match(hoop,/>8<\/text>/);
   assert.match(hoop,/>10<\/text>/);
 });

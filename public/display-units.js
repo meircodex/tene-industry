@@ -82,7 +82,7 @@
     return candidates[0];
   }
 
-  function diagramDimensionPositions(points, texts, distance = 20) {
+  function diagramDimensionPositions(points, texts, distance = 20, options = {}) {
     if (!points.length) return [];
     const xs = points.map(p=>p[0]), ys = points.map(p=>p[1]);
     const bounds = { left:Math.min(...xs),right:Math.max(...xs),top:Math.min(...ys),bottom:Math.max(...ys) };
@@ -115,7 +115,12 @@
       } else if(Math.abs(dx)<0.1){nx=nx>=0?1:-1;ny=0;x=nx<0?bounds.left-distance:bounds.right+distance;}
       // Keep the label on the perpendicular through its own side's midpoint.
       // Return bends use the same rule; never move a side's value to a corner.
-      const halfWidth=Math.max(9,String(texts[i]??'').length*3.7+3),halfHeight=9;
+      let halfWidth=options.width ? options.width(String(texts[i]??''))/2 : Math.max(9,String(texts[i]??'').length*3.7+3),halfHeight=(options.height||18)/2;
+      if(options.rotated) {
+        const w=halfWidth,h=halfHeight;
+        halfWidth=Math.abs(dx/length)*w+Math.abs(dy/length)*h;
+        halfHeight=Math.abs(dy/length)*w+Math.abs(dx/length)*h;
+      }
       const boxAt=(px,py)=>({left:px-halfWidth,right:px+halfWidth,top:py-halfHeight,bottom:py+halfHeight});
       for(let attempt=0;attempt<8;attempt++) {
         const box=boxAt(x,y);
@@ -129,7 +134,32 @@
     return result;
   }
 
+  // Detect exact coincident spans. This is annotation data, never a license to
+  // move vertices, shorten sides or invent a closure hook.
+  function overlappingSegments(points, epsilon = 0.001) {
+    const pairs=[];
+    for(let i=0;i<points.length-1;i++) for(let j=i+1;j<points.length-1;j++) {
+      const a=points[i],b=points[i+1],c=points[j],d=points[j+1];
+      const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
+      if(len<=epsilon)continue;
+      const cross=p=>Math.abs((p[0]-a[0])*dy-(p[1]-a[1])*dx)/len;
+      if(cross(c)>epsilon||cross(d)>epsilon)continue;
+      const project=p=>((p[0]-a[0])*dx+(p[1]-a[1])*dy)/len;
+      const c1=project(c),d1=project(d);
+      if(Math.min(len,Math.max(c1,d1))-Math.max(0,Math.min(c1,d1))>epsilon)pairs.push([i,j]);
+    }
+    return pairs;
+  }
+  function rectangularLoopParts(sides,angles) {
+    if(sides?.length!==4 || !Array.isArray(angles) || angles.length<3)return null;
+    const v=sides.map(Number),a=angles.slice(0,3).map(signedAngleDegrees);
+    if(v.some(x=>!Number.isFinite(x)||x<=0)||a.some(x=>Math.abs(x)!==90||x!==a[0]))return null;
+    if(Math.abs(v[0]-v[2])>0.001||Math.abs(v[1]-v[3])>0.001)return null;
+    return {top:v[0],right:v[1],bottom:v[2],left:v[3],tailStart:0,tailEnd:0,sideMap:[0,1,2,3],tailMap:[null,null]};
+  }
   return Object.freeze({
+    overlappingSegments,
+    rectangularLoopParts,
     finiteNumber,
     millimetersToCentimeters,
     centimetersToMillimeters,

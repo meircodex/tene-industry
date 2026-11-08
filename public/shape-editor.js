@@ -207,6 +207,14 @@ function shapePresetIconSVG(kind) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true">${icons[kind] || icons.straight}</svg>`;
 }
 
+function shapeCataloguePreview(shape) {
+  if(normalizeShapeFamily(shape) !== 'bars') return ShapeEngineRouter.render(shape,300,260,{showDims:false,showAxes:false});
+  if(isRoundedEndBarShape(shape)) return roundedEndBarEditorSVG(shape.sides,300,260,{radiusMm:shape.radiusMm});
+  if(shape.is3d) return shape3DSVG(shape.sides,shape.angles,300,260,shape.diameter||12,{showAxes:false,showDims:false,showBends:false,dark:false,azAngles:shape.azAngles,elAngles:shape.elAngles});
+  const {path}=shapeSVGPath(shape.sides,shape.angles,300,260,24);
+  return `<path data-source-path="1" d="${path}" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
 function liftPresetIconSVG() {
   return '<svg viewBox="0 0 40 40" width="40" height="40"><rect x="7" y="13" width="26" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="10" y1="18" x2="30" y2="18" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="23" x2="30" y2="23" stroke="currentColor" stroke-width="1.5"/><line x1="15" y1="11" x2="15" y2="30" stroke="currentColor" stroke-width="2"/><line x1="25" y1="11" x2="25" y2="30" stroke="currentColor" stroke-width="2"/></svg>';
 }
@@ -437,50 +445,7 @@ function isRightBendAngle(angle) {
 }
 
 function detectClosedStirrupParts(sides, angles) {
-  const values = Array.isArray(sides) ? sides.map(Number) : [];
-  if (values.length < 4 || values.some(v => !Number.isFinite(v) || v <= 0)) return null;
-  if (values.length === 6) {
-    const bodyAngles = (angles || []).slice(1, 4).map(signedDisplayAngle);
-    if (bodyAngles.length === 3 && bodyAngles.every(isRightBendAngle)
-      && bodyAngles.every(angle => angle === bodyAngles[0])
-      && Math.abs(values[1] - values[3]) <= 1 && Math.abs(values[2] - values[4]) <= 1) {
-      return { top: values[2], right: values[1], bottom: values[4], left: values[3], tailStart: values[0], tailEnd: values[5], sideMap: [2, 1, 4, 3], tailMap: [0, 5] };
-    }
-  }
-  const checkedAngles = Array.isArray(angles) ? angles.slice(0, Math.min(4, values.length - 1)) : [];
-  if (checkedAngles.length && (!checkedAngles.every(isRightBendAngle)
-    || !checkedAngles.every(angle => signedDisplayAngle(angle) === signedDisplayAngle(checkedAngles[0])))) return null;
-
-  if (values.length >= 5) {
-    const right = values[0];
-    const tailStart = values[1];
-    const top = values[2];
-    const tailEnd = values[3] || 0;
-    const bottom = values[4];
-    const left = values[5] || right;
-    if (
-      isSimilarShapeDimension(tailStart, tailEnd || tailStart) &&
-      isSimilarShapeDimension(right, left) &&
-      isSimilarShapeDimension(top, bottom)
-    ) {
-      return {
-        top, right, bottom, left, tailStart, tailEnd,
-        sideMap: [2, 0, 4, values.length >= 6 ? 5 : 0],
-        tailMap: [1, values.length >= 6 ? 3 : null],
-      };
-    }
-  }
-
-  if (isSimilarShapeDimension(values[0], values[2]) && isSimilarShapeDimension(values[1], values[3])) {
-    return {
-      top: values[0], right: values[1], bottom: values[2], left: values[3],
-      tailStart: values[4] || 0, tailEnd: 0,
-      sideMap: [0, 1, 2, 3],
-      tailMap: [values.length >= 5 ? 4 : null, null],
-    };
-  }
-
-  return null;
+  return window.IronBendDisplayUnits?.rectangularLoopParts(sides, angles) || null;
 }
 
 function renderClosedStirrupEditor2D(parts, sides, w, h, opts = {}) {
@@ -488,8 +453,8 @@ function renderClosedStirrupEditor2D(parts, sides, w, h, opts = {}) {
   const horizontal = Math.max(parts.top || 0, parts.bottom || 0, 1);
   const vertical = Math.max(parts.left || 0, parts.right || 0, 1);
   const scale = Math.min((w - padding * 2 - 54) / horizontal, (h - padding * 2 - 24) / vertical);
-  const boxW = Math.max(56, horizontal * scale);
-  const boxH = Math.max(48, vertical * scale);
+  const boxW = horizontal * scale;
+  const boxH = vertical * scale;
   const x = padding + ((w - padding * 2) - boxW) / 2 - 8;
   const y = padding + ((h - padding * 2) - boxH) / 2 + 4;
   const right = x + boxW;
@@ -535,7 +500,7 @@ function renderClosedStirrupEditor2D(parts, sides, w, h, opts = {}) {
     return `<path d="M ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} L ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} L ${p3[0].toFixed(1)} ${p3[1].toFixed(1)}" fill="none" stroke="#c4c8cf" stroke-width="2"/>`;
   };
   const clickLine = (i, x1, y1, x2, y2) => `<path d="${pathBetween(x1, y1, x2, y2)}" stroke="transparent" stroke-width="16" fill="none" data-se-focus="bar-side-${i}" data-seg-click="${i}" style="cursor:pointer"/>`;
-  let html = `<g data-shape-kind="closed-stirrup" data-stirrup-marker="overlap">`;
+  let html = `<g data-shape-kind="closed-stirrup">`;
   const bodySegments = [
     [parts.sideMap[0], x, y, right, y],
     [parts.sideMap[1], right, y, right, bottom],
@@ -556,70 +521,9 @@ function renderClosedStirrupEditor2D(parts, sides, w, h, opts = {}) {
   html += label(parts.sideMap[2], midX, bottom + 22, 0, parts.bottom);
   html += label(parts.sideMap[3], x - 22, midY, -90, parts.left);
 
-  const drawTail = (sideIndex, lenValue, offset, flip = 1) => {
-    if (sideIndex == null || !lenValue) return '';
-    const tailPx = Math.max(24, Math.min(48, Number(lenValue) * scale));
-    const sx = right - 2 - offset;
-    const sy = y + 7 + offset;
-    const ex = sx - tailPx * 0.72;
-    const ey = sy + tailPx * 0.38 * flip;
-    const isAct = sideIndex === activeSeg;
-    const stroke = isAct ? highlight : '#111827';
-    const mx = (sx + ex) / 2, my = (sy + ey) / 2;
-    const [rsx, rsy] = rotatePoint(sx, sy);
-    const [rex, rey] = rotatePoint(ex, ey);
-    return `<g data-se-focus="bar-side-${sideIndex}" data-seg-click="${sideIndex}" style="cursor:pointer">
-      <path d="M ${rsx.toFixed(1)} ${rsy.toFixed(1)} L ${rex.toFixed(1)} ${rey.toFixed(1)}" stroke="rgba(0,0,0,.12)" stroke-width="9" stroke-linecap="round" fill="none"/>
-      <path d="M ${rsx.toFixed(1)} ${rsy.toFixed(1)} L ${rex.toFixed(1)} ${rey.toFixed(1)}" stroke="${stroke}" stroke-width="4" stroke-linecap="round" fill="none"/>
-      ${label(sideIndex, mx + 14, my - 10, -25, lenValue)}
-    </g>`;
-  };
-  html += drawTail(parts.tailMap[0], parts.tailStart, 0, -1);
-  html += drawTail(parts.tailMap[1], parts.tailEnd, 16, 1);
   html += `</g>`;
   return html;
 }
-
-// ── OVERLAP OFFSET ────────────────────────────────────────────────
-// Returns array of depth-offsets (signed px) for each segment.
-// Overlapping parallel segments get ±gap — rendered with a DIAGONAL
-// "depth" shift so they appear stacked like real bundled rebar,
-// not just shifted sideways (which looks unnatural).
-function computeSegOffsets(pts2d, barW) {
-  const n = pts2d.length - 1;
-  if (n <= 0) return [];
-  const segs = pts2d.slice(0, -1).map(([x1,y1], i) => {
-    const [x2,y2] = pts2d[i+1];
-    const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy)||1;
-    let angle = Math.atan2(dy,dx)*180/Math.PI; if (angle<0) angle+=180;
-    return { x1,y1,x2,y2, cx:(x1+x2)/2, cy:(y1+y2)/2,
-             ux:dx/len, uy:dy/len, nx:-dy/len, ny:dx/len, angle, len };
-  });
-  const offsets = new Array(n).fill(0);
-  const gap = barW * 1.6;
-  for (let i=0; i<n; i++) {
-    for (let j=i+1; j<n; j++) {
-      const si=segs[i], sj=segs[j];
-      const da = Math.abs(si.angle - sj.angle);
-      if (da>20 && da<160) continue;
-      const dcx=sj.cx-si.cx, dcy=sj.cy-si.cy;
-      const perp = Math.abs(dcx*si.nx + dcy*si.ny);
-      if (perp > gap*1.5) continue;
-      const along = Math.abs(dcx*si.ux + dcy*si.uy);
-      if (along > (si.len+sj.len)*0.6) continue;
-      if (offsets[i]===0 && offsets[j]===0) { offsets[i]=-gap; offsets[j]=+gap; }
-      else if (offsets[i]===0) offsets[i] = offsets[j]>0 ? -gap : +gap;
-      else if (offsets[j]===0) offsets[j] = offsets[i]>0 ? -gap : +gap;
-    }
-  }
-  return offsets;
-}
-
-// Diagonal "depth" direction for overlapping segments.
-// Upper-right = "closer to viewer" in isometric convention.
-// Both axes equal → clean 45° diagonal that reads as depth, not sideways shift.
-const OVLP_DX =  0.707;   // screen-X component of depth vector
-const OVLP_DY = -0.707;   // screen-Y component (negative = upward in screen)
 
 // ── 3D ISOMETRIC SVG ──────────────────────────────────────────────
 // Projects a flat 2D rebar shape into an isometric 3D view.
@@ -683,36 +587,14 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
   const activeSeg = opts.activeSeg ?? -1;
   const BAR_COLOR = dark ? '#b8cfe0' : '#3d5e78';
 
-  // ── Z-LIFT for overlapping parallel segments ─────────────────────
-  // 1. Detect overlaps using the flat projected points.
-  // 2. If overlaps exist, add a small virtual Z-elevation to each 3D point,
-  //    then re-project — shape shows stacked bars connected at bends,
-  //    exactly like real bundled rebar viewed isometrically.
+  // Project the source geometry without artificial depth offsets.
   const flatMapped = iso.map(([sx, sy]) => [
     ox + (sx - minSX) * sc,
     oy + (sy - minSY) * sc,
   ]);
-  const offsets3d  = computeSegOffsets(flatMapped, barW);
-  const hasOverlap = offsets3d.some(o => o !== 0);
-
-  let mapped;
-  if (hasOverlap) {
-    // Screen-space diagonal offset — keeps the shape flat, avoids Z-lift distortion.
-    // Z-lift causes connecting segments to become 3D-diagonal after projection, which
-    // makes 90° bends look skewed. Instead we shift each screen-point by a weighted
-    // average of its adjacent segment offsets along the isometric depth direction.
-    const n = pts3d.length - 1;
-    mapped = flatMapped.map((pt, i) => {
-      let sum = 0, cnt = 0;
-      if (i > 0 && offsets3d[i - 1] !== 0) { sum += offsets3d[i - 1]; cnt++; }
-      if (i < n && offsets3d[i]     !== 0) { sum += offsets3d[i];     cnt++; }
-      if (cnt === 0) return pt;
-      const off = sum / cnt; // ±barW*1.6 px — already scaled
-      return [pt[0] + OVLP_DX * off, pt[1] + OVLP_DY * off];
-    });
-  } else {
-    mapped = flatMapped;
-  }
+  // Project the actual points unchanged, including coincident spans.
+  const mapped = flatMapped;
+  const hasOverlap = false;
 
   // ── Bar rendering: single connected polyline ─────────────────────
   let shadowsHtml, segsHtml, activeGlowHtml;
@@ -758,6 +640,9 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
   // ── Segment length labels ─────────────────────────────────────
   let dimLabels = '';
   if (showDims) {
+    const overlappingIds = new Set((window.IronBendDisplayUnits?.overlappingSegments(mapped)||[]).flat());
+    const texts = sides.map((side,i)=>(overlappingIds.has(i)?String.fromCharCode(65+i)+' · ':'')+formatLengthCmFromMm(side));
+    const labels = window.IronBendDisplayUnits?.diagramDimensionPositions(mapped,texts,22,{width:text=>dimensionTagWidth(text,54,82),height:22});
     for (let i = 0; i < mapped.length - 1; i++) {
       const [x1, y1] = mapped[i], [x2, y2] = mapped[i + 1];
       const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
@@ -766,13 +651,14 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
       const nx = -dy / len * (compactLabels ? 15 : 22), ny = dx / len * (compactLabels ? 15 : 22);
       const isActSeg = i === activeSeg;
       const badgeCol = isActSeg ? '#2979ff' : '#526070';
-      const labelValue = formatLengthCmFromMm(sides[i]);
+      const labelValue = texts[i];
       const labelW = dimensionTagWidth(labelValue, 54, 82);
+      const lx=labels?.[i]?.x ?? mx+nx, ly=labels?.[i]?.y ?? my+ny;
       dimLabels += `
         <g data-seg-click="${i}" style="cursor:pointer">
-          <rect x="${(mx + nx - labelW / 2).toFixed(1)}" y="${(my + ny - 10).toFixed(1)}" width="${labelW}" height="22"
+          <rect x="${(lx - labelW / 2).toFixed(1)}" y="${(ly - 10).toFixed(1)}" width="${labelW}" height="22"
             rx="6" fill="${dark ? 'rgba(26,38,55,0.9)' : 'rgba(255,255,255,0.96)'}" stroke="${badgeCol}" stroke-width="${isActSeg ? 1.8 : 1}"/>
-          <text x="${(mx + nx).toFixed(1)}" y="${(my + ny + 5).toFixed(1)}" text-anchor="middle"
+          <text x="${lx.toFixed(1)}" y="${(ly + 5).toFixed(1)}" text-anchor="middle"
             font-size="10" font-family="Heebo,Arial" font-weight="800" fill="${labelClr}">${labelValue}</text>
         </g>`;
     }
@@ -887,8 +773,7 @@ PolylineBarEngine.render = function(shape, w = 300, h = 260, opts = {}) {
   if (opts.view === '3d') return shape3DSVG(sides, angles, w, h, opts.diameter || 12, opts);
   const stirrup = detectClosedStirrupParts(sides, angles);
   if (stirrup) return `<g data-engine="PolylineBarEngine" data-family="bars">${renderClosedStirrupEditor2D(stirrup, sides, w, h, opts)}</g>`;
-  const maxSide = Math.max(...sides,1);
-  const visualSides = window.IronBendDisplayUnits?.diagramVisualSides?.(sides) || sides.map(side=>Math.max(side,maxSide*0.14));
+  const visualSides = sides;
   const { path, pts } = shapeSVGPath(visualSides, angles, w, h, opts.padding || 38);
   const dimensions = window.IronBendDisplayUnits?.diagramDimensionPositions?.(pts,sides.map(side=>formatLengthCmFromMm(side)),20);
   const labelHtml = pts.slice(0, -1).map((p, i) => {
@@ -3759,10 +3644,11 @@ class ShapeEditorModal {
       <div class="se-catalog-entry" style="padding:8px 14px;border-bottom:1px solid #c5cbd4;background:#eef0f3;">
         <label for="seItemCode" style="display:block;font-size:11px;font-weight:800;margin-bottom:5px;">קוד פריט / מספר צורה</label>
         <div style="display:flex;gap:5px;">
-          <input id="seItemCode" class="se-input" type="text" autocomplete="off" style="min-width:0;flex:1;" aria-label="קוד פריט">
+          <input id="seItemCode" class="se-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" style="min-width:0;flex:1;" aria-label="קוד פריט">
           <button type="button" id="seCatalogArrow" class="se-cancel-btn" aria-label="פתח רשימת צורות" aria-expanded="false" aria-controls="seCatalogPopup">▾</button>
           <button type="button" id="seNewShape" class="se-cancel-btn" style="white-space:nowrap;">צורה חדשה</button>
         </div>
+        <button type="button" id="seEditCatalogShape" class="se-cancel-btn" style="display:none;margin-top:5px;">ערוך צורה בקטלוג</button>
         <small id="seCatalogStatus" role="status"></small>
       </div>
       <details id="seBillingDetails" style="padding:8px 14px;border-bottom:1px solid #e2e8ef;font-size:12px;">
@@ -3837,7 +3723,7 @@ class ShapeEditorModal {
       </div>
       <div class="se-foot-actions">
         <button class="se-cancel-btn" id="seCancel">ביטול</button>
-        <button class="se-save-shape-btn" id="seSaveShapeBtn">שמור צורה</button>
+        <button class="se-save-shape-btn" id="seSaveShapeBtn" style="display:none">שמור צורה</button>
         <button class="se-ok-btn" id="seOk">אשר צורה</button>
       </div>
     </div>
@@ -3848,7 +3734,7 @@ class ShapeEditorModal {
         placeholder="לדוגמה: U-אנקר מיוחד 600מ&quot;מ"
         onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('seSaveCodeInput').focus();}if(event.key==='Escape')window._seEditor._hideSaveBar();">
       <label for="seSaveCodeInput">מספר צורה:</label>
-      <input id="seSaveCodeInput" class="se-input" style="width:120px;" maxlength="40" autocomplete="off"
+      <input id="seSaveCodeInput" class="se-input" style="width:120px;" maxlength="40" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
         onkeydown="if(event.key==='Enter'){event.preventDefault();window._seEditor._doSave();}if(event.key==='Escape')window._seEditor._hideSaveBar();">
       <span id="seSaveError" role="alert" style="color:#b91c1c;"></span>
       <button class="se-ok-btn" onclick="window._seEditor._doSave()" style="padding:8px 22px;">שמור ✓</button>
@@ -3866,6 +3752,7 @@ class ShapeEditorModal {
     const arrow = document.getElementById('seCatalogArrow');
     arrow.onclick = () => window._seEditor._toggleCatalogue();
     document.getElementById('seNewShape').onclick = () => window._seEditor._newCatalogueShape();
+    document.getElementById('seEditCatalogShape').onclick = () => window._seEditor._editCatalogueShape();
     document.getElementById('seItemCode').addEventListener('keydown', event => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
@@ -3895,15 +3782,19 @@ class ShapeEditorModal {
 
   async _loadCatalogue() {
     this._catalogueLoading = true;
+    this._canManageCatalogue = false;
+    this._syncCatalogueMode();
     try {
       const response = await fetch('/api/shape-definitions');
       if (!response.ok) throw new Error('catalogue unavailable');
       const result = await response.json();
       this._sharedShapes = Array.isArray(result.entries) ? result.entries : [];
+      this._canManageCatalogue = result.permissions?.canManage === true;
       this._catalogueError = false;
-    } catch (_) { this._catalogueError = true; }
+    } catch (_) { this._catalogueError = true; this._canManageCatalogue = false; }
     finally {
       this._catalogueLoading = false;
+      this._syncCatalogueMode();
       const status = document.getElementById('seCatalogStatus');
       if (status) status.textContent = this._catalogueError ? 'הקטלוג המשותף אינו זמין כרגע; מוצגות צורות מובנות ושמורות במחשב.' : '';
       if (!document.getElementById('seCatalogPopup')?.hidden) this._renderCatalogue();
@@ -3911,22 +3802,25 @@ class ShapeEditorModal {
   }
 
   _catalogueEntries() {
+    const shared = (this._sharedShapes || []).map(entry => ({ code: entry.itemCode, name: entry.name, source: 'shared',
+      shape: { ...entry.definition, id: entry.id, name: entry.name, billingPolicy: entry.billingPolicy, catalogIdentity: this._catalogIdentity(entry) } }));
+    const overrides = new Map(shared.filter(e=>e.shape.builtinPresetId).map(e=>[e.shape.builtinPresetId,e]));
     return [
-      ...SHAPE_PRESETS.filter(p => !p.custom).map(p => ({ code: p.id, name: p.name, shape: p, source: 'builtin' })),
-      ...(this._sharedShapes || []).map(entry => ({ code: entry.itemCode, name: entry.name, source: 'shared',
-        shape: { ...entry.definition, id: entry.id, name: entry.name, billingPolicy: entry.billingPolicy, catalogIdentity: this._catalogIdentity(entry) } })),
-      ...loadSavedShapes().map(shape => ({ code: shape.id, name: shape.name, shape, source: 'local' })),
-    ];
+      ...SHAPE_PRESETS.filter(p => !p.custom).map(p => overrides.get(p.id) || ({ code: window.IronBendShapeCommercial?.BUILTIN_CODES[p.id], name: p.name, shape: p, source: 'builtin' })),
+      ...shared.filter(e=>!e.shape.builtinPresetId),
+      ...loadSavedShapes().map(shape => ({ code: shape.itemCode || '', name: shape.name, shape, source: 'local' })),
+    ].map(e=>({...e,code:/^[0-9]+$/.test(e.code)?e.code:''})).sort((a,b)=>a.code.localeCompare(b.code,undefined,{numeric:true}));
   }
 
   _selectCatalogueCode(rawCode) {
     const code = String(rawCode || '').trim().toLowerCase();
-    const entry = this._catalogueEntries().find(item => item.code.toLowerCase() === code);
+    const entry = /^[0-9]+$/.test(code) && this._catalogueEntries().find(item => item.code === code);
     if (!entry) {
-      document.getElementById('seCatalogStatus').textContent = this._catalogueLoading ? 'הקטלוג נטען, נסה שוב בעוד רגע' : 'קוד הצורה לא נמצא';
+      document.getElementById('seCatalogStatus').textContent = this._catalogueLoading ? 'הקטלוג נטען, נסה שוב בעוד רגע' : 'יש להזין מק״ט מספרי שקיים בקטלוג';
       return;
     }
     this._closeCatalogue();
+    this._blankNewEntry = false;
     if (entry.source === 'local') this._loadSavedShape(entry.shape);
     else this._loadPreset(entry.shape);
     this._focusSide(this._sideInputs()[0]);
@@ -3959,18 +3853,19 @@ class ShapeEditorModal {
       const button = document.createElement('button'); button.type = 'button';
       button.style.cssText = 'padding:8px;border:1px solid #d8e2ec;border-radius:6px;background:#fff;color:#1a2332;cursor:pointer;font:inherit;';
       const drawing = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      drawing.setAttribute('viewBox', '0 0 100 68'); drawing.setAttribute('width', '100'); drawing.setAttribute('height', '68');
+      drawing.setAttribute('viewBox', '0 0 300 260'); drawing.setAttribute('width', '100'); drawing.setAttribute('height', '68');
       // Render geometry only; user labels/codes are always assigned as text.
-      try { drawing.innerHTML = entry.source === 'builtin' ? shapePresetIconSVG(entry.shape.icon || 'straight') : ShapeEngineRouter.render(entry.shape, 100, 68); } catch (_) { /* Invalid legacy preview must not hide the catalogue. */ }
-      const text = document.createElement('div'); text.textContent = entry.code + ' · ' + entry.name;
+      try { drawing.innerHTML = shapeCataloguePreview(entry.shape); } catch (_) { /* Invalid legacy preview must not hide the catalogue. */ }
+      const text = document.createElement('div'); text.textContent = (entry.code ? entry.code + ' · ' : '') + entry.name;
       button.append(drawing, text);
       if (entry.source === 'local') { const note = document.createElement('small'); note.textContent = 'שמורה במחשב זה'; button.append(note); }
-      button.onclick = () => this._selectCatalogueCode(entry.code);
+      button.onclick = () => { if(entry.code) this._selectCatalogueCode(entry.code); else { this._closeCatalogue(); this._loadSavedShape(entry.shape); } };
       list.append(button);
     }
   }
 
   _newCatalogueShape() {
+    this._catalogueEditTarget = null;
     this._closeCatalogue(); this._hideSaveBar();
     this._blankNewEntry = false;
     this._loadPreset(SHAPE_PRESETS.find(p => p.custom));
@@ -3982,11 +3877,28 @@ class ShapeEditorModal {
 
   _syncCatalogueMode() {
     const code = document.getElementById('seItemCode');
-    if (code) code.value = this.current?.catalogIdentity?.itemCode || '';
+    if (code) { const identity=this.current?.catalogIdentity; code.value = identity?.source === 'builtin' ? window.IronBendShapeCommercial?.BUILTIN_CODES[identity.id] || '' : (/^[0-9]+$/.test(identity?.itemCode) ? identity.itemCode : ''); }
+    const edit = document.getElementById('seEditCatalogShape');
+    if(edit) edit.style.display = this._canManageCatalogue && this.current?.catalogIdentity && this._shapeMode === 'template' ? '' : 'none';
+    const save = document.getElementById('seSaveShapeBtn');
+    if(save) save.style.display = this._canManageCatalogue ? '' : 'none';
     const authoring = document.getElementById('seAuthoring3D');
     if (authoring) authoring.style.display = this._shapeMode === 'authoring' && normalizeShapeFamily(this.current || {}) === 'bars' ? '' : 'none';
     this._renderBillingControls();
     this._renderBillingBasis();
+  }
+
+  _editCatalogueShape() {
+    if(!this._canManageCatalogue || !this.current?.catalogIdentity)return;
+    const identity=this.current.catalogIdentity;
+    const entry=this._catalogueEntries().find(e=>e.shape.id===identity.id || e.shape.builtinPresetId===identity.id);
+    // Edit the current catalogue revision, never a historical order snapshot.
+    if(!entry){this._showToast('יש לבחור את הצורה מחדש מהקטלוג');return;}
+    this._blankNewEntry=false;
+    this._loadPreset(entry.shape);
+    this._catalogueEditTarget={...this.current.catalogIdentity};
+    this._shapeMode='authoring'; this._goToEdit();
+    this._showToast('עריכת צורה בקטלוג — השינוי יישמר רק בלחיצה על שמור צורה');
   }
 
   _currentBillingPolicy() {
@@ -4018,6 +3930,7 @@ class ShapeEditorModal {
     const commercial = window.IronBendShapeCommercial;
     if (!out || !commercial || !this.current) return;
     out.replaceChildren();
+    if(!this._canManageCatalogue || this._shapeMode !== 'authoring') return;
     const policy = this._currentBillingPolicy();
     const details = document.createElement('details');
     const heading = document.createElement('summary'); heading.textContent = 'הגדרת סעיפי חיוב'; details.append(heading);
@@ -4375,7 +4288,7 @@ class ShapeEditorModal {
     const cont = document.getElementById('sePresets');
     cont.innerHTML = shapes.map(s => {
       return '<button class="se-preset-btn" data-id="'+s.id+'" title="'+s.name+'" aria-label="'+s.name+'">'
-        + shapePresetIconSVG(s.icon || 'straight')
+        + '<svg viewBox="0 0 300 260" aria-hidden="true">'+shapeCataloguePreview(s)+'</svg>'
         + '<span class="se-preset-name">'+s.name+'</span>'
         + '</button>';
     }).join('');
@@ -4476,12 +4389,13 @@ class ShapeEditorModal {
   }
 
   _showSaveBar() {
+    if(!this._canManageCatalogue)return;
     document.getElementById('seFootNormal').style.display = 'none';
     const bar = document.getElementById('seFootSave');
     bar.style.display = 'flex';
     const inp = document.getElementById('seSaveNameInput');
     if (inp) { inp.value = this.current?.presetName || ''; inp.focus(); inp.select(); }
-    document.getElementById('seSaveCodeInput').value = this.current?.catalogIdentity?.source === 'shared' ? this.current.catalogIdentity.itemCode : '';
+    document.getElementById('seSaveCodeInput').value = this._catalogueEditTarget?.itemCode || (this.current?.catalogIdentity?.source === 'shared' ? this.current.catalogIdentity.itemCode : '');
     document.getElementById('seSaveError').textContent = '';
   }
 
@@ -4491,6 +4405,7 @@ class ShapeEditorModal {
   }
 
   async _doSave() {
+    if(!this._canManageCatalogue)return;
     if (!this.current) return;
     if (this._savingShape) return;
     const inp  = document.getElementById('seSaveNameInput');
@@ -4498,12 +4413,14 @@ class ShapeEditorModal {
     const itemCode = document.getElementById('seSaveCodeInput').value.trim();
     const error = document.getElementById('seSaveError');
     if (!name || !itemCode) { error.textContent = 'יש להזין שם ומספר צורה'; return; }
+    if(!/^[0-9]{1,40}$/.test(itemCode)){error.textContent='מק״ט חייב להכיל ספרות בלבד';return;}
     this._savingShape = true;
     error.textContent = 'שומר…';
     try {
-      const identity = this.current.catalogIdentity;
-      const updating = identity?.source === 'shared' && identity.itemCode === itemCode;
-      const response = await fetch('/api/shape-definitions' + (updating ? '/' + encodeURIComponent(identity.id) : ''), {
+      const identity = this._catalogueEditTarget || this.current.catalogIdentity;
+      const updating = !!this._catalogueEditTarget || (identity?.source === 'shared' && identity.itemCode === itemCode);
+      const target = updating ? (identity.source === 'builtin' ? '/builtin/' : '/') + encodeURIComponent(identity.id) : '';
+      const response = await fetch('/api/shape-definitions' + target, {
         method: updating ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, itemCode, definition: this.current, billingPolicy: this._currentBillingPolicy(), expectedVersion: updating ? identity.version : undefined }),
       });
@@ -4514,6 +4431,7 @@ class ShapeEditorModal {
       this.current.presetId = entry.id;
       this.current.billingPolicy = entry.billingPolicy;
       this.current.catalogIdentity = this._catalogIdentity(entry);
+      this._catalogueEditTarget = null;
       this._shapeMode = 'template';
       this._hideSaveBar();
       this._goToEdit();
@@ -4542,6 +4460,9 @@ class ShapeEditorModal {
   }
 
   _loadPreset(preset) {
+    this._catalogueEditTarget = null;
+    const override = !preset.catalogIdentity && (this._sharedShapes || []).find(e=>e.definition.builtinPresetId === preset.id);
+    if(override) preset={...override.definition,id:override.id,name:override.name,billingPolicy:override.billingPolicy,catalogIdentity:this._catalogIdentity(override)};
     this._shapeMode = preset.custom && !preset.catalogIdentity ? 'authoring' : 'template';
     const isBlankNewEntry = this._blankNewEntry === true;
     const sides = (Array.isArray(preset.sides) ? [...preset.sides] : [])
@@ -4558,7 +4479,7 @@ class ShapeEditorModal {
     this.current = {
       ...preset,
       billingPolicy: preset.billingPolicy || window.IronBendShapeCommercial?.defaultPolicy(preset),
-      catalogIdentity: preset.catalogIdentity || (preset.custom ? null : { source: 'builtin', id: preset.id, itemCode: preset.id, version: 1, name: preset.name }),
+      catalogIdentity: preset.catalogIdentity || (preset.custom ? null : { source: 'builtin', id: preset.id, itemCode: window.IronBendShapeCommercial?.BUILTIN_CODES[preset.id] || '', version: 1, name: preset.name }),
       presetId:    preset.id,
       presetName:  preset.name,
       presetEmoji: preset.emoji,
@@ -6340,6 +6261,11 @@ class ShapeEditorModal {
         elAngles:  has3D ? (elAngles || []) : [],
         activeSeg: this._activeSeg ?? -1,
       });
+      const projectedBounds=svg.getBBox?.();
+      if(projectedBounds?.width && projectedBounds?.height) {
+        const left=Math.min(0,projectedBounds.x-8),top=Math.min(0,projectedBounds.y-8);
+        svg.setAttribute('viewBox',`${left} ${top} ${Math.max(300,projectedBounds.x+projectedBounds.width+8)-left} ${Math.max(290,projectedBounds.y+projectedBounds.height+8)-top}`);
+      }
       this._bindSvgClicks(svg);
     } else {
       const _activeSeg2d = this._activeSeg ?? -1;
@@ -6370,34 +6296,13 @@ class ShapeEditorModal {
       const BAR_PX = Math.max(4, Math.min((this._diameter||12)*0.55, 14));
       const SEG_GRAY = '#3d5e78'; // dark steel-blue — visible on the light editor background
 
-      // Detect overlapping segments in 2D — same logic as 3D view for consistency.
-      const offsets2d = computeSegOffsets(pts, BAR_PX);
-      const hasOvlp2d = offsets2d.some(o => o !== 0);
-
-      // Compute per-vertex screen offset (weighted average of adjacent segment offsets)
-      const ptOff2d = pts.map((_, i) => {
-        let sum = 0, cnt = 0;
-        if (i > 0 && offsets2d[i - 1] !== 0) { sum += offsets2d[i - 1]; cnt++; }
-        if (i < offsets2d.length && offsets2d[i] !== 0) { sum += offsets2d[i]; cnt++; }
-        if (cnt === 0) return [0, 0];
-        const off = sum / cnt;
-        return [OVLP_DX * off, OVLP_DY * off];
+      // Preserve the actual bend walk. Coincidence is shown by labels, not
+      // diagonal vertex shifts that change angles or produce fake tails.
+      const overlaps = window.IronBendDisplayUnits?.overlappingSegments(pts) || [];
+      const segs = pts.slice(0,-1).map(([x1,y1],i) => {
+        const [x2,y2]=pts[i+1],len=Math.hypot(x2-x1,y2-y1)||1;
+        return {x1,y1,x2,y2,nx:-(y2-y1)/len,ny:(x2-x1)/len};
       });
-
-      // Build offset segments (used for body rendering, labels & arrows)
-      const segs = [];
-      for (let i = 0; i < pts.length - 1; i++) {
-        const [x1,y1] = pts[i], [x2,y2] = pts[i+1];
-        const dx = x2-x1, dy = y2-y1, len = Math.sqrt(dx*dx+dy*dy)||1;
-        const nx = -dy/len, ny = dx/len;
-        const [ox1,oy1] = ptOff2d[i];
-        const [ox2,oy2] = ptOff2d[i + 1];
-        segs.push({
-          x1: x1 + ox1, y1: y1 + oy1,
-          x2: x2 + ox2, y2: y2 + oy2,
-          nx, ny
-        });
-      }
 
       // Arrow marker helper
       const arrowHead = (x1,y1,x2,y2,color,size=7) => {
@@ -6411,7 +6316,7 @@ class ShapeEditorModal {
 
       let html = '';
 
-      // ── Bar body — always drawn from segs (which incorporate any overlap offset) ──
+      // Bar body keeps the unmodified source coordinates.
       {
         // Draw each visible side exactly once. Active side is a color replacement,
         // not an overlay, so it cannot look thicker than the bar.
@@ -6438,6 +6343,9 @@ class ShapeEditorModal {
           data-seg-click="${i}" style="cursor:pointer"/>`;
       }
 
+      const overlappingIds = new Set(overlaps.flat());
+      const dimensionTexts = sides.map((side,i)=>(overlappingIds.has(i) ? String.fromCharCode(65+i)+' · ' : '')+formatLengthCmFromMm(side));
+      const dimensionPositions = window.IronBendDisplayUnits?.diagramDimensionPositions(pts,dimensionTexts,24,{rotated:true,width:dimensionTagWidth,height:16});
       // Dimension tags: small white windows aligned with each side.
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
@@ -6445,10 +6353,10 @@ class ShapeEditorModal {
         const stroke = isAct ? '#ff4047' : '#9aa3b2';
         const fill = isAct ? '#fff4f4' : '#ffffff';
         const mx=(s.x1+s.x2)/2, my=(s.y1+s.y2)/2;
-        const lx=mx+s.nx*24, ly=my+s.ny*24;
+        const lx=dimensionPositions?.[i]?.x ?? mx+s.nx*24, ly=dimensionPositions?.[i]?.y ?? my+s.ny*24;
         const rawAngle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1) * 180 / Math.PI;
         const labelAngle = normalizeReadableLabelAngle(rawAngle);
-        const value = formatLengthCmFromMm(sides[i]);
+        const value = dimensionTexts[i];
         const tagW = dimensionTagWidth(value);
         html += `<g data-se-focus="bar-side-${i}" transform="translate(${lx.toFixed(1)} ${ly.toFixed(1)}) rotate(${labelAngle.toFixed(1)})"
             data-seg-click="${i}" style="cursor:pointer">
@@ -6507,7 +6415,17 @@ class ShapeEditorModal {
         }
       }
 
+      if(overlaps.length) {
+        const bottom = Math.max(260,...(dimensionPositions||[]).map(p=>p.box.bottom));
+        html += `<text data-overlap-note="1" x="150" y="${bottom+25}" text-anchor="middle" font-size="9" fill="#526070">צלעות חופפות: ${overlaps.map(pair => pair.map(i => String.fromCharCode(65+i)).join(' / ')).join(', ')}</text>`;
+      }
       svg.innerHTML = html;
+      // Fit labels as well as the bar; changing the viewport never changes geometry.
+      const bounds = svg.getBBox?.();
+      if(bounds?.width && bounds?.height) {
+        const left=Math.min(0,bounds.x-8),top=Math.min(0,bounds.y-8);
+        svg.setAttribute('viewBox',`${left} ${top} ${Math.max(300,bounds.x+bounds.width+8)-left} ${Math.max(290,bounds.y+bounds.height+8)-top}`);
+      }
       this._applyFamilyFocus(svg);
       this._bindSvgClicks(svg);
     }
@@ -6518,7 +6436,8 @@ class ShapeEditorModal {
   _confirm() {
     if (!this.current || !this.onSelect) return;
     const enteredCode = document.getElementById('seItemCode')?.value.trim() || '';
-    const selectedCode = String(this.current.catalogIdentity?.itemCode || '');
+    const identity=this.current.catalogIdentity;
+    const selectedCode = identity?.source === 'builtin' ? window.IronBendShapeCommercial?.BUILTIN_CODES[identity.id] || '' : (/^[0-9]+$/.test(identity?.itemCode) ? identity.itemCode : '');
     if (enteredCode.toLowerCase() !== selectedCode.toLowerCase()) {
       document.getElementById('seCatalogStatus').textContent = 'יש לאשר את קוד הפריט באמצעות Enter או לבחור צורה מהחץ';
       document.getElementById('seItemCode').focus();
