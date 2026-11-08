@@ -171,3 +171,7 @@ See `inventory-accounting-20261108.md` for quantities, cutoff and replay contrac
 ## Item status correction (2026-10-21)
 
 `GET /api/items/:id/status-correction-preview` belongs to Production; production/kiosk/warehouse/office/manager/admin can inspect. `PATCH /api/items/:id/status` accepts a stale-state preview and an explicit unshipped-certificate cancellation mode, restricted to office/manager/admin. See [contract](item-status-correction.md).
+<!-- Procurement draft supplier units, 2026-11-08: POST /api/procurement/purchase-draft/export
+accepts explicit per-line purchase_unit (coil/bundle/sheet/kg), unit_weight_kg and optional
+shortage_kg. Edited quantity/unit are exported directly; estimated_weight_kg is computed
+on the server. Omitting purchase_unit retains legacy kg/sheet semantics. No DB writes. -->
