@@ -9,15 +9,14 @@ const vm = require('node:vm');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('each order document has a neighbouring PDF send action with email and WhatsApp handoff', () => {
+test('order detail has only document actions; file sharing stays inside documents', () => {
   const orders = read('public/orders.html');
   const printLoader = read('public/order-print.html');
   const route = read('routes/orders.js');
 
-  for (const documentKey of ['print-cards', 'delivery-certificate']) {
-    assert.match(orders, new RegExp(`openSendFile\\(event,\\$\\{o\\.id\\},'${documentKey}'\\)`));
-  }
-  assert.match(orders, /openA4PrintDialog\(\$\{o\.id\},'send'\)/);
+  const prints = orders.match(/const prints = (`[\s\S]*?`);/)[1];
+  assert.doesNotMatch(prints, /send-file-btn|שלח קובץ|openSendFile/);
+  assert.match(prints, /openA4PrintDialog\(\$\{o\.id\}\)/);
   assert.match(orders, /id="sendFileOverlay"/);
   assert.match(orders, /openPdfForSending\(\)/);
   assert.match(orders, /openWhatsAppForSending\(\)/);
@@ -124,9 +123,9 @@ function loadDocumentSending() {
 }
 
 for (const language of ['he', 'th']) {
-  test(`A4 ${language} send button preserves order and language through PDF, email, WhatsApp and filename`, async () => {
+  test(`A4 ${language} legacy send helper preserves order and language through PDF, email, WhatsApp and filename`, async () => {
     const client = loadDocumentSending();
-    client.click(client.context.printButtons, /openA4PrintDialog\(41,'send'\)/);
+    client.run("openA4PrintDialog(41,'send')");
     const dialog = client.nodes.get('a4PrintDialog');
     assert.match(dialog.innerHTML, /שליחת גיליון הזמנה/);
     client.click(dialog.innerHTML, new RegExp(`'${language}', 'send'`));
@@ -180,7 +179,7 @@ for (const language of ['he', 'th']) {
 
 test('cancelling A4 send language selection does not open a document or send panel', () => {
   const client = loadDocumentSending();
-  client.click(client.context.printButtons, /openA4PrintDialog\(41,'send'\)/);
+  client.run("openA4PrintDialog(41,'send')");
   client.click(client.nodes.get('a4PrintDialog').innerHTML, /closePrintDialog/);
   assert.equal(client.nodes.has('a4PrintDialog'), false);
   assert.equal(client.opened.length, 0);
@@ -190,7 +189,7 @@ test('cancelling A4 send language selection does not open a document or send pan
 test('changing the A4 send language replaces the previous document selection', () => {
   const client = loadDocumentSending();
   for (const language of ['th', 'he']) {
-    client.click(client.context.printButtons, /openA4PrintDialog\(41,'send'\)/);
+    client.run("openA4PrintDialog(41,'send')");
     client.click(client.nodes.get('a4PrintDialog').innerHTML, new RegExp(`'${language}', 'send'`));
     client.run('openPdfForSending()');
     const url = new URL(client.opened.at(-1)[0], 'http://localhost');

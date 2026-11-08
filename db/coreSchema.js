@@ -1997,6 +1997,7 @@ function ensureCoreSchema(db) {
   ensureFinanceSchema(db);
   ensureBugReportSchema(db);
   ensureOrderWorkspaceSchema(db);
+  require('./orderOperationsSchema').ensureOperationSchema(db);
 }
 
 module.exports = {

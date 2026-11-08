@@ -250,6 +250,23 @@ module.exports = function createOrdersRouter(deps) {
   const cancellations = createOrderCancellationService(db);
   const historicalReconciliations = createHistoricalProductionReconciliationService(db);
   const workspace = createOrderWorkspaceService({ db });
+  const operations = require('../services/orderOperations').createOrderOperations({db,createOrderFromPayload});
+  const opActor=req=>({id:req.userId||req.auth?.sub,name:req.auth?.display_name||req.auth?.username||String(req.userId)});
+  const opRun=fn=>(req,res)=>{try{fn(req,res);}catch(e){if(!e.statusCode)console.error('[OrderOperations]',e.message);res.status(e.statusCode||500).json({error:e.statusCode?e.message:'הפעולה נכשלה; לא נשמרה פעולה חלקית'});}};
+  const opLimiter=rateLimit({windowMs:60000,limit:40,standardHeaders:true,legacyHeaders:false});
+  router.get('/operations/capabilities',requireAnyRole(['office','manager','admin']),(_req,res)=>res.json({version:1,authentication:'Existing user Bearer JWT; no new agent credentials are provisioned',order_drafts:'/api/operations/order-drafts',delivery_preview:'/api/operations/delivery-preview',delivery_issue:'/api/operations/delivery-notes',spreadsheet_preview:'/api/order-imports/preview',spreadsheet_approve:'/api/order-imports/:id/approve',image_intake:'/api/intake/image',text_intake:'/api/intake/parse-text',approval_required:true,ui:'/order-operations.html'}));
+  router.get('/operations/orders',requireAnyRole(['office','warehouse','manager','admin']),opRun((_req,res)=>res.json({orders:db.prepare('SELECT o.id,o.order_num,o.customer_id,o.status,o.delivery_address,o.company_id,c.name customer_name FROM orders o LEFT JOIN customers c ON c.id=o.customer_id WHERE o.deleted_at IS NULL ORDER BY o.id DESC LIMIT 2000').all()})));
+  router.get('/operations/order-drafts',requireAnyRole(['office','manager','admin']),opRun((_req,res)=>res.json({drafts:operations.listDrafts()})));
+  router.get('/operations/order-drafts/:id',requireAnyRole(['office','manager','admin']),opRun((req,res)=>res.json(operations.draft(req.params.id,opActor(req)))));
+  router.post('/operations/order-drafts',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>res.status(201).json(operations.saveDraft(req.body,opActor(req)))));
+  router.patch('/operations/order-drafts/:id',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>res.json(operations.saveDraft(req.body,opActor(req),req.params.id))));
+  router.post('/operations/order-drafts/:id/approve',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>{const result=operations.approveDraft(req.params.id,req.body,opActor(req));if(!result.replay)wsBroadcast('new_order',result);res.json(result);}));
+  router.post('/operations/delivery-preview',requireAnyRole(['office','warehouse','manager','admin']),opRun((req,res)=>res.json(operations.selection(req.body))));
+  router.post('/operations/delivery-notes',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>{const result=operations.issue(req.body,opActor(req));wsBroadcast('order_updated',{order_ids:result.orders.map(o=>o.id)});res.status(result.replay?200:201).json(result);}));
+  router.get('/operations/delivery-notes/:id',requireAnyRole(['office','warehouse','driver','manager','admin']),opRun((req,res)=>res.json(operations.readNote(req.params.id))));
+  router.get('/operations/delivery-notes/:id/print',requireAnyRole(['office','warehouse','driver','manager','admin']),opRun((req,res)=>{res.set('Cache-Control','no-store');res.type('html').send(require('../services/consolidatedDeliveryPrint').renderConsolidatedDelivery(operations.readNote(req.params.id)));}));
+  router.get('/operations/delivery-notes/:id/cancel-preview',requireAnyRole(['office','manager','admin']),opRun((req,res)=>res.json(operations.cancelPreview(req.params.id))));
+  router.post('/operations/delivery-notes/:id/cancel',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>res.json(operations.cancel(req.params.id,req.body,opActor(req)))));
   const purgeLimiter = rateLimit({ windowMs:15*60000, limit:5, standardHeaders:true, legacyHeaders:false });
   const workspaceActor = req => ({id:req.auth.sub,name:String(req.auth.display_name || req.auth.username || req.auth.sub)});
   function workspaceAction(action) { return (req,res) => { try {
@@ -1271,12 +1288,14 @@ module.exports.manifest = {
     { id: 'orders',    path: '/orders.html', label: 'הזמנות',     icon: '📋', group: 'ראשי' },
     { id: 'order-quotes', path: '/orders.html?view=quotes', label: 'הצעות מחיר', icon: '💬', group: 'ראשי' },
     { id: 'new-order', path: '/index.html',  label: 'הזמנה חדשה', icon: '➕', group: 'ראשי' },
+    { id: 'order-operations',path:'/order-operations.html',label:'קליטה ומשלוח מאוחד',icon:'📑',group:'ראשי' },
   ],
   access: {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'edit', warehouse: 'edit', finance: 'read', production: 'read', sales: 'read' },
   },
   consumes: [
+    { table: 'direct_order_drafts' }, { table: 'consolidated_delivery_operations' }, { table: 'delivery_notes' }, { table: 'delivery_note_orders' },
     { table: 'customers' }, { table: 'orders' }, { table: 'order_quotes' }, { table: 'items' }, { table: 'production_output_events' },
     { table: 'historical_production_reconciliation_transactions' }, { table: 'historical_production_reconciliation_items' },
   ],

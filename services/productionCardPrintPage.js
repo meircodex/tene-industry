@@ -346,14 +346,14 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
 .pc-screen-tools button:hover{background:#c9621a;}
 .pc-split-state{display:inline-flex;align-items:center;border-radius:5px;background:#fff3d7;border:1px solid #ffd6a0;color:#8a4b00;padding:3px 6px;font-size:10px;font-weight:900;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,0.12);}
 .pc-print-face{display:grid;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;padding-block:7.5mm;background:#fff;direction:ltr;}
-.pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
-.pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:13.5px;font-weight:900;line-height:1;background:#fff;color:#000;border:0!important;}
+.pc-print-main{display:grid;grid-template-rows:8mm 9mm minmax(0,1fr) 8mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
+.pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:1mm 3mm;font-size:12.5px;font-weight:900;line-height:1;background:#fff;color:#000;border:0!important;}
 .pc-print-head-meta{display:flex;align-items:center;justify-content:flex-end;gap:2.5mm;min-width:0;flex:1;}
-.pc-print-customer{min-width:0;font-size:12px;font-weight:900;line-height:1.1;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pc-print-diameter{font-size:13.5px;font-weight:900;white-space:nowrap;}
-.pc-print-ref{min-height:11mm;padding:1.25mm 3mm;font-size:12.5px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
-.pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
-.pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
+.pc-print-customer{min-width:0;font-size:11.5px;font-weight:900;line-height:1.1;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pc-print-diameter{font-size:12.5px;font-weight:900;white-space:nowrap;}
+.pc-print-ref{min-height:9mm;padding:.5mm 3mm;font-size:11px;font-weight:900;line-height:1.1;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
+.pc-print-shape{display:flex;align-items:center;justify-content:center;padding:.5mm 2mm;overflow:hidden;}
+.pc-print-shape svg{width:100%!important;height:100%!important;max-width:72mm!important;max-height:29mm!important;}
 .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;font-size:11px;font-weight:900;text-align:center;border:0!important;}
 .pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border:0!important;}
 .pc-print-bottom span:first-child{border-left:0;}
@@ -448,14 +448,14 @@ body{font-family:'Heebo',Arial,sans-serif;background:#e8e8e8;padding:16px;direct
   .pc-screen-tools{display:none!important;}
   .prod-card>:not(.pc-print-face){display:none!important;}
   .pc-print-face{display:grid!important;grid-template-columns:minmax(0,1fr) 27mm;width:100%;height:100%;padding-block:7.5mm!important;background:#fff;direction:ltr;}
-  .pc-print-main{display:grid;grid-template-rows:11mm minmax(11mm,auto) minmax(0,1fr) 18.25mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
-  .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:2mm 3mm;font-size:14px;font-weight:900;line-height:1;background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:0!important;}
-  .pc-print-customer{font-size:12.5px!important;}
-  .pc-print-diameter{font-size:14px!important;}
-  .pc-print-ref{min-height:11mm;padding:1.25mm 3mm;font-size:13px;font-weight:900;line-height:1.25;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
-  .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:1.5mm 3mm;overflow:hidden;}
-  .pc-print-shape svg{max-width:72mm!important;max-height:35mm!important;}
-  .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;font-size:13px;font-weight:900;text-align:center;border:0!important;}
+  .pc-print-main{display:grid;grid-template-rows:8mm 9mm minmax(0,1fr) 8mm;width:100%;height:100%;overflow:hidden;direction:ltr;border:0!important;}
+  .pc-print-head{display:flex;align-items:center;justify-content:space-between;gap:2.5mm;padding:1mm 3mm;font-size:12.5px;font-weight:900;line-height:1;background:#fff!important;color:#000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;border:0!important;}
+  .pc-print-customer{font-size:11.5px!important;}
+  .pc-print-diameter{font-size:12.5px!important;}
+  .pc-print-ref{min-height:9mm;padding:.5mm 3mm;font-size:11px;font-weight:900;line-height:1.1;white-space:normal;overflow:visible;overflow-wrap:anywhere;direction:rtl;text-align:right;display:flex;align-items:center;border:0!important;}
+  .pc-print-shape{display:flex;align-items:center;justify-content:center;padding:.5mm 2mm;overflow:hidden;}
+  .pc-print-shape svg{width:100%!important;height:100%!important;max-width:72mm!important;max-height:29mm!important;}
+  .pc-print-bottom{display:grid;grid-template-columns:1fr 1fr;align-items:center;font-size:11px;font-weight:900;text-align:center;border:0!important;}
   .pc-print-bottom span{height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;border:0!important;}
   .pc-print-bottom span:first-child{border-left:0;}
   .pc-print-qr-panel{display:grid;align-items:center;justify-items:center;width:27mm;height:100%;overflow:hidden;background:transparent!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}

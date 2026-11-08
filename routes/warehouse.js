@@ -1338,6 +1338,7 @@ module.exports = function createWarehouseRouter(deps) {
   // the package snapshot frozen at departure, so a later truck cannot change
   // an earlier delivery note by loading the rest of the order.
   router.get('/delivery-notes/:id/print', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
+    if(db.prepare('SELECT 1 FROM consolidated_delivery_operations WHERE note_id=?').get(req.params.id))return res.redirect('/api/operations/delivery-notes/'+req.params.id+'/print');
     const cancelled=db.prepare('SELECT 1 FROM delivery_note_cancellations WHERE note_id=?').get(req.params.id);
     const note = db.prepare(`
       SELECT dn.*,o.delivery_address,c.name AS customer_name,c.phone AS customer_phone
