@@ -3820,6 +3820,7 @@ class ShapeEditorModal {
       return;
     }
     this._closeCatalogue();
+    document.getElementById('seCatalogStatus').textContent = '';
     this._blankNewEntry = false;
     if (entry.source === 'local') this._loadSavedShape(entry.shape);
     else this._loadPreset(entry.shape);
