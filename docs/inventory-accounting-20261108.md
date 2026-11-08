@@ -26,8 +26,8 @@ Procurement owns purchase orders. No supplier management moves into Inventory.
 ## Data and release
 
 D3 semantics for new order reservations, additive D2 schema. Implement in an isolated
-branch; no production data writes or deployment in this task. Before release: verified
-backup, full test suite, staged count/receipt/order/completion cycle and data audit.
+branch. Production deployment authorized by the owner on 2026-11-08.
+Release verification is recorded below; operational test writes use isolated copies only.
 Rollback code together with its callers; retain the additive schema and ledger.
 Do not roll back to code that ignores count adjustments after any real count is posted.
 
@@ -106,3 +106,31 @@ Isolated review server: `http://127.0.0.1:4601/inventory.html`, backed exclusive
 Screenshots: `docs/mockups/inventory-regular-style.png`,
 `inventory-regular-purchase.png`, `inventory-regular-mobile.png`. The old standalone
 mockup remains research history; `public/inventory.html` is the implementation.
+
+
+## Production release preparation — 2026-11-08
+
+- Rebased both inventory commits onto the verified live `a48c43f` main revision;
+  retained all intervening production/customer/order changes.
+- Downloaded the live database through the existing administrator session. SHA-256:
+  `15641e467eba732502514b5891d97a7f30226a178169842919fc277a3202fb64`.
+  Backup and staging copy remain outside version control in `tmp/deployment-20261108/`.
+- Verified live Render `DB_PATH=/data/ironbend.db`, persistent disk mounted at `/data`.
+  Set `ALLOW_EMPTY_DB_INIT=false` to refuse accidental empty database initialization.
+- Applied the additive schema twice to the downloaded copy: integrity `ok`, zero
+  foreign-key violations, original counts unchanged (110 orders, 1658 items,
+  110 pallets, 3 raw-material lots, 152 usage rows, 1524 reservations, 272 purchases).
+  Receipt/use/scrap counters unchanged; all 1524 old reservations retain legacy mode.
+- Staged a new reservation → actual completion → replay, count → replay, mesh
+  receipt → approval → replay and edited CSV export against that migrated copy.
+  All passed; synthetic business operations were rolled back.
+- Historical reconciliation remains advisory: 152 ambiguous historical consumption
+  diagnostics, 1098 consumed reservations without a usage link, and other existing
+  allocation/counter mismatches. No historical deduction/rewrite was performed.
+- Integrated full suite: 1142 tests, 1141 pass. One pre-existing print-layout literal
+  assertion fails in `test/order-document-send-ui.test.js:61`; both that test and
+  `services/productionCardPrintPage.js` match live main byte-for-byte. All inventory,
+  route authorization, accounting, client and governance tests pass.
+- Rollback before real count use can retain the additive columns. After real count
+  adjustments, any emergency code rollback must preserve materialBalance support;
+  returning blindly to a version that ignores count adjustments is unsafe.

@@ -69,7 +69,7 @@ function liftPackageOrderMetrics(item = {}) {
   return { snapshot, weighedKg, barLengthMm, weightPerUnit: weighedKg / packages };
 }
 
-function createOrderFactory(db, { generateOrderNum, industry, settingsService = null }) {
+function createOrderFactory(db, { generateOrderNum, industry }) {
   if (!db) throw new Error('services/orders missing dependency: db');
   if (!generateOrderNum) throw new Error('services/orders missing dependency: generateOrderNum');
   if (!industry) throw new Error('services/orders missing dependency: industry');
