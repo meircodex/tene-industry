@@ -90,7 +90,7 @@ Inventory count and daily purchase planning contracts (2026-11-08):
 `/api/inventory/mesh*` owns exact-spec sheet stock, pending receipts and sheet counts;
 `/api/inventory/consumption/retry` is manager/admin-only for completed items.
 `/api/procurement/plan` is read-only planning; `/api/procurement/purchase-draft/export`
-is office/manager/admin CSV export and does not create a purchase order or stock.
+is warehouse/office/manager/admin CSV export and does not create a purchase order or stock.
 See `inventory-accounting-20261108.md` for quantities, cutoff and replay contracts.
 
 | Route Family | Module | Expected Security | Current Concern |

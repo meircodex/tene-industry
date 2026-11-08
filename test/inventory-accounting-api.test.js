@@ -21,7 +21,7 @@ test('count approval, stock immutability and purchase export enforce roles and p
     const summary=await (await request('/inventory/summary','GET','warehouse')).json();assert.equal(summary[0].available,800);
     assert.equal((await request('/inventory/1','PATCH','manager',{weight_received:800})).status,409);
     const exportBody={lines:[{material_type:'coil',diameter:12,quantity:1234}]};
-    assert.equal((await request('/procurement/purchase-draft/export','POST','warehouse',exportBody)).status,403);
+    assert.equal((await request('/procurement/purchase-draft/export','POST','production',exportBody)).status,403);
     const result=await request('/procurement/purchase-draft/export','POST','manager',exportBody);assert.equal(result.status,200);assert.match(result.headers.get('content-type'),/text\/csv/);assert.match(await result.text(),/1234/);
     assert.equal((await request('/procurement/plan','GET','warehouse')).status,200);assert.ok(events.some(([name])=>name==='inventory_changed'));
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}

@@ -54,7 +54,7 @@ module.exports = function createProcurementRouter(deps) {
     res.json({ id: r.lastInsertRowid });
   });
 
-  router.post('/procurement/purchase-draft/export', requireAnyRole(['office', 'manager', 'admin']), (req,res) => {
+  router.post('/procurement/purchase-draft/export', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
     try {
       const result=require('../services/purchaseDraftExport').exportPurchaseDraft(db,req.body);
       res.setHeader('Content-Type','text/csv; charset=utf-8');

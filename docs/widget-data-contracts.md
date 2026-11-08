@@ -84,7 +84,7 @@ After dashboard KPIs, extend contracts to:
 
 `itemStatusCorrection` in `public/data-contracts-client.js` owns the orders dialog shipment explanation. The preview is authoritative for linked certificates, documented quantities and every affected line; only explicit cancellation releases document quantities. Work status never erases production or physical shipment history.
 
-## Inventory daily view (pending approved UI integration, 2026-11-08)
+## Inventory daily view (2026-11-08)
 
 Inventory owns the display. `/api/procurement/plan` supplies kg groups with
 `physical_stock_kg`, `backlog_kg`, `incoming_kg`, `recommended_purchase_kg`,

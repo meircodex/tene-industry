@@ -46,7 +46,7 @@ also filter. The draft is created from currently displayed shortages, is editabl
 CSV for Excel. Export does not place an order or change inventory. Strings are escaped
 against spreadsheet formula execution.
 
-## Implemented API contracts (pending UI approval and release)
+## Implemented API contracts (local implementation; not deployed)
 
 - `POST /api/inventory/stocktakes/preview`: warehouse/manager/admin; read-only token.
 - `POST /api/inventory/stocktakes`: manager/admin; idempotent audited adjustment.
@@ -58,7 +58,7 @@ against spreadsheet formula execution.
 - `POST /api/inventory/mesh/stocktakes/preview` and `/stocktakes`: revision-protected
   sheet count; warehouse can preview and managers can approve.
 - `GET /api/procurement/plan`: combined kg demand and separate `mesh_groups` in units.
-- `POST /api/procurement/purchase-draft/export`: office/manager/admin, no writes.
+- `POST /api/procurement/purchase-draft/export`: warehouse/office/manager/admin, no writes.
 
 Earlier kg counts require `post_count_net_kg`, `post_count_reconciled: true` and a
 reconciliation note per line. Positive net means stock added after observation;
@@ -82,9 +82,27 @@ historical reconciliation, completion retries/alerts, split kg/sheets, incompati
 mesh specs, confirmed incoming, editable CSV and permissions. Full suite: 753/754
 passed at the last full run. The remaining existing `shape-geometry` preview test
 expects `pad = 16`; both that test and `public/index.html` are unchanged from HEAD
-and the focused test also fails on those unchanged files. No UI source has been
-replaced, no deployment was performed, and no real inventory database was opened.
+and the focused test also fails on those unchanged files. The existing inventory screen now uses its normal theme and components with sortable headings, a purchase-draft modal, separate count and receiving tabs. No deployment was performed, and no real inventory database was opened.
 
-Before deployment, approve and connect the final UI, inspect existing reservation
+The user directed that the normal application styling be preserved, with clickable headings and an editable purchase-order window; this is implemented.
+
+Before deployment, inspect existing reservation
 ambiguities using reconciliation reports, back up and stage a representative full
 cycle. Do not treat this branch as a production release while those gates remain.
+
+
+## Browser verification of integrated screen
+
+Isolated review server: `http://127.0.0.1:4601/inventory.html`, backed exclusively by
+`tmp/inventory-review-20261108/review.db`. Verified in the browser:
+- ascending/descending sorting and existing application theme;
+- purchase draft populated with shortages, quantity edited 5000 → 5250, downloaded
+  CSV contains 5250 and preserves sheets as units;
+- count 5000 → 4900 posts -100 without changing the received-weight history;
+- receipt of 10 sheets remains pending until approval, then stock 80 → 90 and
+  shortage 30 → 20;
+- desktop and phone layout; no browser console errors.
+
+Screenshots: `docs/mockups/inventory-regular-style.png`,
+`inventory-regular-purchase.png`, `inventory-regular-mobile.png`. The old standalone
+mockup remains research history; `public/inventory.html` is the implementation.

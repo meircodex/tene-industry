@@ -60,7 +60,7 @@ Inventory accounting additions: stocktake preview = warehouse/manager/admin;
 stocktake approval and consumption retry = manager/admin; count history and mesh
 stock = warehouse/office/manager/admin. Mesh receipt creation = warehouse/manager/admin;
 approval = manager/admin. Purchase plan = warehouse/office/finance/manager/admin;
-editable purchase-draft export = office/manager/admin. All use the existing JWT role
+editable purchase-draft export = warehouse/office/manager/admin. All use the existing JWT role
 guard, never browser-supplied role headers.
 
 Use the original permission matrix roles as the product baseline until the role reconciliation decision is complete:
