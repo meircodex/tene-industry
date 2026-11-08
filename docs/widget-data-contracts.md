@@ -1,5 +1,16 @@
 # Widget Data Contracts
 
+## Shape catalogue and billing bases — 2026-11-08
+
+Owner: Orders. Definition: `shapeCatalogueBilling` in `public/data-contracts-client.js`.
+
+- The code field selects on Enter. Focus, typing and ArrowDown do not open the catalogue. Only the adjacent arrow button opens a fixed-position floating panel. Escape, outside click and selection close it without moving the editor layout.
+- Built-in and saved bar templates expose exactly their configured side count; Enter/Tab go through lengths, diameter and quantity. Geometry stays proportional. New shape mode retains add-side/angle and real 3D authoring.
+- `seBillingBasis` resolves material by ribbed/smooth steel, processing by total item kg and additions by item quantity. Lifts use whole-line weighed kg without multiplying by package quantity. Expanded settings allow explicit cutting conditions and processing/unit choices. Saving a shared definition requires its name and unique code.
+- Approved snapshot stores the exact policy and catalogue revision. Orders, the order summary, A4 and delivery certificate read the saved policy. Renaming a hoop does not turn it into a chair. Changing catalogue defaults affects future selections, not prior order snapshots.
+- Charge bases contain no monetary amounts. Delivery certificate remains price-free. Existing pricer reports `pricingScope: material_only`; mapping all processing lines to monetary tariffs is separate work.
+- The internal catalogue API requires staff authentication. In the customer portal or during a connection failure the editor reports shared-catalogue unavailability; built-in and explicitly labelled device-local legacy choices remain usable. Failed server save is never reported as shared success.
+
 Every KPI, icon, badge, chart, and operational widget that displays business
 data must have a data contract.
 

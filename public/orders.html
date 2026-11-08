@@ -24,7 +24,8 @@
 <script src="/straight-stock-cutting.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=83"></script>
+<script src="/shapeCommercial.js?v=1"></script>
+<script src="/shape-editor.js?v=84"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -3288,6 +3289,10 @@ function orderShapeDataFromItem(item) {
   return {
     sides,
     angles,
+    billingPolicy: snapshot.billingPolicy,
+    catalogIdentity: snapshot.catalogIdentity,
+    shapeId: snapshot.shapeId,
+    steelFinish: snapshotData.steelFinish || snapshotData.steel_finish || item?.steel_finish || 'ribbed',
     shapeName: snapshot.displayName || snapshot.shapeName || item?.shape_name || '\u05d9\u05e9\u05e8',
     presetName: snapshot.displayName || snapshot.shapeName || item?.shape_name || '\u05d9\u05e9\u05e8',
     presetId: snapshot.shapeId || snapshot.shape_id || item?.shape_id || null,

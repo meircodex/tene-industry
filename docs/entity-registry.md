@@ -1,5 +1,13 @@
 # Entity Registry
 
+## Shared shape catalogue extension — 2026-11-08
+
+Owner: Orders / Catalog. Additive D2 columns on `shapes`: `item_code` (unique, case-insensitive text; leading zeros retained), `definition_json` (complete editor family payload), `billing_json` (policy version 1), `definition_version` (optimistic update counter). Null definition marks legacy rows; no automatic conversion or deletion occurs. Quantity, order identity and element name are excluded from a reusable definition.
+
+Order `shape_snapshot_json` optionally carries `catalogIdentity:{source,id,itemCode,name,version}` and `billingPolicy:{version:1,lines,cuttingMode}`. The snapshot owns the policy used by that order, independently of later catalogue revisions. Unchanged historical records without policy retain legacy classification. The pure rules live in `modules/steel-rebar/shape-commercial.js`.
+
+There is exactly one material/finished-product kg basis per policy. Cutting/bending kg and unit additions overlap commercially without adding their kg again to material/shipment weight. Smooth steel resolves to a separate material row. The existing monetary pricer still calculates material prices; policy exposes charge quantities and does not invent processing rates.
+
 Source-of-truth registry required by Volume 10. Current entities are inferred
 from SQLite table creation in `server.js` and `auth-core.js`. This registry is
 the first planning-level ownership map; it is not yet a full schema dictionary.

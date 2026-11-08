@@ -347,7 +347,8 @@ body[data-page="intake"] #seOverlay{z-index:980}
 <script src="/rebar-weights.js"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=83"></script>
+<script src="/shapeCommercial.js?v=1"></script>
+<script src="/shape-editor.js?v=84"></script>
 <script src="/shape-renderer.js?v=4"></script>
 <script src="/nav.js"></script>
 
@@ -1609,6 +1610,9 @@ function openOcrShapeEditor(index) {
   if (!editor) return toast('\u05e2\u05d5\u05e8\u05da \u05d4\u05e6\u05d5\u05e8\u05d4 \u05dc\u05d0 \u05e0\u05d8\u05e2\u05df', true);
   const { sides, angles } = itemSidesAngles(item);
   editor.open({
+    billingPolicy: item.shapeSnapshot?.billingPolicy,
+    catalogIdentity: item.shapeSnapshot?.catalogIdentity,
+    steelFinish: item.shapeSnapshot?.data?.steelFinish || item.steelFinish,
     presetId: item.shape_id || item.shapeId || item.presetId || null,
     presetName: item.shape_name || item.shapeName || item.shape || item.type || '\u05e6\u05d5\u05e8\u05d4 \u05de\u05d5\u05ea\u05d0\u05de\u05ea',
     sides: sides.length ? sides : [1000],
@@ -1656,6 +1660,14 @@ function shapeSelectedFromIntake(data) {
   }
   if (activeOcrShapeIndex === null) return;
   const index = activeOcrShapeIndex;
+  if (activeCompareOriginal?.items?.[index]) {
+    activeCompareOriginal.items[index].shapeSnapshot = Number(data.contractVersion) === 2 ? JSON.parse(JSON.stringify(data)) : null;
+    activeCompareOriginal.items[index].steelFinish = data.data?.steelFinish || 'ribbed';
+  }
+  for (const [field, value] of [['diameter', data.diameter], ['quantity', data.orderItemQuantity]]) {
+    const input = ocrItemInput(index, field);
+    if (input && Number(value) > 0) { input.value = Number(value); markOcrEdited(input); }
+  }
   const shapeInput = ocrItemInput(index, 'shape_name');
   const segmentsInput = ocrItemInput(index, 'segments');
   const totalLengthInput = ocrItemInput(index, 'total_length_mm');
@@ -1795,6 +1807,12 @@ function formatIntakeItem(item) {
 }
 
 function applyShapeSelectionToItem(item, data) {
+  if (Number(data.contractVersion) === 2) {
+    item.shapeSnapshot = JSON.parse(JSON.stringify(data));
+    item.steelFinish = data.data?.steelFinish || 'ribbed';
+  }
+  if (Number(data.diameter) > 0) item.diameter = Number(data.diameter);
+  if (Number(data.orderItemQuantity) > 0) { item.quantity = Number(data.orderItemQuantity); item.qty = item.quantity; }
   const sides = Array.isArray(data.sides) ? data.sides.map(toNumber).filter(Boolean) : [];
   const angles = Array.isArray(data.angles) ? data.angles.map(toNumber) : [];
   item.shape_name = data.presetName || item.shape_name || item.shape || item.type || 'custom';
@@ -1842,6 +1860,9 @@ function openQueueItemShapeEditor(rowId, index) {
   activeQueueShapeContext = { rowId, index };
   activeOcrShapeIndex = null;
   editor.open({
+    billingPolicy: item.shapeSnapshot?.billingPolicy,
+    catalogIdentity: item.shapeSnapshot?.catalogIdentity,
+    steelFinish: item.shapeSnapshot?.data?.steelFinish || item.steelFinish,
     presetId: item.shape_id || item.shapeId || item.presetId || null,
     presetName: item.shape_name || item.shapeName || item.shape || item.type || 'צורה מותאמת',
     sides: sides.length ? sides : [1000],

@@ -3,6 +3,7 @@
 const { ensureFinanceSchema } = require('./financeSchema');
 const { ensureBugReportSchema } = require('./bugReportSchema');
 const { ensureOrderWorkspaceSchema } = require('./orderWorkspaceSchema');
+const { ensureSavedShapeCatalogSchema } = require('../services/savedShapeCatalog');
 
 function tableColumns(db, table) {
   return db.pragma(`table_info(${table})`).map(column => column.name);
@@ -1992,6 +1993,7 @@ function ensureCoreSchema(db) {
       ON items(pallet_id, sort_order, id)`);
   }
 
+  ensureSavedShapeCatalogSchema(db);
   ensureFinanceSchema(db);
   ensureBugReportSchema(db);
   ensureOrderWorkspaceSchema(db);

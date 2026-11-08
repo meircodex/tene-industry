@@ -23,7 +23,7 @@ function loadPortalClient() {
     location: { search: '', href: 'http://portal.test/customer.html' },
     localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
     document: { getElementById: element, querySelectorAll() { return []; }, body: element('body') },
-    window: { scrollTo() {}, IronBendSteelRebarShapes: shapes },
+    window: { scrollTo() {}, IronBendSteelRebarShapes: shapes, IronBendShapeCommercial: require('../../modules/steel-rebar/shape-commercial') },
     IronBendSteelRebarShapes: shapes,
     setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; },
     clearTimeout() {},

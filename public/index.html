@@ -15,7 +15,8 @@
 <script src="/display-units.js?v=2"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
-<script src="/shape-editor.js?v=83"></script>
+<script src="/shapeCommercial.js?v=1"></script>
+<script src="/shape-editor.js?v=84"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -2934,6 +2935,8 @@ function approvedShapeContract(data = {}) {
     calculated: data.calculated,
     machineOutput: data.machineOutput,
     validation: data.validation,
+    ...(data.billingPolicy ? { billingPolicy: JSON.parse(JSON.stringify(data.billingPolicy)) } : {}),
+    ...(data.catalogIdentity ? { catalogIdentity: JSON.parse(JSON.stringify(data.catalogIdentity)) } : {}),
   };
 }
 
@@ -3335,18 +3338,20 @@ function openShapeEditor(palletId, itemId) {
   const angles = itemShapeAngles(item || {});
   const contract = itemShapeContract(item || {});
   const elementName = item?.structElement || item?.struct_element || item?.elementName || '';
+  const commercialData = { billingPolicy: contract?.billingPolicy, catalogIdentity: contract?.catalogIdentity, shapeId: contract?.shapeId };
   const allItems = pallets.flatMap(p => p.items || []);
   const itemNumber = allItems.findIndex(i => i.id == itemId) + 1;
   const itemTotal = allItems.length;
   if (contract?.family === 'piles' && contract?.shapeType === 'round_pile_cage') {
     const pileCage = roundPileCageEditorData(item || {});
-    if (pileCage) shapeEditor.open(pileCage);
+    if (pileCage) shapeEditor.open({ ...pileCage, ...commercialData });
     return;
   }
   if (contract?.family === 'spirals') {
     if (contract.shapeType === 'ring') {
       const ring = ringFieldsFromShapeData({ ...item, shapeSnapshot: contract });
       shapeEditor.open({
+        ...commercialData,
         family: 'spirals', shapeType: 'ring', specialty: 'ring',
         presetId: item.shapeId || contract.shapeId || 'ring1',
         presetName: item.shapeName || contract.displayName || 'טבעת עגולה',
@@ -3364,6 +3369,7 @@ function openShapeEditor(palletId, itemId) {
     }
     const spiral = spiralFieldsFromShapeData({ ...item, shapeSnapshot: contract });
     shapeEditor.open({
+      ...commercialData,
       family: 'spirals',
       presetId: item.shapeId || contract.shapeId || 'spiral',
       presetName: item.shapeName || contract.displayName || 'spiral',
@@ -3377,6 +3383,7 @@ function openShapeEditor(palletId, itemId) {
     return;
   }
   shapeEditor.open(sides.length ? {
+    ...commercialData,
     presetId: item.shapeId,
     presetName: item.shapeName || contract?.displayName,
     shapeType: contract?.shapeType || (isBenchBarItem(item) ? 'bench_bar' : undefined),

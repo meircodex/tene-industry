@@ -1,5 +1,17 @@
 # API Registry
 
+## Shared shape definitions — 2026-11-08
+
+Owner: Orders / Catalog. `routes/catalog.js` delegates persistence to `services/savedShapeCatalog.js`.
+
+| Route | Access | Contract |
+| --- | --- | --- |
+| `GET /api/shape-definitions` | office, sales, production, manager, admin | `{entries:[{id,itemCode,name,version,definition,billingPolicy}]}`; active shared definitions only. Built-in templates remain in the editor; local legacy templates are labelled separately. |
+| `POST /api/shape-definitions` | manager, admin | Name, unique itemCode, family definition and explicit billingPolicy. 201 saved, 400 invalid, 409 duplicate. |
+| `PUT /api/shape-definitions/:id` | manager, admin | Same fields plus expectedVersion. Optimistic version check, 409 on stale write, increments version. Existing order snapshots remain unchanged. |
+
+`GET /shapeCommercial.js` serves the same pure rules used by commercial summaries. It contains no prices or private data. Legacy `POST /api/shapes` cannot overwrite a shared definition.
+
 Source-of-truth registry required by Volume 10. Active API routes are implemented
 in `routes/*.js`, with only `/api/health` intentionally remaining in `server.js`;
 this file assigns each route family to a module and records security posture.

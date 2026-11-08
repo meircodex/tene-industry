@@ -1,5 +1,7 @@
 # Permission Registry
 
+Shared shape catalogue (2026-11-08): read through `GET /api/shape-definitions` for office/sales/production/manager/admin; create/update shared definitions and billing defaults for manager/admin, matching existing catalogue management access. Version conflicts cannot silently overwrite another editor's changes. Public/customer sessions do not gain catalogue-management access. Saving errors remain visible in the editor; local storage is not used as a success fallback for a failed shared save.
+
 Working role decision: see `docs/role-model-decision.md`.
 
 Source-of-truth registry required by Volume 10. Current roles are defined in

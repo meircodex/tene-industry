@@ -2046,6 +2046,11 @@ function buildShapeDataContractV2(shape) {
     machineOutput,
     validation,
     extra: {
+      ...(window.IronBendShapeCommercial ? {
+        billingPolicy: window.IronBendShapeCommercial.normalizePolicy(safeShape.billingPolicy)
+          || window.IronBendShapeCommercial.defaultPolicy(safeShape),
+        catalogIdentity: safeShape.catalogIdentity ? JSON.parse(JSON.stringify(safeShape.catalogIdentity)) : null,
+      } : {}),
       calculation: {
         engine: 'shape-editor',
         contract: 'SHAPE_DATA_CONTRACT_V2',
@@ -3751,7 +3756,21 @@ class ShapeEditorModal {
         <label for="seElementName" style="display:block;font-size:11px;font-weight:800;color:#7a93ab;letter-spacing:.3px;margin-bottom:5px">שם הפריט (אלמנט)</label>
         <input id="seElementName" class="se-input" type="text" placeholder="קורה / קומה / ציר" autocomplete="off" style="width:100%;box-sizing:border-box;text-align:right" oninput="window._seEditor._setElementName(this.value)">
       </div>
-      <div class="se-mode-note">
+      <div class="se-catalog-entry" style="padding:8px 14px;border-bottom:1px solid #c5cbd4;background:#eef0f3;">
+        <label for="seItemCode" style="display:block;font-size:11px;font-weight:800;margin-bottom:5px;">קוד פריט / מספר צורה</label>
+        <div style="display:flex;gap:5px;">
+          <input id="seItemCode" class="se-input" type="text" autocomplete="off" style="min-width:0;flex:1;" aria-label="קוד פריט">
+          <button type="button" id="seCatalogArrow" class="se-cancel-btn" aria-label="פתח רשימת צורות" aria-expanded="false" aria-controls="seCatalogPopup">▾</button>
+          <button type="button" id="seNewShape" class="se-cancel-btn" style="white-space:nowrap;">צורה חדשה</button>
+        </div>
+        <small id="seCatalogStatus" role="status"></small>
+      </div>
+      <details id="seBillingDetails" style="padding:8px 14px;border-bottom:1px solid #e2e8ef;font-size:12px;">
+        <summary style="cursor:pointer;font-weight:700;">בסיסי חיוב הצורה</summary>
+        <div id="seBillingBasis"></div>
+        <div id="seBillingControls"></div>
+      </details>
+      <div class="se-mode-note" id="seAuthoring3D">
         <label class="se-3d-toggle">
           <span>
             <strong>מוצר תלת-ממדי אמיתי</strong>
@@ -3827,7 +3846,11 @@ class ShapeEditorModal {
       <span style="font-size:13px;font-weight:700;color:#1a2332;font-family:Heebo,sans-serif;white-space:nowrap;">שם הצורה:</span>
       <input id="seSaveNameInput" class="se-input" style="flex:1;min-width:180px;max-width:300px;"
         placeholder="לדוגמה: U-אנקר מיוחד 600מ&quot;מ"
-        onkeydown="if(event.key==='Enter')window._seEditor._doSave();if(event.key==='Escape')window._seEditor._hideSaveBar();">
+        onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('seSaveCodeInput').focus();}if(event.key==='Escape')window._seEditor._hideSaveBar();">
+      <label for="seSaveCodeInput">מספר צורה:</label>
+      <input id="seSaveCodeInput" class="se-input" style="width:120px;" maxlength="40" autocomplete="off"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();window._seEditor._doSave();}if(event.key==='Escape')window._seEditor._hideSaveBar();">
+      <span id="seSaveError" role="alert" style="color:#b91c1c;"></span>
       <button class="se-ok-btn" onclick="window._seEditor._doSave()" style="padding:8px 22px;">שמור ✓</button>
       <button class="se-cancel-btn" onclick="window._seEditor._hideSaveBar()">ביטול</button>
     </div>
@@ -3836,6 +3859,194 @@ class ShapeEditorModal {
     document.body.appendChild(overlay);
     this._el = overlay;
     this._bindEvents();
+    this._bindCatalogue();
+  }
+
+  _bindCatalogue() {
+    const arrow = document.getElementById('seCatalogArrow');
+    arrow.onclick = () => window._seEditor._toggleCatalogue();
+    document.getElementById('seNewShape').onclick = () => window._seEditor._newCatalogueShape();
+    document.getElementById('seItemCode').addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      window._seEditor._selectCatalogueCode(event.target.value);
+    });
+    const popup = document.createElement('div');
+    popup.id = 'seCatalogPopup'; popup.hidden = true; popup.dir = 'rtl';
+    popup.setAttribute('role', 'dialog'); popup.setAttribute('aria-label', 'קטלוג צורות');
+    popup.style.cssText = 'position:fixed;z-index:2010;width:min(540px,calc(100vw - 24px));max-height:65vh;overflow:auto;background:white;border:1px solid #c5cbd4;border-radius:8px;box-shadow:0 8px 30px #0004;padding:12px;box-sizing:border-box;font-family:Heebo,sans-serif;color:#1a2332;';
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = 'סגור ×';
+    close.onclick = () => { window._seEditor._closeCatalogue(); arrow.focus(); };
+    const list = document.createElement('div'); list.id = 'seCatalogList';
+    list.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px;';
+    popup.append(close, list); document.body.append(popup);
+    document.addEventListener('pointerdown', event => {
+      if (!popup.hidden && !popup.contains(event.target) && !arrow.contains(event.target)) window._seEditor?._closeCatalogue();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !popup.hidden) { event.preventDefault(); event.stopImmediatePropagation(); window._seEditor?._closeCatalogue(); arrow.focus(); }
+    }, true);
+    window.addEventListener('resize', () => window._seEditor?._closeCatalogue());
+  }
+
+  _catalogIdentity(entry) {
+    return { source: 'shared', id: entry.id, itemCode: entry.itemCode, version: entry.version, name: entry.name };
+  }
+
+  async _loadCatalogue() {
+    this._catalogueLoading = true;
+    try {
+      const response = await fetch('/api/shape-definitions');
+      if (!response.ok) throw new Error('catalogue unavailable');
+      const result = await response.json();
+      this._sharedShapes = Array.isArray(result.entries) ? result.entries : [];
+      this._catalogueError = false;
+    } catch (_) { this._catalogueError = true; }
+    finally {
+      this._catalogueLoading = false;
+      const status = document.getElementById('seCatalogStatus');
+      if (status) status.textContent = this._catalogueError ? 'הקטלוג המשותף אינו זמין כרגע; מוצגות צורות מובנות ושמורות במחשב.' : '';
+      if (!document.getElementById('seCatalogPopup')?.hidden) this._renderCatalogue();
+    }
+  }
+
+  _catalogueEntries() {
+    return [
+      ...SHAPE_PRESETS.filter(p => !p.custom).map(p => ({ code: p.id, name: p.name, shape: p, source: 'builtin' })),
+      ...(this._sharedShapes || []).map(entry => ({ code: entry.itemCode, name: entry.name, source: 'shared',
+        shape: { ...entry.definition, id: entry.id, name: entry.name, billingPolicy: entry.billingPolicy, catalogIdentity: this._catalogIdentity(entry) } })),
+      ...loadSavedShapes().map(shape => ({ code: shape.id, name: shape.name, shape, source: 'local' })),
+    ];
+  }
+
+  _selectCatalogueCode(rawCode) {
+    const code = String(rawCode || '').trim().toLowerCase();
+    const entry = this._catalogueEntries().find(item => item.code.toLowerCase() === code);
+    if (!entry) {
+      document.getElementById('seCatalogStatus').textContent = this._catalogueLoading ? 'הקטלוג נטען, נסה שוב בעוד רגע' : 'קוד הצורה לא נמצא';
+      return;
+    }
+    this._closeCatalogue();
+    if (entry.source === 'local') this._loadSavedShape(entry.shape);
+    else this._loadPreset(entry.shape);
+    this._focusSide(this._sideInputs()[0]);
+  }
+
+  _toggleCatalogue() {
+    const popup = document.getElementById('seCatalogPopup');
+    if (!popup.hidden) return this._closeCatalogue();
+    this._renderCatalogue();
+    popup.hidden = false;
+    const rect = document.getElementById('seCatalogArrow').getBoundingClientRect();
+    const width = popup.getBoundingClientRect().width;
+    popup.style.left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.right - width)) + 'px';
+    popup.style.top = Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - popup.offsetHeight - 12)) + 'px';
+    document.getElementById('seCatalogArrow').setAttribute('aria-expanded', 'true');
+    popup.querySelector('button')?.focus();
+  }
+
+  _closeCatalogue() {
+    const popup = document.getElementById('seCatalogPopup');
+    if (popup) popup.hidden = true;
+    document.getElementById('seCatalogArrow')?.setAttribute('aria-expanded', 'false');
+  }
+
+  _renderCatalogue() {
+    const list = document.getElementById('seCatalogList');
+    if (!list) return;
+    list.replaceChildren();
+    for (const entry of this._catalogueEntries()) {
+      const button = document.createElement('button'); button.type = 'button';
+      button.style.cssText = 'padding:8px;border:1px solid #d8e2ec;border-radius:6px;background:#fff;color:#1a2332;cursor:pointer;font:inherit;';
+      const drawing = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      drawing.setAttribute('viewBox', '0 0 100 68'); drawing.setAttribute('width', '100'); drawing.setAttribute('height', '68');
+      // Render geometry only; user labels/codes are always assigned as text.
+      try { drawing.innerHTML = entry.source === 'builtin' ? shapePresetIconSVG(entry.shape.icon || 'straight') : ShapeEngineRouter.render(entry.shape, 100, 68); } catch (_) { /* Invalid legacy preview must not hide the catalogue. */ }
+      const text = document.createElement('div'); text.textContent = entry.code + ' · ' + entry.name;
+      button.append(drawing, text);
+      if (entry.source === 'local') { const note = document.createElement('small'); note.textContent = 'שמורה במחשב זה'; button.append(note); }
+      button.onclick = () => this._selectCatalogueCode(entry.code);
+      list.append(button);
+    }
+  }
+
+  _newCatalogueShape() {
+    this._closeCatalogue(); this._hideSaveBar();
+    this._blankNewEntry = false;
+    this._loadPreset(SHAPE_PRESETS.find(p => p.custom));
+    // Billing for a new geometry follows its sides until the operator explicitly edits it.
+    delete this.current.billingPolicy;
+    this._renderBillingBasis(); this._renderBillingControls();
+    this._focusSide(this._sideInputs()[0]);
+  }
+
+  _syncCatalogueMode() {
+    const code = document.getElementById('seItemCode');
+    if (code) code.value = this.current?.catalogIdentity?.itemCode || '';
+    const authoring = document.getElementById('seAuthoring3D');
+    if (authoring) authoring.style.display = this._shapeMode === 'authoring' && normalizeShapeFamily(this.current || {}) === 'bars' ? '' : 'none';
+    this._renderBillingControls();
+    this._renderBillingBasis();
+  }
+
+  _currentBillingPolicy() {
+    const commercial = window.IronBendShapeCommercial;
+    return commercial?.normalizePolicy(this.current?.billingPolicy) || commercial?.defaultPolicy(this.current || {});
+  }
+
+  _renderBillingBasis(contract) {
+    const out = document.getElementById('seBillingBasis');
+    const commercial = window.IronBendShapeCommercial;
+    if (!out || !commercial || !this.current) return;
+    const snapshot = contract || buildShapeDataContractV2(this.current);
+    const qty = Number(this.current.quantity || 0);
+    const lines = commercial.explain(this._currentBillingPolicy(), {
+      steelType: commercial.steelFinish(this.current, snapshot), lengthMm: snapshot.calculated?.totalLengthMm,
+      weightKg: Number(snapshot.calculated?.weightKg || 0) * (snapshot.family === 'lifts' ? 1 : qty), quantity: qty,
+    });
+    out.replaceChildren();
+    for (const line of lines) {
+      const row = document.createElement('div'); row.style.padding = '3px 0';
+      row.textContent = line.label + ' · לפי ' + (line.unit === 'kg' ? 'משקל' : 'יחידות') + ' · ' + line.value.toLocaleString('he-IL', { maximumFractionDigits: 3 }) + (line.unit === 'kg' ? ' ק״ג' : ' יח׳');
+      out.append(row);
+    }
+    const note = document.createElement('small'); note.textContent = 'המשקל הוא בסיס משותף לחומר ולעיבודים; הוא נספר פעם אחת במשקל המשלוח.'; out.append(note);
+  }
+
+  _renderBillingControls() {
+    const out = document.getElementById('seBillingControls');
+    const commercial = window.IronBendShapeCommercial;
+    if (!out || !commercial || !this.current) return;
+    out.replaceChildren();
+    const policy = this._currentBillingPolicy();
+    const details = document.createElement('details');
+    const heading = document.createElement('summary'); heading.textContent = 'הגדרת סעיפי חיוב'; details.append(heading);
+    // The product family owns its material basis. Processing and unit add-ons are explicit choices.
+    for (const line of commercial.POLICY_LINES.filter(line => line.section === 'processing')) {
+      const label = document.createElement('label'); label.style.cssText = 'display:block;padding:3px 0;';
+      const input = document.createElement('input'); input.type = 'checkbox'; input.checked = policy.lines.includes(line.key); input.dataset.billingKey = line.key;
+      input.onchange = () => {
+        const next = this._currentBillingPolicy();
+        next.lines = next.lines.filter(key => key !== line.key);
+        if (input.checked) next.lines.push(line.key);
+        if (line.key === 'cutting_kg') next.cuttingMode = input.checked ? 'always' : 'none';
+        this.current.billingPolicy = next; this._renderBillingBasis();
+        const cuttingSelect = out.querySelector('select'); if (cuttingSelect) cuttingSelect.value = next.cuttingMode;
+      };
+      label.append(input, document.createTextNode(line.label + (line.unit === 'kg' ? ' · ק״ג' : ' · יחידות'))); details.append(label);
+    }
+    const select = document.createElement('select'); select.setAttribute('aria-label', 'מתי מחייבים חיתוך');
+    for (const [value, text] of [['always','חיתוך בכל אורך'],['non_standard','חיתוך למעט מוט שלם 6 או 12 מטר'],['none','ללא חיתוך']]) {
+      const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option);
+    }
+    select.value = policy.cuttingMode;
+    select.onchange = () => {
+      const next = this._currentBillingPolicy(); next.cuttingMode = select.value;
+      next.lines = next.lines.filter(key => key !== 'cutting_kg');
+      if (select.value !== 'none') next.lines.push('cutting_kg');
+      this.current.billingPolicy = next; this._renderBillingControls(); this._renderBillingBasis();
+    };
+    details.append(select); out.append(details);
   }
 
   _bindEvents() {
@@ -4099,6 +4310,7 @@ class ShapeEditorModal {
     this._syncEditFamilyCards();
     this._renderTable();
     this._updatePreview();
+    this._syncCatalogueMode();
   }
 
   _bindDragRotation() {
@@ -4234,6 +4446,7 @@ class ShapeEditorModal {
   }
 
   _loadSavedShape(saved) {
+    this._shapeMode = 'template';
     const family = saved.family || 'bars';
     if (family === 'spirals') {
       this.current = { ...saved, family: 'spirals', presetId: saved.id, presetName: saved.name, presetEmoji: '⭐' };
@@ -4248,6 +4461,7 @@ class ShapeEditorModal {
     } else {
       const n = (saved.sides || []).length;
       this.current = {
+        ...saved,
         presetId:    saved.id,
         presetName:  saved.name,
         presetEmoji: '⭐',
@@ -4266,7 +4480,9 @@ class ShapeEditorModal {
     const bar = document.getElementById('seFootSave');
     bar.style.display = 'flex';
     const inp = document.getElementById('seSaveNameInput');
-    if (inp) { inp.value = this.current?.presetName || ''; setTimeout(() => { inp.focus(); inp.select(); }, 60); }
+    if (inp) { inp.value = this.current?.presetName || ''; inp.focus(); inp.select(); }
+    document.getElementById('seSaveCodeInput').value = this.current?.catalogIdentity?.source === 'shared' ? this.current.catalogIdentity.itemCode : '';
+    document.getElementById('seSaveError').textContent = '';
   }
 
   _hideSaveBar() {
@@ -4274,14 +4490,37 @@ class ShapeEditorModal {
     document.getElementById('seFootNormal').style.display = 'flex';
   }
 
-  _doSave() {
+  async _doSave() {
     if (!this.current) return;
+    if (this._savingShape) return;
     const inp  = document.getElementById('seSaveNameInput');
-    const name = (inp?.value || '').trim() || this.current.presetName || 'צורה מותאמת';
-    persistSavedShape(this.current, name);
-    this._hideSaveBar();
-    this._showToast('✅ "' + name + '" נשמרה בהצלחה');
-    this._renderSidebarSavedShapes(normalizeShapeFamily(this.current || {}));
+    const name = (inp?.value || '').trim();
+    const itemCode = document.getElementById('seSaveCodeInput').value.trim();
+    const error = document.getElementById('seSaveError');
+    if (!name || !itemCode) { error.textContent = 'יש להזין שם ומספר צורה'; return; }
+    this._savingShape = true;
+    error.textContent = 'שומר…';
+    try {
+      const identity = this.current.catalogIdentity;
+      const updating = identity?.source === 'shared' && identity.itemCode === itemCode;
+      const response = await fetch('/api/shape-definitions' + (updating ? '/' + encodeURIComponent(identity.id) : ''), {
+        method: updating ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, itemCode, definition: this.current, billingPolicy: this._currentBillingPolicy(), expectedVersion: updating ? identity.version : undefined }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'שמירת הצורה נכשלה');
+      const entry = result.entry;
+      this.current.presetName = entry.name;
+      this.current.presetId = entry.id;
+      this.current.billingPolicy = entry.billingPolicy;
+      this.current.catalogIdentity = this._catalogIdentity(entry);
+      this._shapeMode = 'template';
+      this._hideSaveBar();
+      this._goToEdit();
+      await this._loadCatalogue();
+      this._showToast('הצורה נשמרה בקטלוג המשותף');
+    } catch (err) { error.textContent = err.message || 'לא ניתן לשמור כרגע'; }
+    finally { this._savingShape = false; }
   }
 
   _showToast(msg) {
@@ -4303,6 +4542,7 @@ class ShapeEditorModal {
   }
 
   _loadPreset(preset) {
+    this._shapeMode = preset.custom && !preset.catalogIdentity ? 'authoring' : 'template';
     const isBlankNewEntry = this._blankNewEntry === true;
     const sides = (Array.isArray(preset.sides) ? [...preset.sides] : [])
       .map(value => isBlankNewEntry ? 0 : value);
@@ -4317,6 +4557,8 @@ class ShapeEditorModal {
       : Array(n).fill(0);
     this.current = {
       ...preset,
+      billingPolicy: preset.billingPolicy || window.IronBendShapeCommercial?.defaultPolicy(preset),
+      catalogIdentity: preset.catalogIdentity || (preset.custom ? null : { source: 'builtin', id: preset.id, itemCode: preset.id, version: 1, name: preset.name }),
       presetId:    preset.id,
       presetName:  preset.name,
       presetEmoji: preset.emoji,
@@ -4452,37 +4694,8 @@ class ShapeEditorModal {
   _renderSidebarSavedShapes(family) {
     const cont = document.getElementById('seSidebarSaved');
     if (!cont) return;
-    const list = loadSavedShapes().filter(s => (s.family || 'bars') === family);
-    if (!list.length) { cont.innerHTML = ''; return; }
-    const cards = list.map(s => {
-      const sf = s.family || 'bars';
-      let inner;
-      if (sf === 'spirals') inner = ShapeEngineRouter.render(s, 100, 68);
-      else if (sf === 'mesh') inner = MeshEngine.render(s, 100, 68);
-      else if (sf === 'piles') inner = PileCageEngine.render(s, 100, 68);
-      else inner = shape3DSVG(s.sides || [], s.angles || [], 100, 68, 12, { showAxes: false, showDims: false });
-      return `<button class="se-preset-btn se-sidebar-saved-btn" data-saved-id="${s.id}" title="${s.name}" aria-label="${s.name}" style="position:relative;">
-        <svg viewBox="0 0 100 68" aria-hidden="true">${inner}</svg>
-        <button class="se-del-saved-btn" data-del-id="${s.id}" title="מחק">✕</button>
-      </button>`;
-    }).join('');
-    cont.innerHTML = `<div style="font-size:10px;font-weight:800;color:#8a96a6;margin-bottom:6px;letter-spacing:0.4px;">⭐ שמורות</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">${cards}</div>`;
-    cont.querySelectorAll('.se-sidebar-saved-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        if (e.target.closest('.se-del-saved-btn')) return;
-        const shape = loadSavedShapes().find(s => s.id === btn.dataset.savedId);
-        if (shape) this._loadSavedShape(shape);
-      });
-    });
-    cont.querySelectorAll('.se-del-saved-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        if (!confirm('למחוק?')) return;
-        deleteSavedShape(btn.dataset.delId);
-        this._renderSidebarSavedShapes(family);
-      });
-    });
+    // All saved-shape choices live in the arrow's floating catalogue.
+    cont.replaceChildren();
   }
 
   _focusFamilyField(key) {
@@ -4550,6 +4763,7 @@ class ShapeEditorModal {
     set('sePanelTotalMm', (totalMm / 10).toLocaleString('he-IL', { maximumFractionDigits: 1 }));
     set('sePanelTotalM', (totalMm / 10).toLocaleString('he-IL', { maximumFractionDigits: 2 }));
     set('sePanelBends', bends);
+    this._renderBillingBasis(contract);
   }
 
   _setQuantity(value) {
@@ -4617,7 +4831,7 @@ class ShapeEditorModal {
     if (table) table.classList.toggle('se-family-editor-table', !isBars);
     if (thead) thead.style.display = isBars ? '' : 'none';
     if (addRow) addRow.style.display = isBars ? '' : 'none';
-    if (modeNote) modeNote.style.display = isBars ? '' : 'none';
+    if (modeNote) modeNote.style.display = isBars && this._shapeMode !== 'template' ? '' : 'none';
     if (summary) summary.style.display = isBars ? '' : 'none';
     if (title) {
       const titleText = kind === 'lifts' ? 'חבילת ליפטים' : kind === 'mesh' ? 'עריכת רשת' : kind === 'piles' ? 'עריכת כלונס' : kind === 'spirals' ? 'עריכת ספיראלה' : kind === 'ring' ? 'עריכת טבעת' : 'מידות צלעות וזוויות';
@@ -5254,7 +5468,7 @@ class ShapeEditorModal {
     const isStraightBar = !isReal3D && Array.isArray(sides) && sides.length === 1 && (!Array.isArray(angles) || angles.length === 0);
     const addRow = document.querySelector('#seModal .se-add-row');
     const addButton = document.getElementById('seAddSide');
-    if (addRow) addRow.style.display = '';
+    if (addRow) addRow.style.display = this._shapeMode === 'template' ? 'none' : '';
     if (addButton) addButton.textContent = isStraightBar ? '+ \u05d4\u05d5\u05e1\u05e3 \u05e6\u05dc\u05e2 / \u05db\u05d9\u05e4\u05d5\u05e3' : '+ \u05d4\u05d5\u05e1\u05e3 \u05e6\u05dc\u05e2';
     // All bars — straight or bent — use one layout: the side table plus a
     // diameter and quantity field in the footer. A straight bar is simply a
@@ -5336,6 +5550,10 @@ class ShapeEditorModal {
       }
     }
     document.getElementById('seTableBody').innerHTML = html;
+    if (this._shapeMode === 'template') {
+      document.querySelectorAll('#seTableBody [data-angle],#seTableBody [data-az],#seTableBody [data-el]').forEach(input => { input.readOnly = true; input.tabIndex = -1; });
+      document.querySelectorAll('#seTableBody .se-del-btn').forEach(button => button.remove());
+    }
   }
 
   _setMeshField(key, val) {
@@ -5640,7 +5858,7 @@ class ShapeEditorModal {
   }
 
   _setReal3D(enabled) {
-    if (!this.current) return;
+    if (!this.current || this._shapeMode === 'template') return;
     this.current.is3d = enabled ? 1 : 0;
     if (enabled) {
       this._init3DAnglesFrom2D();
@@ -5706,9 +5924,8 @@ class ShapeEditorModal {
     });
   }
 
-  // Focus the element-name field once the editor is open (falls back to the
-  // first side). Tried through a couple of timers so it lands regardless of
-  // render/paint timing.
+  // Focus once after opening. Delayed retries can steal focus from a user
+  // who has already moved to a code, side or quantity field.
   _focusFirstSideSoon() {
     const focus = () => {
       const target = (this._el && this._el.querySelector('#seElementName'))
@@ -5719,8 +5936,6 @@ class ShapeEditorModal {
       }
     };
     requestAnimationFrame(focus);
-    setTimeout(focus, 40);
-    setTimeout(focus, 160);
   }
 
   _sideInputs() {
@@ -5757,6 +5972,14 @@ class ShapeEditorModal {
     const isQty = t && t.id === 'seQuantityInput';
     if (!isName && !isSide && !isAngle && !isDia && !isQty) return;
 
+    if (this._shapeMode === 'template' && ((e.key === 'Enter' && !e.shiftKey && isSide) || (e.key === 'Tab' && (isSide || isDia || isQty)))) {
+      const chain = this._fieldChain();
+      const next = chain[chain.indexOf(t) + (e.shiftKey ? -1 : 1)];
+      if (next) { e.preventDefault(); this._focusSide(next); }
+      else if (e.key === 'Tab' && isQty && !e.shiftKey) { e.preventDefault(); document.getElementById('seOk').focus(); }
+      return;
+    }
+
     if (e.key === 'Enter' && e.shiftKey) {
       const dia = document.getElementById('seDiameterSelect');
       if (dia && dia.offsetParent !== null) { e.preventDefault(); dia.focus(); }
@@ -5791,7 +6014,7 @@ class ShapeEditorModal {
       if (isQty) { e.preventDefault(); this._confirm(); return; }
     }
     // Delete removes the focused side row (an accidental extra side).
-    if (e.key === 'Delete' && isSide) {
+    if (e.key === 'Delete' && isSide && this._shapeMode !== 'template') {
       const inputs = this._sideInputs();
       if (inputs.length > 1) {
         e.preventDefault();
@@ -5813,7 +6036,7 @@ class ShapeEditorModal {
   }
 
   _setAngle(i, val) {
-    if (!this.current) return;
+    if (!this.current || this._shapeMode === 'template') return;
     const rawValue = String(val ?? '').trim();
     const numeric = Number(rawValue);
     const input = document.querySelector(`[data-angle="${i}"]`);
@@ -5835,7 +6058,7 @@ class ShapeEditorModal {
   }
 
   _setAzAngle(i, val) {
-    if (!this.current) return;
+    if (!this.current || this._shapeMode === 'template') return;
     if (i === 0) return; // first segment has no turn — always 0
     const rawValue = String(val ?? '').trim();
     const numeric = Number(rawValue);
@@ -5891,7 +6114,7 @@ class ShapeEditorModal {
   }
 
   _setElAngle(i, val) {
-    if (!this.current) return;
+    if (!this.current || this._shapeMode === 'template') return;
     const rawValue = String(val ?? '').trim();
     const numeric = Number(rawValue);
     const input = document.querySelector(`[data-el="${i}"]`);
@@ -5920,7 +6143,7 @@ class ShapeEditorModal {
   }
 
   _addSide() {
-    if (!this.current) return;
+    if (!this.current || this._shapeMode === 'template') return;
     if (this.current.shapeType === 'straight_bar') this.current.shapeType = 'custom_bar';
     this.current.sides.push(300);
     if (this.current.sides.length > 1) this.current.angles.push(90);
@@ -5935,7 +6158,7 @@ class ShapeEditorModal {
   }
 
   _deleteSide(i) {
-    if (!this.current || this.current.sides.length <= 1) return;
+    if (!this.current || this._shapeMode === 'template' || this.current.sides.length <= 1) return;
     this.current.sides.splice(i, 1);
     if (i < this.current.angles.length) this.current.angles.splice(i, 1);
     else if (this.current.angles.length > 0) this.current.angles.pop();
@@ -5987,6 +6210,7 @@ class ShapeEditorModal {
   }
 
   _editAngleFromDrawing(i) {
+    if (this._shapeMode === 'template') return;
     if (!this.current || !Number.isInteger(i) || i < 0 || i >= this.current.angles.length) return;
     this._focusRow(i, true);
     // דאבל-קליק לעריכת זווית
@@ -6022,7 +6246,7 @@ class ShapeEditorModal {
       row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       const sel = focusAngle === 'z' ? '[data-el]' : (focusAngle ? '[data-angle],[data-az]' : '[data-side]');
       const inp = row.querySelector(sel);
-      if (inp) { setTimeout(() => { inp.focus(); inp.select(); }, 50); }
+      if (inp && document.activeElement !== inp) { inp.focus(); inp.select(); }
     }
   }
 
@@ -6293,6 +6517,13 @@ class ShapeEditorModal {
 
   _confirm() {
     if (!this.current || !this.onSelect) return;
+    const enteredCode = document.getElementById('seItemCode')?.value.trim() || '';
+    const selectedCode = String(this.current.catalogIdentity?.itemCode || '');
+    if (enteredCode.toLowerCase() !== selectedCode.toLowerCase()) {
+      document.getElementById('seCatalogStatus').textContent = 'יש לאשר את קוד הפריט באמצעות Enter או לבחור צורה מהחץ';
+      document.getElementById('seItemCode').focus();
+      return;
+    }
     if (this.current.roundPileCage) {
       const pileResult = PileCageEngine.calculate(this.current);
       if (!pileResult.validation?.valid) {
@@ -6374,6 +6605,9 @@ class ShapeEditorModal {
   open(existingData) {
     if (!this._el || !document.body.contains(this._el)) this._ensureDom();
     window._seEditor = this;
+    this._closeCatalogue();
+    this._shapeMode = existingData?.catalogIdentity || SHAPE_PRESETS.some(p => p.id === existingData?.presetId && !p.custom) ? 'template' : 'authoring';
+    this._loadCatalogue();
     this._openedAt = Date.now();
     this._backdropPress = false;
     this._hideSaveBar?.();
@@ -6456,6 +6690,7 @@ class ShapeEditorModal {
   }
 
   close() {
+    this._closeCatalogue();
     if (window._seResetDrag) window._seResetDrag();
     this._hideSaveBar?.();
     this._el.classList.remove('show');

@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    shapeCatalogueBilling: {
+      screen: 'shape-editor.js', owner: 'Orders',
+      source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy'] },
+      meaning: 'Only the arrow opens a floating catalogue. Fixed bar templates retain topology while lengths remain proportional. Billing policy and catalogue identity/version are copied into each approved order snapshot. Material kg is counted once; cutting/bending use that kg basis and product add-ons use item quantity. Existing snapshots are not reclassified when the catalogue changes.',
+      consumers: ['seItemCode', 'seCatalogPopup', 'seBillingBasis', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
+    },
     shapeSideDimensions: {
       screen: 'orders.html', owner: 'Production Cards',
       source: { api: '/api/orders/:id', fields: ['pallets[].items[].shape_svg', 'pallets[].items[].segments'] },

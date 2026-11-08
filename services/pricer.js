@@ -1,6 +1,7 @@
 'use strict';
 
 const { itemShapeMetrics } = require('./shapeSnapshot');
+const { buildOrderCommercialSummary, classifyOrderItem } = require('./orderCommercialSummary');
 
 function createPricer(db) {
   if (!db) throw new Error('services/pricer missing dependency: db');
@@ -219,6 +220,7 @@ function createPricer(db) {
       if (resolved.requiresPriceListUpdate) warnings.push(resolved);
       return {
         diameter: item.diameter,
+        billingBasis: classifyOrderItem(item).billingBasis || null,
         weight: +weight.toFixed(3),
         pricePerKg: ppu === null ? null : +ppu.toFixed(3),
         price_per_kg: ppu === null ? null : +ppu.toFixed(3),
@@ -235,6 +237,10 @@ function createPricer(db) {
 
     return {
       breakdown,
+      // Basis quantities are shared with the delivery certificate. Currency
+      // amounts below remain the existing material-price calculation.
+      commercialSummary: buildOrderCommercialSummary(items),
+      pricingScope: 'material_only',
       totalWeight: +totalWeight.toFixed(2),
       billingWeight: +billingWeight.toFixed(2),
       totalPrice: +totalPrice.toFixed(2),

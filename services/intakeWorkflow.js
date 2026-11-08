@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { normalizeCustomerTaxId } = require('./customerIdentity');
 const { buildFullShapeSnapshot, buildMachineProfilesPlaceholder } = require('./shapeSnapshot');
+const shapeCommercial = require('../modules/steel-rebar/shape-commercial');
 const { mapOcrItemToShapeSnapshot } = require('./ocrShapeSnapshotMapper');
 const { rebarKgPerMeter } = require('../constants');
 const { normalizeSpiralParams, spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
@@ -363,6 +364,14 @@ function intakeItemNote(item = {}) {
 }
 
 function applyOcrShapeSnapshotMapping(item = {}, normalized = {}) {
+  if (shapeCommercial.normalizePolicy(item.shapeSnapshot?.billingPolicy)) {
+    // An operator-selected product keeps its commercial identity even when
+    // OCR fields (name/length/diameter) are subsequently corrected.
+    normalized.shapeSnapshot = buildIntakeShapeSnapshot(item, normalized);
+    normalized.shape_review_status = 'ready';
+    normalized.requires_shape_edit = false;
+    return true;
+  }
   const result = mapOcrItemToShapeSnapshot({ item: { ...item, ...normalized }, source: item.source || {} });
   if (result.status === 'not_applicable') return false;
 
@@ -524,6 +533,8 @@ function buildIntakeShapeSnapshot(item = {}, normalized = {}) {
   const data = shapeType === 'spiral'
     ? { diameter, spiralDiameterMm: spiral.spiralDiameterMm, spiralTurns: spiral.turns }
     : { sides, angles, diameter };
+  const billingPolicy = shapeCommercial.normalizePolicy(item.shapeSnapshot?.billingPolicy);
+  if (billingPolicy) data.steelFinish = shapeCommercial.steelFinish(item, item.shapeSnapshot);
   const generic = shapeType === 'spiral'
     ? {
         family: 'bars',
@@ -549,6 +560,7 @@ function buildIntakeShapeSnapshot(item = {}, normalized = {}) {
     shapeType,
     family: 'bars',
     source: 'intake-ocr-approval',
+    extra: billingPolicy ? { billingPolicy, catalogIdentity: item.shapeSnapshot.catalogIdentity || null } : {},
     approvedAt: now,
     displayName,
     data,

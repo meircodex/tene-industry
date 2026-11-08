@@ -3,6 +3,7 @@
 const productionCards = require('./productionCards');
 const { itemShapeMetrics } = require('./shapeSnapshot');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
+const commercial = require('../modules/steel-rebar/shape-commercial');
 
 const SECTION_DEFINITIONS = Object.freeze([
   { key: 'material', label: 'ברזל מעובד' },
@@ -10,22 +11,7 @@ const SECTION_DEFINITIONS = Object.freeze([
   { key: 'finished_products', label: 'רשת סטנדרט' },
 ]);
 
-const LINE_DEFINITIONS = Object.freeze([
-  { key: 'processed_rebar_kg', section: 'material', label: 'ברזל', unit: 'kg' },
-  { key: 'round_wire_coil_kg', section: 'material', label: 'סלילים עגולים-חוטים', unit: 'kg' },
-  { key: 'cutting_kg', section: 'processing', label: 'חיתוך', unit: 'kg' },
-  { key: 'bending_kg', section: 'processing', label: 'כיפוף', unit: 'kg' },
-  { key: 'spiral_processing_kg', section: 'processing', label: 'עיבוד ספירלות עד קוטר 12 כולל', unit: 'kg' },
-  { key: 'chairs_units', section: 'processing', label: 'כסאות', unit: 'unit' },
-  { key: 'rings_units', section: 'processing', label: 'עיבוד טבעות', unit: 'unit' },
-  { key: 'hoops_units', section: 'processing', label: 'עיבוד חישוקים', unit: 'unit' },
-  { key: 'column_penetration_units', section: 'processing', label: 'פריט חדירה לעמודים', unit: 'unit' },
-  { key: 'lifting_units', section: 'processing', label: 'ציפורים/אזני הרמה/קרומים', unit: 'unit' },
-  { key: 'mesh_kg', section: 'finished_products', label: 'רשת לבניין סטנדרט בחבילות', unit: 'kg' },
-  { key: 'pile_cages_kg', section: 'finished_products', label: 'כלונסאות / כלובי זיון', unit: 'kg' },
-  { key: 'lift_packages_units', section: 'finished_products', label: 'ליפטים — חבילות (חבילה = יחידה)', unit: 'unit' },
-  { key: 'lift_packages_kg', section: 'finished_products', label: 'ליפטים — משקל שנשקל', unit: 'kg' },
-]);
+const LINE_DEFINITIONS = commercial.LINE_DEFINITIONS;
 
 const LINE_BY_KEY = new Map(LINE_DEFINITIONS.map(line => [line.key, line]));
 
@@ -185,6 +171,19 @@ function classifyOrderItem(item = {}) {
   const pileBreakdown = pileCageBreakdown(item, snapshot);
   const { weightKg, source: weightSource } = effectiveItemWeight(item, pileBreakdown);
   const lengthMm = positive(productionCards.shapeTotalLengthMmFromItem(item) ?? item.total_length_mm);
+  const policy = commercial.normalizePolicy(snapshot.billingPolicy);
+  if (policy) {
+    const steelType = commercial.steelFinish(item, snapshot);
+    const lines = commercial.resolvedLines(policy, { steelType, lengthMm });
+    const kind = lines.includes('hoops_units') ? 'hoop' : lines.includes('chairs_units') ? 'chair'
+      : lines.includes('rings_units') ? 'ring' : lines.includes('pile_cages_kg') ? 'pile_cage'
+        : lines.includes('mesh_kg') ? 'mesh' : lines.includes('lift_packages_kg') ? 'lift_package'
+          : lines.includes('bending_kg') ? 'bent_rebar' : 'straight_rebar';
+    return { kind, weightKg, weightSource, quantity, lengthMm, pileBreakdown, lines,
+      steelType, billingPolicy: policy, billingSource: 'saved_shape_policy',
+      catalogIdentity: snapshot.catalogIdentity || null,
+      billingBasis: commercial.explain(policy, { steelType, lengthMm, weightKg, quantity }) };
+  }
   const spiralTurns = positive(item.spiral_turns ?? item.spiralTurns ?? shape.data.spiral?.turns ?? shape.generic.turns);
   // A lift is recognised by its family alone. Never by wording: the OCR wording
   // rules own 'ליפט' for bent bars and must keep behaving exactly as before.
@@ -281,6 +280,9 @@ function contributorFor(item, classification, lineNo) {
     material_source: classification.materialSource || null,
     material_source_basis: classification.materialSourceBasis || null,
     classification: classification.kind,
+    billing_source: classification.billingSource || 'legacy_classification',
+    steel_type: classification.steelType || null,
+    catalog_identity: classification.catalogIdentity || null,
     pile_components: classification.pileBreakdown?.components || [],
   };
 }

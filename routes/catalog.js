@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { createSavedShapeCatalog } = require('../services/savedShapeCatalog');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/catalog missing dependency: ${name}`);
@@ -366,6 +367,19 @@ If a value is uncertain, still return the row with a note. Never invent prices t
     res.json({ success: true });
   });
 
+  const savedShapeCatalog = createSavedShapeCatalog(db);
+  router.get('/shape-definitions', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (_req, res) => {
+    res.json({ entries: savedShapeCatalog.list() });
+  });
+  router.post('/shape-definitions', requireAnyRole(['manager', 'admin']), (req, res) => {
+    const result = savedShapeCatalog.create(req.body || {});
+    res.status(result.status).json(result.entry ? { entry: result.entry } : { error: result.error });
+  });
+  router.put('/shape-definitions/:id', requireAnyRole(['manager', 'admin']), (req, res) => {
+    const result = savedShapeCatalog.update(req.params.id, req.body || {});
+    res.status(result.status).json(result.entry ? { entry: result.entry } : { error: result.error });
+  });
+
   router.get('/shapes', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (req, res) => {
     const { bends } = req.query;
     let sql = 'SELECT * FROM shapes WHERE active=1';
@@ -377,6 +391,7 @@ If a value is uncertain, still return the row with a note. Never invent prices t
 
   router.post('/shapes', requireAnyRole(['manager', 'admin']), (req, res) => {
     const { id, name, bends, sidesDefault, anglesDefault, emoji, description } = req.body;
+    if (db.prepare('SELECT id FROM shapes WHERE id=? AND definition_json IS NOT NULL').get(id || '')) return res.status(409).json({ error: 'יש לעדכן צורה משותפת דרך קטלוג הצורות' });
     db.prepare(`INSERT OR REPLACE INTO shapes (id,name,bends,sides_default,angles_default,emoji,description) VALUES (?,?,?,?,?,?,?)`)
       .run(id, name, bends || 0, JSON.stringify(sidesDefault || []), JSON.stringify(anglesDefault || []), emoji || '⬡', description || '');
     res.json({ success: true });
