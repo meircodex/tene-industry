@@ -26,12 +26,6 @@ function validateShapeGeometry(segments) {
 const steelModule = require('../modules/steel-rebar');
 const { normalizeSpiralParams, spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
-const {
-  allocateOrderItemStock,
-  openProcurementForStockShortages,
-  normalizeStockAllocationPolicy,
-  selectedRawMaterialId,
-} = require('./inventory');
 const { createStableOrderId, buildOrderItemUid, shapeSnapshotJson, isShapeDataContractV2, withShapeContractLegacyFields } = require('./orderContracts');
 const { reserveMaterialForOrder } = require('./inventoryReservation');
 const { validateCustomerTaxId, normalizeCustomerTaxId, findCustomersByTaxId, assertCustomerTaxIdAvailable, customerIdentityError, mergedCustomerId } = require('./customerIdentity');
@@ -75,7 +69,7 @@ function liftPackageOrderMetrics(item = {}) {
   return { snapshot, weighedKg, barLengthMm, weightPerUnit: weighedKg / packages };
 }
 
-function createOrderFactory(db, { generateOrderNum, industry, settingsService = null }) {
+function createOrderFactory(db, { generateOrderNum, industry }) {
   if (!db) throw new Error('services/orders missing dependency: db');
   if (!generateOrderNum) throw new Error('services/orders missing dependency: generateOrderNum');
   if (!industry) throw new Error('services/orders missing dependency: industry');
@@ -177,9 +171,6 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
     }
 
     const orderNum = order.orderNum || generateOrderNum();
-    const inventoryPolicy = normalizeStockAllocationPolicy(
-      order.inventoryAllocationPolicy || order.stockAllocationPolicy || settingsService?.get('INVENTORY_ALLOCATION_POLICY', 'auto_fifo')
-    );
     const wastePct = order.wastePctCharged ?? 3;
     const totalWeight = order.totalWeight ?? 0;
     const billingWeight = totalWeight * (1 + wastePct / 100);
@@ -195,7 +186,6 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
       totalWeight, wastePct, billingWeight, salePrice, order.createdBy || null);
 
     const orderId = orderResult.lastInsertRowid;
-    const inventoryShortages = [];
     const reservationItems = [];
 
     let globalItemSequence = 0;
@@ -295,34 +285,16 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
           id: itemResult.lastInsertRowid,
           item_id: itemResult.lastInsertRowid,
           diameter: item.diameter,
-          material_type: item.material_type || item.materialType || 'coil',
+          material_type: item.material_type || item.materialType || (JSON.parse(shapeSnapshot||'{}').family==='lifts'?'straight':'coil'),
+          mesh_specification: item.mesh_specification || null,
+          quantity_units: item.qty || 1,
           total_weight: totalWeight,
           quantity: item.qty || 1,
           weight_per_unit: weightPerUnit,
           shape_snapshot_json: shapeSnapshot,
+          preferred_raw_material_id: item.raw_material_id || item.rawMaterialId || item.batch_id || null,
         });
 
-        const allocation = allocateOrderItemStock(db, {
-          orderId,
-          itemId: itemResult.lastInsertRowid,
-          item: {
-            diameter: item.diameter,
-            material_type: item.material_type || item.materialType || null,
-          },
-          requiredWeightKg: totalWeight,
-          requestedRawMaterialId: selectedRawMaterialId(item),
-          policy: inventoryPolicy,
-        });
-        if (!allocation.allocated && ['no_stock', 'insufficient_stock'].includes(allocation.reason)) {
-          inventoryShortages.push({
-            itemId: itemResult.lastInsertRowid,
-            diameter: item.diameter,
-            material_type: item.material_type || item.materialType || 'coil',
-            shortageKg: allocation.missingWeightKg || totalWeight,
-            requiredWeightKg: totalWeight,
-            reason: allocation.reason,
-          });
-        }
       });
     });
 
@@ -331,14 +303,7 @@ function createOrderFactory(db, { generateOrderNum, industry, settingsService = 
       items: reservationItems,
     });
 
-    const procurementRequests = openProcurementForStockShortages(db, {
-      orderId,
-      orderNum,
-      shortages: inventoryShortages,
-      createdBy: order.createdBy || 'order-create',
-    });
-
-    return { success: true, orderNum, orderId, inventoryShortages: procurementRequests, inventoryReservations };
+    return { success: true, orderNum, orderId, inventoryShortages: [], inventoryReservations };
   }
 
   return {

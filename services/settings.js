@@ -82,7 +82,6 @@ function createSettingsService(db) {
     ['WASTE_PCT_DEFAULT',              1, 'אחוז פסולת ברירת מחדל',     'אחוז waste שמחושב על כל הזמנה',             'percent',  '3',    0,   30, '%',     0, 'edit',   1],
     ['URGENT_ORDER_WAIT_MINUTES',      1, 'זמן המתנה לדחוף',           'כמה דקות עד התראה על הזמנה דחופה',          'minutes',  '30',   5,  120, 'דקות', 0, 'edit',   2],
     ['PENDING_APPROVAL_WAIT_MINUTES',  1, 'זמן המתנה לאישור',          'כמה דקות עד התראה על הזמנה ממתינה',         'minutes',  '15',   5,   60, 'דקות', 0, 'edit',   3],
-    ['INVENTORY_ALLOCATION_POLICY',    1, 'ברירת מחדל לניכוי מלאי',  'auto_fifo=הורד אוטומטי FIFO; manual_required=חייב בחירת מלאי; disabled=לא מוריד', 'string', 'auto_fifo', null, null, null, 0, 'edit', 4],
 
     // ── מיתוג (white-label — הלקוח יכול לערוך) ───────────────────
     ['BRAND_NAME',                     10, 'שם המערכת',                 'השם שמוצג ללקוח בכותרת ובלשונית',           'string',   'טנא תעשיות ברזל בע"מ',  null, null, null, 0, 'edit', 1],

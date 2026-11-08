@@ -53,15 +53,15 @@ test('production cards open on the visible card sheet instead of an empty picker
   assert.match(printPage, /\.prod-card\[data-picked="0"\]\{display:none!important;\}/);
 });
 
-test('production card customer and item description stay readable without truncation', () => {
+test('production card description wraps within the enlarged-shape layout', () => {
   const printPage = read('services/productionCardPrintPage.js');
 
   assert.match(read('public/production-card-face.js'), /class="pc-print-customer"/);
   assert.match(printPage, /IronBendProductionCardFace\.render/);
-  assert.match(printPage, /\.pc-print-customer\{[^}]*font-size:12px[^}]*font-weight:900/);
-  assert.match(printPage, /\.pc-print-ref\{[^}]*min-height:11mm[^}]*font-size:12\.5px[^}]*white-space:normal[^}]*overflow:visible[^}]*overflow-wrap:anywhere/);
+  assert.match(printPage, /\.pc-print-customer\{[^}]*font-size:11\.5px[^}]*font-weight:900/);
+  assert.match(printPage, /\.pc-print-ref\{[^}]*min-height:9mm[^}]*font-size:11px[^}]*white-space:normal[^}]*overflow:visible[^}]*overflow-wrap:anywhere/);
   assert.doesNotMatch(printPage, /\.pc-print-ref\{[^}]*text-overflow:ellipsis/);
-  assert.match(printPage, /grid-template-rows:11mm minmax\(11mm,auto\) minmax\(0,1fr\) 18\.25mm/);
+  assert.match(printPage, /grid-template-rows:8mm 9mm minmax\(0,1fr\) 8mm/);
 });
 
 // Exercise the real rendered button handlers without opening external messaging apps.

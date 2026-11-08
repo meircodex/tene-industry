@@ -198,11 +198,13 @@ module.exports = function createProductionRouter(deps) {
 
   function consumeProductionReservations(item, actualWeightKg) {
     if (!item?.order_id || !item?.id) return { consumed: 0 };
-    return consumeReservationsForProduction(db, {
+    const result = consumeReservationsForProduction(db, {
       order_id: item.order_id,
       item_ids: [item.id],
-      actual_weight_kg: actualWeightKg,
+      actual_weight_kg: actualWeightKg ?? item.actual_weight_kg,
     });
+    if(result.consumed)wsBroadcast('inventory_changed',{item_id:item.id});
+    return result;
   }
 
   function workerCardWrite(handler) {
@@ -928,6 +930,7 @@ module.exports.manifest = {
   },
   consumes: [{ event: 'new_order' }, { event: 'order_status' }, { table: 'items' }, { table: 'machines' }],
   produces: [
+    { event: 'inventory_changed' },
     { event: 'machine_assign' },
     { event: 'end_of_day' },
     { event: 'item_status' },

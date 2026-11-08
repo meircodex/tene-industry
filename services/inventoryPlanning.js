@@ -1,0 +1,52 @@
+'use strict';
+
+const { kg, materialOnHand } = require('./materialBalance');
+const CONFIRMED_INCOMING = new Set(['approved','transit','ordered','מאושר','מאושרת','הוזמן','בדרך']);
+function planInventory(db,input={}) {
+  const mode=input.mode || 'backlog';
+  if (!['backlog','reorder'].includes(mode)) throw new Error('invalid_planning_mode');
+  const percent=Number(input.waste_percent ?? 0), safety=Number(input.safety_stock_kg ?? 0);
+  if (!Number.isFinite(percent)||percent<0||percent>100||!Number.isFinite(safety)||safety<0) throw new Error('invalid_planning_allowance');
+  const through=input.through_date || null;
+  if (through && (!/^\d{4}-\d{2}-\d{2}$/.test(through)||new Date(through).toISOString().slice(0,10)!==through)) throw new Error('invalid_through_date');
+  const groups=new Map();
+  const group=(diameter,type)=>{
+    const key=`${Number(diameter)}|${type||'coil'}`;
+    if (!groups.has(key)) groups.set(key,{diameter:Number(diameter),material_type:type||'coil',physical_stock_kg:0,backlog_kg:0,incoming_kg:0,legacy_preallocated_kg:0,undated_demand_kg:0,undated_incoming_kg:0,requires_specification_review:true});
+    return groups.get(key);
+  };
+  if (input.diameter) {if(!Number.isFinite(Number(input.diameter))||Number(input.diameter)<=0)throw new Error('invalid_diameter');group(input.diameter,input.material_type||'coil');}
+  for (const lot of db.prepare("SELECT * FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved'").all()) group(lot.diameter,lot.material_type).physical_stock_kg+=materialOnHand(lot);
+  const reservations=db.prepare(`SELECT r.*,o.delivery_date,o.status AS order_status FROM inventory_reservations r JOIN orders o ON o.id=r.order_id
+    WHERE r.status='active' AND o.inventory_lifecycle_version=1 AND o.status NOT IN ('בוטל','cancelled','canceled') ORDER BY r.id`).all();
+  const legacyUsage=db.prepare(`SELECT COALESCE(SUM(u.weight_used),0) AS kg FROM raw_material_usage u JOIN raw_material m ON m.id=u.raw_material_id
+    WHERE u.order_id=? AND u.item_id=? AND m.diameter=? AND COALESCE(m.material_type,'coil')=?`);
+  for (const row of reservations) {
+    const g=group(row.diameter,row.material_type);
+    const prepaid=row.consumption_mode==='on_completion'?0:Math.min(Number(row.reserved_kg),Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type).kg));
+    g.legacy_preallocated_kg+=prepaid;
+    const remaining=Math.max(0,Number(row.reserved_kg)-prepaid);
+    if (!row.delivery_date) g.undated_demand_kg+=remaining;
+    if (!through||!row.delivery_date||row.delivery_date<=through) g.backlog_kg+=remaining;
+  }
+  const net=db.prepare(`SELECT COALESCE(SUM(CASE WHEN e.event_type='consumption' THEN l.consumed_kg ELSE -l.consumed_kg END),0) AS kg
+    FROM material_consumption_events_v2 e JOIN material_consumption_event_lines_v2 l ON l.consumption_event_id=e.id WHERE e.material_requirement_id=?`);
+  for (const row of db.prepare(`SELECT r.* FROM material_requirements_v2 r JOIN orders o ON o.id=r.order_id
+    WHERE r.status='open' AND r.lifecycle_version=2 AND o.inventory_lifecycle_version=2 AND o.status NOT IN ('בוטל','cancelled','canceled')`).all()) {
+    const g=group(row.diameter,row.material_type), remaining=Math.max(0,Number(row.required_kg)-Number(net.get(row.id).kg));
+    if (!row.need_by_date) g.undated_demand_kg+=remaining;
+    if (!through||!row.need_by_date||row.need_by_date<=through) g.backlog_kg+=remaining;
+  }
+  for (const po of db.prepare("SELECT * FROM purchase_orders WHERE material_type IN ('coil','straight','bent') AND diameter>0").all()) {
+    if (!CONFIRMED_INCOMING.has(String(po.status||'').trim().toLowerCase())||po.received_at) continue;
+    const g=group(po.diameter,po.material_type), amount=Math.max(0,Number(po.quantity_ton||0)*1000-Number(po.received_weight||0));
+    if (!po.expected_date) g.undated_incoming_kg+=amount;
+    if (!through||(po.expected_date&&po.expected_date<=through)) g.incoming_kg+=amount;
+  }
+  const rows=[...groups.values()].filter(g=>(!input.diameter||g.diameter===Number(input.diameter))&&(!input.material_type||g.material_type===input.material_type)).map(g=>{
+    const demand=mode==='backlog'?g.backlog_kg:0, waste=kg(demand*percent/100);
+    return {...Object.fromEntries(Object.entries(g).map(([k,v])=>[k,k.endsWith('_kg')?kg(v):v])),waste_kg:waste,safety_stock_kg:kg(safety),recommended_purchase_kg:kg(Math.max(0,demand+waste+safety-g.physical_stock_kg-g.incoming_kg))};
+  }).sort((a,b)=>a.diameter-b.diameter||a.material_type.localeCompare(b.material_type));
+  return {mode,through_date:through,read_only:true,identity_scope:'diameter_material_type',specification_warning:'יש לבדוק אורך, דרגה ותקן לפני פתיחת רכש; אין קיזוז אוטומטי בין מפרטים.',groups:rows};
+}
+module.exports={planInventory,CONFIRMED_INCOMING};

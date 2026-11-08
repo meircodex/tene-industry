@@ -1,4 +1,5 @@
 'use strict';
+const { materialOnHand } = require('./materialBalance');
 
 // B5A is deliberately a projection: this module performs SELECTs only.
 const SUPPORTED = new Set(['coil', 'straight']);
@@ -86,7 +87,7 @@ function projectMaterialCoverageV2(db) {
 
   const lots = db.prepare("SELECT * FROM raw_material WHERE active=1 AND material_type IN ('coil','straight') ORDER BY id").all();
   for (const lot of lots) {
-    if (!validIdentity(lot)) continue; const group = add(lot.diameter, lot.material_type); const availableRaw = raw(lot.weight_received) - raw(lot.weight_used) - raw(lot.weight_scrapped);
+    if (!validIdentity(lot)) continue; const group = add(lot.diameter, lot.material_type); const availableRaw = materialOnHand(lot);
     if (availableRaw < 0) group.anomalies.push(anomaly('negative_lot_available_weight', 'warning', { raw_material_id: lot.id, available_kg: availableRaw }));
     if (lot.verification_status === 'approved') {
       group.approved_inventory.physical_kg += kg(availableRaw);

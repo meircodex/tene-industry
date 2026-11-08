@@ -97,6 +97,14 @@ Orders owns `/api/operations/*` in `routes/orders.js`: authenticated proposal, v
 
 ## Inventory, Procurement, Delivery
 
+Inventory count and daily purchase planning contracts (2026-11-08):
+`/api/inventory/stocktakes*` is preview/read for warehouse and manager/admin approval;
+`/api/inventory/mesh*` owns exact-spec sheet stock, pending receipts and sheet counts;
+`/api/inventory/consumption/retry` is manager/admin-only for completed items.
+`/api/procurement/plan` is read-only planning; `/api/procurement/purchase-draft/export`
+is warehouse/office/manager/admin CSV export and does not create a purchase order or stock.
+See `inventory-accounting-20261108.md` for quantities, cutoff and replay contracts.
+
 | Route Family | Module | Expected Security | Current Concern |
 | --- | --- | --- | --- |
 | `/api/suppliers*` | Procurement | auth-required; writes manager | Supplier master data; inventory may read it only as a dependency for receiving. |

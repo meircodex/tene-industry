@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const { consumeReservationsForProduction } = require('../services/inventoryReservation');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/productionMachines missing dependency: ${name}`);
@@ -133,10 +134,12 @@ module.exports = function createProductionMachinesRouter(deps) {
     db.prepare('UPDATE machines SET current_item_id=NULL,current_order_num=NULL,counter=0 WHERE id=?').run(machineId);
 
     const pallet = item ? db.prepare('SELECT order_id FROM pallets WHERE id=?').get(item.pallet_id) : null;
+    const consumedReservations = pallet ? consumeReservationsForProduction(db,{order_id:pallet.order_id,item_ids:[item.id],actual_weight_kg:req.body.actual_weight_kg}) : {consumed:0};
     if (pallet) checkOrderComplete(pallet.order_id);
 
+    if(consumedReservations.consumed)wsBroadcast('inventory_changed',{item_id:item.id});
     wsBroadcast('machine_complete', { machineId });
-    res.json({ success: true, actualWaste });
+    res.json({ success: true, actualWaste, consumedReservations });
   });
 
   // ── MACHINE STATE MACHINE ────────────────────────────────────────
@@ -224,6 +227,7 @@ module.exports.manifest = {
   },
   consumes: [{ table: 'machines' }, { table: 'items' }],
   produces: [
+    { event: 'inventory_changed' },
     { event: 'machine_assign' },
     { event: 'machine_complete' },
     { event: 'machine_state' },

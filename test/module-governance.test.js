@@ -281,10 +281,11 @@ test('inventory receiving and bent-shape parsing live in an inventory service', 
   assert.match(service, /function bendingShapeColumns/);
   assert.match(service, /function normalizeReceiptReviewItem/);
   assert.match(service, /function parseReceiptReviewPayload/);
-  assert.match(service, /function allocateOrderItemStock/);
-  assert.match(service, /function openProcurementForStockShortages/);
-  assert.match(service, /function summarizeStockShortages/);
-  assert.match(service, /function normalizeStockAllocationPolicy/);
+  assert.doesNotMatch(service, /allocateOrderItemStock|openProcurementForStockShortages/);
+  assert.match(read('services/inventoryStocktake.js'), /function approveStocktake/);
+  assert.match(read('services/inventoryPlanning.js'), /function planInventory/);
+  assert.match(route, /stocktakes\/preview/);
+  assert.match(read('routes/procurement.js'), /procurement\/plan/);
   assert.match(route, /require\('\.\.\/services\/inventory'\)/);
   assert.match(route, /const \{\s+MATERIAL_TYPES,\s+bendingShapeColumns,\s+normalizeReceiptReviewItem,\s+parseReceiptReviewPayload,\s+\} = require\('\.\.\/services\/inventory'\);/);
   assert.match(visionRoute, /const \{\s+normalizeBendingShapeInput,\s+parseReceiptReviewPayload,\s+\} = require\('\.\.\/services\/inventory'\);/);
@@ -295,7 +296,7 @@ test('inventory receiving API routes are split out of the server monolith', () =
   const server = read('server.js');
 
   assert.match(route, /module\.exports = function createInventoryRouter/);
-  assert.match(route, /router\.get\('\/inventory\/forecast'/);
+  assert.match(route, /router\.post\('\/inventory\/stocktakes\/preview'/);
   assert.doesNotMatch(route, /axios/);
   assert.doesNotMatch(route, /router\.(get|post|patch)\('\/suppliers/);
   assert.doesNotMatch(route, /router\.post\('\/inventory\/analyze-bending-shape'/);

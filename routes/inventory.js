@@ -9,6 +9,10 @@ const {
 } = require('../services/inventory');
 const { normalizeDiameter } = require('../services/materialCatalog');
 const receipts = require('../services/pendingRawMaterialReceiptV2');
+const stocktakes = require('../services/inventoryStocktake');
+const mesh = require('../services/meshInventory');
+const { materialOnHandSql } = require('../services/materialBalance');
+const { consumeReservationsForProduction } = require('../services/inventoryReservation');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/inventory missing dependency: ${name}`);
@@ -77,7 +81,7 @@ module.exports = function createInventoryRouter(deps) {
   router.get('/inventory', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
     const { diameter, supplier_id } = req.query;
     const page = listPage(req.query, { limit: 200, max: 1000 });
-    let sql = "SELECT r.*,s.name as supplier_name,ROUND(r.weight_received-r.weight_used-r.weight_scrapped,2) as weight_available FROM raw_material r LEFT JOIN suppliers s ON r.supplier_id=s.id WHERE r.active=1 AND COALESCE(r.verification_status,'approved')='approved'";
+    let sql = `SELECT r.*,s.name as supplier_name,ROUND(${materialOnHandSql(db,'r')},2) as weight_available FROM raw_material r LEFT JOIN suppliers s ON r.supplier_id=s.id WHERE r.active=1 AND COALESCE(r.verification_status,'approved')='approved'`;
     const params = [];
     if (diameter) { sql += ' AND r.diameter=?'; params.push(diameter); }
     if (supplier_id) { sql += ' AND r.supplier_id=?'; params.push(supplier_id); }
@@ -87,7 +91,57 @@ module.exports = function createInventoryRouter(deps) {
   });
 
   router.get('/inventory/summary', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
-    res.json(db.prepare("SELECT diameter,SUM(weight_received) as total_received,SUM(weight_used) as total_used,SUM(weight_scrapped) as total_scrapped,ROUND(SUM(weight_received-weight_used-weight_scrapped),2) as available,COUNT(*) as batches FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved' GROUP BY diameter ORDER BY diameter").all());
+    res.json(db.prepare(`SELECT diameter,material_type,nominal_length_mm,SUM(stock_adjustment_kg) as total_adjustments,SUM(weight_received) as total_received,SUM(weight_used) as total_used,SUM(weight_scrapped) as total_scrapped,ROUND(SUM(${materialOnHandSql(db)}),2) as available,COUNT(*) as batches FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved' GROUP BY diameter,material_type,nominal_length_mm ORDER BY diameter,material_type,nominal_length_mm`).all());
+  });
+
+  router.get('/inventory/mesh', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
+    const page=listPage(req.query,{limit:100,max:500});
+    res.json(mesh.planMesh(db,req.query).slice(page.offset,page.offset+page.limit));
+  });
+  router.get('/inventory/mesh/receipts', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
+    const page=listPage(req.query,{limit:50,max:200});
+    res.json(db.prepare("SELECT * FROM inventory_mesh_receipts WHERE status='draft' ORDER BY id DESC LIMIT ? OFFSET ?").all(page.limit,page.offset));
+  });
+  router.post('/inventory/mesh/receipts', requireAnyRole(['warehouse', 'manager', 'admin']), (req,res) => {
+    try {res.json(mesh.receiptDraft(db,{...req.body,actor_id:req.auth.sub}));}
+    catch(error){res.status(error.statusCode||400).json({error:error.code||error.message});}
+  });
+  router.post('/inventory/mesh/receipts/:id/approve', requireAnyRole(['manager', 'admin']), (req,res) => {
+    try {const result=mesh.approveReceipt(db,{...req.body,receipt_id:req.params.id,actor_id:req.auth.sub});wsBroadcast('inventory_changed',{mesh_receipt_id:result.id});res.json(result);}
+    catch(error){res.status(error.statusCode||400).json({error:error.code||error.message});}
+  });
+  router.post('/inventory/mesh/stocktakes/preview', requireAnyRole(['warehouse', 'manager', 'admin']), (req,res) => {
+    try {res.json(mesh.previewCount(db,req.body));}
+    catch(error){res.status(error.statusCode||400).json({error:error.code||error.message});}
+  });
+  router.post('/inventory/mesh/stocktakes', requireAnyRole(['manager', 'admin']), (req,res) => {
+    try {const result=mesh.approveCount(db,{...req.body,actor_id:req.auth.sub});wsBroadcast('inventory_changed',{mesh_count_id:result.id});res.json(result);}
+    catch(error){res.status(error.statusCode||400).json({error:error.code||error.message});}
+  });
+  router.post('/inventory/stocktakes/preview', requireAnyRole(['warehouse', 'manager', 'admin']), (req,res) => {
+    try { res.json(stocktakes.previewStocktake(db,req.body)); }
+    catch(error) { res.status(error.statusCode||400).json({error:error.code||error.message}); }
+  });
+  router.post('/inventory/stocktakes', requireAnyRole(['manager', 'admin']), (req,res) => {
+    try {
+      const result=stocktakes.approveStocktake(db,{...req.body,actor_id:req.auth.sub});
+      wsBroadcast('inventory_changed',{stocktake_id:result.id});res.json(result);
+    } catch(error) { res.status(error.statusCode||400).json({error:error.code||error.message}); }
+  });
+  router.get('/inventory/stocktakes', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
+    const page=listPage(req.query,{limit:50,max:200});
+    res.json(db.prepare('SELECT id,counted_at,reason,actor_id,created_at FROM inventory_stocktakes ORDER BY id DESC LIMIT ? OFFSET ?').all(page.limit,page.offset));
+  });
+  router.get('/inventory/stocktakes/:id', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
+    const result=stocktakes.getStocktake(db,req.params.id);res.status(result?200:404).json(result||{error:'stocktake_not_found'});
+  });
+  router.post('/inventory/consumption/retry', requireAnyRole(['manager', 'admin']), (req,res) => {
+    try {
+      const item=db.prepare("SELECT i.id,i.status,COALESCE(i.order_id,p.order_id) AS order_id FROM items i LEFT JOIN pallets p ON p.id=i.pallet_id WHERE i.id=?").get(Number(req.body.item_id));
+      if(!item||!['הושלם','סופק'].includes(item.status)) return res.status(409).json({error:'completed_item_required'});
+      const result=consumeReservationsForProduction(db,{order_id:item.order_id,item_ids:[item.id]});
+      wsBroadcast('inventory_changed',{item_id:item.id});res.json(result);
+    } catch(error) {res.status(error.statusCode||400).json({error:error.code||error.message});}
   });
 
   router.get('/inventory/diameter-catalog', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (_req, res) => {
@@ -249,7 +303,7 @@ module.exports = function createInventoryRouter(deps) {
     catch (error) { res.status(error instanceof receipts.PendingReceiptError ? 409 : 400).json({ error: error.code || error.message }); }
   });
   router.post('/inventory/pending-receipts/:id/approve', requireAnyRole(['manager', 'admin']), (req, res) => {
-    try { res.json(receipts.approveReceipt(db, { ...req.body, receipt_id: req.params.id, decided_by: req.auth?.sub })); }
+    try { const receipt=receipts.approveReceipt(db, { ...req.body, receipt_id: req.params.id, decided_by: req.auth?.sub });wsBroadcast('inventory_changed',{receipt_id:receipt.id});res.json(receipt); }
     catch (error) { res.status(error instanceof receipts.PendingReceiptError ? 409 : 400).json({ error: error.code || error.message }); }
   });
   router.post('/inventory/pending-receipts/:id/reject', requireAnyRole(['manager', 'admin']), (req, res) => {
@@ -277,6 +331,16 @@ module.exports = function createInventoryRouter(deps) {
     const f = req.body;
     const current = db.prepare('SELECT * FROM raw_material WHERE id=?').get(req.params.id);
     if (!current) return res.status(404).json({ error: 'raw_material_not_found' });
+    for (const field of ['weight_received','weight_used','weight_scrapped','stock_adjustment_kg']) {
+      if (Object.hasOwn(f,field) && Number(f[field])!==Number(current[field]||0)) {
+        return res.status(409).json({error:'use_stocktake_receipt_or_consumption_for_stock_changes'});
+      }
+    }
+    if ((Number(current.weight_used)||Number(current.weight_scrapped)||Number(current.stock_adjustment_kg)) &&
+        ((f.diameter!==undefined&&Number(f.diameter)!==Number(current.diameter))||(f.material_type&&f.material_type!==current.material_type))) {
+      return res.status(409).json({error:'used_lot_specification_is_immutable'});
+    }
+
     const materialType = f.material_type && MATERIAL_TYPES.has(f.material_type) ? f.material_type : current.material_type;
     const merged = { ...current, ...f, material_type: materialType };
     const shape = bendingShapeColumns(merged);
@@ -303,9 +367,6 @@ module.exports = function createInventoryRouter(deps) {
       nominal_length_mm=COALESCE(?,nominal_length_mm),
       spec_exception=?,
       received_date=COALESCE(?,received_date),
-      weight_received=COALESCE(?,weight_received),
-      weight_used=COALESCE(?,weight_used),
-      weight_scrapped=COALESCE(?,weight_scrapped),
       purchase_price=COALESCE(?,purchase_price),
       warehouse_loc=COALESCE(?,warehouse_loc),
       bending_shape_name=?,
@@ -318,7 +379,7 @@ module.exports = function createInventoryRouter(deps) {
       .run(materialType, diameter.numeric, catalogItem?.id || null, verificationStatus,
         f.supplier_id || null, f.lot_number || null, f.certificate_num || null, f.grade || null,
         f.standard_code ?? f.standardCode ?? null, Number(f.nominal_length_mm ?? f.nominalLengthMm) || null, specException ? 1 : 0,
-        f.received_date || null, f.weight_received ?? null, f.weight_used ?? null, f.weight_scrapped ?? null,
+        f.received_date || null,
         f.purchase_price ?? null, f.warehouse_loc || null, shape.name, shape.segments, shape.source,
         shape.confidence, f.notes || null, f.active ?? null, req.params.id);
       res.json({ success: true, diameter: diameter.display, verification_status: verificationStatus,
@@ -327,51 +388,6 @@ module.exports = function createInventoryRouter(deps) {
       res.status(err.statusCode || 400).json({ error: err.message || 'inventory_update_failed' });
     }
   });
-
-  router.get('/inventory/forecast', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
-    const consumption = db.prepare(`
-      SELECT i.diameter,
-             COALESCE(SUM(i.total_weight),0) / 30 as avg_daily_kg
-      FROM items i
-      JOIN pallets p ON i.pallet_id=p.id
-      JOIN orders o ON p.order_id=o.id
-      WHERE DATE(o.created_at) >= DATE('now','-30 days')
-      AND i.status='הושלם'
-      GROUP BY i.diameter
-    `).all();
-
-    const stock = db.prepare(`
-      SELECT diameter,
-             COALESCE(SUM(weight_received-weight_used-weight_scrapped),0) as on_hand_kg
-      FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved'
-      GROUP BY diameter
-    `).all();
-
-    const stockMap = {};
-    for (const s of stock) stockMap[s.diameter] = s.on_hand_kg;
-
-    const forecast = consumption.map(row => {
-      const on_hand = stockMap[row.diameter] || 0;
-      const days_left = row.avg_daily_kg > 0 ? Math.floor(on_hand / row.avg_daily_kg) : 999;
-      return {
-        diameter: row.diameter,
-        on_hand_kg: Math.round(on_hand),
-        avg_daily_kg: Math.round(row.avg_daily_kg),
-        days_left,
-        alert: days_left <= 3 ? 'critical' : days_left <= 7 ? 'warning' : 'ok',
-      };
-    });
-
-    for (const [diam, kg] of Object.entries(stockMap)) {
-      if (!forecast.find(f => f.diameter == diam)) {
-        forecast.push({ diameter: Number(diam), on_hand_kg: Math.round(kg), avg_daily_kg: 0, days_left: 999, alert: 'ok' });
-      }
-    }
-    forecast.sort((a, b) => a.days_left - b.days_left);
-    res.json(forecast);
-  });
-
-
 
   return router;
 };
@@ -386,8 +402,9 @@ module.exports.manifest = {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'read', production: 'read', warehouse: 'edit' },
   },
-  consumes: [{ table: 'raw_materials' }, { table: 'inventory_receipt_reviews' }],
+  consumes: [{ table: 'raw_materials' }, { table: 'inventory_receipt_reviews' }, { table: 'inventory_stocktakes' }, { table: 'inventory_mesh_stock' }],
   produces: [
+    { event: 'inventory_changed' },
     { event: 'inventory_receipt_review_approved' },
     { event: 'inventory_receipt_review_rejected' },
   ],

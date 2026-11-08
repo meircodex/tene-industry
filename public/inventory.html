@@ -95,23 +95,6 @@ tr:hover td{background:rgba(0,0,0,0.015);}
 @media(max-width:980px){.receipt-workspace,.receipt-fullscreen-body{grid-template-columns:1fr}.receipt-source{position:static;min-height:420px}.receipt-source iframe,.receipt-source img{height:420px}.receipt-fullscreen-source{min-height:45vh;border-left:0;border-bottom:1px solid var(--border)}}
 @media(max-width:700px){.form-grid,.bending-grid{grid-template-columns:1fr}.modal{max-width:calc(100vw - 24px);padding:22px}}
 
-/* DIAMETER SUMMARY GRID */
-.diam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;padding:16px 20px;}
-.diam-card{background:var(--steel-light);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;text-align:center;cursor:pointer;transition:all 0.2s;}
-.diam-card:hover{border-color:var(--accent);background:var(--accent-dim);}
-.diam-card.low-stock{border-color:var(--warning);background:var(--warning-dim);}
-.diam-card.no-stock{border-color:var(--danger);background:var(--danger-dim);}
-.diam-num{font-size:20px;font-weight:900;}
-.diam-label{font-size:10px;color:var(--text-muted);margin-bottom:8px;}
-.diam-kg{font-size:15px;font-weight:800;}
-.diam-sub{font-size:11px;color:var(--text-dim);}
-
-/* PROGRESS BAR */
-.stock-bar{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
-.stock-fill{height:100%;border-radius:2px;background:var(--success);}
-.stock-fill.warn{background:var(--warning);}
-.stock-fill.danger{background:var(--danger);}
-
 /* SEARCH */
 .search-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .search-row input,.search-row select{padding:8px 12px;border:1px solid var(--border-bright);border-radius:var(--radius-sm);font-family:'Heebo',sans-serif;font-size:13px;background:var(--steel);color:var(--text);}
@@ -121,6 +104,7 @@ tr:hover td{background:rgba(0,0,0,0.015);}
 <script src="/display-units.js"></script>
 <script src="/safe-dom.js"></script>
 <script src="/nav.js"></script><link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/inventory-workspace.css?v=20261108">
 </head>
 <body data-page="inventory">
 <nav class="topnav">
@@ -138,29 +122,45 @@ tr:hover td{background:rgba(0,0,0,0.015);}
 
 <div class="page">
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('summary')">סיכום מלאי</button>
+    <button class="tab-btn active" onclick="showTab('summary')">מלאי וחוסרים</button>
+    <button class="tab-btn" onclick="showTab('receipts')">הכנסת מלאי</button>
+    <button class="tab-btn" onclick="showTab('stocktake')">ספירת מלאי</button>
     <button class="tab-btn" onclick="showTab('batches')">אצוות / מנות</button>
-    <button class="tab-btn" onclick="showTab('receipts')">קבלת חומר (OCR)</button>
     <button class="tab-btn" onclick="showTab('waste')">פחת וגרוטאות</button>
   </div>
 
   <!-- SUMMARY TAB -->
   <div id="tab-summary" class="tab-panel active">
     <div class="kpi-row" id="kpiRow">
-      <div class="kpi-card"><div class="kpi-label">סה"כ מלאי</div><div class="kpi-val" id="kpiTotal">—</div><div class="kpi-sub">ק"ג זמין</div></div>
+      <div class="kpi-card"><div class="kpi-label">סה"כ מלאי</div><div class="kpi-val" id="kpiTotal">—</div><div class="kpi-sub">ק״ג במלאי, לפני שריונים</div></div>
       <div class="kpi-card"><div class="kpi-label">קוטרים במלאי</div><div class="kpi-val" id="kpiDiam">—</div><div class="kpi-sub">סוגים</div></div>
       <div class="kpi-card"><div class="kpi-label">אצוות פעילות</div><div class="kpi-val" id="kpiBatches">—</div><div class="kpi-sub">מנות</div></div>
       <div class="kpi-card"><div class="kpi-label">שימוש מצטבר</div><div class="kpi-val" id="kpiUsed">—</div><div class="kpi-sub">ק"ג</div></div>
     </div>
     <div class="card">
       <div class="card-header">
-        <span class="card-title">📦 מלאי לפי קוטר</span>
+        <span class="card-title">📦 מלאי, חוסרים והמלצת הזמנה</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-outline btn-sm" onclick="openReceiptOCR()">צלם תעודת ספק OCR</button>
-          <button class="btn btn-primary btn-sm" onclick="openAddBatch()">+ קבלת חומר ידנית</button>
+          <button class="btn btn-primary btn-sm" id="inventoryPurchase" disabled>הזמנת רכש</button>
+          <button class="btn btn-outline btn-sm" onclick="showTab('receipts')">הכנסת מלאי</button>
         </div>
       </div>
-      <div class="diam-grid" id="diamGrid">טוען...</div>
+      <div class="inventory-toolbar">
+        <div class="form-row"><label for="inventoryType">סוג חומר</label><select id="inventoryType"><option value="">כל הסוגים</option><option value="coil">גלילים</option><option value="straight">ליפטים / מוטות ישרים</option><option value="mesh">רשתות</option><option value="bent">מכופף</option></select></div>
+        <div class="form-row"><label for="inventoryDiameter">קוטר</label><select id="inventoryDiameter"><option value="">כל הקטרים</option></select></div>
+        <label><input id="inventoryShortages" type="checkbox"> רק חוסרים</label>
+        <details class="inventory-plan-options"><summary>אפשרויות תכנון</summary><div class="inventory-plan-fields">
+        <div class="form-row"><label for="inventoryThrough">תכנון עד</label><input id="inventoryThrough" type="date"></div>
+        <div class="form-row"><label for="inventoryWaste">פחת לתכנון (%)</label><input id="inventoryWaste" type="number" min="0" max="100" step="0.1" value="0"></div>
+        <div class="form-row"><label for="inventorySafety">מלאי ביטחון (ק״ג לכל סוג וקוטר)</label><input id="inventorySafety" type="number" min="0" value="0"></div>
+        </div></details>
+      </div>
+      <div class="inventory-table-wrap"><table><thead><tr>
+        <th><button class="inventory-heading" data-inventory-sort="label">סוג ומפרט</button></th><th><button class="inventory-heading" data-inventory-sort="stock">במלאי</button></th>
+        <th><button class="inventory-heading" data-inventory-sort="demand">נדרש להזמנות</button></th><th><button class="inventory-heading" data-inventory-sort="available">פנוי / חוסר</button></th>
+        <th><button class="inventory-heading" data-inventory-sort="incoming">בדרך</button></th><th><button class="inventory-heading" data-inventory-sort="buy">המלצת הזמנה</button></th>
+      </tr></thead><tbody id="inventoryDailyRows"><tr><td colspan="6" class="inventory-message">טוען...</td></tr></tbody></table></div>
+      <div class="inventory-caption">לחיצה על כותרת ממיינת; לחיצה נוספת הופכת את הסדר. לחיצה על סוג ומפרט מסננת את הרשימה. רשתות ביחידות; ברזל בק״ג.</div>
     </div>
   </div>
 
@@ -191,8 +191,10 @@ tr:hover td{background:rgba(0,0,0,0.015);}
   <div id="tab-receipts" class="tab-panel">
     <div class="card">
       <div class="card-header">
-        <span class="card-title">📄 קבלת חומר OCR - תעודות ספק לאישור</span>
+        <span class="card-title">📄 הכנסת מלאי — קבלות ותעודות ספק לאישור</span>
         <div class="search-row">
+          <button class="btn btn-primary btn-sm" onclick="openAddBatch()">+ הכנסת ברזל</button>
+          <button class="btn btn-outline btn-sm" id="inventoryMeshReceipt">+ הכנסת רשתות</button>
           <input id="receiptImage" type="file" accept="image/*,.pdf,application/pdf" style="display:none" onchange="uploadReceiptReview(this.files[0])">
           <button class="btn btn-primary btn-sm" onclick="document.getElementById('receiptImage').click()">צלם / העלה תעודה</button>
           <button class="btn btn-outline btn-sm" onclick="loadReceiptReviews()">רענן</button>
@@ -227,6 +229,12 @@ tr:hover td{background:rgba(0,0,0,0.015);}
   </div>
 </div>
 
+<div class="modal-overlay inventory-overlay" id="inventoryPurchaseModal" role="dialog" aria-modal="true" aria-labelledby="purchaseTitle"><div class="modal inventory-modal">
+<h2 id="purchaseTitle">הזמנת רכש — בדיקה ושינוי כמויות</h2><p class="muted" style="margin-bottom:16px">הטיוטה נבנתה מהחוסרים המוצגים. אפשר לשנות כמויות ומפרט, להוסיף ולהסיר שורות לפני הוצאת הקובץ.</p>
+<div class="form-grid"><div class="form-row"><label for="purchaseSupplier">ספק</label><select id="purchaseSupplier"><option value="">ללא בחירת ספק</option></select></div><div class="form-row"><label for="purchaseDate">אספקה מבוקשת</label><input type="date" id="purchaseDate"></div><div class="form-row"><label for="purchaseReference">אסמכתה</label><input id="purchaseReference"></div><div class="form-row"><label for="purchaseNotes">הערות להזמנה</label><input id="purchaseNotes"></div></div>
+<div class="inventory-table-wrap"><table><thead><tr><th>סוג חומר</th><th>קוטר</th><th>מפרט ואורך</th><th>כמות להזמנה</th><th>יחידה</th><th>הערות</th><th></th></tr></thead><tbody id="purchaseDraftRows"></tbody></table></div>
+<div class="inventory-form-actions"><button class="btn btn-outline" id="purchaseAddRow">+ הוספת שורה</button><div><button class="btn btn-outline" data-inventory-close="inventoryPurchaseModal">סגירה</button> <button class="btn btn-primary" id="purchaseDownload">הוצאת קובץ לאקסל</button></div></div><p id="purchaseMessage" class="muted" role="status" style="margin-top:12px"></p><p class="muted">הקובץ ניתן לעריכה באקסל (CSV). הכנת הטיוטה אינה משנה מלאי ואינה שולחת הזמנה לספק.</p>
+</div></div>
 <!-- ADD BATCH MODAL -->
 <div class="modal-overlay" id="modalBatch">
   <div class="modal">
@@ -239,7 +247,7 @@ tr:hover td{background:rgba(0,0,0,0.015);}
       </div>
       <div class="form-row"><label>מק"ט חומר גלם</label><select id="bCatalogItem" onchange="applyCatalogItem()"><option value="">— ללא מק"ט —</option></select></div>
       <div class="form-row"><label>סוג חומר</label>
-        <select id="bType" onchange="toggleBendingPanel()"><option value="coil">סלילים (coil)</option><option value="straight">ישר (straight)</option><option value="bent">כיפוף (bent)</option></select>
+        <select id="bType" onchange="toggleBendingPanel()"><option value="coil">גלילים</option><option value="straight">ליפטים / מוטות ישרים</option><option value="bent">כיפוף (bent)</option></select>
       </div>
       <div class="form-row"><label>ספק</label>
         <select id="bSupplier"><option value="">— ללא ספק —</option></select>
@@ -366,6 +374,7 @@ function showTab(id) {
   if (id === 'batches')   loadBatches();
   if (id === 'receipts')  loadReceiptReviews();
   if (id === 'waste')     loadWaste();
+  if (id === 'stocktake' && window.InventoryCounts) InventoryCounts.load();
 }
 
 function openInitialInventoryTab() {
@@ -384,8 +393,8 @@ function openReceiptOCR() {
   setTimeout(() => document.getElementById('receiptImage')?.click(), 80);
 }
 const MATERIAL_LABELS = {
-  coil: '🔄 סלילים',
-  straight: '➖ ישר',
+  coil: '🔄 גלילים',
+  straight: '➖ ליפטים / ישר',
   bent: '〰️ כיפוף',
 };
 const BENDING_PRESETS = [
@@ -533,24 +542,11 @@ async function loadSummary() {
   const totalUsed   = r.reduce((s,d)=>s+(d.total_used||0),0);
   const totalBatch  = r.reduce((s,d)=>s+(d.batches||0),0);
   document.getElementById('kpiTotal').textContent    = fmt0(totalAvail);
-  document.getElementById('kpiDiam').textContent     = r.length;
+  document.getElementById('kpiDiam').textContent     = new Set(r.map(row=>row.diameter)).size;
   document.getElementById('kpiBatches').textContent  = totalBatch;
   document.getElementById('kpiUsed').textContent     = fmt0(totalUsed);
 
-  const grid = document.getElementById('diamGrid');
-  if (!r.length) { grid.innerHTML = '<p style="padding:20px;color:var(--text-muted)">אין מלאי – הוסף קבלת חומר</p>'; return; }
-  const maxAvail = Math.max(...r.map(d=>d.available||0), 1);
-  grid.innerHTML = r.map(d => {
-    const pct = Math.min(100, Math.round((d.available||0)/maxAvail*100));
-    const cls = pct < 15 ? 'danger' : pct < 35 ? 'warn' : '';
-    const cardCls = pct < 15 ? 'no-stock' : pct < 35 ? 'low-stock' : '';
-    return `<div class="diam-card ${cardCls}" onclick="showTab('batches');setTimeout(()=>{document.getElementById('batchDiam').value='${d.diameter}';filterBatches()},100)">
-      <div class="diam-label">Ø${d.diameter} מ"מ</div>
-      <div class="diam-kg">${fmt0(d.available)} ק"ג</div>
-      <div class="diam-sub">${d.batches} אצוות · ${fmt0(d.total_received)} הוזמן</div>
-      <div class="stock-bar"><div class="stock-fill ${cls}" style="width:${pct}%"></div></div>
-    </div>`;
-  }).join('');
+  if(window.InventoryWorkspace) window.InventoryWorkspace.reload();
 }
 
 // ── BATCHES ───────────────────────────────────────────────────────
@@ -664,18 +660,7 @@ function renderReceiptReview(row) {
     <div class="receipt-body">${table}${parsed.notes ? `<div class="muted">${escH(parsed.notes)}</div>` : ''}</div>
   </article>`;
 }
-async function loadReceiptReviews() {
-  const box = document.getElementById('receiptReviewList');
-  box.innerHTML = '<div class="muted">טוען תעודות...</div>';
-  const pending = await fetch('/api/inventory/pending-receipts?status=draft').then(r=>r.ok ? r.json() : []).catch(()=>[]);
-  if (pending.length) {
-    box.innerHTML = pending.map(r => `<article class="receipt-card"><div class="card-title">${escH(r.supplier_name || 'ללא ספק')} · ${escH(r.delivery_note_num || 'ללא תעודה')}</div><div class="muted">${escH(r.source_type)} · ${escH(r.status)} · ${r.lines.length} שורות${r.duplicate_warning?.suspected ? ' · אזהרת כפילות' : ''}</div></article>`).join('');
-    return;
-  }
-  receiptReviews = await fetch('/api/inventory/receipt-reviews?status=pending_review').then(r=>r.ok ? r.json() : []).catch(()=>[]);
-  box.innerHTML = receiptReviews.length ? receiptReviews.map(renderReceiptReview).join('') : '<div class="muted">אין תעודות ממתינות לאישור.</div>';
-  if (receiptReviews[0]) showReceiptSource(receiptReviews[0].id);
-}
+function loadReceiptReviews() { return window.InventoryCounts?.loadReceipts(); }
 async function uploadReceiptReview(file) {
   if (!file) return;
   const box = document.getElementById('receiptReviewList');
@@ -740,6 +725,7 @@ async function loadWaste() {
 // ── BATCH MODAL ───────────────────────────────────────────────────
 let editingBatchId = null;
 function openAddBatch() {
+  document.getElementById('bWeight').readOnly = false;
   editingBatchId = null;
   initBendingPresets();
   document.getElementById('modalBatchTitle').textContent = '📦 קבלת חומר גלם';
@@ -780,6 +766,7 @@ function editBatch(id) {
   document.getElementById('bNominalLength').value = IronBendDisplayUnits.millimetersToCentimeters(b.nominal_length_mm) ?? '';
   document.getElementById('bDate').value = b.received_date||'';
   document.getElementById('bWeight').value = b.weight_received||'';
+  document.getElementById('bWeight').readOnly = true;
   document.getElementById('bPrice').value = b.purchase_price||'';
   document.getElementById('bLoc').value = b.warehouse_loc||'';
   document.getElementById('bNotes').value = b.notes||'';
@@ -858,5 +845,8 @@ loadSummary();
 loadSuppliers();
 openInitialInventoryTab();
 </script>
+<script src="/data-contracts-client.js"></script>
+<script src="/inventory-workspace.js?v=20261108"></script>
+<script src="/inventory-counts.js?v=20261108"></script>
 </body>
 </html>
