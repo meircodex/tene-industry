@@ -36,3 +36,8 @@ Rollback: revert the draft UI and export helper together; no data migration need
 Full verification: npm test — 1152 tests passed, zero failures. Only the standalone
 mockup and backend support have changed; the live purchase dialog remains unchanged
 until visual approval.
+
+Owner correction 2026-11-09: specification and length are separate fields.
+The draft preview has distinct specification and length (meters) columns; CSV exports
+length_m separately. Length applies to straight/bent bars, not coils or mesh sheets.
+Unit export tests pass, including independent B500B / 12-meter values.

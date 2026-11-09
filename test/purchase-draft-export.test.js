@@ -40,7 +40,7 @@ test('supplier export preserves edited package quantity and recalculates estimat
   const db=new Database(':memory:');ensureCoreSchema(db);
   const result=exportPurchaseDraft(db,{lines:[
     {material_type:'coil',diameter:12,quantity:5,purchase_unit:'coil',unit_weight_kg:2100,estimated_weight_kg:123,shortage_kg:7013.52},
-    {material_type:'straight',diameter:16,specification:'12 מטר',quantity:1.5,purchase_unit:'bundle',unit_weight_kg:2000},
+    {material_type:'straight',diameter:16,specification:'B500B',length_m:12,quantity:1.5,purchase_unit:'bundle',unit_weight_kg:2000},
     {material_type:'mesh',quantity:25,specification:'6x2.5',purchase_unit:'sheet'}
   ]});
   assert.equal(result.draft.lines[0].quantity,5);
@@ -49,6 +49,10 @@ test('supplier export preserves edited package quantity and recalculates estimat
   assert.equal(result.draft.lines[0].shortage_kg,7013.52);
   assert.equal(result.draft.lines[1].unit_label,'חבילות');
   assert.equal(result.draft.lines[1].estimated_weight_kg,3000);
+  assert.equal(result.draft.lines[1].specification,'B500B');
+  assert.equal(result.draft.lines[1].length_m,12);
+  assert.match(result.content,/"מפרט","אורך \(מטר\)"/);
+  assert.match(result.content,/"B500B","12","1.5","חבילות"/);
   assert.equal(result.draft.lines[2].estimated_weight_kg,null);
   assert.match(result.content,/"5","גלילים","2100","10500","7013.52"/);
   assert.match(result.content,/"1.5","חבילות","2000","3000"/);

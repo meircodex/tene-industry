@@ -34,8 +34,11 @@ function normalizeDraft(db,input={}) {
     if(diameter!==null&&(!Number.isFinite(diameter)||diameter<=0))fail('invalid_diameter');
     if(line.material_type!=='mesh'&&diameter===null)fail('diameter_required');
     const specification=string(line.specification);
+    const length=line.length_m===undefined||line.length_m===null||line.length_m===''?null:Number(line.length_m);
+    if(length!==null&&(typeof line.length_m==='boolean'||!Number.isFinite(length)||length<=0||length>1000))fail('invalid_purchase_length');
+    if(length!==null&&!['straight','bent'].includes(line.material_type))fail('invalid_purchase_length');
     if(unit==='sheet'&&!specification)fail('mesh_specification_required');
-    return {row:index+1,material_type:line.material_type,type_label:TYPE_LABELS[line.material_type],diameter,specification,quantity,unit,unit_label:unit==='kg'?'ק״ג':unit==='sheet'?'יחידות':expected.label,unit_weight_kg:unitWeight,estimated_weight_kg:totalWeight,shortage_kg:shortage,notes:string(line.notes)};
+    return {row:index+1,material_type:line.material_type,type_label:TYPE_LABELS[line.material_type],diameter,specification,length_m:length,quantity,unit,unit_label:unit==='kg'?'ק״ג':unit==='sheet'?'יחידות':expected.label,unit_weight_kg:unitWeight,estimated_weight_kg:totalWeight,shortage_kg:shortage,notes:string(line.notes)};
   });
   const deliveryDate=string(input.expected_date);
   if(deliveryDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)||!Number.isFinite(Date.parse(deliveryDate))||new Date(deliveryDate).toISOString().slice(0,10)!==deliveryDate))fail('invalid_expected_date');
@@ -49,8 +52,8 @@ function csvCell(value) {
 }
 function exportPurchaseDraft(db,input={}) {
   const draft=normalizeDraft(db,input);
-  const rows=[['ספק','אספקה מבוקשת','אסמכתה','שורה','סוג חומר','קוטר במ״מ','מפרט / אורך','כמות להזמנה','יחידה','ק״ג ליחידה (משוער)','משקל להזמנה בק״ג (משוער)','חוסר מדויק בק״ג','הערות שורה','הערות להזמנה']];
-  for(const line of draft.lines)rows.push([draft.supplier,draft.expected_date,draft.reference,line.row,line.type_label,line.diameter,line.specification,line.quantity,line.unit_label,line.unit_weight_kg,line.estimated_weight_kg,line.shortage_kg,line.notes,draft.notes]);
+  const rows=[['ספק','אספקה מבוקשת','אסמכתה','שורה','סוג חומר','קוטר במ״מ','מפרט','אורך (מטר)','כמות להזמנה','יחידה','ק״ג ליחידה (משוער)','משקל להזמנה בק״ג (משוער)','חוסר מדויק בק״ג','הערות שורה','הערות להזמנה']];
+  for(const line of draft.lines)rows.push([draft.supplier,draft.expected_date,draft.reference,line.row,line.type_label,line.diameter,line.specification,line.length_m,line.quantity,line.unit_label,line.unit_weight_kg,line.estimated_weight_kg,line.shortage_kg,line.notes,draft.notes]);
   return {filename:'purchase-order-draft.csv',content:'\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n',draft};
 }
 module.exports={normalizeDraft,exportPurchaseDraft,csvCell};
