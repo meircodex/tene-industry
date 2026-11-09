@@ -1,5 +1,9 @@
 # Widget Data Contracts
 
+## Inventory consumption evidence — 2026-11-09
+
+Owner: Inventory; `inventoryConsumptionEvidence` contract. `/api/inventory/metrics` replaces the unbounded historic usage counter on the main screen. `kpiUsed` shows recorded net kg since the stated stocktake approval only when reporting checks pass; otherwise „לא מאומת”. Journal zero is never described as proof of zero actual production. Missing baseline or failed request cannot fall back to history or zero. Source events: production_completion usage plus signed V2 consumption/reversals. Reservations and stocktake adjustments are excluded. Detail text exposes legacy coverage gaps. `kpiBatches` and `kpiDiam` count only positive-balance, active, approved lot records, not packages or coils.
+
 ## Shape catalogue and billing bases — 2026-11-08
 
 Owner: Orders. Definition: `shapeCatalogueBilling` in `public/data-contracts-client.js`.

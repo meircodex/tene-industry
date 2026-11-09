@@ -132,11 +132,12 @@ tr:hover td{background:rgba(0,0,0,0.015);}
   <!-- SUMMARY TAB -->
   <div id="tab-summary" class="tab-panel active">
     <div class="kpi-row" id="kpiRow">
-      <div class="kpi-card"><div class="kpi-label">סה"כ מלאי</div><div class="kpi-val" id="kpiTotal">—</div><div class="kpi-sub">ק״ג במלאי, לפני שריונים</div></div>
+      <div class="kpi-card"><div class="kpi-label">יתרת מלאי רשומה</div><div class="kpi-val" id="kpiTotal">—</div><div class="kpi-sub">לפי הספירה והתנועות שנרשמו, ק״ג לפני שריונים</div></div>
       <div class="kpi-card"><div class="kpi-label">קוטרים במלאי</div><div class="kpi-val" id="kpiDiam">—</div><div class="kpi-sub">סוגים</div></div>
-      <div class="kpi-card"><div class="kpi-label">אצוות פעילות</div><div class="kpi-val" id="kpiBatches">—</div><div class="kpi-sub">מנות</div></div>
-      <div class="kpi-card"><div class="kpi-label">שימוש מצטבר</div><div class="kpi-val" id="kpiUsed">—</div><div class="kpi-sub">ק"ג</div></div>
+      <div class="kpi-card"><div class="kpi-label">מנות מלאי עם יתרה</div><div class="kpi-val" id="kpiBatches">—</div><div class="kpi-sub">רישומי מלאי, לא מספר גלילים או חבילות</div></div>
+      <div class="kpi-card"><div class="kpi-label">צריכה מתועדת מאז אישור ספירה</div><div class="kpi-val" id="kpiUsed">—</div><div class="kpi-sub" id="kpiUsedPeriod">ממתין לבדיקת רישומים</div></div>
     </div>
+    <div class="card" id="inventoryConsumptionEvidence" style="padding:14px;line-height:1.6" role="status">בודק כיסוי רישומי צריכה…</div>
     <div class="card">
       <div class="card-header">
         <span class="card-title">📦 מלאי, חוסרים והמלצת הזמנה</span>
@@ -536,15 +537,31 @@ function ocrSetupMessage(err) {
 
 // ── SUMMARY ──────────────────────────────────────────────────────
 async function loadSummary() {
-  const r = await fetch('/api/inventory/summary').then(r=>r.ok ? r.json() : []).catch(()=>[]);
+  let r;
+  try { const response=await fetch('/api/inventory/summary');if(!response.ok)throw Error();r=await response.json(); }
+  catch(_) {
+    for(const id of ['kpiTotal','kpiDiam','kpiBatches','kpiUsed'])document.getElementById(id).textContent='—';
+    document.getElementById('inventoryConsumptionEvidence').textContent='נתוני המלאי אינם זמינים כרגע. לא מוצגת יתרת אפס במקום נתון חסר.';
+    return;
+  }
   summary = r;
   const totalAvail  = r.reduce((s,d)=>s+(d.available||0),0);
-  const totalUsed   = r.reduce((s,d)=>s+(d.total_used||0),0);
-  const totalBatch  = r.reduce((s,d)=>s+(d.batches||0),0);
   document.getElementById('kpiTotal').textContent    = fmt0(totalAvail);
-  document.getElementById('kpiDiam').textContent     = new Set(r.map(row=>row.diameter)).size;
-  document.getElementById('kpiBatches').textContent  = totalBatch;
-  document.getElementById('kpiUsed').textContent     = fmt0(totalUsed);
+  try {
+    const response=await fetch('/api/inventory/metrics');if(!response.ok)throw Error();const metrics=await response.json();
+    document.getElementById('kpiDiam').textContent=metrics.stocked_diameters;
+    document.getElementById('kpiBatches').textContent=metrics.stocked_lots;
+    const period=metrics.baseline?new Date(metrics.baseline.created_at.replace(' ','T')+'Z').toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'}):null;
+    document.getElementById('kpiUsed').textContent=metrics.status==='recorded_only'?fmt0(metrics.recorded_net_kg):'לא מאומת';
+    document.getElementById('kpiUsedPeriod').textContent=period?'מאישור ספירה #'+metrics.baseline.id+' · '+period:'אין ספירת בסיס מאושרת';
+    document.getElementById('inventoryConsumptionEvidence').textContent=!period?'אין בסיס ספירה מאושר לחישוב צריכה בתקופה.':metrics.status==='recorded_only'?
+      'נרשמו '+fmt0(metrics.recorded_net_kg)+' ק״ג צריכה נטו מאז אישור הספירה, לאחר קיזוז ביטולי צריכה. המדד מציג דיווחים שנרשמו; עבודה שלא דווחה אינה נכללת.':
+      'אין נתון מאומת לצריכה בפועל. ביומן נרשמו '+fmt0(metrics.recorded_net_kg)+' ק״ג צריכה נטו מאז אישור הספירה, אך אין להסיק מכך כמה חומר נצרך בפועל. '+(metrics.gaps.legacy_active_reservations?'קיימים '+metrics.gaps.legacy_active_reservations+' שריוני עבר פתוחים שדורשים התאמה לדיווחי הצריכה. ':'')+'נדרשת התאמת הזמנות ודיווחי צריכה. הכמות המתועדת אינה סך צריכת המפעל או סך המשלוחים.';
+  } catch(_) {
+    for(const id of ['kpiDiam','kpiBatches','kpiUsed'])document.getElementById(id).textContent='—';
+    document.getElementById('kpiUsedPeriod').textContent='הבדיקה אינה זמינה';
+    document.getElementById('inventoryConsumptionEvidence').textContent='לא ניתן לבדוק כרגע את כיסוי רישומי הצריכה.';
+  }
 
   if(window.InventoryWorkspace) window.InventoryWorkspace.reload();
 }

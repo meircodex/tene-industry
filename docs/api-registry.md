@@ -1,5 +1,7 @@
 # API Registry
 
+`GET /api/inventory/metrics` (Inventory, 2026-11-09): warehouse/office/manager/admin; read-only stocktake-period journal/control report. Returns stocked_lots, stocked_diameters, baseline{id,counted_at,created_at}, recorded_net_kg (null without baseline), verified_consumption_kg (null; actual use is not inferred), status (no_baseline/needs_reconciliation/recorded_only), issues, historical counters and legacy coverage diagnostics. Uses approval time as the explicit period boundary. Existing inventory/summary response remains unchanged.
+
 ## Shared shape definitions — 2026-11-08
 
 Owner: Orders / Catalog. `routes/catalog.js` delegates persistence to `services/savedShapeCatalog.js`.

@@ -66,7 +66,12 @@
     },
     inventoryPhysicalTotal: {
       screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','total_adjustments']},
-      meaning:'Current approved physical bar stock in kg, including audited count adjustments. Excludes sheet units and does not subtract order reservations.',consumers:['kpiTotal'],risk:'D1',
+      meaning:'Recorded approved bar stock balance in kg, including audited count adjustments. Depends on count accuracy and recorded movements; unreported consumption is not known. Excludes sheet units and does not subtract order reservations.',consumers:['kpiTotal'],risk:'D1',
+    },
+    inventoryConsumptionEvidence: {
+      screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/metrics',fields:['stocked_lots','stocked_diameters','baseline','recorded_net_kg','status','issues','gaps']},
+      meaning:'Stocktake approval defines the stated reporting period. Net documented production consumption excludes reservations, receipts and count adjustments and includes reversals/inactive lots. Legacy gaps or failed coverage checks show unknown, not actual use or zero. Positive-balance approved active records define lot/diameter counts, not physical package counts.',
+      consumers:['kpiUsed','kpiUsedPeriod','inventoryConsumptionEvidence','kpiBatches','kpiDiam'],risk:'D0',
     },
     kpiOrdersToday: {
       screen: 'dashboard.html',
