@@ -86,6 +86,15 @@ test('overlap detection ignores crossings and endpoint contacts and preserves al
     assert.ok(a.right<=b.left || b.right<=a.left || a.bottom<=b.top || b.bottom<=a.top);
   }
 });
+test('overlap color covers only the shared interval and leaves a partial remainder untouched',()=>{
+  const units=require('../public/display-units');
+  const points=[[0,0],[100,0],[100,50],[40,50],[40,0],[160,0]];
+  const original=JSON.stringify(points);
+  assert.deepEqual(units.overlapSpans(points),[{sides:[0,4],start:[40,0],end:[100,0]}]);
+  assert.equal(JSON.stringify(points),original);
+  assert.deepEqual(units.overlapSpans([[0,0],[100,0],[40,0]])[0],{sides:[0,1],start:[40,0],end:[100,0]});
+  assert.deepEqual(units.overlapSpans([[0,0],[100,0],[200,0]]),[]);
+});
 
 test('shape editor 2D preview rotates U bars so the long bridge is the bottom base', () => {
   const { shapeSVGPath } = loadShapeEditorGeometry();
@@ -605,7 +614,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=87/);
+  assert.match(index, /shape-editor\.js\?v=88/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

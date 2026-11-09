@@ -158,6 +158,15 @@
     return {top:v[0],right:v[1],bottom:v[2],left:v[3],tailStart:0,tailEnd:0,sideMap:[0,1,2,3],tailMap:[null,null]};
   }
   return Object.freeze({
+    overlapSpans(points) {
+      return overlappingSegments(points).map(([i,j])=>{
+        const a=points[i],b=points[i+1],c=points[j],d=points[j+1];
+        const dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);
+        const project=p=>((p[0]-a[0])*dx+(p[1]-a[1])*dy)/len;
+        const lo=Math.max(0,Math.min(project(c),project(d))),hi=Math.min(len,Math.max(project(c),project(d)));
+        return {sides:[i,j],start:[a[0]+dx*lo/len,a[1]+dy*lo/len],end:[a[0]+dx*hi/len,a[1]+dy*hi/len]};
+      });
+    },
     overlappingSegments,
     rectangularLoopParts,
     finiteNumber,

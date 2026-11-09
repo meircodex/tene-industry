@@ -215,6 +215,15 @@ function shapeCataloguePreview(shape) {
   return `<path data-source-path="1" d="${path}" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
 
+// A colored center stripe over a wider base shows two coincident bars. Only
+// the common interval is striped; the unshared remainder retains its color.
+function overlapSpanSVG(points,width=4) {
+  return (window.IronBendDisplayUnits?.overlapSpans(points)||[]).map(span=>{
+    const [a,b]=[span.start,span.end],d=`M ${a[0]},${a[1]} L ${b[0]},${b[1]}`;
+    return `<g data-overlap-span="${span.sides.join('-')}"><path d="${d}" stroke="#172b3a" stroke-width="${width+1.5}" fill="none" stroke-linecap="butt"/><path d="${d}" stroke="#df650c" stroke-width="${Math.max(1.7,width*.48)}" fill="none" stroke-linecap="butt"/></g>`;
+  }).join('');
+}
+
 function liftPresetIconSVG() {
   return '<svg viewBox="0 0 40 40" width="40" height="40"><rect x="7" y="13" width="26" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><line x1="10" y1="18" x2="30" y2="18" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="23" x2="30" y2="23" stroke="currentColor" stroke-width="1.5"/><line x1="15" y1="11" x2="15" y2="30" stroke="currentColor" stroke-width="2"/><line x1="25" y1="11" x2="25" y2="30" stroke="currentColor" stroke-width="2"/></svg>';
 }
@@ -609,10 +618,6 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
       stroke-width="${barW}" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
     segsHtml += `<polyline points="${pts3}" stroke="rgba(255,255,255,0.38)"
       stroke-width="${(barW*0.28).toFixed(1)}" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
-    for(const i of overlappingIds) {
-      const a=mapped[i],b=mapped[i+1];
-      segsHtml += `<path data-overlap-segment="${i}" d="M ${a[0]},${a[1]} L ${b[0]},${b[1]}" stroke="#172b3a" stroke-width="${barW}" stroke-linecap="round" fill="none"/>`;
-    }
     if (activeSeg >= 0 && activeSeg < mapped.length - 1) {
       const [ax1,ay1] = mapped[activeSeg], [ax2,ay2] = mapped[activeSeg+1];
       const ad = `M ${ax1.toFixed(1)},${ay1.toFixed(1)} L ${ax2.toFixed(1)},${ay2.toFixed(1)}`;
@@ -621,6 +626,7 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
       segsHtml += `<path d="${ad}" stroke="rgba(255,255,255,0.55)"
         stroke-width="${(barW*0.28).toFixed(1)}" stroke-linecap="round" fill="none"/>`;
     } else { activeGlowHtml = ''; }
+    segsHtml += overlapSpanSVG(mapped,barW);
   }
 
   // ── Bend angle labels ─────────────────────────────────────────
@@ -6336,11 +6342,12 @@ class ShapeEditorModal {
           const s = segs[i];
           const isActive = i === _activeSeg2d;
           html += `<path d="M ${s.x1.toFixed(1)},${s.y1.toFixed(1)} L ${s.x2.toFixed(1)},${s.y2.toFixed(1)}"
-            stroke="${overlappingIds.has(i)?'#172b3a':SEG_GRAY}" stroke-width="4" fill="none" stroke-linecap="round"
+            stroke="${SEG_GRAY}" stroke-width="4" fill="none" stroke-linecap="round"
             ${overlappingIds.has(i)?`data-overlap-segment="${i}"`:''}
             stroke-linejoin="round" data-se-focus="bar-all bar-side-${i}"
             data-seg-click="${i}" style="cursor:pointer"/>`;
         }
+        html += overlapSpanSVG(pts,4);
       }
 
       // Start dot
@@ -6432,7 +6439,7 @@ class ShapeEditorModal {
 
       if(overlaps.length) {
         const bottom = Math.max(260,...(dimensionPositions||[]).map(p=>p.box.bottom));
-        html += `<text data-overlap-note="1" x="150" y="${bottom+25}" text-anchor="middle" font-size="9" fill="#526070">צלעות חופפות: ${overlaps.map(pair => pair.map(i => String.fromCharCode(65+i)).join(' / ')).join(', ')}</text>`;
+        html += `<text data-overlap-note="1" x="150" y="${bottom+25}" text-anchor="middle" font-size="9" fill="#526070">צלעות חופפות: ${overlaps.map(pair => pair.map(i => String.fromCharCode(65+i)).join(' / ')).join(', ')}</text><text x="150" y="${bottom+39}" text-anchor="middle" font-size="8" fill="#b95108">כתום: קטע חופף · כחול: קטע יחיד</text>`;
       }
       svg.innerHTML = html;
       // Fit labels as well as the bar; changing the viewport never changes geometry.
