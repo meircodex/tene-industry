@@ -68,10 +68,10 @@
       screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','total_adjustments']},
       meaning:'Recorded approved bar stock balance in kg, including audited count adjustments. Depends on count accuracy and recorded movements; unreported consumption is not known. Excludes sheet units and does not subtract order reservations.',consumers:['kpiTotal'],risk:'D1',
     },
-    inventoryConsumptionEvidence: {
-      screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/metrics',fields:['stocked_lots','stocked_diameters','baseline','recorded_net_kg','status','issues','gaps']},
-      meaning:'Stocktake approval defines the stated reporting period. Net documented production consumption excludes reservations, receipts and count adjustments and includes reversals/inactive lots. Legacy gaps or failed coverage checks show unknown, not actual use or zero. Positive-balance approved active records define lot/diameter counts, not physical package counts.',
-      consumers:['kpiUsed','kpiUsedPeriod','inventoryConsumptionEvidence','kpiBatches','kpiDiam'],risk:'D0',
+    inventoryStockBasis: {
+      screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','diameter']},
+      meaning:'The user-approved count is the opening stock basis. Current stock follows approved receipts minus recorded consumption and scrap, with audited count adjustments. Reservations are separate demand and not physical removal. Positive-balance groups define the diameter count. Latest stocktake approval from /api/inventory/stocktakes supplies the displayed basis date. Historic usage and uncertain consumption diagnostics are not displayed on the main inventory screen.',
+      consumers:['inventoryStockBasis','kpiDiam'],risk:'D0',
     },
     kpiOrdersToday: {
       screen: 'dashboard.html',

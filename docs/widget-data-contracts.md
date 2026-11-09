@@ -4,6 +4,8 @@
 
 Owner: Inventory; `inventoryConsumptionEvidence` contract. `/api/inventory/metrics` replaces the unbounded historic usage counter on the main screen. `kpiUsed` shows recorded net kg since the stated stocktake approval only when reporting checks pass; otherwise „לא מאומת”. Journal zero is never described as proof of zero actual production. Missing baseline or failed request cannot fall back to history or zero. Source events: production_completion usage plus signed V2 consumption/reversals. Reservations and stocktake adjustments are excluded. Detail text exposes legacy coverage gaps. `kpiBatches` and `kpiDiam` count only positive-balance, active, approved lot records, not packages or coils.
 
+**Superseded by the user's final clarification on 2026-11-09:** the count supplied by the user is the authoritative opening stock. Main screen now shows only current stock and diameters with positive stock, plus an explicit stocktake basis date and balance definition (`inventoryStockBasis`). Consumption, lot-record counts and „לא מאומת” explanations are removed from the main screen. The diagnostic /inventory/metrics API and research evidence remain internal/read-only and are not called by that screen. A failed basis-date lookup does not invalidate a successful balance read; a failed balance read shows unavailable rather than zero.
+
 ## Shape catalogue and billing bases — 2026-11-08
 
 Owner: Orders. Definition: `shapeCatalogueBilling` in `public/data-contracts-client.js`.
