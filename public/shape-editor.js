@@ -594,6 +594,7 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
   ]);
   // Project the actual points unchanged, including coincident spans.
   const mapped = flatMapped;
+  const overlappingIds = new Set((window.IronBendDisplayUnits?.overlappingSegments(mapped)||[]).flat());
   const hasOverlap = false;
 
   // ── Bar rendering: single connected polyline ─────────────────────
@@ -608,11 +609,15 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
       stroke-width="${barW}" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
     segsHtml += `<polyline points="${pts3}" stroke="rgba(255,255,255,0.38)"
       stroke-width="${(barW*0.28).toFixed(1)}" stroke-linejoin="round" stroke-linecap="round" fill="none"/>`;
+    for(const i of overlappingIds) {
+      const a=mapped[i],b=mapped[i+1];
+      segsHtml += `<path data-overlap-segment="${i}" d="M ${a[0]},${a[1]} L ${b[0]},${b[1]}" stroke="#172b3a" stroke-width="${barW}" stroke-linecap="round" fill="none"/>`;
+    }
     if (activeSeg >= 0 && activeSeg < mapped.length - 1) {
       const [ax1,ay1] = mapped[activeSeg], [ax2,ay2] = mapped[activeSeg+1];
       const ad = `M ${ax1.toFixed(1)},${ay1.toFixed(1)} L ${ax2.toFixed(1)},${ay2.toFixed(1)}`;
       activeGlowHtml = '';
-      segsHtml += `<path d="${ad}" stroke="#2979ff" stroke-width="${barW}" stroke-linecap="round" fill="none"/>`;
+      segsHtml += `<path d="${ad}" stroke="${overlappingIds.has(activeSeg)?'#07131f':'#2979ff'}" stroke-width="${barW}" stroke-linecap="round" fill="none"/>`;
       segsHtml += `<path d="${ad}" stroke="rgba(255,255,255,0.55)"
         stroke-width="${(barW*0.28).toFixed(1)}" stroke-linecap="round" fill="none"/>`;
     } else { activeGlowHtml = ''; }
@@ -638,9 +643,8 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
   }
 
   // ── Segment length labels ─────────────────────────────────────
-  let dimLabels = '';
+  let dimLabels = '', dimLeaders = '';
   if (showDims) {
-    const overlappingIds = new Set((window.IronBendDisplayUnits?.overlappingSegments(mapped)||[]).flat());
     const texts = sides.map((side,i)=>(overlappingIds.has(i)?String.fromCharCode(65+i)+' · ':'')+formatLengthCmFromMm(side));
     const labels = window.IronBendDisplayUnits?.diagramDimensionPositions(mapped,texts,22,{width:text=>dimensionTagWidth(text,54,82),height:22});
     for (let i = 0; i < mapped.length - 1; i++) {
@@ -650,10 +654,11 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
       const len = Math.sqrt(dx * dx + dy * dy) || 1;
       const nx = -dy / len * (compactLabels ? 15 : 22), ny = dx / len * (compactLabels ? 15 : 22);
       const isActSeg = i === activeSeg;
-      const badgeCol = isActSeg ? '#2979ff' : '#526070';
+      const badgeCol = overlappingIds.has(i) ? (isActSeg?'#07131f':'#172b3a') : isActSeg ? '#2979ff' : '#526070';
       const labelValue = texts[i];
       const labelW = dimensionTagWidth(labelValue, 54, 82);
       const lx=labels?.[i]?.x ?? mx+nx, ly=labels?.[i]?.y ?? my+ny;
+      if(overlappingIds.has(i)) dimLeaders += `<line data-overlap-leader="${i}" data-seg-click="${i}" x1="${mx}" y1="${my}" x2="${lx}" y2="${ly}" stroke="${badgeCol}" stroke-width="${isActSeg?1.8:.8}" stroke-dasharray="${isActSeg?'none':'3 3'}" style="cursor:pointer"/>`;
       dimLabels += `
         <g data-seg-click="${i}" style="cursor:pointer">
           <rect x="${(lx - labelW / 2).toFixed(1)}" y="${(ly - 10).toFixed(1)}" width="${labelW}" height="22"
@@ -718,7 +723,7 @@ function shape3DSVG(sides, angles, w, h, diameterMm = 12, opts = {}) {
     <!-- end dot -->
     <circle cx="${mapped[mapped.length-1][0].toFixed(1)}" cy="${mapped[mapped.length-1][1].toFixed(1)}"
       r="${(barW/2).toFixed(1)}" fill="#1560a8" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>
-    ${dimLabels}
+    ${dimLeaders}${dimLabels}
     ${bendLabels}
     ${axisHTML}
     ${dragHint}
@@ -3161,6 +3166,8 @@ class ShapeEditorModal {
 #seModal svg.se-focus-mode [data-se-focus]{opacity:.68;transition:opacity .14s,stroke .14s,fill .14s,filter .14s;}
 #seModal svg.se-focus-mode [data-se-focus].se-focus-hit{opacity:1!important;filter:drop-shadow(0 0 1px rgba(224,107,34,.3))!important;}
 #seModal svg.se-focus-mode [data-se-focus].se-focus-hit:not(text){stroke-width:2.2px;}
+#seModal input.se-overlap-input{border-color:#172b3a;color:#172b3a;font-weight:800;}
+#seModal input.se-overlap-input:focus{outline:2px solid #172b3a;outline-offset:2px;background:#e8eef3;}
 #seModal.se-pile-editor .se-foot{height:58px;min-height:58px;padding:7px 12px;}
 #seModal.se-pile-editor .se-summary-item{min-width:96px;padding:5px 8px;}
 #seModal.se-pile-editor .se-summary-item strong,#seModal.se-pile-editor .se-quantity-input{font-size:15px;}
@@ -6222,6 +6229,9 @@ class ShapeEditorModal {
     const is3D = window._seViewMode !== '2d';
     const isReal3D = this.current.is3d === 1 || this.current.is3d === true;
     const engine = ShapeEngineRouter(this.current);
+    const sourcePoints = isReal3D ? [] : calcShapePoints(sides || [],angles || []);
+    const sourceOverlapIds = new Set((window.IronBendDisplayUnits?.overlappingSegments(sourcePoints)||[]).flat());
+    document.querySelectorAll('#seTableBody [data-side]').forEach(input=>input.classList.toggle('se-overlap-input',sourceOverlapIds.has(Number(input.dataset.side))));
     if (engine === PolylineBarEngine) svg.setAttribute('viewBox', '0 0 300 290');
     if (engine !== PolylineBarEngine) {
       const pileCageCanvas = Boolean(this.current.roundPileCage);
@@ -6300,6 +6310,7 @@ class ShapeEditorModal {
       // Preserve the actual bend walk. Coincidence is shown by labels, not
       // diagonal vertex shifts that change angles or produce fake tails.
       const overlaps = window.IronBendDisplayUnits?.overlappingSegments(pts) || [];
+      const overlappingIds = new Set(overlaps.flat());
       const segs = pts.slice(0,-1).map(([x1,y1],i) => {
         const [x2,y2]=pts[i+1],len=Math.hypot(x2-x1,y2-y1)||1;
         return {x1,y1,x2,y2,nx:-(y2-y1)/len,ny:(x2-x1)/len};
@@ -6325,7 +6336,8 @@ class ShapeEditorModal {
           const s = segs[i];
           const isActive = i === _activeSeg2d;
           html += `<path d="M ${s.x1.toFixed(1)},${s.y1.toFixed(1)} L ${s.x2.toFixed(1)},${s.y2.toFixed(1)}"
-            stroke="${SEG_GRAY}" stroke-width="4" fill="none" stroke-linecap="round"
+            stroke="${overlappingIds.has(i)?'#172b3a':SEG_GRAY}" stroke-width="4" fill="none" stroke-linecap="round"
+            ${overlappingIds.has(i)?`data-overlap-segment="${i}"`:''}
             stroke-linejoin="round" data-se-focus="bar-all bar-side-${i}"
             data-seg-click="${i}" style="cursor:pointer"/>`;
         }
@@ -6344,21 +6356,22 @@ class ShapeEditorModal {
           data-seg-click="${i}" style="cursor:pointer"/>`;
       }
 
-      const overlappingIds = new Set(overlaps.flat());
       const dimensionTexts = sides.map((side,i)=>(overlappingIds.has(i) ? String.fromCharCode(65+i)+' · ' : '')+formatLengthCmFromMm(side));
       const dimensionPositions = window.IronBendDisplayUnits?.diagramDimensionPositions(pts,dimensionTexts,24,{rotated:true,width:dimensionTagWidth,height:16});
+      let overlapLeaders='';
       // Dimension tags: small white windows aligned with each side.
       for (let i = 0; i < segs.length; i++) {
         const s = segs[i];
         const isAct = i === _activeSeg2d;
-        const stroke = isAct ? '#ff4047' : '#9aa3b2';
-        const fill = isAct ? '#fff4f4' : '#ffffff';
+        const stroke = overlappingIds.has(i) ? (isAct?'#07131f':'#172b3a') : isAct ? '#ff4047' : '#9aa3b2';
+        const fill = isAct ? (overlappingIds.has(i)?'#e8eef3':'#fff4f4') : '#ffffff';
         const mx=(s.x1+s.x2)/2, my=(s.y1+s.y2)/2;
         const lx=dimensionPositions?.[i]?.x ?? mx+s.nx*24, ly=dimensionPositions?.[i]?.y ?? my+s.ny*24;
         const rawAngle = Math.atan2(s.y2 - s.y1, s.x2 - s.x1) * 180 / Math.PI;
         const labelAngle = normalizeReadableLabelAngle(rawAngle);
         const value = dimensionTexts[i];
         const tagW = dimensionTagWidth(value);
+        if(overlappingIds.has(i)) overlapLeaders += `<line data-overlap-leader="${i}" data-se-focus="bar-side-${i}" data-seg-click="${i}" x1="${mx}" y1="${my}" x2="${lx}" y2="${ly}" stroke="${stroke}" stroke-width="${isAct?1.8:.8}" stroke-dasharray="${isAct?'none':'3 3'}" style="cursor:pointer"/>`;
         html += `<g data-se-focus="bar-side-${i}" transform="translate(${lx.toFixed(1)} ${ly.toFixed(1)}) rotate(${labelAngle.toFixed(1)})"
             data-seg-click="${i}" style="cursor:pointer">
           <rect x="${(-tagW/2).toFixed(1)}" y="-8" width="${tagW}" height="16" rx="3"
@@ -6370,6 +6383,7 @@ class ShapeEditorModal {
         </g>`;
       }
 
+      html=overlapLeaders+html;
       // Bend marks: right angle gets a clean corner marker without number.
       if (segs.length > 1) {
         for (let i = 0; i < segs.length - 1; i++) {

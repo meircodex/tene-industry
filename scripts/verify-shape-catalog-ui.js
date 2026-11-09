@@ -102,6 +102,13 @@ const root = path.resolve(__dirname,'..');
     await page.locator('[data-side="5"]').press('Tab');
     await page.waitForSelector('[data-overlap-note]');
     assert.match(await page.locator('[data-overlap-note]').textContent(),/A \/ E/);
+    assert.equal(await page.locator('#seShapeSvg [data-overlap-segment]').count(),4);
+    assert.equal(await page.locator('#seShapeSvg [data-overlap-leader]').count(),4);
+    await page.locator('#seShapeSvg g[data-seg-click="0"]').click();
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.side),'0');
+    assert.equal(await page.locator('[data-side="0"]').evaluate(e=>e.classList.contains('se-overlap-input')),true);
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator('#seShapeSvg [data-overlap-leader="0"]').getAttribute('stroke'),'#07131f');
     const checkLabels = () => {
       const svg=document.getElementById('seShapeSvg'),v=svg.viewBox.baseVal;
       const boxes=[...svg.querySelectorAll('g[data-seg-click]')].filter(g=>g.querySelector('rect')&&g.querySelector('text')).map(g=>g.getBoundingClientRect());
