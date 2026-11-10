@@ -76,7 +76,7 @@
     },
     inventoryStockBasis: {
       screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','diameter']},
-      meaning:'The user-approved count is the opening stock basis. Current stock follows approved receipts minus recorded consumption and scrap, with audited count adjustments. Reservations are separate demand and not physical removal. Positive-balance groups define the diameter count. Latest stocktake approval from /api/inventory/stocktakes supplies the displayed basis date. Historic usage and uncertain consumption diagnostics are not displayed on the main inventory screen.',
+      meaning:'The user-approved physical count is the opening stock basis. Current stock follows approved receipts minus recorded consumption and scrap, with audited count adjustments. Reservations are separate demand and not physical removal. Positive-balance groups define the diameter count. GET /api/inventory/metrics baseline.counted_at supplies the displayed basis date, pinned to the explicitly activated physical count rather than a later weight correction. Historic usage and uncertain consumption diagnostics are not displayed on the main inventory screen.',
       consumers:['inventoryStockBasis','kpiDiam'],risk:'D0',
     },
     kpiOrdersToday: {
