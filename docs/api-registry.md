@@ -209,3 +209,9 @@ All require manager/admin and `expectedVersion`. GET returns `hiddenBuiltinIds`
 and manager-only `archived` metadata. Existing create/update and lifecycle changes
 record catalogue audit events. No rows or historical snapshots are deleted.
 See [handoff](shape-catalog-management-20261110.md).
+<!-- Product trait recognition, 2026-11-10: GET /api/shape-definitions now also
+returns entries[].recognitionTraits derived from the saved numeric geometry.
+Existing manager/admin create/update calls accept definition.recognitionRules
+(version=1; boolean enabled/allowReverse/allowMirror). Existing role/version/audit
+checks remain. /shapeRecognition.js exposes the same pure, non-mutating matcher.
+See product-trait-recognition-20261110.md. -->

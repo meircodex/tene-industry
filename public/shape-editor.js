@@ -1949,6 +1949,7 @@ function buildShapeDataContractV2(shape) {
         billingPolicy: window.IronBendShapeCommercial.normalizePolicy(safeShape.billingPolicy)
           || window.IronBendShapeCommercial.defaultPolicy(safeShape),
         catalogIdentity: safeShape.catalogIdentity ? JSON.parse(JSON.stringify(safeShape.catalogIdentity)) : null,
+        productRecognition: safeShape.productRecognition ? JSON.parse(JSON.stringify(safeShape.productRecognition)) : null,
       } : {}),
       calculation: {
         engine: 'shape-editor',
@@ -3569,8 +3570,8 @@ class ShapeEditorModal {
 
 /* Billing controls must not inherit full-width, 44px form inputs from host pages. */
 #seModal #seBillingDetails{padding:5px 12px!important;flex:0 0 auto;min-height:26px;max-height:42vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;font-size:12px;line-height:1.35;}
-#seModal #sePageEdit .se-data-panel:has(.se-billing-options){overflow-y:auto;}
-#seModal #sePageEdit .se-data-panel:has(.se-billing-options) .se-table-wrap{flex-shrink:0;min-height:140px;}
+#seModal #sePageEdit .se-data-panel:has(.se-billing-options,#seRecognitionDetails[open]){overflow-y:auto;}
+#seModal #sePageEdit .se-data-panel:has(.se-billing-options,#seRecognitionDetails[open]) .se-table-wrap{flex-shrink:0;min-height:140px;}
 #seModal #seBillingDetails>summary{padding:2px 0;}
 #seModal #seBillingBasis{display:flex;flex-wrap:wrap;gap:2px 10px;padding-top:3px;}
 #seModal #seBillingBasis>div{padding:0!important;font-size:11px;line-height:1.4;}
@@ -3583,6 +3584,13 @@ class ShapeEditorModal {
 #seModal #seBillingControls .se-billing-option input[type="checkbox"]{appearance:auto;display:block;position:static;flex:0 0 16px;width:16px!important;height:16px!important;min-width:16px!important;max-width:16px!important;min-height:16px!important;max-height:16px!important;padding:0!important;margin:0!important;box-shadow:none;border-radius:3px;accent-color:#c9621a;}
 #seModal .se-billing-option span{min-width:0;overflow-wrap:anywhere;}
 #seModal #seBillingControls select{display:block;width:100%;box-sizing:border-box;min-height:28px;height:28px;margin-top:4px;padding:2px 5px;font-family:inherit;font-size:11px;color:#243047;background:#fff;border:1px solid #c5cbd4;border-radius:5px;}
+#seModal #seRecognitionDetails{padding:5px 12px;font-size:11px;line-height:1.4;border-bottom:1px solid #c5cbd4;flex-shrink:0;}
+#seModal #seRecognitionDetails summary{cursor:pointer;font-weight:700;}
+#seModal #seRecognitionDetails p{margin:4px 0;}
+#seModal #seRecognitionDetails label{display:flex;align-items:center;gap:6px;margin:0;padding:2px 0;font-size:11px;letter-spacing:0;text-transform:none;}
+#seModal #seRecognitionDetails input[type="checkbox"]{width:16px!important;height:16px!important;min-height:16px!important;min-width:16px!important;max-width:16px!important;flex:0 0 16px;padding:0!important;margin:0!important;}
+#seModal #seRecognitionDetails button{min-height:28px;margin:3px;padding:3px 6px;font-family:inherit;font-size:11px;cursor:pointer;border:1px solid #c5cbd4;border-radius:5px;background:#fff;color:#243047;}
+#seModal #seRecognitionDetails select{width:100%;min-height:28px;padding:3px;font-family:inherit;font-size:12px;background:#fff;color:#243047;}
 @media(max-height:760px){#seModal #seBillingDetails{max-height:36vh;}}
 </style>
 <div id="seModal">
@@ -3693,6 +3701,7 @@ class ShapeEditorModal {
         <div id="seBillingBasis"></div>
         <div id="seBillingControls"></div>
       </details>
+      <details id="seRecognitionDetails"><summary id="seRecognitionTitle">זיהוי מוצר לפי תכונות</summary><div id="seRecognitionBody"></div></details>
       <div class="se-mode-note" id="seAuthoring3D">
         <label class="se-3d-toggle">
           <span>
@@ -3869,6 +3878,7 @@ class ShapeEditorModal {
   }
 
   _selectCatalogueEntry(entry) {
+    this._recognitionChoice=null;this._recognitionReview=false;
     this._catalogueEditTarget=null;
     this._catalogueNewAuthoring=false;
     this._hideSaveBar();
@@ -3983,6 +3993,7 @@ class ShapeEditorModal {
   }
 
   _newCatalogueShape() {
+    this._recognitionChoice=null;this._recognitionReview=false;
     this._catalogueEditTarget = null;
     this._catalogueNewAuthoring=true;
     this._closeCatalogue(); this._hideSaveBar();
@@ -4013,6 +4024,69 @@ class ShapeEditorModal {
     if (authoring) authoring.style.display = this._shapeMode === 'authoring' && normalizeShapeFamily(this.current || {}) === 'bars' ? '' : 'none';
     this._renderBillingControls();
     this._renderBillingBasis();
+    this._renderRecognition();
+  }
+
+  _recognitionResult() {
+    return window.IronBendShapeRecognition?.recognize(this.current,this._catalogueEntries());
+  }
+
+  _recognitionSelection(result) {
+    const choice=this._recognitionChoice;
+    if(!choice||choice.fingerprint!==result.traits.fingerprint)return null;
+    return this._catalogueEntries().find(entry=>entry.source===choice.source&&entry.shape.id===choice.id&&Number(entry.shape.catalogIdentity?.version||1)===choice.version)||null;
+  }
+
+  _renderRecognition() {
+    const engine=window.IronBendShapeRecognition,out=document.getElementById('seRecognitionBody'),details=document.getElementById('seRecognitionDetails'),title=document.getElementById('seRecognitionTitle');
+    if(!engine||!out||!this.current)return;
+    const result=this._recognitionResult(),chosen=this._recognitionSelection(result),explicit=Boolean(this.current.catalogIdentity);
+    const canConfigure=this._canManageCatalogue&&this._shapeMode==='authoring';
+    const blocked=this._catalogueLoading||this._catalogueError;
+    title.textContent=explicit?'תכונות זיהוי המוצר':blocked?'זיהוי מוצר — הקטלוג אינו זמין עדיין':chosen?'נבחר: '+chosen.code+' · '+chosen.name:result.status==='unique'?'מתאים למוצר '+result.candidates[0].code+' · '+result.candidates[0].name:result.status==='ambiguous'?'כמה מוצרים מתאימים — נדרשת בחירה':result.status==='unmatched'?'המוצר טרם סווג':'זיהוי מוצר — יש להשלים מידות';
+    out.replaceChildren();
+    const traits=document.createElement('p');traits.textContent=result.traits.valid?result.traits.summary.join(' · '):result.traits.error;out.append(traits);
+    if(canConfigure){
+      const rules=engine.normalizeRules(this.current.recognitionRules)||engine.normalizeRules();
+      for(const [key,labelText] of [['enabled','אפשר זיהוי אוטומטי של מוצר זה'],['allowReverse','זהה גם כשההזנה מתחילה מהקצה השני'],['allowMirror','אפשר גם צורת מראה']]){
+        const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=rules[key];
+        input.onchange=()=>{this.current.recognitionRules={...(engine.normalizeRules(this.current.recognitionRules)||engine.normalizeRules()),[key]:input.checked};this._recognitionChoice=null;};
+        label.append(input,document.createTextNode(labelText));out.append(label);
+      }
+      const savedNote=document.createElement('p');savedNote.textContent='כללי הזיהוי יישמרו בשמירת המוצר בקטלוג.';out.append(savedNote);
+    }
+    if(explicit||blocked||!result.traits.valid)return;
+    const note=document.createElement('p');note.textContent=chosen?'המידות שהוקלדו יישמרו; החיובים יילקחו מהמוצר שנבחר.':result.status==='unique'?'באישור הפריט ישויכו המק״ט והחיובים של מוצר זה. המידות שהוקלדו נשמרות.':result.status==='ambiguous'?'הגאומטריה מתאימה לכמה מוצרים. יש לבחור מוצר לפני אישור הפריט.':'אין התאמה בקטלוג. אפשר לשייך למוצר קיים או לבקש ממנהל להגדיר מוצר חדש.';out.append(note);
+    if(result.status==='ambiguous')for(const entry of result.candidates){
+      const button=document.createElement('button');button.type='button';button.textContent=entry.code+' · '+entry.name;button.onclick=()=>this._chooseRecognizedProduct(entry,'user_choice');out.append(button);
+    }
+    if(this._recognitionReview||result.status==='unmatched'){
+      const select=document.createElement('select');select.setAttribute('aria-label','שיוך המוצר להזנה הידנית');
+      const empty=document.createElement('option');empty.value='';empty.textContent='שיוך ידני למוצר קיים — בחר מוצר';select.append(empty);
+      const entries=this._catalogueEntries().filter(entry=>entry.code&&entry.source!=='local');
+      entries.forEach((entry,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=entry.code+' · '+entry.name;select.append(option);});
+      select.onchange=()=>{if(select.value!=='')this._chooseRecognizedProduct(entries[Number(select.value)],'manual_assignment');};out.append(select);
+    }
+    if(this._recognitionReview)details.open=true;
+  }
+
+  _chooseRecognizedProduct(entry,method) {
+    const result=this._recognitionResult();
+    this._recognitionChoice={source:entry.source,id:entry.shape.id,version:Number(entry.shape.catalogIdentity?.version||1),fingerprint:result.traits.fingerprint,method};
+    this._renderRecognition();
+  }
+
+  _recognizedProductMetadata() {
+    if(this.current.catalogIdentity){
+      const previous=this.current.productRecognition,traits=window.IronBendShapeRecognition?.describe(this.current);
+      return previous?.fingerprint&&traits?.valid&&previous.fingerprint!==traits.fingerprint?{productRecognition:{...previous,method:'explicit_catalogue_selection',fingerprint:traits.fingerprint,traits:traits.summary}}:{};
+    }
+    const result=this._recognitionResult();
+    if(!result||this._catalogueLoading||this._catalogueError){this._showToast('יש להמתין לטעינת הקטלוג או לרענן אותו לפני זיהוי המוצר');return null;}
+    const chosen=this._recognitionSelection(result),entry=chosen||(result.status==='unique'?result.candidates[0]:null);
+    if(!entry){this._recognitionReview=true;this._renderRecognition();document.getElementById('seRecognitionDetails').open=true;this._showToast(result.status==='ambiguous'?'יש כמה מוצרים מתאימים. בחר מוצר באזור ״זיהוי מוצר״.':'המוצר טרם סווג. יש לבחור שיוך למוצר קיים או לשמור מוצר חדש בקטלוג.');return null;}
+    const catalogIdentity=entry.shape.catalogIdentity||{source:'builtin',id:entry.shape.id,itemCode:entry.code,name:entry.name,version:1};
+    return {catalogIdentity,presetId:entry.shape.id,presetName:entry.name,billingPolicy:entry.shape.billingPolicy||window.IronBendShapeCommercial.defaultPolicy(entry.shape),productRecognition:{version:1,method:chosen?this._recognitionChoice.method:'unique_geometry',catalogIdentity:{...catalogIdentity},fingerprint:result.traits.fingerprint,traits:result.traits.summary}};
   }
 
   _editCatalogueShape(selectedEntry) {
@@ -4262,6 +4336,7 @@ class ShapeEditorModal {
   _startDefaultEdit(family = 'bars') {
     const authoring=this._shapeMode==='authoring' && (this._catalogueEditTarget || this._catalogueNewAuthoring);
     const editName=this.current?.presetName;
+    const editRules=this.current?.recognitionRules;
     const target=this._catalogueEditTarget?{...this._catalogueEditTarget}:null;
     this._selectedFamily = family === 'ring' ? 'spirals' : ((family === 'mesh' || family === 'piles' || family === 'spirals' || family === 'lifts') ? family : 'bars');
     this._selectedCategory = '';
@@ -4272,6 +4347,7 @@ class ShapeEditorModal {
       this._shapeMode='authoring';this._catalogueEditTarget=target;
       this.current.catalogIdentity=target;
       if(target)this.current.presetName=editName||target.name;
+      if(target&&editRules)this.current.recognitionRules=editRules;
       this._goToEdit();
     }
   }
@@ -6368,6 +6444,7 @@ class ShapeEditorModal {
 
   _renderPreviewNow() {
     if (!this.current) return;
+    this._renderRecognition();
     const { sides, angles } = this.current;
     const svg = document.getElementById('seShapeSvg');
     if (!svg) return;
@@ -6665,10 +6742,13 @@ class ShapeEditorModal {
         return;
       }
     }
+    const recognized=this._recognizedProductMetadata();
+    if(!recognized)return;
     const isReal3D = this.current.is3d === 1 || this.current.is3d === true;
     const orderItemQuantity = Math.max(1, Number(this.current.quantity || this.current.qty || 1) || 1);
     const normalized = {
       ...this.current,
+      ...recognized,
       is3d: isReal3D ? 1 : 0,
       azAngles: isReal3D ? (this.current.azAngles || []) : null,
       elAngles: isReal3D ? (this.current.elAngles || []) : null,
@@ -6686,7 +6766,9 @@ class ShapeEditorModal {
   }
 
   open(existingData) {
+    this._recognitionChoice=null;this._recognitionReview=false;
     if (!this._el || !document.body.contains(this._el)) this._ensureDom();
+    document.getElementById('seRecognitionDetails').open=false;
     window._seEditor = this;
     this._catalogueEditTarget=null;
     this._catalogueNewAuthoring=false;

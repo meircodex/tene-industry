@@ -163,3 +163,11 @@ suppresses removed static defaults; `archived` supplies restore IDs/revisions.
 The expanded delivery-summary policy is stored with each definition and copied
 into future selected order snapshots. Existing orders retain their saved values.
 See [management contract](shape-catalog-management-20261110.md).
+## Product trait recognition (2026-11-10)
+
+Orders owns `seRecognitionDetails`/`seRecognitionTitle`/`seRecognitionBody`.
+Sources: active catalogue definitions, recognition rules, exact numeric manual
+geometry and the pure shapeRecognition module. Matches are provisional until
+item approval. Unique matches bind existing identity/policy without replacing
+geometry; ambiguities and unmatched items require explicit resolution. Existing
+snapshots retain their policies. See product-trait-recognition-20261110.md.

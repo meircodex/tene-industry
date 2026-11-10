@@ -1,5 +1,10 @@
 # Module Inventory
 
+Product trait recognition (2026-11-10): Orders owns manual-entry resolution and
+recognition evidence in order snapshots; `modules/steel-rebar/shape-recognition.js`
+is the shared pure geometry dependency. Catalog persists explicit recognition
+rules using existing saved-shape revisions. See product-trait-recognition-20261110.md.
+
 Historical delivery status reconciliation and inline priority (2026-11-10):
 Orders owns `services/historicalOrderClosure.js` and `services/orderPriority.js`.
 Historical delivery calls Inventory's explicit exemption/release services without

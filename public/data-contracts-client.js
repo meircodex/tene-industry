@@ -21,6 +21,12 @@
       meaning: 'Only the arrow opens a floating catalogue. Numeric SKUs are separate from internal IDs. Thumbnails use template geometry; overlapping sides keep source coordinates and separate labels. Fixed templates retain topology while lengths remain proportional. Managers/admins explicitly edit a versioned catalogue definition. Billing policy and catalogue identity/version are copied into each approved order snapshot. Material kg is counted once; cutting/bending use that kg basis and product add-ons use item quantity. Existing snapshots are not reclassified when the catalogue changes.',
       consumers: ['seItemCode', 'seCatalogPopup', 'seEditCatalogShape', 'seCatalogName', 'seArchivedCatalog', 'seBillingBasis', 'data-overlap-segment', 'data-overlap-span', 'data-overlap-leader', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
     },
+    productTraitRecognition: {
+      screen:'shape-editor.js',owner:'Orders',
+      source:{api:'/api/shape-definitions',fields:['entries[].definition','entries[].definition.recognitionRules','entries[].recognitionTraits','entries[].billingPolicy','entries[].version','hiddenBuiltinIds']},
+      meaning:'Manual numeric geometry is compared with active product traits. Names and quantities do not establish identity. A unique match binds its existing catalogue identity and billing policy at item approval without replacing dimensions. Multiple/no matches require explicit resolution, recorded in productRecognition; historic snapshots remain unchanged.',
+      consumers:['seRecognitionDetails','seRecognitionTitle','seRecognitionBody','shape-snapshot.productRecognition'],risk:'D1',
+    },
     shapeSideDimensions: {
       screen: 'orders.html', owner: 'Production Cards',
       source: { api: '/api/orders/:id', fields: ['pallets[].items[].shape_svg', 'pallets[].items[].segments'] },

@@ -174,6 +174,9 @@ app.get('/steelRebarShapes.js', (_req, res) => {
 app.get('/shapeCommercial.js', (_req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'modules', 'steel-rebar', 'shape-commercial.js'));
 });
+app.get('/shapeRecognition.js', (_req, res) => {
+  res.type('application/javascript').sendFile(path.join(__dirname, 'modules', 'steel-rebar', 'shape-recognition.js'));
+});
 app.use(createMobileAppLinksRouter());
 app.use(express.static(path.join(__dirname, 'public')));
 

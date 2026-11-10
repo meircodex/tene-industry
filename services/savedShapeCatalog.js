@@ -1,6 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const commercial = require('../modules/steel-rebar/shape-commercial');
+const recognition = require('../modules/steel-rebar/shape-recognition');
 
 function ensureSavedShapeCatalogSchema(db) {
   const columns = new Set(db.pragma('table_info(shapes)').map(column => column.name));
@@ -11,7 +12,7 @@ function ensureSavedShapeCatalogSchema(db) {
 }
 function readEntry(row) {
   return { id: row.id, itemCode: row.item_code, name: row.name, version: row.definition_version,
-    active: row.active === 1, definition: JSON.parse(row.definition_json), billingPolicy: JSON.parse(row.billing_json) };
+    active: row.active === 1, definition: JSON.parse(row.definition_json), billingPolicy: JSON.parse(row.billing_json), recognitionTraits: recognition.publicTraits(JSON.parse(row.definition_json)) };
 }
 function validateDefinition(input, builtinId = null) {
   const errors = [];
@@ -46,6 +47,7 @@ function validateDefinition(input, builtinId = null) {
     }
   }
   const billingPolicy = commercial.normalizePolicy(input.billingPolicy);
+  if (definition && !recognition.normalizeRules(definition.recognitionRules)) errors.push('כללי זיהוי המוצר אינם תקינים');
   if (!billingPolicy) errors.push('יש להגדיר בסיס חומר יחיד וסעיפי חיוב תקינים');
   else {
     const material = {bars:'material_by_steel_type',spirals:'material_by_steel_type',mesh:'mesh_kg',piles:'pile_cages_kg',lifts:'lift_packages_kg'}[definition?.family];
@@ -56,6 +58,9 @@ function validateDefinition(input, builtinId = null) {
 function createSavedShapeCatalog(db) {
   function cleanDefinition(input) {
     const definition = { ...input };
+    definition.recognitionRules=recognition.normalizeRules(input.recognitionRules);
+    delete definition.productRecognition;
+    delete definition.recognitionTraits;
     for (const key of ['quantity','qty','structElement','shapeId','approvedAt','catalogIdentity','billingPolicy','custom','builtinPresetId']) delete definition[key];
     if (definition.family === 'lifts') definition.weighedKg = 0;
     return definition;

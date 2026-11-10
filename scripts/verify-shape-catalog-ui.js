@@ -21,10 +21,10 @@ const root = path.resolve(__dirname,'..');
   app.post('/api/shape-definitions/builtin/:id/archive',(req,res)=>{const r=catalog.archiveBuiltin(req.params.id,req.body);res.status(r.status).json(r);});
   app.post('/api/shape-definitions/:id/archive',(req,res)=>{const r=catalog.archive(req.params.id,req.body);res.status(r.status).json(r);});
   app.post('/api/shape-definitions/:id/restore',(req,res)=>{const r=catalog.restore(req.params.id,req.body);res.status(r.status).json(r);});
-  for (const [url,file] of Object.entries({shapeSnapshot:'services/shapeSnapshot.js',steelRebarShapes:'modules/steel-rebar/shapes.js',shapeCommercial:'modules/steel-rebar/shape-commercial.js'})) app.get('/'+url+'.js',(_req,res) => res.sendFile(path.join(root,file)));
+  for (const [url,file] of Object.entries({shapeSnapshot:'services/shapeSnapshot.js',steelRebarShapes:'modules/steel-rebar/shapes.js',shapeCommercial:'modules/steel-rebar/shape-commercial.js',shapeRecognition:'modules/steel-rebar/shape-recognition.js'})) app.get('/'+url+'.js',(_req,res) => res.sendFile(path.join(root,file)));
   app.get('/',(req,res) => {
     const hostCss=['index','orders'].includes(req.query.host)?[...fs.readFileSync(path.join(root,'public',req.query.host+'.html'),'utf8').matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match=>match[0]).join('\n'):'';
-    res.send(`<!doctype html><html dir="rtl" lang="he"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${hostCss}<body><script src="/user-messages.js"></script><script src="/rebar-weights.js"></script><script src="/display-units.js"></script><script src="/shapeSnapshot.js"></script><script src="/steelRebarShapes.js"></script><script src="/shapeCommercial.js"></script><script src="/shape-editor.js"></script><script>window.editor = new ShapeEditorModal(data => window.approved = data); editor.open();</script></body></html>`);
+    res.send(`<!doctype html><html dir="rtl" lang="he"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${hostCss}<body><script src="/user-messages.js"></script><script src="/rebar-weights.js"></script><script src="/display-units.js"></script><script src="/shapeSnapshot.js"></script><script src="/steelRebarShapes.js"></script><script src="/shapeCommercial.js"></script><script src="/shapeRecognition.js"></script><script src="/shape-editor.js"></script><script>window.editor = new ShapeEditorModal(data => window.approved = data); editor.open();</script></body></html>`);
   });
   app.use(express.static(path.join(root,'public')));
   const server = await new Promise(resolve => { const running = app.listen(0,'127.0.0.1',() => resolve(running)); });
@@ -247,6 +247,52 @@ const root = path.resolve(__dirname,'..');
     assert.equal(await page.locator('[data-catalog-code="001"]').count(),1,'failed removal cannot hide an active entry');
     assert.equal(catalog.list().find(row=>row.id===sharedId).version,versionBeforeCancel);
     assert.equal(approved.catalogIdentity.version,1,'historical order snapshot remains version 1');
+    // Manual dimensions bind product identity/policy without loading defaults or
+    // approving an ambiguous or unknown product. These are fixture-only items.
+    const manual=await browser.newPage({viewport:{width:1366,height:900}});
+    await manual.goto(`http://127.0.0.1:${server.address().port}/`);
+    await manual.waitForFunction(()=>editor._canManageCatalogue===true);
+    async function manualBar(lengths,angles){
+      await manual.locator('#seNewShape').click();
+      for(let i=1;i<lengths.length;i++)await manual.locator('#seAddSide').click();
+      for(let i=0;i<lengths.length;i++)await manual.locator(`[data-side="${i}"]`).fill(String(lengths[i]));
+      for(let i=0;i<angles.length;i++)await manual.locator(`[data-angle="${i}"]`).fill(String(angles[i]));
+      await manual.locator('#seDiameterSelect').selectOption('8');await manual.locator('#seQuantityInput').fill('10');
+      await manual.locator('#seQuantityInput').press('Tab');
+    }
+    await manualBar([40,20,60],[90,90]);
+    await manual.waitForFunction(()=>document.getElementById('seRecognitionTitle').textContent.includes('מתאים למוצר 3'));
+    await manual.locator('#seOk').click();
+    let recognized=await manual.evaluate(()=>window.approved);
+    assert.equal(recognized.catalogIdentity.itemCode,'3');assert.deepEqual(recognized.data.sides,[400,200,600]);assert.equal(recognized.orderItemQuantity,10);
+    assert.equal(recognized.productRecognition.method,'unique_geometry');
+    assert.deepEqual(recognized.billingPolicy.lines,['material_by_steel_type','cutting_kg','bending_kg']);
+    await manual.reload();await manual.waitForFunction(()=>editor._canManageCatalogue===true);
+    await manualBar([40,20,40,20],[90,90,90]);
+    await manual.locator('#seOk').click();assert.equal(await manual.evaluate(()=>window.approved),undefined);
+    assert.match(await manual.locator('#seRecognitionTitle').innerText(),/כמה מוצרים/);
+    await manual.locator('#seRecognitionBody').getByRole('button',{name:'8 · צורה 8',exact:true}).click();
+    if(shotDir)await manual.screenshot({path:path.join(shotDir,'recognition-choice.png')});
+    await manual.locator('#seOk').click();recognized=await manual.evaluate(()=>window.approved);
+    assert.equal(recognized.catalogIdentity.itemCode,'8');assert.equal(recognized.productRecognition.method,'user_choice');
+    assert.deepEqual(recognized.data.sides,[400,200,400,200]);assert.ok(recognized.billingPolicy.lines.includes('hoops_units'));
+    await manual.reload();await manual.waitForFunction(()=>editor._canManageCatalogue===true);
+    await manualBar([40,20,60],[60,90]);await manual.locator('#seOk').click();assert.equal(await manual.evaluate(()=>window.approved),undefined);
+    assert.match(await manual.locator('#seRecognitionTitle').innerText(),/טרם סווג/);
+    const assignment=manual.getByRole('combobox',{name:'שיוך המוצר להזנה הידנית',exact:true});
+    const code3=await assignment.locator('option').filter({hasText:'3 · צורה 3'}).getAttribute('value');await assignment.selectOption(code3);
+    await manual.locator('#seOk').click();recognized=await manual.evaluate(()=>window.approved);
+    assert.equal(recognized.productRecognition.method,'manual_assignment');assert.deepEqual(recognized.data.angles,[60,90]);
+    await manual.reload();await manual.waitForFunction(()=>editor._canManageCatalogue===true);
+    await manualBar([40,20,60],[90,90]);
+    await manual.locator('#seRecognitionDetails summary').click();
+    await manual.getByRole('checkbox',{name:'אפשר זיהוי אוטומטי של מוצר זה',exact:true}).uncheck();
+    await manual.getByRole('checkbox',{name:'אפשר גם צורת מראה',exact:true}).check();
+    await manual.locator('#seSaveShapeBtn').click();await manual.locator('#seSaveNameInput').fill('ח׳ ללא זיהוי אוטומטי');await manual.locator('#seSaveCodeInput').fill('887');await manual.locator('#seSaveCodeInput').press('Enter');
+    await manual.waitForFunction(()=>editor.current.catalogIdentity?.itemCode==='887');
+    const savedRules=catalog.list().find(row=>row.itemCode==='887').definition.recognitionRules;
+    assert.equal(savedRules.enabled,false);assert.equal(savedRules.allowMirror,true,'multiple checkbox changes preserve each other');
+    await manual.close();
     // Check actual host CSS, including its global input width and minimum height.
     for(const host of ['index','orders']) for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:390,height:844}]) {
       const layoutPage=await browser.newPage({viewport});

@@ -31,6 +31,9 @@ test('authorized catalogue editing and order/delivery consumers share immutable 
   assert.equal((await request('/api/shape-definitions',{method:'POST',headers:office,body:JSON.stringify(input)})).status,403);
   const created = await request('/api/shape-definitions',{method:'POST',headers:manager,body:JSON.stringify(input)}); assert.equal(created.status,201);
   const entry = (await created.json()).entry;
+  assert.equal(entry.recognitionTraits.segments,4);
+  assert.equal(entry.recognitionTraits.closed,true);
+  assert.deepEqual(entry.definition.recognitionRules,{version:1,enabled:true,allowReverse:true,allowMirror:false});
   const builtin = {...input,itemCode:'8',expectedVersion:1};
   assert.equal((await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:office,body:JSON.stringify(builtin)})).status,403);
   const override = await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:manager,body:JSON.stringify(builtin)});
