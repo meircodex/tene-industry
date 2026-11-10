@@ -17,6 +17,11 @@ function ensureInventoryAccountingSchema(db) {
   add('purchase_orders','specification_json','TEXT');
   add('purchase_orders','unit_price','REAL');
   db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory_item_consumption_overrides (
+      item_id INTEGER PRIMARY KEY REFERENCES items(id),order_id INTEGER NOT NULL REFERENCES orders(id),
+      stocktake_id INTEGER NOT NULL REFERENCES inventory_stocktakes(id),diameter REAL NOT NULL,
+      reason TEXT NOT NULL,actor_id INTEGER,created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS inventory_item_completion_policy (
       id INTEGER PRIMARY KEY CHECK(id=1),stocktake_id INTEGER NOT NULL REFERENCES inventory_stocktakes(id),
       counted_at TEXT NOT NULL,eligible_from TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP

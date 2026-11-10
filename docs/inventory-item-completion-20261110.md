@@ -34,6 +34,16 @@ post-count usage requires reconciliation. No Orders/Production history is erased
 The old per-reservation completion implementation remains compatibility behavior
 for installations without the explicitly activated policy.
 
+Owner exception (10 November): diameter 12 items in orders 105, 106 and 107
+must use the counted stock despite their earlier order-creation dates. Inventory
+stores explicit per-item overrides, bound to the physical stocktake, order and
+diameter, with reason and audit. This bypasses only the creation lookback;
+pre-count completion, cancellation and unfinished production remain guarded.
+Unfinished overridden demand remains visible even when a legacy order header
+already says supplied. No other diameter/order is admitted. Existing consumption
+states prevent duplicate debits. An insufficient compatible lot retains a
+pending debit rather than making stock negative or consuming straight material.
+
 Release evidence: `tmp/order-completion-20261110/production-before.db`, downloaded
 10 November, integrity_check=ok, 111 orders and two stocktakes. SHA256
 `d563fa321168ebdd45e48e0779075ea1adcce922053765a236ba042304d4aee4`.

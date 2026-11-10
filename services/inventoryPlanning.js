@@ -26,12 +26,13 @@ function planInventory(db,input={}) {
     ${completionPolicy?'AND julianday(u.used_at)>julianday(?)':''}`);
   for (const row of reservations) {
     if(completionPolicy){
+      const exceptional=require('./inventoryItemCompletion').consumptionOverride(db,require('./inventoryItemCompletion').itemRecord(db,row.item_id));
       const status=require('../status-contracts').normalizeOrderStatus(row.order_status);
       const {ORDER_STATUS}=require('../status-contracts');
-      if([ORDER_STATUS.CANCELLED,ORDER_STATUS.DELIVERED_CONFIRMED].includes(status)||countCompleted.has(row.item_id))continue;
+      if(status===ORDER_STATUS.CANCELLED||(status===ORDER_STATUS.DELIVERED_CONFIRMED&&!exceptional)||countCompleted.has(row.item_id))continue;
       const stamp=String(row.order_created_at||'');
       const created=Date.parse(/[zZ]$|[+-]\d\d:\d\d$/.test(stamp)?stamp:stamp.replace(' ','T')+'Z');
-      if(!Number.isFinite(created)||created<Date.parse(completionPolicy.eligible_from))continue;
+      if((!Number.isFinite(created)||created<Date.parse(completionPolicy.eligible_from))&&!exceptional)continue;
     }
     const g=group(row.diameter,row.material_type);
     const prepaid=row.consumption_mode==='on_completion'?0:Math.min(Number(row.reserved_kg),Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type,...(completionPolicy?[completionPolicy.counted_at]:[])).kg));

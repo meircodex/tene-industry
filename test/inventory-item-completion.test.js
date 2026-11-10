@@ -59,3 +59,17 @@ test('planning excludes historical completed and supplied demand but keeps curre
  db.exec("UPDATE orders SET status='סופק – אושר' WHERE id=1");assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,0);
  db.exec("UPDATE orders SET status='בייצור',created_at='2026-10-08 10:00:00' WHERE id=1");assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,0);db.close();
 });
+test('an explicit diameter-specific item exception admits an older order without admitting its other items',()=>{
+ const db=setup({created:'2026-10-14 10:00:00'});assert.equal(consume(db).consumed,0);
+ assert.equal(completion.authorizeConsumptionOverrides(db,{item_ids:[1],reason:'הבעלים אישר קוטר 12 מהמלאי החדש'}).authorized,1);
+ assert.equal(consume(db).consumed,1);assert.equal(used(db),100);
+ assert.equal(completion.authorizeConsumptionOverrides(db,{item_ids:[1],reason:'הבעלים אישר קוטר 12 מהמלאי החדש'}).authorized,0);assert.equal(consume(db).consumed,0);
+ db.exec("UPDATE items SET status='הושלם',completed_at='2026-11-10 10:00:00' WHERE id=2");assert.equal(completion.consumeItem(db,{item_id:2}).consumed,0);
+ db.exec('UPDATE items SET diameter=16 WHERE id=1');assert.equal(completion.eligibility(db,completion.itemRecord(db,1)),'created_before_lookback');db.close();
+});
+test('override keeps unfinished material in demand, but never debits it before completion or before count',()=>{
+ const db=setup({created:'2026-10-14 10:00:00'}),plan=require('../services/inventoryPlanning').planInventory;
+ completion.authorizeConsumptionOverrides(db,{item_ids:[2],reason:'הבעלים אישר קוטר 12 מהמלאי החדש'});
+ db.exec("UPDATE orders SET status='סופק – אושר' WHERE id=1");assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,200);assert.equal(completion.consumeItem(db,{item_id:2}).consumed,0);
+ db.exec("UPDATE items SET status='הושלם',completed_at='2026-11-07 10:00:00' WHERE id=2");assert.equal(completion.consumeItem(db,{item_id:2}).consumed,0);assert.equal(used(db),0);db.close();
+});

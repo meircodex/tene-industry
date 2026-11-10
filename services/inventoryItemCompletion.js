@@ -14,11 +14,31 @@ function eligibility(db,item){
   if(!rule)return 'policy_not_configured';
   if(!item || ['בוטל','cancelled','canceled'].includes(item.order_status)||item.status==='בוטל')return 'cancelled_or_missing';
   if(db.prepare('SELECT 1 FROM inventory_count_completed_items WHERE item_id=?').get(item.id))return 'completed_before_count';
-  if(!Number.isFinite(utc(item.order_created_at))||utc(item.order_created_at)<utc(rule.eligible_from))return 'created_before_lookback';
+  if((!Number.isFinite(utc(item.order_created_at))||utc(item.order_created_at)<utc(rule.eligible_from))&&!consumptionOverride(db,item))return 'created_before_lookback';
   if(!DONE.has(item.status))return 'production_incomplete';
   if(!Number.isFinite(utc(item.completed_at)))return 'completion_time_missing';
   if(utc(item.completed_at)<=utc(rule.counted_at))return 'completed_before_count';
   return null;
+}
+function consumptionOverride(db,item){
+  const rule=policy(db);if(!rule||!item)return null;
+  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE name='inventory_item_consumption_overrides'").get())return null;
+  return db.prepare('SELECT * FROM inventory_item_consumption_overrides WHERE item_id=? AND order_id=? AND stocktake_id=? AND diameter=?').get(item.id,item.owner_order_id,rule.stocktake_id,item.diameter)||null;
+}
+function authorizeConsumptionOverrides(db,{item_ids,reason,actor_id}){
+  if(!Array.isArray(item_ids)||!item_ids.length||String(reason||'').trim().length<3)throw Error('explicit_consumption_override_required');
+  return db.transaction(()=>{
+    const rule=policy(db);if(!rule)throw Error('physical_count_policy_required');
+    let authorized=0;
+    for(const id of new Set(item_ids)){
+      const item=itemRecord(db,id);if(!item||Number(item.inventory_lifecycle_version)!==1)throw Error('invalid_consumption_override_item');
+      const prior=db.prepare('SELECT * FROM inventory_item_consumption_overrides WHERE item_id=?').get(id);
+      if(prior){if(prior.order_id!==item.owner_order_id||prior.stocktake_id!==rule.stocktake_id||prior.diameter!==item.diameter)throw Error('consumption_override_conflict');continue;}
+      authorized+=db.prepare('INSERT INTO inventory_item_consumption_overrides(item_id,order_id,stocktake_id,diameter,reason,actor_id) VALUES(?,?,?,?,?,?)').run(id,item.owner_order_id,rule.stocktake_id,item.diameter,reason,actor_id??null).changes;
+      db.prepare('INSERT INTO audit_log(entity_type,entity_id,action,new_value,notes,user_id) VALUES(?,?,?,?,?,?)').run('item',id,'authorize_count_consumption_override',JSON.stringify({order_id:item.owner_order_id,diameter:item.diameter,stocktake_id:rule.stocktake_id}),reason,actor_id??null);
+    }
+    return {authorized};
+  }).immediate();
 }
 function activatePolicy(db,{stocktake_id,completed_item_ids=[]}){
   return db.transaction(()=>{
@@ -125,4 +145,4 @@ function exemptHistoricalItems(db,{item_ids,reason}){
   let exempted=0;for(const id of new Set(item_ids))exempted+=insert.run(id,rule.stocktake_id).changes;
   return {exempted};
 }
-module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction,exemptHistoricalItems};
+module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction,exemptHistoricalItems,consumptionOverride,authorizeConsumptionOverrides};
