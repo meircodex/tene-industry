@@ -20,7 +20,7 @@ function planInventory(db,input={}) {
   const completionPolicy=require('./inventoryItemCompletion').policy(db);
   const countCompleted=new Set(completionPolicy?db.prepare('SELECT item_id FROM inventory_count_completed_items').all().map(r=>r.item_id):[]);
   const reservations=db.prepare(`SELECT r.*,o.delivery_date,o.created_at AS order_created_at,o.status AS order_status FROM inventory_reservations r JOIN orders o ON o.id=r.order_id
-    WHERE r.status='active' AND o.inventory_lifecycle_version=1 AND o.status NOT IN ('בוטל','cancelled','canceled') ORDER BY r.id`).all();
+    WHERE ${completionPolicy?"(r.status='active' OR r.pending_actual_kg IS NOT NULL)":"r.status='active'"} AND o.inventory_lifecycle_version=1 AND o.status NOT IN ('בוטל','cancelled','canceled') ORDER BY r.id`).all();
   const legacyUsage=db.prepare(`SELECT COALESCE(SUM(u.weight_used),0) AS kg FROM raw_material_usage u JOIN raw_material m ON m.id=u.raw_material_id
     WHERE u.order_id=? AND u.item_id=? AND m.diameter=? AND COALESCE(m.material_type,'coil')=?
     ${completionPolicy?'AND julianday(u.used_at)>julianday(?)':''}`);
@@ -35,9 +35,12 @@ function planInventory(db,input={}) {
       if((!Number.isFinite(created)||created<Date.parse(completionPolicy.eligible_from))&&!exceptional)continue;
     }
     const g=group(row.diameter,row.material_type);
-    const prepaid=row.consumption_mode==='on_completion'?0:Math.min(Number(row.reserved_kg),Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type,...(completionPolicy?[completionPolicy.counted_at]:[])).kg));
+    const target=Number(row.pending_actual_kg??row.reserved_kg);
+    const charged=completionPolicy?require('./inventoryItemCompletion').state(db,row.item_id):null;
+    const identity=charged?JSON.parse(charged.identity_json):null;
+    const prepaid=charged?(identity.diameter===Number(row.diameter)&&identity.material_type===row.material_type?Math.min(target,charged.consumed_kg):0):(row.consumption_mode==='on_completion'?0:Math.min(target,Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type,...(completionPolicy?[completionPolicy.counted_at]:[])).kg)));
     g.legacy_preallocated_kg+=prepaid;
-    const remaining=Math.max(0,Number(row.reserved_kg)-prepaid);
+    const remaining=Math.max(0,target-prepaid);
     if (!row.delivery_date) g.undated_demand_kg+=remaining;
     if (!through||!row.delivery_date||row.delivery_date<=through) g.backlog_kg+=remaining;
   }

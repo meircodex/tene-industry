@@ -31,7 +31,14 @@ test('baseline completed items stay excluded after a later rescan; a status roll
 });
 test('an unavailable corrected debit rolls back the refund and retries after stock arrival',()=>{
  const db=setup();consume(db,100);const result=consume(db,1100);assert.equal(result.pending[0].missing_kg,100);assert.equal(used(db),100);
+ assert.equal(require('../services/inventoryPlanning').planInventory(db).groups.find(g=>g.diameter===12).backlog_kg,1200);
  db.exec("INSERT INTO raw_material(id,diameter,material_type,weight_received) VALUES(2,12,'coil',200)");consume(db);assert.equal(used(db),1100);db.close();
+});
+test('pending consumption of a previously closed legacy reservation stays in procurement demand',()=>{
+ const db=setup({created:'2026-10-14 10:00:00'});completion.authorizeConsumptionOverrides(db,{item_ids:[1],reason:'הבעלים אישר'});
+ db.exec("UPDATE inventory_reservations SET status='consumed',consumption_mode='legacy' WHERE item_id=1;UPDATE raw_material SET weight_received=25");
+ assert.equal(consume(db).pending[0].missing_kg,75);
+ assert.equal(require('../services/inventoryPlanning').planInventory(db).groups.find(g=>g.diameter===12).backlog_kg,100);db.close();
 });
 test('erroneous production returns a proportional amount, once, to its source lots',()=>{
  const db=setup();consume(db,100);const input={itemId:1,ratio:0.4,eventKey:'correction:1',reason:'דיווח שגוי',actorId:1};
