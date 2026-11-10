@@ -1,5 +1,7 @@
 # Widget Data Contracts
 
+Order material-source selector (2026-11-10): automatic selection remains the existing string `auto` in new-order drafts/payloads; the server normalizes it to a null preferred lot reference. Explicit lot selection retains its numeric identity. Order save reserves demand; it does not deduct physical inventory. Failed transaction leaves the draft available for retry and commits no partial order. See `docs/order-auto-material-fk-20261110.md`.
+
 ## Inventory consumption evidence — 2026-11-09
 
 Owner: Inventory; `inventoryConsumptionEvidence` contract. `/api/inventory/metrics` replaces the unbounded historic usage counter on the main screen. `kpiUsed` shows recorded net kg since the stated stocktake approval only when reporting checks pass; otherwise „לא מאומת”. Journal zero is never described as proof of zero actual production. Missing baseline or failed request cannot fall back to history or zero. Source events: production_completion usage plus signed V2 consumption/reversals. Reservations and stocktake adjustments are excluded. Detail text exposes legacy coverage gaps. `kpiBatches` and `kpiDiam` count only positive-balance, active, approved lot records, not packages or coils.
