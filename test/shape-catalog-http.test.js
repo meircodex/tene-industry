@@ -56,6 +56,22 @@ test('authorized catalogue editing and order/delivery consumers share immutable 
   for(const [key,value] of [['hoops_units',20],['chairs_units',10],['smooth_rebar_kg',50],['bending_kg',150],['cutting_kg',150]]) assert.equal(summary.lines.find(line=>line.key===key).value,value,key);
   assert.equal(summary.material_weight_kg,150);
   assert.equal(summary.lines.find(line=>line.key==='hoops_units').contributors[0].catalog_identity.version,1);
+  const beforeSnapshot=db.prepare('SELECT shape_snapshot_json FROM items WHERE order_id=? ORDER BY id').all(orderId);
+  for(const headers of [office]) for(const suffix of ['/archive','/restore']) {
+    assert.equal((await request('/api/shape-definitions/'+entry.id+suffix,{method:'POST',headers,body:JSON.stringify({expectedVersion:2})})).status,403);
+  }
+  const removed=await request('/api/shape-definitions/'+entry.id+'/archive',{method:'POST',headers:manager,body:JSON.stringify({expectedVersion:2})});assert.equal(removed.status,200);
+  const removedEntry=(await removed.json()).entry;assert.equal(removedEntry.active,false);
+  const listing=await (await request('/api/shape-definitions',{headers:manager})).json();assert.ok(listing.archived.some(row=>row.id===entry.id));assert.ok(!listing.entries.some(row=>row.id===entry.id));
+  const officeList=await (await request('/api/shape-definitions',{headers:office})).json();assert.deepEqual(officeList.archived,[]);
+  const restored=await request('/api/shape-definitions/'+entry.id+'/restore',{method:'POST',headers:admin,body:JSON.stringify({expectedVersion:removedEntry.version})});assert.equal(restored.status,200);
+  const builtinDelete={...input,itemCode:'9',expectedVersion:1};
+  assert.equal((await request('/api/shape-definitions/builtin/s9/archive',{method:'POST',headers:office,body:JSON.stringify(builtinDelete)})).status,403);
+  assert.equal((await request('/api/shape-definitions/builtin/s9/archive',{method:'POST',headers:manager,body:JSON.stringify(builtinDelete)})).status,200);
+  assert.ok((await (await request('/api/shape-definitions',{headers:office})).json()).hiddenBuiltinIds.includes('s9'));
+  assert.deepEqual(db.prepare('SELECT shape_snapshot_json FROM items WHERE order_id=? ORDER BY id').all(orderId),beforeSnapshot);
+  const actions=db.prepare("SELECT action FROM audit_log WHERE entity_type='shape'").all().map(row=>row.action);
+  for(const action of ['catalogue_create','catalogue_update','catalogue_archive','catalogue_restore'])assert.ok(actions.includes(action),action);
   for(const suffix of ['/print-a4','/delivery-certificate?waste3=0']) {
     const response = await request('/api/orders/'+orderId+suffix,{headers:office}); assert.equal(response.status,200);
     const html = await response.text();

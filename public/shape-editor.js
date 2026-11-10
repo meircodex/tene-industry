@@ -1555,12 +1555,12 @@ ShapeEngineRouter.render = function(shape, w = 300, h = 260, opts = {}) {
 };
 const SAVED_SHAPES_KEY = 'ironbend_saved_shapes';
 
-function loadSavedShapes() {
-  try { return JSON.parse(localStorage.getItem(SAVED_SHAPES_KEY) || '[]'); }
+function loadSavedShapes(includeArchived = false) {
+  try { const rows=JSON.parse(localStorage.getItem(SAVED_SHAPES_KEY) || '[]'); return Array.isArray(rows)?rows.filter(row=>includeArchived || !row.archived):[]; }
   catch { return []; }
 }
 function persistSavedShape(shapeData, name) {
-  const shapes = loadSavedShapes();
+  const shapes = loadSavedShapes(true);
   const id = 'u' + Date.now();
   const family = shapeData.family || 'bars';
   const entry = { id, name: (name || 'צורה מותאמת').trim(), family, savedAt: Date.now() };
@@ -1603,8 +1603,11 @@ function persistSavedShape(shapeData, name) {
   return id;
 }
 function deleteSavedShape(id) {
-  const shapes = loadSavedShapes().filter(s => s.id !== id);
+  const shapes = loadSavedShapes(true).map(s => s.id===id?{...s,archived:true}:s);
   localStorage.setItem(SAVED_SHAPES_KEY, JSON.stringify(shapes));
+}
+function restoreSavedShape(id) {
+  localStorage.setItem(SAVED_SHAPES_KEY,JSON.stringify(loadSavedShapes(true).map(s=>s.id===id?{...s,archived:false}:s)));
 }
 
 // ── WEIGHT ────────────────────────────────────────────────────────
@@ -3662,10 +3665,14 @@ class ShapeEditorModal {
           <button type="button" id="seNewShape" class="se-cancel-btn" style="white-space:nowrap;">צורה חדשה</button>
         </div>
         <button type="button" id="seEditCatalogShape" class="se-cancel-btn" style="display:none;margin-top:5px;">ערוך צורה בקטלוג</button>
+        <div id="seCatalogNameRow" style="display:none;margin-top:8px;">
+          <label for="seCatalogName" style="display:block;font-size:11px;font-weight:800;">שם הצורה בקטלוג</label>
+          <input id="seCatalogName" class="se-input" maxlength="120" autocomplete="off" style="width:100%;box-sizing:border-box;text-align:right;">
+        </div>
         <small id="seCatalogStatus" role="status"></small>
       </div>
       <details id="seBillingDetails" style="padding:8px 14px;border-bottom:1px solid #e2e8ef;font-size:12px;">
-        <summary style="cursor:pointer;font-weight:700;">בסיסי חיוב הצורה</summary>
+        <summary style="cursor:pointer;font-weight:700;">סעיפים בתעודת משלוח / בסיסי חיוב הצורה</summary>
         <div id="seBillingBasis"></div>
         <div id="seBillingControls"></div>
       </details>
@@ -3766,6 +3773,7 @@ class ShapeEditorModal {
     arrow.onclick = () => window._seEditor._toggleCatalogue();
     document.getElementById('seNewShape').onclick = () => window._seEditor._newCatalogueShape();
     document.getElementById('seEditCatalogShape').onclick = () => window._seEditor._editCatalogueShape();
+    document.getElementById('seCatalogName').oninput = event => { if(window._seEditor._canManageCatalogue && window._seEditor._shapeMode==='authoring') window._seEditor.current.presetName=event.target.value; };
     document.getElementById('seItemCode').addEventListener('keydown', event => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
@@ -3779,7 +3787,10 @@ class ShapeEditorModal {
     close.onclick = () => { window._seEditor._closeCatalogue(); arrow.focus(); };
     const list = document.createElement('div'); list.id = 'seCatalogList';
     list.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px;';
-    popup.append(close, list); document.body.append(popup);
+    const archived=document.createElement('details'); archived.id='seArchivedCatalog'; archived.hidden=true; archived.style.marginTop='12px';
+    const archivedTitle=document.createElement('summary'); archivedTitle.textContent='צורות שהוסרו — שחזור';
+    const archivedList=document.createElement('div'); archivedList.id='seArchivedCatalogList'; archived.append(archivedTitle,archivedList);
+    popup.append(close, list, archived); document.body.append(popup);
     document.addEventListener('pointerdown', event => {
       if (!popup.hidden && !popup.contains(event.target) && !arrow.contains(event.target)) window._seEditor?._closeCatalogue();
     });
@@ -3802,6 +3813,8 @@ class ShapeEditorModal {
       if (!response.ok) throw await window.IronBendMessages.responseError(response, 'catalogue unavailable');
       const result = await response.json();
       this._sharedShapes = Array.isArray(result.entries) ? result.entries : [];
+      this._archivedShapes = Array.isArray(result.archived) ? result.archived : [];
+      this._hiddenBuiltinIds = new Set(Array.isArray(result.hiddenBuiltinIds)?result.hiddenBuiltinIds:[]);
       this._canManageCatalogue = result.permissions?.canManage === true;
       this._catalogueError = false;
     } catch (_) { this._catalogueError = true; this._canManageCatalogue = false; }
@@ -3809,7 +3822,9 @@ class ShapeEditorModal {
       this._catalogueLoading = false;
       this._syncCatalogueMode();
       const status = document.getElementById('seCatalogStatus');
-      if (status) status.textContent = this._catalogueError ? 'הקטלוג המשותף אינו זמין כרגע; מוצגות צורות מובנות ושמורות במחשב.' : '';
+      if (status && this._catalogueError) status.textContent = 'הקטלוג המשותף אינו זמין כרגע; מוצגות צורות מובנות ושמורות במחשב.';
+      else if(status&&!this._catalogueEditTarget)status.textContent='';
+      if(!this._catalogueError&&this._blankNewEntry&&this.current?.catalogIdentity?.source==='builtin'&&this._hiddenBuiltinIds?.has(this.current.catalogIdentity.id))this._startDefaultEdit(this._selectedFamily||'bars');
       if (!document.getElementById('seCatalogPopup')?.hidden) this._renderCatalogue();
     }
   }
@@ -3819,7 +3834,7 @@ class ShapeEditorModal {
       shape: { ...entry.definition, id: entry.id, name: entry.name, billingPolicy: entry.billingPolicy, catalogIdentity: this._catalogIdentity(entry) } }));
     const overrides = new Map(shared.filter(e=>e.shape.builtinPresetId).map(e=>[e.shape.builtinPresetId,e]));
     return [
-      ...SHAPE_PRESETS.filter(p => !p.custom).map(p => overrides.get(p.id) || ({ code: window.IronBendShapeCommercial?.BUILTIN_CODES[p.id], name: p.name, shape: p, source: 'builtin' })),
+      ...SHAPE_PRESETS.filter(p => !p.custom && !this._hiddenBuiltinIds?.has(p.id)).map(p => overrides.get(p.id) || ({ code: window.IronBendShapeCommercial?.BUILTIN_CODES[p.id], name: p.name, shape: p, source: 'builtin' })),
       ...shared.filter(e=>!e.shape.builtinPresetId),
       ...loadSavedShapes().map(shape => ({ code: shape.itemCode || '', name: shape.name, shape, source: 'local' })),
     ].map(e=>({...e,code:/^[0-9]+$/.test(e.code)?e.code:''})).sort((a,b)=>a.code.localeCompare(b.code,undefined,{numeric:true}));
@@ -3827,11 +3842,19 @@ class ShapeEditorModal {
 
   _selectCatalogueCode(rawCode) {
     const code = String(rawCode || '').trim().toLowerCase();
-    const entry = /^[0-9]+$/.test(code) && this._catalogueEntries().find(item => item.code === code);
+    const matches=/^[0-9]+$/.test(code)?this._catalogueEntries().filter(item=>item.code===code):[];
+    const entry=matches.length===1?matches[0]:null;
     if (!entry) {
-      document.getElementById('seCatalogStatus').textContent = this._catalogueLoading ? 'הקטלוג נטען, נסה שוב בעוד רגע' : 'יש להזין מק״ט מספרי שקיים בקטלוג';
+      document.getElementById('seCatalogStatus').textContent = matches.length>1?'יש כמה צורות עם המספר הזה. יש לבחור את הצורה המדויקת מהחץ':this._catalogueLoading ? 'הקטלוג נטען, נסה שוב בעוד רגע' : 'יש להזין מק״ט מספרי שקיים בקטלוג';
       return;
     }
+    this._selectCatalogueEntry(entry);
+  }
+
+  _selectCatalogueEntry(entry) {
+    this._catalogueEditTarget=null;
+    this._catalogueNewAuthoring=false;
+    this._hideSaveBar();
     this._closeCatalogue();
     document.getElementById('seCatalogStatus').textContent = '';
     this._blankNewEntry = false;
@@ -3873,13 +3896,78 @@ class ShapeEditorModal {
       const text = document.createElement('div'); text.textContent = (entry.code ? entry.code + ' · ' : '') + entry.name;
       button.append(drawing, text);
       if (entry.source === 'local') { const note = document.createElement('small'); note.textContent = 'שמורה במחשב זה'; button.append(note); }
-      button.onclick = () => { if(entry.code) this._selectCatalogueCode(entry.code); else { this._closeCatalogue(); this._loadSavedShape(entry.shape); } };
-      list.append(button);
+      button.onclick = () => this._selectCatalogueEntry(entry);
+      const card=document.createElement('div'); card.style.cssText='display:flex;flex-direction:column;gap:4px;min-width:0;'; card.dataset.catalogCode=entry.code; card.append(button);
+      if(this._canManageCatalogue) {
+        const actions=document.createElement('div'); actions.style.cssText='display:flex;gap:4px;';
+        for(const [action,label] of [['edit','עריכה'],['archive','הסרה']]) {
+          const control=document.createElement('button'); control.type='button'; control.textContent=label; control.dataset.catalogAction=action;
+          control.setAttribute('aria-label',label+' צורה '+(entry.code||entry.name));
+          control.style.cssText='flex:1;border:1px solid #d8e2ec;border-radius:5px;background:white;color:#1a2332;cursor:pointer;padding:4px;font:inherit;font-size:12px;';
+          control.onclick=()=>action==='edit'?this._editCatalogueShape(entry):this._archiveCatalogueEntry(entry);
+          actions.append(control);
+        }
+        card.append(actions);
+      }
+      list.append(card);
     }
+    const archived=document.getElementById('seArchivedCatalog'),archivedList=document.getElementById('seArchivedCatalogList');
+    archivedList.replaceChildren();
+    const rows=[...(this._archivedShapes||[]).map(entry=>({...entry,source:'shared'})),...loadSavedShapes(true).filter(shape=>shape.archived).map(shape=>({...shape,source:'local'}))];
+    archived.hidden=!this._canManageCatalogue || !rows.length;
+    if(this._canManageCatalogue) for(const row of rows) {
+      const item=document.createElement('div'); item.style.cssText='display:flex;gap:8px;align-items:center;padding:6px 0;';
+      const name=document.createElement('span'); name.textContent=(row.itemCode?row.itemCode+' · ':'')+row.name+(row.source==='local'?' · שמורה במחשב זה':''); name.style.flex='1';
+      const restore=document.createElement('button'); restore.type='button'; restore.textContent='שחזור'; restore.setAttribute('aria-label','שחזר צורה '+(row.itemCode||row.name));
+      restore.onclick=()=>this._restoreCatalogueEntry(row); item.append(name,restore); archivedList.append(item);
+    }
+  }
+
+  async _archiveCatalogueEntry(entry) {
+    if(!this._canManageCatalogue || this._catalogueBusy)return;
+    if(!confirm('להסיר את צורה '+(entry.code||entry.name)+' מהקטלוג? אפשר לשחזר אותה מתוך ״צורות שהוסרו״. הזמנות קיימות יישארו כפי שנשמרו.'))return;
+    this._catalogueBusy=true;
+    try {
+      if(entry.source==='local')deleteSavedShape(entry.shape.id);
+      else {
+        const identity=entry.shape.catalogIdentity || {source:'builtin',id:entry.shape.id,version:1};
+        const target=identity.source==='builtin'?'builtin/'+encodeURIComponent(identity.id):encodeURIComponent(identity.id);
+        const response=await fetch('/api/shape-definitions/'+target+'/archive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:identity.version,name:entry.name,itemCode:entry.code,definition:{...entry.shape,family:entry.shape.family||'bars'},billingPolicy:entry.shape.billingPolicy||window.IronBendShapeCommercial.defaultPolicy(entry.shape)})});
+        if(!response.ok)throw await window.IronBendMessages.responseError(response,'הסרת הצורה מהקטלוג נכשלה');
+        const {entry:removed}=await response.json();
+        this._sharedShapes=(this._sharedShapes||[]).filter(row=>row.id!==removed.id);
+        this._archivedShapes=[...(this._archivedShapes||[]).filter(row=>row.id!==removed.id),{...removed,builtinId:removed.definition.builtinPresetId||null}];
+        if(removed.definition.builtinPresetId){this._hiddenBuiltinIds||=new Set();this._hiddenBuiltinIds.add(removed.definition.builtinPresetId);}
+        await this._loadCatalogue();
+      }
+      this._renderCatalogue();
+      this._showToast('הצורה הוסרה מהקטלוג. ניתן לשחזר אותה מתוך ״צורות שהוסרו״.');
+    }catch(error){this._showToast(error.message);}finally{this._catalogueBusy=false;}
+  }
+
+  async _restoreCatalogueEntry(entry) {
+    if(!this._canManageCatalogue || this._catalogueBusy)return;
+    this._catalogueBusy=true;
+    try {
+      if(entry.source==='local') {
+        if(entry.itemCode&&this._catalogueEntries().some(row=>row.code===entry.itemCode))throw new Error('מספר הצורה כבר נמצא בקטלוג הפעיל. יש לערוך את הצורה הפעילה במקום לשחזר עותק נוסף.');
+        restoreSavedShape(entry.id);
+      } else {
+        const response=await fetch('/api/shape-definitions/'+encodeURIComponent(entry.id)+'/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expectedVersion:entry.version})});
+        if(!response.ok)throw await window.IronBendMessages.responseError(response,'שחזור הצורה נכשל');
+        const {entry:restored}=await response.json();
+        this._sharedShapes=[...(this._sharedShapes||[]).filter(row=>row.id!==restored.id),restored];
+        this._archivedShapes=(this._archivedShapes||[]).filter(row=>row.id!==restored.id);
+        if(restored.definition.builtinPresetId)this._hiddenBuiltinIds?.delete(restored.definition.builtinPresetId);
+        await this._loadCatalogue();
+      }
+      this._renderCatalogue(); this._showToast('הצורה שוחזרה לקטלוג');
+    }catch(error){this._showToast(error.message);}finally{this._catalogueBusy=false;}
   }
 
   _newCatalogueShape() {
     this._catalogueEditTarget = null;
+    this._catalogueNewAuthoring=true;
     this._closeCatalogue(); this._hideSaveBar();
     this._blankNewEntry = false;
     this._loadPreset(SHAPE_PRESETS.find(p => p.custom));
@@ -3893,25 +3981,37 @@ class ShapeEditorModal {
     const code = document.getElementById('seItemCode');
     if (code) { const identity=this.current?.catalogIdentity; code.value = identity?.source === 'builtin' ? window.IronBendShapeCommercial?.BUILTIN_CODES[identity.id] || '' : (/^[0-9]+$/.test(identity?.itemCode) ? identity.itemCode : ''); }
     const edit = document.getElementById('seEditCatalogShape');
-    if(edit) edit.style.display = this._canManageCatalogue && this.current?.catalogIdentity && this._shapeMode === 'template' ? '' : 'none';
+    const identity=this.current?.catalogIdentity;
+    const activeEntry=identity && this._catalogueEntries().some(entry=>entry.shape.id===identity.id || entry.shape.builtinPresetId===identity.id);
+    if(edit) edit.style.display = this._canManageCatalogue && activeEntry && this._shapeMode === 'template' ? '' : 'none';
     const save = document.getElementById('seSaveShapeBtn');
-    if(save) save.style.display = this._canManageCatalogue ? '' : 'none';
+    if(save) save.style.display = this._canManageCatalogue && this._shapeMode==='authoring' ? '' : 'none';
+    const nameRow=document.getElementById('seCatalogNameRow'),name=document.getElementById('seCatalogName');
+    if(nameRow)nameRow.style.display=this._canManageCatalogue&&this._shapeMode==='authoring'?'':'none';
+    if(name&&document.activeElement!==name)name.value=this.current?.presetName||'';
+    const editing=this._catalogueEditTarget && this._shapeMode==='authoring';
+    const ok=document.getElementById('seOk');if(ok)ok.textContent=editing?'עדכן צורה בקטלוג':'אשר צורה';
+    const status=document.getElementById('seCatalogStatus');if(status&&editing)status.textContent='עריכת צורה '+(this._catalogueEditTarget.itemCode||this._catalogueEditTarget.name||'')+' — השמירה תעדכן את הצורה הקיימת בקטלוג';
     const authoring = document.getElementById('seAuthoring3D');
     if (authoring) authoring.style.display = this._shapeMode === 'authoring' && normalizeShapeFamily(this.current || {}) === 'bars' ? '' : 'none';
     this._renderBillingControls();
     this._renderBillingBasis();
   }
 
-  _editCatalogueShape() {
-    if(!this._canManageCatalogue || !this.current?.catalogIdentity)return;
-    const identity=this.current.catalogIdentity;
-    const entry=this._catalogueEntries().find(e=>e.shape.id===identity.id || e.shape.builtinPresetId===identity.id);
+  _editCatalogueShape(selectedEntry) {
+    if(!this._canManageCatalogue)return;
+    const identity=this.current?.catalogIdentity;
+    if(!selectedEntry&&!identity)return;
+    const entry=selectedEntry || this._catalogueEntries().find(e=>e.shape.id===identity?.id || e.shape.builtinPresetId===identity?.id);
     // Edit the current catalogue revision, never a historical order snapshot.
     if(!entry){this._showToast('יש לבחור את הצורה מחדש מהקטלוג');return;}
+    this._closeCatalogue(); this._hideSaveBar();
+    this._catalogueNewAuthoring=false;
     this._blankNewEntry=false;
-    this._loadPreset(entry.shape);
+    if(entry.source==='local')this._loadSavedShape(entry.shape);else this._loadPreset(entry.shape);
     this._catalogueEditTarget={...this.current.catalogIdentity};
     this._shapeMode='authoring'; this._goToEdit();
+    document.getElementById('seBillingDetails').open=true;
     this._showToast('עריכת צורה בקטלוג — השינוי יישמר רק בלחיצה על שמור צורה');
   }
 
@@ -3947,7 +4047,9 @@ class ShapeEditorModal {
     if(!this._canManageCatalogue || this._shapeMode !== 'authoring') return;
     const policy = this._currentBillingPolicy();
     const details = document.createElement('details');
+    details.open=true;
     const heading = document.createElement('summary'); heading.textContent = 'הגדרת סעיפי חיוב'; details.append(heading);
+    const explanation=document.createElement('p');explanation.textContent='בחר לאילו סעיפי חומר, עיבוד ויחידות הצורה תצורף בסיכום תעודת המשלוח. התעודה מוצגת ללא מחירים.';details.append(explanation);
     // The product family owns its material basis. Processing and unit add-ons are explicit choices.
     for (const line of commercial.POLICY_LINES.filter(line => line.section === 'processing')) {
       const label = document.createElement('label'); label.style.cssText = 'display:block;padding:3px 0;';
@@ -4123,25 +4225,36 @@ class ShapeEditorModal {
   }
 
   _defaultPresetForFamily(family = 'bars') {
-    if (family === 'ring') return SHAPE_PRESETS.find(isStandaloneRingShape) || SHAPE_PRESETS[0];
-    if (family === 'bench') return SHAPE_PRESETS.find(isBenchBarShape) || SHAPE_PRESETS[0];
-    if (family === 'rounded') return SHAPE_PRESETS.find(isRoundedEndBarShape) || SHAPE_PRESETS[0];
+    const presets=this._shapeMode==='authoring'&&(this._catalogueEditTarget||this._catalogueNewAuthoring)?SHAPE_PRESETS:SHAPE_PRESETS.filter(shape=>!this._hiddenBuiltinIds?.has(shape.id));
+    const fallback=presets.find(shape=>shape.custom)||presets[0];
+    if (family === 'ring') return presets.find(isStandaloneRingShape) || fallback;
+    if (family === 'bench') return presets.find(isBenchBarShape) || fallback;
+    if (family === 'rounded') return presets.find(isRoundedEndBarShape) || fallback;
     const normalizedFamily = (family === 'mesh' || family === 'piles' || family === 'spirals' || family === 'lifts') ? family : 'bars';
     const requestedSideCount = Number(this._selectedCount || this._selectedSideCount);
-    const candidates = SHAPE_PRESETS.filter(shape => (shape.family || 'bars') === normalizedFamily && !shape.custom && (normalizedFamily !== 'spirals' || !isStandaloneRingShape(shape)));
+    const candidates = presets.filter(shape => (shape.family || 'bars') === normalizedFamily && !shape.custom && (normalizedFamily !== 'spirals' || !isStandaloneRingShape(shape)));
     if (normalizedFamily === 'bars' && Number.isFinite(requestedSideCount) && requestedSideCount > 0) {
       const bySideCount = candidates.find(shape => Array.isArray(shape.sides) && shape.sides.length === requestedSideCount);
       if (bySideCount) return bySideCount;
     }
-    return candidates[0] || SHAPE_PRESETS.find(shape => (shape.family || 'bars') === normalizedFamily) || SHAPE_PRESETS[0];
+    return candidates[0] || presets.find(shape => (shape.family || 'bars') === normalizedFamily) || fallback;
   }
 
   _startDefaultEdit(family = 'bars') {
+    const authoring=this._shapeMode==='authoring' && (this._catalogueEditTarget || this._catalogueNewAuthoring);
+    const editName=this.current?.presetName;
+    const target=this._catalogueEditTarget?{...this._catalogueEditTarget}:null;
     this._selectedFamily = family === 'ring' ? 'spirals' : ((family === 'mesh' || family === 'piles' || family === 'spirals' || family === 'lifts') ? family : 'bars');
     this._selectedCategory = '';
     if (this._selectedSideCount === undefined) this._selectedSideCount = this._selectedCount || null;
     const preset = this._defaultPresetForFamily(family);
     if (preset) this._loadPreset(preset);
+    if(authoring) {
+      this._shapeMode='authoring';this._catalogueEditTarget=target;
+      this.current.catalogIdentity=target;
+      if(target)this.current.presetName=editName||target.name;
+      this._goToEdit();
+    }
   }
 
   _goToSelect() {
@@ -4293,6 +4406,7 @@ class ShapeEditorModal {
     const category = this._selectedCategory || 'הכל';
     const sideCount = this._selectedSideCount === undefined || this._selectedSideCount === 'הכל' ? countFilter : Number(this._selectedSideCount);
     const shapes = SHAPE_PRESETS.filter(s => {
+      if(this._hiddenBuiltinIds?.has(s.id))return false;
       const sameFamily = (s.family || 'bars') === family;
       const n = Array.isArray(s.sides) ? s.sides.length : 0;
       const countOk = !sideCount || family !== 'bars' || n === sideCount;
@@ -4363,8 +4477,10 @@ class ShapeEditorModal {
       });
     });
     cont.querySelectorAll('.se-del-saved-btn').forEach(btn => {
+      btn.hidden=!this._canManageCatalogue;
       btn.addEventListener('click', e => {
         e.stopPropagation();
+        if(!this._canManageCatalogue)return;
         if (!confirm('למחוק את הצורה הזו?')) return;
         deleteSavedShape(btn.dataset.delId);
         this._renderSavedShapes(countFilter);
@@ -4373,6 +4489,7 @@ class ShapeEditorModal {
   }
 
   _loadSavedShape(saved) {
+    this._catalogueEditTarget=null;
     this._shapeMode = 'template';
     const family = saved.family || 'bars';
     if (family === 'spirals') {
@@ -4399,11 +4516,12 @@ class ShapeEditorModal {
         elAngles:    saved.elAngles ? [...saved.elAngles] : Array(n).fill(0),
       };
     }
+    this.current.catalogIdentity={source:'local',id:saved.id,itemCode:saved.itemCode||'',name:saved.name,version:1};
     this._goToEdit();
   }
 
   _showSaveBar() {
-    if(!this._canManageCatalogue)return;
+    if(!this._canManageCatalogue || this._shapeMode!=='authoring')return;
     document.getElementById('seFootNormal').style.display = 'none';
     const bar = document.getElementById('seFootSave');
     bar.style.display = 'flex';
@@ -4432,7 +4550,7 @@ class ShapeEditorModal {
     error.textContent = 'שומר…';
     try {
       const identity = this._catalogueEditTarget || this.current.catalogIdentity;
-      const updating = !!this._catalogueEditTarget || (identity?.source === 'shared' && identity.itemCode === itemCode);
+      const updating = identity?.source!=='local' && (!!this._catalogueEditTarget || (identity?.source === 'shared' && identity.itemCode === itemCode));
       const target = updating ? (identity.source === 'builtin' ? '/builtin/' : '/') + encodeURIComponent(identity.id) : '';
       const response = await fetch('/api/shape-definitions' + target, {
         method: updating ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
@@ -4440,12 +4558,15 @@ class ShapeEditorModal {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.user_message || result.error || 'שמירת הצורה נכשלה');
+      if(identity?.source==='local')deleteSavedShape(identity.id);
       const entry = result.entry;
+      this._sharedShapes=[...(this._sharedShapes||[]).filter(row=>row.id!==entry.id),entry];
       this.current.presetName = entry.name;
       this.current.presetId = entry.id;
       this.current.billingPolicy = entry.billingPolicy;
       this.current.catalogIdentity = this._catalogIdentity(entry);
       this._catalogueEditTarget = null;
+      this._catalogueNewAuthoring=false;
       this._shapeMode = 'template';
       this._hideSaveBar();
       this._goToEdit();
@@ -6458,6 +6579,7 @@ class ShapeEditorModal {
 
   _confirm() {
     if (!this.current || !this.onSelect) return;
+    if(this._catalogueEditTarget && this._shapeMode==='authoring'){this._showSaveBar();return;}
     const enteredCode = document.getElementById('seItemCode')?.value.trim() || '';
     const identity=this.current.catalogIdentity;
     const selectedCode = identity?.source === 'builtin' ? window.IronBendShapeCommercial?.BUILTIN_CODES[identity.id] || '' : (/^[0-9]+$/.test(identity?.itemCode) ? identity.itemCode : '');
@@ -6547,6 +6669,8 @@ class ShapeEditorModal {
   open(existingData) {
     if (!this._el || !document.body.contains(this._el)) this._ensureDom();
     window._seEditor = this;
+    this._catalogueEditTarget=null;
+    this._catalogueNewAuthoring=false;
     this._closeCatalogue();
     this._shapeMode = existingData?.catalogIdentity || SHAPE_PRESETS.some(p => p.id === existingData?.presetId && !p.custom) ? 'template' : 'authoring';
     this._loadCatalogue();

@@ -194,3 +194,12 @@ Platform Core adds `user_message` to JSON error objects without changing raw
 `error`, `code` or status. Request IDs identify internal failures. Parser errors
 also use JSON. Diagnostic details can identify affected item sequences and lots.
 See [contract and handoff](hebrew-system-messages-20261110.md).
+
+## Reversible shape catalogue management (2026-11-10)
+
+Orders owns POST `/api/shape-definitions/builtin/:id/archive`, POST
+`/api/shape-definitions/:id/archive` and POST `/api/shape-definitions/:id/restore`.
+All require manager/admin and `expectedVersion`. GET returns `hiddenBuiltinIds`
+and manager-only `archived` metadata. Existing create/update and lifecycle changes
+record catalogue audit events. No rows or historical snapshots are deleted.
+See [handoff](shape-catalog-management-20261110.md).

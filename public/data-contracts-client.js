@@ -12,9 +12,9 @@
     },
     shapeCatalogueBilling: {
       screen: 'shape-editor.js', owner: 'Orders',
-      source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy', 'permissions.canManage'] },
+      source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].name', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy', 'archived', 'hiddenBuiltinIds', 'permissions.canManage'] },
       meaning: 'Only the arrow opens a floating catalogue. Numeric SKUs are separate from internal IDs. Thumbnails use template geometry; overlapping sides keep source coordinates and separate labels. Fixed templates retain topology while lengths remain proportional. Managers/admins explicitly edit a versioned catalogue definition. Billing policy and catalogue identity/version are copied into each approved order snapshot. Material kg is counted once; cutting/bending use that kg basis and product add-ons use item quantity. Existing snapshots are not reclassified when the catalogue changes.',
-      consumers: ['seItemCode', 'seCatalogPopup', 'seEditCatalogShape', 'seBillingBasis', 'data-overlap-segment', 'data-overlap-span', 'data-overlap-leader', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
+      consumers: ['seItemCode', 'seCatalogPopup', 'seEditCatalogShape', 'seCatalogName', 'seArchivedCatalog', 'seBillingBasis', 'data-overlap-segment', 'data-overlap-span', 'data-overlap-leader', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
     },
     shapeSideDimensions: {
       screen: 'orders.html', owner: 'Production Cards',

@@ -186,7 +186,10 @@ test('bench preset opens as real 3D and keeps the schedule elevation in every 2D
   const outgoingRay = [31 - acuteVertex[0], 28 - acuteVertex[1]];
   const interiorDotProduct = incomingRay[0] * outgoingRay[0] + incomingRay[1] * outgoingRay[1];
   assert.ok(interiorDotProduct > 0, 'expected the left bench icon corner to be acute, not obtuse');
-  assert.match(editor, /family === 'bench'.*SHAPE_PRESETS\.find\(isBenchBarShape\)/);
+  const presetContext = loadShapeEditorGeometry();
+  assert.equal(vm.runInContext("ShapeEditorModal.prototype._defaultPresetForFamily.call({}, 'bench').id", presetContext), 's15');
+  assert.notEqual(vm.runInContext("ShapeEditorModal.prototype._defaultPresetForFamily.call({_hiddenBuiltinIds:new Set(['s15'])}, 'bench').id", presetContext), 's15');
+  assert.equal(vm.runInContext("ShapeEditorModal.prototype._defaultPresetForFamily.call({_hiddenBuiltinIds:new Set(['s15']),_shapeMode:'authoring',_catalogueNewAuthoring:true}, 'bench').id", presetContext), 's15');
   assert.match(editor, /if \(isReal3D\) window\.seSetView\?\.\('3d'\)/);
   assert.match(editor, /diameter:\s+isBlankNewEntry \? 0 : \(Number\(preset\.diameter \?\? this\.current\?\.diameter \?\? this\._pendingDiameter/);
   assert.equal(contract.shapeType, 'bench_bar');
@@ -288,7 +291,7 @@ test('shape editor exposes the rounded-end preset and optional radius field', ()
   const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
   assert.match(editor, /id: 's16'.*shapeType: 'rounded_end_bar'.*roundedBends: true/);
   assert.match(editor, /data-edit-family="rounded"[^>]*_jumpToFamily\('rounded'\)[\s\S]*?<span>קצה מעוגל<\/span>/);
-  assert.match(editor, /family === 'rounded'\) return SHAPE_PRESETS\.find\(isRoundedEndBarShape\)/);
+  assert.equal(vm.runInContext("ShapeEditorModal.prototype._defaultPresetForFamily.call({}, 'rounded').id", loadShapeEditorGeometry()), 's16');
   assert.match(editor, /id="seRadiusInput"/);
   assert.match(editor, /roundedEndBarEditorSVG\(sides, 300, 260/);
 });
@@ -614,7 +617,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=88/);
+  assert.match(index, /shape-editor\.js\?v=89/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

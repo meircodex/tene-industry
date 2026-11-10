@@ -141,3 +141,12 @@ toasts, inline error panels, worker and warehouse feedback. Raw `error` remains
 a machine code for client decisions. Messages must name a known cause and next
 action, without inventing inventory values, affected records or save outcomes.
 See [contract](hebrew-system-messages-20261110.md).
+
+## Catalogue management (2026-11-10)
+
+`shapeCatalogueBilling` also owns the editable catalogue name and archive list.
+The picker exposes edit/remove actions only to managers/admins. `hiddenBuiltinIds`
+suppresses removed static defaults; `archived` supplies restore IDs/revisions.
+The expanded delivery-summary policy is stored with each definition and copied
+into future selected order snapshots. Existing orders retain their saved values.
+See [management contract](shape-catalog-management-20261110.md).

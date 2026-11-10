@@ -48,6 +48,41 @@ test('invalid geometry and ambiguous material basis cannot enter shared catalogu
   assert.equal(catalog.create(definition({ billingPolicy: { ...hoopPolicy, lines: ['material_by_steel_type','invented'] } })).status, 400);
   assert.equal(catalog.list().length, 0);
 });
+
+test('shared removal and restoration retain rows, references and historical snapshots with stale-write guards', t => {
+  const db=new Database(':memory:');t.after(()=>db.close());db.pragma('foreign_keys=ON');
+  db.exec('CREATE TABLE shapes(id TEXT PRIMARY KEY,name TEXT,bends INTEGER,sides_default TEXT,angles_default TEXT,active INTEGER DEFAULT 1)');ensureSavedShapeCatalogSchema(db);
+  db.exec('CREATE TABLE historical_items(shape_id TEXT REFERENCES shapes(id),snapshot_json TEXT)');
+  const catalog=createSavedShapeCatalog(db),entry=catalog.create(definition()).entry;
+  const snapshot=JSON.stringify(entry);db.prepare('INSERT INTO historical_items VALUES(?,?)').run(entry.id,snapshot);
+  const removed=catalog.archive(entry.id,{expectedVersion:1});assert.equal(removed.status,200);assert.equal(removed.entry.version,2);
+  assert.equal(catalog.list().length,0);assert.equal(catalog.archived()[0].id,entry.id);
+  assert.equal(db.prepare('SELECT active FROM shapes WHERE id=?').get(entry.id).active,0);
+  assert.equal(catalog.create(definition()).status,409,'removed SKU cannot be reused for an unrelated shape');
+  assert.equal(catalog.update(entry.id,definition({expectedVersion:2})).status,404);
+  assert.equal(catalog.restore(entry.id,{expectedVersion:1}).status,409);
+  const restored=catalog.restore(entry.id,{expectedVersion:2});assert.equal(restored.status,200);assert.equal(restored.entry.version,3);
+  assert.equal(catalog.list()[0].id,entry.id);assert.equal(catalog.archived().length,0);
+  assert.equal(catalog.archive(entry.id,{expectedVersion:1}).status,409);
+  assert.equal(db.prepare('SELECT snapshot_json FROM historical_items').get().snapshot_json,snapshot);
+  assert.deepEqual(db.pragma('foreign_key_check'),[]);
+});
+
+test('removing an unchanged builtin creates a reversible definition, never exposes the fallback again',t=>{
+  const db=new Database(':memory:');t.after(()=>db.close());
+  db.exec('CREATE TABLE shapes(id TEXT PRIMARY KEY,name TEXT,bends INTEGER,sides_default TEXT,angles_default TEXT,active INTEGER DEFAULT 1)');ensureSavedShapeCatalogSchema(db);
+  const catalog=createSavedShapeCatalog(db),input=definition({itemCode:'8',expectedVersion:1});
+  const removed=catalog.archiveBuiltin('s8',input);assert.equal(removed.status,200);assert.equal(removed.entry.active,false);
+  assert.equal(removed.entry.version,2);assert.equal(catalog.list().length,0);assert.equal(catalog.archived()[0].builtinId,'s8');
+  assert.equal(catalog.archiveBuiltin('s8',input).status,409);
+  assert.equal(catalog.updateBuiltin('s8',{...input,expectedVersion:2}).status,404,'update cannot silently restore a removed builtin');
+  assert.equal(catalog.archiveBuiltin('unknown',input).status,404);
+  const restored=catalog.restore(removed.entry.id,{expectedVersion:2});assert.equal(restored.entry.version,3);
+  const updated=catalog.updateBuiltin('s8',{...input,expectedVersion:3,name:'שם מעודכן'});
+  assert.equal(updated.entry.id,removed.entry.id);assert.equal(updated.entry.name,'שם מעודכן');assert.equal(updated.entry.version,4);
+  assert.equal(catalog.list().length,1);assert.equal(catalog.archived().length,0);
+  assert.equal(db.pragma('integrity_check',{simple:true}),'ok');
+});
 test('numeric catalogue codes and built-in revisions preserve source identity and reject stale writes', t => {
   const db = new Database(':memory:'); t.after(() => db.close());
   db.exec('CREATE TABLE shapes(id TEXT PRIMARY KEY,name TEXT,bends INTEGER,sides_default TEXT,angles_default TEXT,active INTEGER DEFAULT 1)'); ensureSavedShapeCatalogSchema(db);

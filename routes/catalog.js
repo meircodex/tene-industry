@@ -368,20 +368,38 @@ If a value is uncertain, still return the row with a note. Never invent prices t
   });
 
   const savedShapeCatalog = createSavedShapeCatalog(db);
+  function catalogueResult(req,res,result,action) {
+    if (result.entry && deps.auditLog) {
+      const entry=result.entry;
+      deps.auditLog('shape',entry.id,entry.itemCode,action,'catalogue_version',null,String(entry.version),'שינוי בקטלוג הצורות',req.auth?.sub||null,req.auth?.display_name||null);
+    }
+    res.status(result.status).json(result.entry ? {entry:result.entry} : {error:result.error});
+  }
   router.get('/shape-definitions', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (req, res) => {
-    res.json({ entries: savedShapeCatalog.list(), permissions: { canManage: ['manager','admin'].includes(req.userRole) } });
+    const canManage=['manager','admin'].includes(req.userRole);
+    const archived=savedShapeCatalog.archived();
+    res.json({ entries: savedShapeCatalog.list(), hiddenBuiltinIds:archived.map(entry=>entry.builtinId).filter(Boolean), archived:canManage?archived:[], permissions: { canManage } });
   });
   router.put('/shape-definitions/builtin/:id', requireAnyRole(['manager', 'admin']), (req,res) => {
     const result = savedShapeCatalog.updateBuiltin(req.params.id,req.body);
-    res.status(result.status).json(result);
+    catalogueResult(req,res,result,'catalogue_update');
   });
   router.post('/shape-definitions', requireAnyRole(['manager', 'admin']), (req, res) => {
     const result = savedShapeCatalog.create(req.body || {});
-    res.status(result.status).json(result.entry ? { entry: result.entry } : { error: result.error });
+    catalogueResult(req,res,result,'catalogue_create');
   });
   router.put('/shape-definitions/:id', requireAnyRole(['manager', 'admin']), (req, res) => {
     const result = savedShapeCatalog.update(req.params.id, req.body || {});
-    res.status(result.status).json(result.entry ? { entry: result.entry } : { error: result.error });
+    catalogueResult(req,res,result,'catalogue_update');
+  });
+  router.post('/shape-definitions/builtin/:id/archive', requireAnyRole(['manager','admin']), (req,res) => {
+    catalogueResult(req,res,savedShapeCatalog.archiveBuiltin(req.params.id,req.body||{}),'catalogue_archive');
+  });
+  router.post('/shape-definitions/:id/archive', requireAnyRole(['manager','admin']), (req,res) => {
+    catalogueResult(req,res,savedShapeCatalog.archive(req.params.id,req.body||{}),'catalogue_archive');
+  });
+  router.post('/shape-definitions/:id/restore', requireAnyRole(['manager','admin']), (req,res) => {
+    catalogueResult(req,res,savedShapeCatalog.restore(req.params.id,req.body||{}),'catalogue_restore');
   });
 
   router.get('/shapes', requireAnyRole(['office', 'sales', 'production', 'manager', 'admin']), (req, res) => {

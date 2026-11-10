@@ -875,6 +875,7 @@ app.use('/api', requireModule('reports'), createReportsRouter({
 
 app.use('/api', requireModule('production'), createCatalogRouter({
   db,
+  auditLog,
   requireAnyRole,
   intake,
   PORT,
