@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>מחירונים | IronBend</title>
@@ -691,7 +692,7 @@
       const text = await response.text();
       const data = text ? JSON.parse(text) : null;
       if (!response.ok) {
-        const error = new Error((data && data.error) || `HTTP ${response.status}`);
+        const error = new Error((data && (data.user_message || data.error)) || `HTTP ${response.status}`);
         error.status = response.status;
         throw error;
       }
@@ -699,11 +700,12 @@
     }
 
     function toast(message) {
+  message = window.IronBendMessages?.text(message) ?? message;
       const el = $('#toast');
       el.textContent = message;
       el.classList.add('show');
       clearTimeout(toast.timer);
-      toast.timer = setTimeout(() => el.classList.remove('show'), 2600);
+      toast.timer = setTimeout(() => el.classList.remove('show'), (window.IronBendMessages?.duration(message, 2600) ?? 2600));
     }
 
     function escapeHtml(value) {
@@ -1269,7 +1271,7 @@
           body: fd,
         });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        if (!response.ok) throw new Error(data.user_message || data.error || `HTTP ${response.status}`);
         state.importDraft = data.draft || { items: [] };
         setForm(importForm, {
           ...formData(importForm),
@@ -1379,7 +1381,7 @@
       event.preventDefault();
       if (event.submitter.value === 'analyze') {
         analyzeImport().catch(err => {
-          $('#importStatus').textContent = err.message;
+          $('#importStatus').textContent = (window.IronBendMessages?.text(err.message) ?? err.message);
           toast(err.message);
         });
       } else if (event.submitter.value === 'save') {

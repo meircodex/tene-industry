@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
@@ -291,7 +292,7 @@ async function saveProject() {
   const url = editingProjId ? `/api/projects/${editingProjId}` : '/api/projects';
   const method = editingProjId ? 'PATCH' : 'POST';
   const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (!r.ok) return alert('שגיאה בשמירה');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירה')).message);
   closeProjModal();
   loadProjects();
 }
@@ -353,7 +354,7 @@ async function saveSite() {
   const url = editingSiteId ? `/api/sites/${editingSiteId}` : '/api/sites';
   const method = editingSiteId ? 'PATCH' : 'POST';
   const r = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (!r.ok) return alert('שגיאה בשמירה');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירה')).message);
   closeSiteModal();
   loadSites();
 }

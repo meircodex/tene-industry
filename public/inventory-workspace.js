@@ -26,7 +26,7 @@
     const response = await fetch(path, options && {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(options)});
     const data = await response.json().catch(() => ({}));
     if(data.offline)throw new Error('אין חיבור לשרת. אי אפשר לעדכן מלאי במצב לא מקוון.');
-    if (!response.ok) {const error=new Error(errors[data.error] || (response.status===403 ? errors.Forbidden : data.error || 'טעינת הנתונים נכשלה'));error.code=data.error;throw error;}
+    if (!response.ok) {const error=new Error(errors[data.error] || (response.status===403 ? errors.Forbidden : data.user_message || data.error || 'טעינת הנתונים נכשלה'));error.code=data.error;throw error;}
     return data;
   }
   function meshDescription(s) {
@@ -68,7 +68,7 @@
       $('inventoryDiameter').value=previous;state.loaded=true;render();
     } catch(error) {
       if(revision!==loadRevision)return;
-      state.rows=[];$('inventoryDailyRows').innerHTML=`<tr><td colspan="6" class="inventory-message">${escape(error.message)} <button class="btn btn-outline btn-sm" id="inventoryRetry">נסה שוב</button></td></tr>`;
+      state.rows=[];$('inventoryDailyRows').innerHTML=`<tr><td colspan="6" class="inventory-message">${escape(window.IronBendMessages?.text(error.message) ?? error.message)} <button class="btn btn-outline btn-sm" id="inventoryRetry">נסה שוב</button></td></tr>`;
       $('inventoryRetry')?.addEventListener('click',reload);
     }
   }
@@ -95,7 +95,7 @@
     $('purchaseMaterialType').value=$('inventoryType').value||'coil';
     buildPurchase();openModal('inventoryPurchaseModal');
     try {const suppliers=await api('/api/suppliers');$('purchaseSupplier').innerHTML='<option value="">ללא בחירת ספק</option>'+suppliers.map(s=>`<option value="${s.id}">${escape(s.name)}</option>`).join('');}
-    catch(error){$('purchaseMessage').textContent=error.message;}
+    catch(error){$('purchaseMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   }
   function updatePurchaseTotals(){
     let total=0;
@@ -126,10 +126,10 @@
     try {
       const payload={supplier_id:$('purchaseSupplier').value||null,expected_date:$('purchaseDate').value,reference:$('purchaseReference').value,notes:$('purchaseNotes').value,enforce_supplier_policy:true,lines:state.draft};
       const response=await fetch('/api/procurement/purchase-draft/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(!response.ok){const result=await response.json();throw new Error(errors[result.error]||result.error||'הפקת הקובץ נכשלה');}
+      if(!response.ok){const result=await response.json();throw new Error(errors[result.error]||result.user_message || result.error||'הפקת הקובץ נכשלה');}
       const url=URL.createObjectURL(await response.blob()),link=document.createElement('a');link.href=url;link.download='טיוטת-הזמנת-רכש.csv';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
       $('purchaseMessage').textContent='הקובץ הוכן להורדה. המלאי לא השתנה.';
-    } catch(error){$('purchaseMessage').textContent=error.message;}finally{updatePurchaseTotals();}
+    } catch(error){$('purchaseMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}finally{updatePurchaseTotals();}
   }
   document.querySelectorAll('[data-inventory-sort]').forEach(button=>{button.dataset.label=button.textContent;button.addEventListener('click',()=>{const field=button.dataset.inventorySort;state.direction=state.sort===field?-state.direction:1;state.sort=field;render();});});
   ['inventoryType','inventoryDiameter','inventoryShortages'].forEach(id=>$(id).addEventListener('change',render));

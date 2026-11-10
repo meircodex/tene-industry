@@ -23,7 +23,7 @@
       $('countRows').innerHTML=lots.map(row=>`<tr data-count-lot="${row.id}"><td>${esc(row.material_type==='coil'?'גליל':row.material_type==='straight'?'ליפט / ישר':'מכופף')} Ø${esc(row.diameter)} · ${esc(row.lot_number||row.id)}</td><td>${esc(row.warehouse_loc||'')}</td><td>${fmt(row.weight_available)} ק״ג</td><td><input class="inventory-count-input" type="number" min="0" step="1" data-count-value aria-label="נספר באצווה ${row.id}"></td><td><input class="inventory-count-input" type="number" step="1" data-count-net aria-label="תנועות מאז הספירה באצווה ${row.id}"></td><td><input class="inventory-count-input" data-count-note aria-label="פירוט תנועות באצווה ${row.id}"></td></tr>`).join('')||'<tr><td colspan="6" class="inventory-message">אין אצוות פעילות לספירה.</td></tr>';
       $('meshCountRows').innerHTML=sheets.map((row,i)=>`<tr><td>${esc(workspace.meshDescription(row.specification))}</td><td>${fmt(row.physical_units)} יחידות</td><td><input class="inventory-count-input" type="number" min="0" step="1" id="meshCount-${i}" aria-label="נספר במפרט רשת ${i+1}"></td><td><button class="btn btn-outline btn-sm" data-mesh-count="${i}">בדיקת הפרש</button></td></tr>`).join('')||'<tr><td colspan="4" class="inventory-message">אין מפרטי רשת במלאי.</td></tr>';
       $('countMessage').textContent='';
-    }catch(error){$('countMessage').textContent=error.message;}
+    }catch(error){$('countMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   }
   async function preview() {
     try {
@@ -38,7 +38,7 @@
       const result=await workspace.api('/api/inventory/stocktakes/preview',payload);
       pending={path:'/api/inventory/stocktakes',payload:{...payload,preview_token:result.preview_token,idempotency_key:uid()}};
       showPreview(result.lines.map(row=>`אצווה ${row.raw_material_id}: יתרה ${fmt(row.expected_kg)}, נספר ${fmt(row.counted_kg)}, התאמה ${fmt(row.adjustment_kg)} ק״ג`));
-    }catch(error){$('countMessage').textContent=error.message;}
+    }catch(error){$('countMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   }
   function showPreview(lines){$('countConfirmRows').innerHTML=lines.map(text=>`<p style="margin-bottom:12px">${esc(text)}</p>`).join('');$('countConfirmMessage').textContent='';workspace.openModal('countConfirmModal');}
   $('countPreview').addEventListener('click',preview);$('countReload').addEventListener('click',load);
@@ -46,24 +46,24 @@
   $('countApprove').addEventListener('click',async()=>{
     if(!pending)return;const button=$('countApprove');button.disabled=true;
     try {await workspace.api(pending.path,pending.payload);workspace.closeModal('countConfirmModal');pending=null;await load();await loadSummary();$('countMessage').textContent='הספירה נשמרה והתאמת המלאי נרשמה.';}
-    catch(error){$('countConfirmMessage').textContent=error.message;}finally{button.disabled=false;}
+    catch(error){$('countConfirmMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}finally{button.disabled=false;}
   });
   $('meshCountRows').addEventListener('click',async event=>{
     const button=event.target.closest('[data-mesh-count]');if(!button)return;
     try {const i=Number(button.dataset.meshCount),input=$(`meshCount-${i}`);if(input.value==='')throw new Error('יש להזין כמות רשתות שנספרה.');const payload={specification:sheets[i].specification,counted_units:Number(input.value),reason:$('countReason').value};const result=await workspace.api('/api/inventory/mesh/stocktakes/preview',payload);pending={path:'/api/inventory/mesh/stocktakes',payload:{...payload,preview_token:result.preview_token,idempotency_key:uid()}};showPreview([`רשתות: יתרה ${result.expected_units}, נספר ${result.counted_units}, התאמה ${result.adjustment_units} יחידות`]);}
-    catch(error){$('countMessage').textContent=error.message;}
+    catch(error){$('countMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   });
   let meshReceiptKey=uid();
   $('inventoryMeshReceipt').addEventListener('click',async()=>{
     workspace.openModal('meshReceiptModal');$('meshReceiptMessage').textContent='';meshReceiptKey=uid();
-    try{const suppliers=await workspace.api('/api/suppliers');$('meshSupplier').innerHTML='<option value="">ללא ספק</option>'+suppliers.map(row=>`<option value="${row.id}">${esc(row.name)}</option>`).join('');}catch(error){$('meshReceiptMessage').textContent=error.message;}
+    try{const suppliers=await workspace.api('/api/suppliers');$('meshSupplier').innerHTML='<option value="">ללא ספק</option>'+suppliers.map(row=>`<option value="${row.id}">${esc(row.name)}</option>`).join('');}catch(error){$('meshReceiptMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   });
   $('meshReceiptClose').addEventListener('click',()=>workspace.closeModal('meshReceiptModal'));
   $('meshReceiptSave').addEventListener('click',async()=>{
     const button=$('meshReceiptSave');button.disabled=true;
     try{const specification={grade:$('meshGrade').value,standard_code:$('meshStandard').value};for(const [key,,factor]of fields)specification[key]=Number($(`mesh-${key}`).value)*factor;
       await workspace.api('/api/inventory/mesh/receipts',{specification,quantity_units:Number($('meshUnits').value),supplier_id:Number($('meshSupplier').value)||null,delivery_note_num:$('meshNote').value,idempotency_key:meshReceiptKey});workspace.closeModal('meshReceiptModal');await loadReceipts();}
-    catch(error){$('meshReceiptMessage').textContent=error.message;}finally{button.disabled=false;}
+    catch(error){$('meshReceiptMessage').textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}finally{button.disabled=false;}
   });
   async function loadReceipts() {
     const box=$('receiptReviewList');box.textContent='טוען קבלות...';
@@ -72,7 +72,7 @@
       receiptReviews=ocr;
       box.innerHTML=raw.map(row=>`<article class="receipt-card"><div class="receipt-body"><strong>${esc(row.delivery_note_num||'קבלה ידנית')} · ${row.lines.length} שורות</strong>${row.lines.map(line=>`<div>Ø${esc(line.diameter)} · ${fmt(line.weight_received)} ק״ג</div>`).join('')}<button class="btn btn-primary btn-sm" data-approve-receipt="${row.id}" data-duplicate="${row.duplicate_warning?.suspected?'1':'0'}">אישור קבלה למלאי</button></div></article>`).join('')+mesh.map(row=>`<article class="receipt-card"><div class="receipt-body"><strong>רשתות · ${esc(row.delivery_note_num||'ללא תעודה')} · ${row.quantity_units} יחידות</strong><div>${esc(workspace.meshDescription(JSON.parse(row.specification_json)))}</div><button class="btn btn-primary btn-sm" data-approve-mesh="${row.id}">אישור רשתות למלאי</button></div></article>`).join('')+ocr.map(renderReceiptReview).join('')||'<div class="muted">אין קבלות ממתינות לאישור.</div>';
       if(ocr[0])showReceiptSource(ocr[0].id);
-    }catch(error){box.textContent=error.message;}
+    }catch(error){box.textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   }
   $('receiptReviewList').addEventListener('click',async event=>{
     const button=event.target.closest('[data-approve-receipt],[data-approve-mesh]');if(!button)return;button.disabled=true;

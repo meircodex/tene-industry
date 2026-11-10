@@ -45,7 +45,7 @@ async function openCustomerMerge(targetId, sourceId = null, taxId = '') {
     const response = await fetch('/api/customers/' + Number(targetId));
     const customer = await response.json();
     if (generation !== customerMergeGeneration) return;
-    if (!response.ok) throw new Error(customer.error || 'לא ניתן לטעון את הכרטיס');
+    if (!response.ok) throw new Error(customer.user_message || customer.error || 'לא ניתן לטעון את הכרטיס');
     customerMergeState.targetId = Number(customer.id);
     customerMergeState.target = customer;
     mergeElement('customerMergeTarget').innerHTML = '<strong>הכרטיס שיישאר: ' + mergeEscape(customer.name) + ' · #' + Number(customer.id) + '</strong><div>ח.פ: ' + mergeEscape(customer.tax_id || 'חסר') + '</div>';
@@ -74,7 +74,7 @@ async function searchCustomerMerge() {
     const response = await fetch('/api/customers?q=' + encodeURIComponent(query) + '&limit=20');
     const rows = await response.json();
     if (customerMergeState !== state || state.revision !== revision) return;
-    if (!response.ok || !Array.isArray(rows)) throw new Error(rows.error || 'חיפוש הלקוחות נכשל');
+    if (!response.ok || !Array.isArray(rows)) throw new Error(rows.user_message || rows.error || 'חיפוש הלקוחות נכשל');
     const candidates = rows.filter(row => Number(row.id) !== state.targetId);
     mergeElement('customerMergeResults').innerHTML = candidates.map(row => '<button type="button" class="btn-action" onclick="selectCustomerMergeSource(' + Number(row.id) + ')">' + mergeEscape(row.name) + ' · #' + Number(row.id) + ' · ' + mergeEscape(row.tax_id ? 'ח.פ ' + row.tax_id : 'ח.פ חסר') + '</button>').join('');
     mergeStatus(candidates.length ? 'בחר את הכרטיס שיעבור לארכיון לאחר העברת הנתונים.' : 'לא נמצאו כרטיסים נוספים. אפשר לחפש לפי שם אחר, טלפון או מספר לקוח.');
@@ -97,7 +97,7 @@ async function previewCustomerMerge() {
     const response = await fetch('/api/customers/merge/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetId: state.targetId, sourceId: state.sourceId, taxId: mergeElement('customerMergeTaxId').value }) });
     const data = await response.json();
     if (customerMergeState !== state || state.revision !== revision) return;
-    if (!response.ok) throw new Error(data.error || 'לא ניתן להכין איחוד');
+    if (!response.ok) throw new Error(data.user_message || data.error || 'לא ניתן להכין איחוד');
     state.preview = data;
     mergeElement('customerMergePreview').innerHTML =
       '<h4>לאחד את ' + mergeEscape(data.source.name) + ' (#' + Number(data.source.id) + ') לתוך ' + mergeEscape(data.target.name) + ' (#' + Number(data.target.id) + ')?</h4>' +
@@ -137,7 +137,7 @@ async function confirmCustomerMerge() {
   try {
     const response = await fetch('/api/customers/merge/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: state.preview.token, acknowledge: true, confirmTaxId: mergeElement('customerMergeConfirmTaxId').value }) });
     const data = await response.json();
-    if (!response.ok) throw Object.assign(new Error(data.error || 'האיחוד לא הושלם'), { code: data.code });
+    if (!response.ok) throw Object.assign(new Error(data.user_message || data.error || 'האיחוד לא הושלם'), { code: data.code });
     succeeded = true;
     state.busy = false;
     closeCustomerMerge();

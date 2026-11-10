@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ניהול מערכת – IronBend</title>
@@ -1036,7 +1037,7 @@ async function renderPermissions() {
         <div id="accessSaveMsg" style="margin-top:8px;font-size:12px;color:#1a7a42;display:none">✅ נשמר</div>
       </div>`;
   } catch (e) {
-    grid.innerHTML = `<div style="padding:16px;color:#b83227">שגיאה: ${escHtml(e.message)}</div>`;
+    grid.innerHTML = `<div style="padding:16px;color:#b83227">שגיאה: ${escHtml(window.IronBendMessages?.text(e.message) ?? e.message)}</div>`;
   }
 }
 
@@ -1051,7 +1052,7 @@ async function saveAccessOverride(sel) {
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
       body: JSON.stringify({ screenId, role, level }),
     });
-    if (!res.ok) { const e = await res.json(); alert('שגיאה: ' + e.error); return; }
+    if (!res.ok) { const e = await res.json(); alert(e.user_message || window.IronBendMessages.text(e.error)); return; }
     const msg = document.getElementById('accessSaveMsg');
     if (msg) { msg.style.display = 'block'; clearTimeout(msg._t); msg._t = setTimeout(() => { msg.style.display = 'none'; }, 2000); }
   } catch (e) {
@@ -1102,7 +1103,7 @@ async function downloadDatabase() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
+      throw new Error(data.user_message || data.error || `HTTP ${res.status}`);
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -1159,7 +1160,7 @@ async function handleDbUpload(file) {
         loadAll(); // reload data
       }, 5000);
     } else {
-      throw new Error(data.error || 'שגיאה לא ידועה');
+      throw new Error(data.user_message || data.error || 'שגיאה לא ידועה');
     }
   } catch (e) {
     console.error(e);
@@ -1580,12 +1581,13 @@ function openInitialTabFromUrl() {
 
 // ── Toast ──────────────────────────────────────────────────────
 function toast(msg, err=false) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.style.background = err ? 'var(--danger)' : 'var(--success)';
   t.style.opacity = '1';
   clearTimeout(t._t);
-  t._t = setTimeout(() => t.style.opacity='0', 3000);
+  t._t = setTimeout(() => t.style.opacity='0', (window.IronBendMessages?.duration(msg, 3000) ?? 3000));
 }
 
 loadAll().then(openInitialTabFromUrl);
@@ -1648,7 +1650,7 @@ async function saveUser() {
   const url = id ? `/api/users/${id}` : '/api/users';
   const method = id ? 'PATCH' : 'POST';
   const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  if (!r.ok) { const e = await r.json().catch(()=>({})); return alert(e.error||'שגיאה'); }
+  if (!r.ok) { const e = await r.json().catch(()=>({})); return alert(e.user_message || e.error||'שגיאה'); }
   document.getElementById('userFormWrapper').style.display = 'none';
   loadUsers();
   toast('✓ משתמש נשמר');
@@ -1666,13 +1668,13 @@ async function resetUserPin(id) {
   try {
     const response = await fetch(`/api/users/${id}/reset-pin`, { method:'POST', headers:{'Content-Type':'application/json'} });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) return alert(data.error || 'איפוס ה-PIN נכשל');
+    if (!response.ok) return alert(data.user_message || data.error || 'איפוס ה-PIN נכשל');
     document.getElementById('temporaryPinUser').textContent = `למשתמש: ${data.user.display_name}`;
     document.getElementById('temporaryPinValue').textContent = data.temporaryPin;
     document.getElementById('temporaryPinDialog').showModal();
     loadUsers();
   } catch (error) {
-    alert('איפוס ה-PIN נכשל. נסה שוב.');
+    alert(globalThis.IronBendMessages?.text(e) || 'לא התקבל אישור לאיפוס קוד הכניסה. יש לבדוק אם האיפוס בוצע לפני ניסיון נוסף.');
   } finally {
     resetUserPin.inFlight = false;
   }
@@ -1842,7 +1844,7 @@ async function createWorkerInvitation(profileId) {
     method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.activation_url) return toast(result.error || 'יצירת הקישור נכשלה. יש לוודא שכתובת הענן מוגדרת.', true);
+  if (!response.ok || !result.activation_url) return toast(result.user_message || result.error || 'יצירת הקישור נכשלה. יש לוודא שכתובת הענן מוגדרת.', true);
   document.getElementById('workerInviteLink').value = result.activation_url;
   workerInviteQrDataUrl = result.activation_qr_data_url || '';
   workerInviteShareMessage = result.whatsapp_message || result.activation_url;
@@ -1895,7 +1897,7 @@ async function saveQrAccessMode() {
     method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ mode })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) return toast(result.error || 'עדכון מצב הסריקה נכשל', true);
+  if (!response.ok) return toast(result.user_message || result.error || 'עדכון מצב הסריקה נכשל', true);
   toast(mode === 'secure' ? '✓ מצב מאובטח הופעל' : '✓ מצב פתוח הופעל');
   loadQrAccessMode();
 }
@@ -1933,7 +1935,7 @@ async function cancelWorkerInvitation(id) {
     method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'cancel' })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) return toast(result.error || 'ביטול ההזמנה נכשל', true);
+  if (!response.ok) return toast(result.user_message || result.error || 'ביטול ההזמנה נכשל', true);
   toast('הקישור בוטל');
   loadWorkerInvitations();
 }
@@ -1993,7 +1995,7 @@ async function reviewDevice(id, status) {
     method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ status })
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) return toast(result.error || 'עדכון המכשיר נכשל', true);
+  if (!response.ok) return toast(result.user_message || result.error || 'עדכון המכשיר נכשל', true);
   toast(status === 'approved' ? '✓ המכשיר אושר לסריקה' : 'הרשאת המכשיר עודכנה');
   loadDeviceRequests();
 }

@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -611,7 +612,7 @@ async function pinConfirm() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ username: op.username, pin: pinBuffer })
     });
-    if (!response.ok) throw new Error('Invalid PIN');
+    if (!response.ok) throw await window.IronBendMessages.responseError(response, 'Invalid PIN');
     const result = await response.json();
     if (window.IronBendAuth?.storeSession) window.IronBendAuth.storeSession(result, true);
     authUser = result.user || op;

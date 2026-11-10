@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex,nofollow">
@@ -593,7 +594,7 @@ async function saveLog(){
   const url=editingId?`/api/maintenance/${editingId}`:'/api/maintenance';
   const method=editingId?'PATCH':'POST';
   const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok) return alert('שגיאה בשמירה');
+  if(!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירה')).message);
   closeModal('mainModal'); loadStats(); loadLogs();
 }
 
@@ -701,7 +702,7 @@ async function saveLoto(){
   if(!machineId||!worker) return alert('יש לבחור מכונה ומבצע');
   const body={machine_id:Number(machineId),locked_by:worker,reason:reason==='אחר'&&other?other:reason,safety_notes:safety};
   const r=await fetch('/api/loto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok) return alert('שגיאה בפתיחת LOTO');
+  if(!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בפתיחת LOTO')).message);
   closeModal('lotoModal');
   loadLoto();
   loadLotoKpi();
@@ -728,7 +729,7 @@ async function releaseLoto(){
   const notes=document.getElementById('rNotes').value;
   const id=releasingLotoId;
   const r=await fetch(`/api/loto/${id}/release`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({released_by:released,release_notes:notes})});
-  if(!r.ok) return alert('שגיאה בשחרור LOTO');
+  if(!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשחרור LOTO')).message);
   closeModal('releaseModal');
   loadLoto();
   loadLotoKpi();
@@ -800,7 +801,7 @@ async function savePm(){
   const url=id?`/api/pm-schedule/${id}`:'/api/pm-schedule';
   const method=id?'PATCH':'POST';
   const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok) return alert('שגיאה בשמירה');
+  if(!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירה')).message);
   closeModal('pmModal');
   loadPm();
 }

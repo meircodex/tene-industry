@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
   <title>IronBend – הזמנת ברזל</title>
@@ -1056,7 +1057,7 @@ async function saveCustomerProfile(event) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res?.data?.error || 'לא ניתן לשמור פרטים', true); return; }
+  if (!res || !res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res?.data?.user_message || res?.data?.error || 'לא ניתן לשמור פרטים', true); return; }
   ME = res.data.customer || ME;
   if (res.data.request) ME.pending_profile_change_request = res.data.request;
   document.getElementById('headerName').textContent = ME?.name || '';
@@ -1103,7 +1104,7 @@ async function setPortalSiteStatus(siteId, status) {
     body: JSON.stringify({ token:TOKEN, status }),
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
   if (!response || !response.ok || !response.data?.success) {
-    toast(response?.data?.error || 'לא ניתן לעדכן את האתר', true);
+    toast(response?.data?.user_message || response?.data?.error || 'לא ניתן לעדכן את האתר', true);
     return;
   }
   toast(status === 'active' ? 'האתר שוחזר' : (status === 'completed' ? 'האתר הועבר לארכיון' : 'האתר נמחק והועבר לארכיון'));
@@ -1121,7 +1122,7 @@ function toggleAllSiteContacts(checked) {
 
 async function openSiteContacts(siteId) {
   const data = await fetch(`/api/c/sites/${siteId}/contacts?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()).catch(() => null);
-  if (!data || data.error) { toast(data?.error || 'לא ניתן לטעון אנשי קשר', true); return; }
+  if (!data || data.error) { toast(data?.user_message || data?.error || 'לא ניתן לטעון אנשי קשר', true); return; }
   let dialog = document.getElementById('siteContactsDialog');
   if (!dialog) {
     dialog = document.createElement('dialog');
@@ -1155,7 +1156,7 @@ async function saveSiteContacts(siteId, event) {
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
   if (!response || !response.ok || !response.data?.success) {
     setButtonBusy(btn, false);
-    toast(response?.data?.error || 'לא ניתן לשמור אנשי קשר', true);
+    toast(response?.data?.user_message || response?.data?.error || 'לא ניתן לשמור אנשי קשר', true);
     return;
   }
   closeSiteContacts();
@@ -1183,7 +1184,7 @@ async function openSiteDetail(siteId, from = '', to = '') {
   if (to) query.set('to', to);
   const data = await fetch(`/api/c/sites/${siteId}/summary?${query.toString()}`).then(r=>r.json()).catch(()=>null);
   if (!data || data.error) {
-    if (host) host.innerHTML = `<div class="empty-state"><strong>לא ניתן לטעון את האתר</strong><span>${escapeHtml(data?.error || 'שגיאת תקשורת')}</span></div>`;
+    if (host) host.innerHTML = `<div class="empty-state"><strong>לא ניתן לטעון את האתר</strong><span>${escapeHtml(data?.user_message || data?.error || 'שגיאת תקשורת')}</span></div>`;
     return;
   }
   PORTAL_SITE_SUMMARIES[Number(siteId)] = data;
@@ -1288,7 +1289,7 @@ async function createPortalUser(event) {
     return;
   }
   if (!res.ok || !res.data?.success) {
-    const errorMessage = res.data?.error || `השרת החזיר שגיאה (${res.status || 'לא ידועה'}). נסו לרענן ולשלוח שוב.`;
+    const errorMessage = res.data?.user_message || res.data?.error || `השרת החזיר שגיאה (${res.status || 'לא ידועה'}). נסו לרענן ולשלוח שוב.`;
     setButtonBusy(btn, false);
     setPortalUserFormError(errorMessage);
     toast(errorMessage, true);
@@ -1323,7 +1324,7 @@ async function requestPortalInvite(userId) {
   const res = await fetch(`/api/c/users/${userId}/invite`, {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:TOKEN })
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן ליצור קישור', true); return; }
+  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן ליצור קישור', true); return; }
   showPortalInvite(res.data.activationLink, { ...user, siteId:assignment?.site_id || user.default_site_id });
   toast('נוצר קישור חדש שתקף ל-5 דקות');
 }
@@ -1355,7 +1356,7 @@ async function revokePortalDeviceAccess(deviceId) {
   const res = await fetch(`/api/c/devices/${deviceId}/revoke`, {
     method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token:TOKEN })
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן לבטל את המחשב', true); return; }
+  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן לבטל את המחשב', true); return; }
   await loadPortalUsers();
   renderCustomerSitesPanel();
   toast('הגישה מהמחשב בוטלה');
@@ -1368,7 +1369,7 @@ async function deactivatePortalUser(id) {
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ token:TOKEN })
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok || !res.data?.success) { toast(res?.data?.error || 'לא ניתן לבטל משתמש', true); return; }
+  if (!res || !res.ok || !res.data?.success) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן לבטל משתמש', true); return; }
   toast('הגישה בוטלה');
   await loadPortalUsers();
   renderCustomerSitesPanel();
@@ -1402,7 +1403,7 @@ async function createPortalSite(event) {
     body: JSON.stringify(body)
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { setButtonBusy(btn, false); toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res.data?.error || 'לא ניתן לפתוח פרויקט', true); return; }
+  if (!res.ok || !res.data?.success) { setButtonBusy(btn, false); toast(res.data?.user_message || res.data?.error || 'לא ניתן לפתוח פרויקט', true); return; }
   const sitesData = await fetch(`/api/c/sites?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
   setPortalContext(sitesData);
   await loadSiteSummaries();
@@ -1458,7 +1459,7 @@ async function activateTrustedDevice() {
     method: 'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ enrollmentToken:PENDING_ENROLLMENT_TOKEN, pin, deviceName:navigator.platform || 'דפדפן מאושר' })
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן להפעיל את המחשב', true); return; }
+  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן להפעיל את המחשב', true); return; }
   PENDING_ENROLLMENT_TOKEN = '';
   await completeAuth(res.data);
   toast('המחשב אושר. מעכשיו נכנסים באמצעות ה-PIN בלבד.');
@@ -1470,7 +1471,7 @@ async function loginWithTrustedDevicePin() {
   const res = await fetch('/api/c/auth/device-pin', {
     method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ pin })
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.error || 'לא ניתן להיכנס', true); return; }
+  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן להיכנס', true); return; }
   document.getElementById('trustedDevicePin').value = '';
   await completeAuth(res.data);
 }
@@ -1508,7 +1509,7 @@ async function loginWithPassword() {
     body: JSON.stringify({ phone, password })
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok) { toast(res.data?.error || 'טלפון או סיסמה שגויים', true); return; }
+  if (!res.ok) { toast(res.data?.user_message || res.data?.error || 'טלפון או סיסמה שגויים', true); return; }
   if (!res.data?.enrollmentToken) { toast('לא ניתן לאשר את המחשב', true); return; }
   PENDING_ENROLLMENT_TOKEN = res.data.enrollmentToken;
   showDeviceEnrollment();
@@ -1605,7 +1606,7 @@ async function changePortalPin() {
     body: JSON.stringify({ token:TOKEN, oldPassword, newPassword })
   }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok) { toast(res.data?.error || 'לא ניתן לשנות PIN', true); return; }
+  if (!res.ok) { toast(res.data?.user_message || res.data?.error || 'לא ניתן לשנות PIN', true); return; }
   toast('ה-PIN עודכן');
 }
 
@@ -2054,7 +2055,7 @@ async function uploadGuaranteeDocument(event) {
   fd.append('file', file);
   const res = await fetch('/api/c/guarantee-documents', { method:'POST', body: fd })
     .then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res?.ok) { setButtonBusy(btn, false); toast(res?.data?.error || 'העלאת הטופס נכשלה', true); return; }
+  if (!res?.ok) { setButtonBusy(btn, false); toast(res?.data?.user_message || res?.data?.error || 'העלאת הטופס נכשלה', true); return; }
   input.value = '';
   toast('הטופס הועלה וממתין לבדיקת משרד');
   await loadGuaranteeDocuments();
@@ -2130,7 +2131,7 @@ async function assignOrderToSite(orderId, rawSiteId, event) {
   }).then(async r => ({ ok:r.ok, data:await r.json().catch(() => null) })).catch(() => null);
   if (!response || !response.ok || !response.data?.success) {
     if (select) select.disabled = false;
-    toast(response?.data?.error || 'לא ניתן לשייך את ההזמנה לפרויקט', true);
+    toast(response?.data?.user_message || response?.data?.error || 'לא ניתן לשייך את ההזמנה לפרויקט', true);
     return;
   }
   const wasDetailOpen = document.getElementById('screenDetail')?.classList.contains('active');
@@ -2933,7 +2934,7 @@ function escapeHtml(value) {
 }
 
 function portalErrorMessage(value, fallback = 'לא ניתן להשלים את הפעולה') {
-  const code = String(value?.code || value?.error || value || '').toLowerCase();
+  const code = String(value?.code || value?.user_message || value?.error || value || '').toLowerCase();
   if (code.includes('length') || code.includes('positive')) return 'יש להזין אורכי קטעים חיוביים בכל פריט.';
   if (code.includes('shape') || code.includes('unsupported')) return 'יש לשמור את הצורה בעורך לפני המשך.';
   if (code.includes('permission') || code.includes('forbidden')) return 'אין לך הרשאה לבצע פעולה זו.';
@@ -2999,7 +3000,7 @@ async function submitOrder(event) {
   submitOrder.inFlight = true;
   const button = event?.currentTarget || document.getElementById('submitOrderBtn');
   try { return await performPortalOrderSubmit(event); }
-  catch (error) { toast('השליחה לא הושלמה. אפשר לנסות שוב; הזמנה שכבר נקלטה לא תישלח פעמיים.', true); }
+  catch (error) { toast(window.IronBendMessages.text(error), true); }
   finally { submitOrder.inFlight = false; setButtonBusy(button, false); }
 }
 
@@ -3082,6 +3083,7 @@ function showScreen(id) {
 }
 
 function toast(msg, err=false) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className = 'show' + (err?' err':'');

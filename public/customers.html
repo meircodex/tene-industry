@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>לקוחות – IronBend</title>
@@ -1164,14 +1165,14 @@ function billingSourceText(row) {
 
 async function approveProfileChange(customerId, requestId) {
   const r = await fetch('/api/customers/' + customerId + '/profile-change-requests/' + requestId + '/approve', { method: 'POST' });
-  if (!r.ok) return alert('לא ניתן לאשר את בקשת השינוי');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'לא ניתן לאשר את בקשת השינוי')).message);
   await loadCustomers(lastCustomerQuery);
   selectCustomer(customerId);
 }
 
 async function rejectProfileChange(customerId, requestId) {
   const r = await fetch('/api/customers/' + customerId + '/profile-change-requests/' + requestId + '/reject', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ notes: 'נדחה ממסך לקוחות' }) });
-  if (!r.ok) return alert('לא ניתן לדחות את בקשת השינוי');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'לא ניתן לדחות את בקשת השינוי')).message);
   selectCustomer(customerId);
 }
 
@@ -1310,7 +1311,7 @@ async function selectCustomer(id) {
   try {
     const r = await fetch('/api/customers/' + id);
     const c = await r.json();
-    if (!r.ok) throw new Error(c.error || 'שגיאה בטעינת לקוח');
+    if (!r.ok) throw new Error(c.user_message || c.error || 'שגיאה בטעינת לקוח');
     if (Number(c.id) !== Number(id)) {
       activeId = Number(c.id);
       document.querySelectorAll('.cust-card').forEach(el => el.classList.toggle('active', Number(el.dataset.id) === activeId));
@@ -1574,7 +1575,7 @@ async function recordCustomerBilling(customerId, orderId) {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    const msg = data.error || 'לא ניתן לרשום חיוב';
+    const msg = data.user_message || data.error || 'לא ניתן לרשום חיוב';
     window.showToast ? window.showToast(msg, true) : alert(msg);
     return;
   }
@@ -1705,7 +1706,7 @@ async function saveCustomerSite() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!r.ok) return alert('לא ניתן לפתוח אתר ללקוח');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'לא ניתן לפתוח אתר ללקוח')).message);
   closeSiteModal();
   await loadCustomers(lastCustomerQuery);
   selectCustomer(customerId);
@@ -1854,7 +1855,7 @@ async function openPortalAsCustomer(id) {
   try {
     const response = await fetch('/api/customers/' + id + '/portal-users');
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'לא ניתן לטעון משתמשי פורטל');
+    if (!response.ok) throw new Error(data.user_message || data.error || 'לא ניתן לטעון משתמשי פורטל');
     const users = (data.users || []).filter(user => Number(user.active) === 1);
     if (!users.length) {
       launchPortalSupport(id);
@@ -1914,7 +1915,7 @@ async function launchPortalSupport(id, portalUserId) {
     const userQuery = portalUserId ? '?portalUserId=' + encodeURIComponent(portalUserId) : '';
     const r = await fetch('/api/customers/' + id + '/portal-preview' + userQuery);
     const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.link) throw new Error(d.error || 'לא ניתן לפתוח את הפורטל');
+    if (!r.ok || !d.link) throw new Error(d.user_message || d.error || 'לא ניתן לפתוח את הפורטל');
     previewWindow.location.replace(d.link);
   } catch (error) {
     previewWindow.close();
@@ -1945,7 +1946,7 @@ async function resetPortalPassword(id) {
       body: JSON.stringify({})
     });
     const d = await r.json();
-    if (!r.ok) throw new Error(d?.error || 'reset failed');
+    if (!r.ok) throw new Error(d?.user_message || d?.error || 'reset failed');
     showPortalAccess(Object.assign({}, linkResp, d), 'סיסמה זמנית נוצרה ✓');
   } catch(e) {
     window.showToast && window.showToast(e.message || 'שגיאה ביצירת סיסמה זמנית', true);
@@ -1956,7 +1957,7 @@ async function revokePortalLink(id) {
   if (!confirm('לבטל את גישת הלקוח לפורטל?')) return;
   try {
     const r = await fetch('/api/customers/' + id + '/token', { method: 'DELETE' });
-    if (!r.ok) throw new Error('revoke failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'revoke failed');
     const ps = document.querySelector('.portal-section');
     const existing = ps && ps.querySelector('.portal-access-card, .portal-link-box');
     if (existing) existing.remove();
@@ -2092,12 +2093,12 @@ async function saveCustomer() {
     if (editId) {
       r = await fetch('/api/customers/' + editId, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'לא ניתן לעדכן את הלקוח');
+      if (!r.ok) throw new Error(d.user_message || d.error || 'לא ניתן לעדכן את הלקוח');
       window.showToast && window.showToast('הלקוח עודכן ✓');
     } else {
       r = await fetch('/api/customers', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
       d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'לא ניתן ליצור את הלקוח');
+      if (!r.ok) throw new Error(d.user_message || d.error || 'לא ניתן ליצור את הלקוח');
       window.showToast && window.showToast('הלקוח נוצר ✓');
     }
     closeModal();
@@ -2105,7 +2106,7 @@ async function saveCustomer() {
     if (editId) selectCustomer(Number(editId));
     else if (d.id) selectCustomer(d.id);
   } catch(e) {
-    errorBox.textContent = e.message || 'שגיאה בשמירה';
+    errorBox.textContent = (window.IronBendMessages?.text(e.message) ?? e.message) || 'שגיאה בשמירה';
     errorBox.hidden = false;
     if (d?.code === 'duplicate_customer_tax_id') {
       taxInput.focus();

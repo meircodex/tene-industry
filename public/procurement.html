@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>רכש – IronBend</title>
@@ -1176,7 +1177,7 @@ async function init(){
     renderPOTable();
     renderSuppliers();
     renderPrices();
-    alert('שגיאה בטעינת נתוני רכש. בדוק הרשאות או חיבור שרת.');
+    alert(window.IronBendMessages.text(e));
   }
 }
 

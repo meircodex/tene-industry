@@ -21,6 +21,6 @@ test('explicit material source is preserved and missing sources fail clearly wit
  const {db,service}=setup(t);const r=service.createOrderTransaction(payload('1'));
  assert.equal(db.prepare('SELECT preferred_raw_material_id id FROM inventory_reservations WHERE order_id=?').get(r.orderId).id,1);
  const before=Object.fromEntries(['orders','customers','pallets','items','inventory_reservations'].map(t=>[t,db.prepare('SELECT COUNT(*) n FROM '+t).get().n]));
- for(const value of ['auto-bad',999,-1,1.5])assert.throws(()=>service.createOrderTransaction(payload(value)),e=>e.statusCode===400 && !e.message.includes('FOREIGN KEY'));
+ for(const value of ['auto-bad',999,-1,1.5])assert.throws(()=>service.createOrderTransaction(payload(value)),e=>e.statusCode===400 && !e.message.includes('FOREIGN KEY') && e.details.item_sequence===1 && e.details.field==='preferred_raw_material_id' && e.details.value===value);
  assert.deepEqual(Object.fromEntries(Object.keys(before).map(t=>[t,db.prepare('SELECT COUNT(*) n FROM '+t).get().n])),before);
 });

@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>פורטל ספקים – IronBend</title>
@@ -635,11 +636,12 @@ async function saveCert() {
 // TOAST
 let toastTimer;
 function showToast(msg) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+  toastTimer = setTimeout(() => t.classList.remove('show'), (window.IronBendMessages?.duration(msg, 3500) ?? 3500));
 }
 
 // Close modals on overlay click

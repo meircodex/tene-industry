@@ -186,3 +186,11 @@ read-only `purchase_policy` with 10000/30000/30000 kg thresholds per supply form
 Supplier-unit draft export with `enforce_supplier_policy:true` rejects mixed forms,
 coil/straight orders below 30000 estimated kg and straight-package rows without
 `length_m`. Other diameters may complete the minimum without mixing supply forms.
+
+
+## Shared Hebrew error presentation (2026-11-10)
+
+Platform Core adds `user_message` to JSON error objects without changing raw
+`error`, `code` or status. Request IDs identify internal failures. Parser errors
+also use JSON. Diagnostic details can identify affected item sequences and lots.
+See [contract and handoff](hebrew-system-messages-20261110.md).

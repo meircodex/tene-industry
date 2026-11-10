@@ -215,8 +215,10 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
       let preferredId=null;
       if(modern && source!==null && source!==undefined && source!=='' && source!==0 && String(source).toLowerCase()!=='auto') {
         const id=Number(source);
-        if(!['string','number'].includes(typeof source) || !Number.isSafeInteger(id) || id<=0 || !db.prepare('SELECT id FROM raw_material WHERE id=?').get(id)) {
-          throw Object.assign(new Error('מנת המלאי שנבחרה אינה תקינה או אינה קיימת. יש לבחור מקור ברזל מחדש או בחירה אוטומטית.'),{statusCode:400,code:'invalid_preferred_raw_material'});
+        const validId=['string','number'].includes(typeof source) && Number.isSafeInteger(id) && id>0;
+        if(!validId || !db.prepare('SELECT id FROM raw_material WHERE id=?').get(id)) {
+          const message=validId?'מנת המלאי שנבחרה אינה קיימת במערכת. יש לבחור מנה קיימת מהרשימה או בחירה אוטומטית.':'מקור הברזל שנבחר אינו מספר מנת מלאי תקין. יש לבחור מנה מהרשימה או בחירה אוטומטית.';
+          throw Object.assign(new Error(message),{statusCode:400,code:'invalid_preferred_raw_material',details:{item_sequence:item.display_sequence || null,field:'preferred_raw_material_id',value:typeof source==='number'||typeof source==='string'?source:null}});
         }
         preferredId=id;
       }

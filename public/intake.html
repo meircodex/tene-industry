@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>מרכז קליטת הזמנות - IronBend</title>
@@ -441,12 +442,13 @@ function escapeHtml(value) {
 }
 
 function toast(message, err = false) {
+  message = window.IronBendMessages?.text(message) ?? message;
   const el = document.getElementById('toast');
   el.textContent = message;
   el.style.background = err ? 'var(--danger)' : 'var(--success)';
   el.style.opacity = '1';
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.style.opacity = '0', 2400);
+  el._t = setTimeout(() => el.style.opacity = '0', (window.IronBendMessages?.duration(message, 2400) ?? 2400));
 }
 
 function sourceKey(source) {
@@ -2176,7 +2178,7 @@ function safeOpenIntakeCompare(id) {
     openIntakeCompare(id);
   } catch (error) {
     console.error('intake compare failed', error);
-    toast('פתיחת ההשוואה נכשלה. רענן או בדוק את נתוני ה-OCR.', true);
+    toast(window.IronBendMessages.text(error), true);
   }
 }
 
@@ -2588,7 +2590,7 @@ function mergeReviewedOcrItems(currentParsed, refreshedParsed) {
 }
 async function reprocessIntakeOcr(id, options = {}) {
   const row = intakeRows.find(item => item.id === id);
-  if (!row) return toast('OCR row was not found', true);
+  if (!row) return toast('פניית הזיהוי לא נמצאה. יש לרענן ולבחור פנייה קיימת.', true);
   const blob = intakeDataUrlToBlob(row.original_data_url || row.source_data_url || '');
   if (!blob) return toast('\u05d0\u05d9\u05df \u05e7\u05d5\u05d1\u05e5 \u05de\u05e7\u05d5\u05e8 \u05dc\u05e2\u05d9\u05d1\u05d5\u05d3 \u05de\u05d7\u05d3\u05e9', true);
   const trigger = options.trigger || null;
@@ -2607,7 +2609,7 @@ async function reprocessIntakeOcr(id, options = {}) {
   try {
     const response = await fetch('/api/analyze-image', { method:'POST', body: formData });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) return toast(result.error || 'OCR reprocess failed', true);
+    if (!response.ok) return toast(result.user_message || result.error || 'הפענוח החוזר נכשל. יש לבדוק את קובץ המקור או להקליד את הנתונים ידנית.', true);
     const refreshed = result.parsed || result;
     const merged = mergeReviewedOcrItems(currentParsed, refreshed);
     row.parsed = merged;
@@ -2618,7 +2620,7 @@ async function reprocessIntakeOcr(id, options = {}) {
     if (options.openAfter || activeCompareId === id) openIntakeCompare(id);
     toast('\u05e2\u05d9\u05d1\u05d5\u05d3 \u05de\u05d7\u05d3\u05e9 \u05d4\u05d5\u05e9\u05dc\u05dd. \u05e1\u05d9\u05de\u05d5\u05e0\u05d9\u05dd \u05e7\u05d9\u05d9\u05de\u05d9\u05dd \u05e0\u05e9\u05de\u05e8\u05d5.');
   } catch (err) {
-    toast(err?.message || 'OCR reprocess failed', true);
+    toast(err?.message || 'הפענוח החוזר נכשל. יש לבדוק את קובץ המקור או להקליד את הנתונים ידנית.', true);
   } finally {
     if (trigger) {
       trigger.disabled = false;
@@ -2642,7 +2644,7 @@ async function saveIntakeDraft(id, options = {}) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    toast(result.error || (row?.post_order_review ? 'Review status save failed' : 'Draft save failed'), true);
+    toast(result.user_message || result.error || (row?.post_order_review ? 'לא התקבל אישור לעדכון מצב הבדיקה. יש לבדוק מה נקלט לפני ניסיון נוסף.' : 'לא התקבל אישור לשמירת הטיוטה. יש לבדוק את רשימת הטיוטות לפני ניסיון נוסף.'), true);
     return false;
   }
   if (row) {
@@ -2654,7 +2656,7 @@ async function saveIntakeDraft(id, options = {}) {
   }
   activeCompareOriginal = cloneParsedForCompare(result.parsed || parsed);
   refreshOcrStatusSummary();
-  if (!options.silent) toast(row?.post_order_review ? 'Review status saved' : 'Draft saved for review');
+  if (!options.silent) toast(row?.post_order_review ? 'מצב הבדיקה נשמר' : 'הטיוטה נשמרה לבדיקה');
   return true;
 }
 
@@ -2668,7 +2670,7 @@ async function intakeApprove(id, options = {}) {
   const parsed = activeCompareId === id ? readCorrectedParsed() : (row ? parsedOf(row) : {});
   if (!selected && !confirm('לא שויך לקוח קיים. ליצור לקוח חדש לפי פרטי ההזמנה שזוהו?')) return;
   if (!(parsed.items || []).length) {
-    toast('Cannot approve without extracted items. Edit the table or correct the OCR text first.', true);
+    toast('אין פריטים שאפשר לאשר. יש להשלים את טבלת הפריטים או לתקן את תוצאות הזיהוי לפני האישור.', true);
     return;
   }
   const response = await fetch(`/api/intake/${id}/approve`, {
@@ -2680,7 +2682,7 @@ async function intakeApprove(id, options = {}) {
   if (!response.ok || !result.success) {
     const issue = result.errors?.[0];
     if (issue && Number.isInteger(issue.item_index)) highlightOcrSource('items.' + issue.item_index + '.' + issue.field);
-    return toast(result.error || 'אישור ההזמנה נכשל', true);
+    return toast(result.user_message || result.error || 'אישור ההזמנה נכשל', true);
   }
   selectedCustomers[id] = null;
   intakeRows = intakeRows.filter(row => row.id !== id);
@@ -2695,7 +2697,7 @@ async function intakeApprove(id, options = {}) {
 async function intakeReject(id) {
   if (!confirm('לדחות את הפנייה הזו?')) return;
   const response = await fetch(`/api/intake/${id}/reject`, { method:'POST' });
-  if (!response.ok) return toast('דחייה נכשלה', true);
+  if (!response.ok) return toast((await window.IronBendMessages.responseError(response, 'דחייה נכשלה')).message, true);
   intakeRows = intakeRows.filter(row => row.id !== id);
   renderIntakeQueue();
   toast('הפנייה סומנה כדחויה');

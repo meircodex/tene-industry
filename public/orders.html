@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>הזמנות – IronBend</title>
@@ -876,7 +877,7 @@ async function changeListOrderStatus(event,id) {
     if(next==='__paid'||next==='__unpaid') {
       const paid=next==='__paid';const reason=paid?'סימון ידני של ההזמנה כשולמה':await requestCorrectionReason({title:'תיקון סימון שולם',info:'מה סיבת ביטול הסימון שולם? סטטוס הייצור והאספקה והמסמכים נשמרים ללא שינוי.'});
       if(!reason?.trim()||!confirm(paid?'לסמן את ההזמנה כשולמה ולהעביר להזמנות סגורות? זהו סימון ידני בלבד — אינו מפיק קבלה ואינו משנה את הנהלת החשבונות.':'לאשר תיקון של סימון התשלום? סטטוס הייצור והאספקה יישאר ללא שינוי.'))return;
-      const response=await fetch(`/api/orders/${id}/payment`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,payment_status:paid?'paid':'unpaid',reason})});const data=await response.json();if(!response.ok)throw new Error(data.error);await fetchOrders();
+      const response=await fetch(`/api/orders/${id}/payment`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,payment_status:paid?'paid':'unpaid',reason})});const data=await response.json();if(!response.ok)throw new Error(data.user_message || data.error);await fetchOrders();
     } else if(next===ORDER_STATUS.CANCELLED)await openCancellationReview(event,id);
     else await setStatus(id,next,order.status);
   }catch(error){alert(error.message||'עדכון הסטטוס נכשל');}
@@ -1014,7 +1015,7 @@ async function approveQuote(id, quoteNum) {
   const response = await fetch(`/api/order-quotes/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'אישור הצעת המחיר נכשל');
+    alert(result.user_message || result.error || 'אישור הצעת המחיר נכשל');
     return;
   }
   viewMode = 'orders';
@@ -1045,7 +1046,7 @@ async function setStatus(id, status, expectedStatus) {
   try {
   const previewResponse = await fetch(`/api/orders/${id}/status-correction-preview?status=${encodeURIComponent(status)}`);
   const preview = await previewResponse.json();
-  if (!previewResponse.ok) throw new Error(preview.error || 'לא ניתן לבדוק את שינוי הסטטוס');
+  if (!previewResponse.ok) throw new Error(preview.user_message || preview.error || 'לא ניתן לבדוק את שינוי הסטטוס');
   let correction = null;
   if (preview.requires_correction) {
     const affectedText = preview.affected_items.length === 1 ? 'פריט אחד יוחזר' : `${preview.affected_items.length} פריטים יוחזרו`;
@@ -1070,7 +1071,7 @@ async function setStatus(id, status, expectedStatus) {
   }
   if (!response.ok || !result.success) {
     const allowed = result.allowed?.length ? ` אפשרי: ${result.allowed.join(' / ')}` : '';
-    alert((result.error || 'עדכון סטטוס נכשל') + allowed);
+    alert((result.user_message || result.error || 'עדכון סטטוס נכשל') + allowed);
     return false;
   }
   await fetchOrders();
@@ -1093,7 +1094,7 @@ async function setItemStatusFromOrder(orderId, itemId, status) {
   if (backwards) {
     const previewResponse = await fetch(`/api/items/${itemId}/status-correction-preview?status=${encodeURIComponent(status)}`);
     const preview = await previewResponse.json();
-    if (!previewResponse.ok) throw new Error(preview.error || 'לא ניתן לבדוק את התיקון');
+    if (!previewResponse.ok) throw new Error(preview.user_message || preview.error || 'לא ניתן לבדוק את התיקון');
     const correction = await requestCorrectionReason({ title: `החזרה מ־${preview.current_status} ל־${status}`,
       info: 'מצב ההזמנה יתעדכן יחד עם הפריט, וניתן יהיה להמשיך לעבוד. הכמויות שיוצרו נשמרות.', itemCorrection: preview });
     if (!correction) { await openDetail(orderId); return false; }
@@ -1109,7 +1110,7 @@ async function setItemStatusFromOrder(orderId, itemId, status) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || result.ok === false) {
-    alert(result.error || 'עדכון סטטוס הפריט נכשל');
+    alert(result.user_message || result.error || 'עדכון סטטוס הפריט נכשל');
     await openDetail(orderId);
     return false;
   }
@@ -1223,7 +1224,7 @@ async function openCancellationReview(event, orderId, itemId = null) {
   try {
     const response = await fetch(url);
     const review = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(review.error || 'לא ניתן להכין סקירת ביטול');
+    if (!response.ok) throw new Error(review.user_message || review.error || 'לא ניתן להכין סקירת ביטול');
     currentCancellation = {
       orderId: Number(orderId),
       itemId: itemId ? Number(itemId) : null,
@@ -1377,7 +1378,7 @@ async function submitCancellation(event) {
       body: JSON.stringify({ reason, items, idempotency_key: currentCancellation.idempotencyKey }),
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.success) throw new Error(result.error || 'ביטול ההזמנה נכשל');
+    if (!response.ok || !result.success) throw new Error(result.user_message || result.error || 'ביטול ההזמנה נכשל');
     const orderId = currentCancellation.orderId;
     closeCancellationPanel();
     await fetchOrders();
@@ -1479,7 +1480,7 @@ async function openHistoricalReconciliation(event, orderId, itemId) {
   try {
     const response = await fetch(`/api/orders/${orderId}/items/${itemId}/historical-production-reconciliation-review`);
     const review = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(review.error || 'לא ניתן לפתוח תיקון ביצוע היסטורי');
+    if (!response.ok) throw new Error(review.user_message || review.error || 'לא ניתן לפתוח תיקון ביצוע היסטורי');
     currentHistoricalReconciliation = { orderId: Number(orderId), itemId: Number(itemId), review, idempotencyKey: newCancellationIdempotencyKey() };
     const options = (review.warehouses || []).map(warehouse => `<option value="${Number(warehouse.id)}" data-requires-location="${warehouse.requires_location ? '1' : '0'}">${escHtml(warehouse.name)}</option>`).join('');
     document.getElementById('historicalReconciliationMeta').textContent = `הזמנה ${review.order_num} · ${review.item_label}`;
@@ -1538,7 +1539,7 @@ async function submitHistoricalReconciliation(event) {
     }),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.success) { alert(result.error || 'תיקון היסטורי נכשל'); return; }
+  if (!response.ok || !result.success) { alert(result.user_message || result.error || 'תיקון היסטורי נכשל'); return; }
   const orderId = currentHistoricalReconciliation.orderId;
   closeHistoricalReconciliationPanel();
   await fetchOrders();
@@ -1584,7 +1585,7 @@ async function loadPortalSourceDocuments(orderId) {
         button.disabled = true;
         try {
           const file = await fetch(`/api/orders/${orderId}/portal-source-documents/${doc.id}/download`);
-          if (!file.ok) throw Error('הורדת המסמך נכשלה');
+          if (!file.ok) throw await window.IronBendMessages.responseError(file, 'הורדת המסמך נכשלה');
           const url = URL.createObjectURL(await file.blob());
           const link = document.createElement('a'); link.href = url; link.download = doc.original_name;
           document.body.appendChild(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -2002,7 +2003,7 @@ async function saveOrderEdit(event) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'עדכון ההזמנה נכשל');
+    alert(result.user_message || result.error || 'עדכון ההזמנה נכשל');
     return;
   }
   const orderId = orderEditOrder.id;
@@ -2894,13 +2895,13 @@ async function cancelIssuedCertificate(orderId,noteId) {
   try {
     const previewResponse=await fetch(`/api/orders/${orderId}/delivery-certificates/${noteId}/cancel-preview`);
     const preview=await previewResponse.json();
-    if(!previewResponse.ok) throw new Error(preview.error||'לא ניתן לבדוק את התעודה');
+    if(!previewResponse.ok) throw new Error(preview.user_message || preview.error||'לא ניתן לבדוק את התעודה');
     const reason=await requestCorrectionReason({title:`ביטול תעודה ${noteId} לצורך תיקון`,info:'התעודה תישמר כמבוטלת והכמויות שלה ישתחררו לתעודה מתוקנת. סטטוסים שלא שונו מאז ההפקה יחזרו למצב הקודם; דיווחי ייצור ומלאי לא יימחקו. יש לציין מה היה שגוי.'});
     if(!reason?.trim()) return;
     if(!await confirmCertificateCancellation(noteId,preview,reason)) return;
     const response=await fetch(`/api/orders/${orderId}/delivery-certificates/${noteId}/cancel`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason,expected_fingerprint:preview.fingerprint})});
     const result=await response.json();
-    if(!response.ok) throw new Error(result.error||'ביטול התעודה נכשל');
+    if(!response.ok) throw new Error(result.user_message || result.error||'ביטול התעודה נכשל');
     await fetchOrders();await openDetail(orderId);
   } catch(error) {alert(error.message);}
   finally {pendingCertificateCancellations.delete(key);}
@@ -3183,7 +3184,7 @@ async function openOrderIntakeSource(event, orderId, mode = 'view') {
   try {
     const response = await fetch(`/api/orders/${orderId}/intake-source`);
     const row = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(row.error || 'לא נמצא מקור קליטה להזמנה');
+    if (!response.ok) throw new Error(row.user_message || row.error || 'לא נמצא מקור קליטה להזמנה');
     document.getElementById('sourceTitle').textContent = `מקור קליטה - ${row.order_num || ''}`;
     document.getElementById('sourceMeta').textContent = `${row.customer_name || ''} · ${row.source || ''} · ${row.created_at || ''}`;
     document.getElementById('sourceOriginal').innerHTML = sourceOriginalHtml(row);
@@ -3193,7 +3194,7 @@ async function openOrderIntakeSource(event, orderId, mode = 'view') {
   } catch (error) {
     document.getElementById('sourceTitle').textContent = '\u05de\u05e7\u05d5\u05e8 \u05e7\u05dc\u05d9\u05d8\u05d4 \u05dc\u05d0 \u05e0\u05de\u05e6\u05d0';
     document.getElementById('sourceMeta').textContent = '';
-    document.getElementById('sourceOriginal').innerHTML = `<div class="note-chip">${escHtml(error.message)}</div>`;
+    document.getElementById('sourceOriginal').innerHTML = `<div class="note-chip">${escHtml(window.IronBendMessages?.text(error.message) ?? error.message)}</div>`;
     document.getElementById('sourceParsed').innerHTML = mode === 'add'
       ? `<div class="d-title">\u05d0\u05d9\u05df OCR \u05e9\u05de\u05d5\u05e8 \u05dc\u05d4\u05d6\u05de\u05e0\u05d4 \u05d4\u05d6\u05d5</div>
         <div class="note-chip">\u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05d5\u05e1\u05d9\u05e3 \u05d9\u05d3\u05e0\u05d9\u05ea \u05d3\u05e8\u05da \u05e2\u05d5\u05e8\u05da \u05e6\u05d5\u05e8\u05d5\u05ea \u05d4\u05d1\u05e8\u05d6\u05dc \u05d4\u05e7\u05d9\u05d9\u05dd.</div>
@@ -3370,7 +3371,7 @@ async function shapeSelectedFromOrder(data) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    alert(result.error || (isNewItem ? '\u05d4\u05d5\u05e1\u05e4\u05ea \u05d4\u05e6\u05d5\u05e8\u05d4 \u05dc\u05d4\u05d6\u05de\u05e0\u05d4 \u05e0\u05db\u05e9\u05dc\u05d4' : '\u05e9\u05de\u05d9\u05e8\u05ea \u05d4\u05e6\u05d5\u05e8\u05d4 \u05e0\u05db\u05e9\u05dc\u05d4'));
+    alert(result.user_message || result.error || (isNewItem ? '\u05d4\u05d5\u05e1\u05e4\u05ea \u05d4\u05e6\u05d5\u05e8\u05d4 \u05dc\u05d4\u05d6\u05de\u05e0\u05d4 \u05e0\u05db\u05e9\u05dc\u05d4' : '\u05e9\u05de\u05d9\u05e8\u05ea \u05d4\u05e6\u05d5\u05e8\u05d4 \u05e0\u05db\u05e9\u05dc\u05d4'));
     return;
   }
   await openDetail(ctx.orderId);
@@ -3451,7 +3452,7 @@ async function addParsedItemToOrder(event, index) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    alert(result.error || 'הוספת שורת OCR נכשלה');
+    alert(result.user_message || result.error || 'הוספת שורת OCR נכשלה');
     return;
   }
   closeSourcePanel();
@@ -3467,7 +3468,7 @@ async function deleteOrder(orderId, orderNum) {
   const response = await fetch(`/api/orders/${orderId}/trash`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,reason})});
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'העברה לסל המחזור נכשלה');
+    alert(result.user_message || result.error || 'העברה לסל המחזור נכשלה');
     return;
   }
   if (currentDetailOrder && Number(currentDetailOrder.id) === Number(orderId)) {
@@ -3477,11 +3478,11 @@ async function deleteOrder(orderId, orderNum) {
   await fetchOrders();
 }
 
-async function restoreOrderFromTrash(id){const order=allOrders.find(o=>o.id===id);if(!order||!confirm(`לשחזר את ${order.order_num}? ההזמנה תחזור ללשונית המתאימה לסטטוס האספקה והתשלום שלה.`))return;const response=await fetch(`/api/orders/${id}/restore`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,reason:'שחזור מתוך סל המחזור'})});const result=await response.json();if(!response.ok){alert(result.error);return;}await fetchOrders();}
-async function openOrderPurge(id){const order=allOrders.find(o=>o.id===id);if(!order)return;const response=await fetch(`/api/orders/${id}/purge-review`);const review=await response.json();if(!response.ok||!review.can_purge){alert(review.error||review.reason||'המחיקה נחסמה כדי לשמור על ההיסטוריה');return;}pendingOrderPurge=order;document.getElementById('orderPurgeForm').reset();document.getElementById('orderPurgeTitle').textContent=order.order_num;document.getElementById('orderPurgeDialog').showModal();}
+async function restoreOrderFromTrash(id){const order=allOrders.find(o=>o.id===id);if(!order||!confirm(`לשחזר את ${order.order_num}? ההזמנה תחזור ללשונית המתאימה לסטטוס האספקה והתשלום שלה.`))return;const response=await fetch(`/api/orders/${id}/restore`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,reason:'שחזור מתוך סל המחזור'})});const result=await response.json();if(!response.ok){alert(result.user_message || result.error);return;}await fetchOrders();}
+async function openOrderPurge(id){const order=allOrders.find(o=>o.id===id);if(!order)return;const response=await fetch(`/api/orders/${id}/purge-review`);const review=await response.json();if(!response.ok||!review.can_purge){alert(review.user_message || review.error||review.reason||'המחיקה נחסמה כדי לשמור על ההיסטוריה');return;}pendingOrderPurge=order;document.getElementById('orderPurgeForm').reset();document.getElementById('orderPurgeTitle').textContent=order.order_num;document.getElementById('orderPurgeDialog').showModal();}
 function closeOrderPurge(){document.getElementById('orderPurgeForm').reset();document.getElementById('orderPurgeDialog').close();pendingOrderPurge=null;}
 document.getElementById('orderPurgeDialog').addEventListener('cancel',closeOrderPurge);
-document.getElementById('orderPurgeForm').onsubmit=async event=>{event.preventDefault();const order=pendingOrderPurge;if(!order)return;if(document.getElementById('orderPurgeConfirmation').value.trim()!==order.order_num){alert('מספר ההזמנה לא תואם');return;}const button=event.currentTarget.querySelector('button[type=submit]');button.disabled=true;const password=document.getElementById('orderPurgePassword').value;document.getElementById('orderPurgePassword').value='';try{const response=await fetch(`/api/orders/${order.id}/purge`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,password,reason:'מחיקה לצמיתות לאחר אישור וסיסמת מנהל'})});const result=await response.json();if(!response.ok)throw new Error(result.error);closeOrderPurge();await fetchOrders();}catch(error){alert(error.message||'המחיקה נכשלה');}finally{button.disabled=false;}};
+document.getElementById('orderPurgeForm').onsubmit=async event=>{event.preventDefault();const order=pendingOrderPurge;if(!order)return;if(document.getElementById('orderPurgeConfirmation').value.trim()!==order.order_num){alert('מספר ההזמנה לא תואם');return;}const button=event.currentTarget.querySelector('button[type=submit]');button.disabled=true;const password=document.getElementById('orderPurgePassword').value;document.getElementById('orderPurgePassword').value='';try{const response=await fetch(`/api/orders/${order.id}/purge`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:order.workspace_version,confirmed:true,password,reason:'מחיקה לצמיתות לאחר אישור וסיסמת מנהל'})});const result=await response.json();if(!response.ok)throw new Error(result.user_message || result.error);closeOrderPurge();await fetchOrders();}catch(error){alert(error.message||'המחיקה נכשלה');}finally{button.disabled=false;}};
 
 function startQtyEdit(event, orderId, itemId, current) {
   event?.stopPropagation?.();
@@ -3516,7 +3517,7 @@ async function saveQtyEdit(event, orderId, itemId) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'עדכון הכמות נכשל');
+    alert(result.user_message || result.error || 'עדכון הכמות נכשל');
     return;
   }
   await openDetail(orderId);
@@ -3527,7 +3528,7 @@ async function deleteOrderItem(event, orderId, itemId) {
   const response = await fetch(`/api/orders/${orderId}/items/${itemId}`, { method: 'DELETE' });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || '\u05de\u05d7\u05d9\u05e7\u05ea \u05d4\u05e4\u05e8\u05d9\u05d8 \u05e0\u05db\u05e9\u05dc\u05d4');
+    alert(result.user_message || result.error || '\u05de\u05d7\u05d9\u05e7\u05ea \u05d4\u05e4\u05e8\u05d9\u05d8 \u05e0\u05db\u05e9\u05dc\u05d4');
     return;
   }
   await openDetail(orderId);
@@ -3541,7 +3542,7 @@ async function approveItemReview(event, orderId, itemId) {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
-    alert(result.error || 'אישור ההערה נכשל');
+    alert(result.user_message || result.error || 'אישור ההערה נכשל');
     return;
   }
   await openDetail(orderId);

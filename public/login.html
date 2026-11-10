@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>כניסה – IronBend</title>
@@ -419,6 +420,7 @@ function setLang(lang, btn) {
 }
 
 function showError(msg) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   const b = document.getElementById('errBanner');
   b.textContent = msg;
   b.classList.add('show');
@@ -453,10 +455,10 @@ async function doLogin() {
       body: JSON.stringify({ username: u, pin: p }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Login failed');
+    if (!response.ok) throw new Error(result.user_message || result.error || 'Login failed');
     storeLogin(result, remember);
-  } catch (_) {
-    showError('שם משתמש או PIN שגויים');
+  } catch (error) {
+    showError(window.IronBendMessages?.text(error) || 'לא התקבל אישור התחברות. יש לבדוק את החיבור ולנסות שוב.');
   }
 }
 
@@ -487,10 +489,10 @@ async function checkPin() {
       body: JSON.stringify({ pin: pinValue }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Login failed');
+    if (!response.ok) throw new Error(result.user_message || result.error || 'Login failed');
     storeLogin(result, true);
-  } catch (_) {
-    showError('קוד PIN שגוי. נסה שוב.');
+  } catch (error) {
+    showError(window.IronBendMessages?.text(error) || 'לא התקבל אישור התחברות. יש לבדוק את החיבור ולנסות שוב.');
     pinValue = '';
     updatePinDots();
   }

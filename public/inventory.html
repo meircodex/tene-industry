@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>מלאי חומר גלם – IronBend</title>
@@ -499,7 +500,7 @@ async function analyzeBendingShape(file) {
   try {
     const r = await fetch('/api/inventory/analyze-bending-shape', { method:'POST', body: fd });
     const data = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(data.error || 'זיהוי צורת כיפוף נכשל');
+    if (!r.ok) throw new Error(data.user_message || data.error || 'זיהוי צורת כיפוף נכשל');
     document.getElementById('bType').value = 'bent';
     toggleBendingPanel();
     setBendingShapeFields({ name:data.shape_name, segments:data.segments || [], source:'image' });
@@ -535,7 +536,7 @@ function ocrSetupMessage(err) {
 // ── SUMMARY ──────────────────────────────────────────────────────
 async function loadSummary() {
   let r;
-  try { const response=await fetch('/api/inventory/summary');if(!response.ok)throw Error();r=await response.json(); }
+  try { const response=await fetch('/api/inventory/summary');if(!response.ok)throw await window.IronBendMessages.responseError(response, 'invalid_json_response');r=await response.json(); }
   catch(_) {
     for(const id of ['kpiTotal','kpiDiam'])document.getElementById(id).textContent='—';
     document.getElementById('inventoryStockBasis').textContent='נתוני המלאי אינם זמינים כרגע. יש לרענן את המסך.';
@@ -547,7 +548,7 @@ async function loadSummary() {
   document.getElementById('kpiDiam').textContent = new Set(r.filter(row=>Number(row.available)>0).map(row=>Number(row.diameter))).size;
   document.getElementById('inventoryStockBasis').textContent='מלאי נוכחי = המלאי בספירה + כניסות שאושרו − צריכות שנרשמו − גרוטאות שנרשמו. שריון להזמנה מוצג בנפרד ואינו יציאת חומר.';
   try {
-    const response=await fetch('/api/inventory/stocktakes?limit=1');if(!response.ok)throw Error();const counts=await response.json();
+    const response=await fetch('/api/inventory/stocktakes?limit=1');if(!response.ok)throw await window.IronBendMessages.responseError(response, 'invalid_json_response');const counts=await response.json();
     if(counts[0]) {
       const at=new Date(counts[0].created_at.replace(' ','T')+'Z').toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
       document.getElementById('inventoryStockBasis').textContent='בסיס המלאי: הספירה שאושרה ב־'+at+'. '+document.getElementById('inventoryStockBasis').textContent;
@@ -679,7 +680,7 @@ async function uploadReceiptReview(file) {
   try {
     const r = await fetch('/api/inventory/receipt-reviews/analyze', { method:'POST', body: fd });
     const data = await r.json().catch(()=>({}));
-    if (!r.ok) throw new Error(data.error || 'פענוח תעודת ספק נכשל');
+    if (!r.ok) throw new Error(data.user_message || data.error || 'פענוח תעודת ספק נכשל');
     await loadReceiptReviews();
   } catch (err) {
     box.innerHTML = `<div class="muted">${ocrSetupMessage(err)}</div>`;
@@ -691,7 +692,7 @@ async function approveReceiptReview(id) {
   if (!confirm('לאשר את התעודה ולהכניס את השורות למלאי?')) return;
   const r = await fetch(`/api/inventory/receipt-reviews/${id}/approve`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ notes:'approved from inventory comparison screen' }) });
   const data = await r.json().catch(()=>({}));
-  if (!r.ok) return alert(data.error || 'אישור נכשל');
+  if (!r.ok) return alert(data.user_message || data.error || 'אישור נכשל');
   closeReceiptCompare();
   await loadReceiptReviews();
   await loadSummary();
@@ -700,7 +701,7 @@ async function approveReceiptReview(id) {
 async function rejectReceiptReview(id) {
   const notes = prompt('סיבת דחייה / תיקון נדרש') || '';
   const r = await fetch(`/api/inventory/receipt-reviews/${id}/reject`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ notes }) });
-  if (!r.ok) return alert('דחייה נכשלה');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'דחייה נכשלה')).message);
   closeReceiptCompare();
   await loadReceiptReviews();
 }
@@ -833,7 +834,7 @@ async function saveBatch() {
   const method = editingBatchId ? 'PATCH' : 'POST';
   const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
   const result = await r.json().catch(()=>({}));
-  if (!r.ok) return alert(result.error || 'שגיאה בשמירה');
+  if (!r.ok) return alert(result.user_message || result.error || 'שגיאה בשמירה');
   if (result.verification_status === 'pending_verification') {
     alert('הקבלה נשמרה כממתינה לאימות ואינה זמינה עדיין למלאי תפעולי');
   }

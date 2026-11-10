@@ -282,6 +282,7 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
             item.is_3d ? 1 : 0);
         db.prepare('UPDATE items SET item_uid=? WHERE id=?').run(buildOrderItemUid(orderId, itemResult.lastInsertRowid), itemResult.lastInsertRowid);
         reservationItems.push({
+          display_sequence: globalItemSequence,
           id: itemResult.lastInsertRowid,
           item_id: itemResult.lastInsertRowid,
           diameter: item.diameter,

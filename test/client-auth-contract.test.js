@@ -902,7 +902,7 @@ test('new order screen uses compact workspace layout with sticky summary', () =>
   assert.match(index, /const selectedCustomerId = Number\(window\._selectedCustomerId \|\| 0\) \|\| null/);
   assert.match(index, /const selectedSiteId = selectedCustomerId \? \(document\.getElementById\('orderSiteId'\)\?\.value \|\| null\) : null/);
   assert.match(index, /siteId: selectedSiteId/);
-  assert.match(index, /alert\(result\.error \|\|/);
+  assert.match(index, /alert\(result\.user_message \|\| result\.error \|\|/);
   assert.match(index, /function isSpiralOrderItem\(item = \{\}\)/);
   assert.match(index, /function itemShapeContract\(item = \{\}\)/);
   assert.match(index, /function approvedShapeContract\(data = \{\}\)/);

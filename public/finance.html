@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>IronBend – בינה פיננסית</title>
@@ -348,7 +349,7 @@ async function submitSteelPrice() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)
   });
-  if (!r.ok) return alert('שגיאה בשמירת מחיר פלדה');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירת מחיר פלדה')).message);
   document.getElementById('new-price-val').value = '';
   document.getElementById('new-price-diam').value = '';
   loadSteelPrices();
@@ -455,7 +456,7 @@ async function loadSteelPricesSafe() {
   const tbody = document.getElementById('steel-price-body');
   try {
     const r = await fetch('/api/steel-prices');
-    if (!r.ok) throw new Error('steel prices failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'steel prices failed');
     const prices = await r.json();
     if (!Array.isArray(prices) || !prices.length) {
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:12px;">אין מחירים רשומים</td></tr>';
@@ -478,7 +479,7 @@ async function loadOrdersSafe() {
   const sel = document.getElementById('cost-order-sel');
   try {
     const r = await fetch('/api/orders');
-    if (!r.ok) throw new Error('orders failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'orders failed');
     const data = await r.json();
     const orders = Array.isArray(data) ? data : (data.orders || []);
     sel.innerHTML = '<option value="">בחר הזמנה...</option>' +
@@ -492,7 +493,7 @@ async function loadCustomersSafe() {
   const sel = document.getElementById('ledger-cust-sel');
   try {
     const r = await fetch('/api/customers');
-    if (!r.ok) throw new Error('customers failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'customers failed');
     const data = await r.json();
     const customers = Array.isArray(data) ? data : (data.customers || []);
     sel.innerHTML = '<option value="">בחר לקוח...</option>' +
@@ -514,7 +515,7 @@ async function calcOrderCostSafe() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ reason:'manual finance recalculation' })
     });
-    if (!r.ok) throw new Error('cost recalculation failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'cost recalculation failed');
     data = await r.json();
   } catch (e) {
     resultEl.innerHTML = '<div style="padding:16px;color:var(--danger)">שגיאה בחישוב עלות הזמנה</div>';

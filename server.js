@@ -125,18 +125,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json({
-  // Large steel orders (100+ items, each with a shape snapshot and review
-  // notes) push a single POST /api/orders past the 100kb express default,
-  // which returned a 413 HTML page the client could only show as a generic
-  // "save failed". 5mb covers even very large orders; file uploads use
-  // multer (10mb) on their own routes, not this JSON body.
-  limit: '5mb',
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  },
-}));
-
 // BUG-16: Attach requestId + timestamp to every response
 app.use((req, res, next) => {
   req.requestId = crypto.randomBytes(8).toString('hex');
@@ -151,6 +139,21 @@ app.use((req, res, next) => {
   };
   next();
 });
+
+const { attachResponseMessages, apiErrorHandler } = require('./services/httpUserMessages');
+app.use(attachResponseMessages);
+app.use(express.json({
+  // Large steel orders (100+ items, each with a shape snapshot and review
+  // notes) push a single POST /api/orders past the 100kb express default,
+  // which returned a 413 HTML page the client could only show as a generic
+  // "save failed". 5mb covers even very large orders; file uploads use
+  // multer (10mb) on their own routes, not this JSON body.
+  limit: '5mb',
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
+
 
 // HTML pages: never cache — always serve fresh
 app.use((req, res, next) => {
@@ -887,6 +890,8 @@ app.use('/api', requireModule('orders'), createPriorityRouter({ db, requireRole,
 app.use('/api', requireModule('ai'), createAiRouter({ db, requireAnyRole, ai }));
 app.use('/api', requireModule('reports'), createSearchRouter({ db, requireRole }));
 app.use('/api', requireModule('bvbs'), createBvbsRouter({ db, requireAnyRole, upload, industry, generateOrderNum, wsBroadcast }));
+
+app.use(apiErrorHandler);
 
 
 function tryParseJSON(val, fallback = null) {

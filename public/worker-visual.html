@@ -1,6 +1,7 @@
 ﻿<!doctype html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>דשבורד איסוף כרטיסים – IronBend</title>
@@ -150,8 +151,10 @@
       const params=new URLSearchParams(location.search);
       return parseCardToken(params.get('card')||params.get('item')||'');
     }
-    function showScanResult(message,kind='ok'){const el=document.querySelector('#scanResult');if(!el)return;el.textContent=message;el.className=`scan-result ${kind}`;}
+    function showScanResult(message,kind='ok'){
+  message = window.IronBendMessages?.text(message) ?? message;const el=document.querySelector('#scanResult');if(!el)return;el.textContent=message;el.className=`scan-result ${kind}`;}
     function showOperation(message,kind,retry=null){
+  message = window.IronBendMessages?.text(message) ?? message;
       const feedback=document.getElementById('operationFeedback');
       feedback.textContent=message;
       feedback.dataset.state=kind;
@@ -184,7 +187,7 @@
             if(!response.ok)throw Object.assign(new Error(workerErrorMessage()),{explicit:true});
             throw Object.assign(new Error('לא התקבל אישור תקין מהמערכת. יש לבדוק ולנסות שוב.'),{uncertain:true});
           }
-          if(!response.ok)throw Object.assign(new Error(workerErrorMessage(data?.error)),{explicit:true});
+          if(!response.ok)throw Object.assign(new Error((data?.user_message || workerErrorMessage(data?.error))),{explicit:true});
           if(!data||data.offline)throw Object.assign(new Error('אין חיבור למערכת ולא התקבל אישור קליטה.'),{uncertain:true});
           return data;
         })()]);
@@ -275,11 +278,11 @@
       select.disabled=true;
       try{
         const check=await fetch(`/api/orders/${orderId}/status-correction-preview?status=${encodeURIComponent(next)}`),preview=await check.json();
-        if(!check.ok)throw Error(preview.error||'לא ניתן לבדוק את שינוי הסטטוס');
+        if(!check.ok)throw Error(preview.user_message || preview.error||'לא ניתן לבדוק את שינוי הסטטוס');
         const effect=preview.requires_correction?` ${preview.affected_items.length} פריטים יוחזרו לשלב ${preview.target_item_status||next}. הכמויות ותעודות המשלוח נשמרות.${preview.cancelled_loading_session_ids.length?' ההעמסה הפעילה תבוטל ותישמר בהיסטוריה.':''}`:'';
         if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״?${effect}`)){select.value=order.order_status;select.disabled=false;return;}
         const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status,correction_fingerprint:preview.fingerprint,correction_reason:'תיקון סטטוס מתחנת עבודה',correction_mode:'keep_documents'})});
-        const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.error||'עדכון סטטוס ההזמנה נכשל');await load();
+        const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.user_message || result.error||'עדכון סטטוס ההזמנה נכשל');await load();
       }catch(error){alert(error.message);select.value=order.order_status;select.disabled=false;}
     }
     function targetWeight(item){return Number(item.weight ?? item.total_weight ?? 0)||0}
@@ -388,7 +391,7 @@
       if(pendingWrite||pendingLoad||unresolvedWrite)return;
       pendingLoad=true;
       try{const data=await workerRequest('/api/production-queue?visual=1');if(!Array.isArray(data.items))throw Error('invalid_queue');state.items=data.items;render();showOperation('תור הייצור עודכן מהמערכת. אפשר לסרוק כרטיס.','success');}
-      catch(_){showOperation('לא התקבל עדכון מהמערכת. בדוק את החיבור ונסה שוב.','unknown',load);}
+      catch(error){showOperation(window.IronBendMessages?.text(error)||'לא התקבל עדכון מהמערכת. יש לבדוק את החיבור.','unknown',load);}
       finally{pendingLoad=false;}
     }
     document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelector('.panel').classList.toggle('mobile-hidden',b.dataset.pane!=='panel');document.querySelector('.stage').classList.toggle('mobile-hidden',b.dataset.pane!=='stage')});

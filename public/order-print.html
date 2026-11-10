@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IronBend - print</title>
@@ -42,7 +43,7 @@
     let preview;
     try {
       const response = await fetcher('/api/orders/' + encodeURIComponent(id) + '/delivery-certificate-preview', { credentials: 'same-origin' });
-      if (!response.ok) throw new Error('לא ניתן לבדוק את יתרת ההזמנה. רענן והתחבר מחדש במידת הצורך.');
+      if (!response.ok) throw await window.IronBendMessages.responseError(response, 'לא ניתן לבדוק את יתרת ההזמנה. רענן והתחבר מחדש במידת הצורך.');
       preview = await response.json();
     } catch (error) { fail(error.message); return; }
     const draft = new URL(location.href);

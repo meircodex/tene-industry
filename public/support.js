@@ -10,11 +10,11 @@
   async function api(path, init = {}) {
     const response = await fetch(path, init);
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || 'support_request_failed');
+    if (!response.ok) throw new Error(body.user_message || body.error || 'support_request_failed');
     return body;
   }
 
-  function message(id, value = '') { $(id).textContent = value; }
+  function message(id, value = '') { value=window.IronBendMessages?.text(value)??value; $(id).textContent = value; }
   function statusLabel(status) {
     return ({ requested:'ממתין להפעלה', agent_ready:'מסך משותף', control_requested:'ממתין לאישור שליטה', control_granted:'שליטה אושרה', ended:'הסתיים', expired:'פג תוקף', rejected:'נדחה' })[status] || status;
   }

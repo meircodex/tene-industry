@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#021A48">
@@ -77,7 +78,7 @@
       try {
         const response = await fetch(`/api/worker-invitations/activation?token=${encodeURIComponent(invitationToken)}`, { credentials:'same-origin' });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'invitation_not_found');
+        if (!response.ok) throw new Error(result.user_message || result.error || 'invitation_not_found');
         document.getElementById('title').textContent = 'הפעלת אפליקציית עובדים';
         document.getElementById('lead').textContent = 'מלא פרטים אישיים. הבקשה תישלח לאישור מנהל המפעל.';
         document.getElementById('workerName').value = result.worker_name;
@@ -110,7 +111,7 @@
           }),
         });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.error || 'worker_registration_failed');
+        if (!response.ok) throw new Error(result.user_message || result.error || 'worker_registration_failed');
         localStorage.setItem(DEVICE_KEY, result.device_credential);
         invitationToken = '';
         document.getElementById('registrationForm').hidden = true;

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>הגדרות ייצור - IronBend</title>
@@ -133,12 +134,13 @@ function escapeHtml(value) {
 }
 
 function toast(message, err = false) {
+  message = window.IronBendMessages?.text(message) ?? message;
   const el = document.getElementById('toast');
   el.textContent = message;
   el.style.background = err ? 'var(--danger)' : 'var(--success)';
   el.style.opacity = '1';
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.style.opacity = '0', 2400);
+  el._t = setTimeout(() => el.style.opacity = '0', (window.IronBendMessages?.duration(message, 2400) ?? 2400));
 }
 
 function showSetupTab(name, btn) {
@@ -311,7 +313,7 @@ async function submitAddMachine() {
       double_max_diameter: Number(document.getElementById('nm_double_max').value || 16),
     }),
   });
-  if (!response.ok) return toast('הוספת מכונה נכשלה', true);
+  if (!response.ok) return toast((await window.IronBendMessages.responseError(response, 'הוספת מכונה נכשלה')).message, true);
   document.getElementById('addMachineModal').style.display = 'none';
   toast('מכונה נוספה');
   loadMachinesAdmin();

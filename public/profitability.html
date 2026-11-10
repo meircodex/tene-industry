@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>ריווחיות – IronBend</title>
@@ -292,7 +293,7 @@ async function apiFetch(url, opts = {}) {
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) throw await window.IronBendMessages.responseError(res, 'invalid_json_response');
   return res.json();
 }
 

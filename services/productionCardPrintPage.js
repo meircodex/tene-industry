@@ -291,7 +291,7 @@ function renderA4CardPages(cardHtmlList) {
 
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
-<head>
+<head><script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <title>כרטיסיות ייצור – ${order.order_num}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1265,7 +1265,7 @@ async function saveCardWeight(itemId, cardIndex, cardTotal, cardQty, uid, event)
     body: JSON.stringify({ item_id: itemId, card_index: cardIndex, card_total: cardTotal, card_qty: cardQty, actual_weight_kg: value })
   });
   var body = await res.json().catch(function(){ return {}; });
-  if (!res.ok) { alert(body.error || 'שמירת משקל נכשלה'); return; }
+  if (!res.ok) { alert(body.user_message || body.error || 'שמירת משקל נכשלה'); return; }
   var item = allItems.find(function(row){ return Number(row.id) === Number(itemId); });
   if (item) {
     item.actual_weight_kg = Number(body.item_actual_weight_kg || 0);

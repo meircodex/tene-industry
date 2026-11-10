@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>נהג – IronBend</title>
@@ -254,7 +255,7 @@ async function loadDrivers() {
   let list = [];
   try {
     const res = await fetch('/api/drivers');
-    if (!res.ok) throw new Error('drivers unavailable');
+    if (!res.ok) throw await window.IronBendMessages.responseError(res, 'drivers unavailable');
     list = await res.json();
   } catch {
     el.innerHTML = `<div style="padding:20px;color:var(--danger);text-align:center">לא ניתן לטעון נהגים. התחבר מחדש או פנה למשרד.</div>`;
@@ -295,7 +296,7 @@ async function loadDeliveries() {
   let list = [];
   try {
     const res = await fetch(`/api/deliveries?driverId=${encodeURIComponent(currentDriver.id)}&date=${encodeURIComponent(date)}`);
-    if (!res.ok) throw new Error('deliveries unavailable');
+    if (!res.ok) throw await window.IronBendMessages.responseError(res, 'deliveries unavailable');
     list = await res.json();
   } catch {
     document.getElementById('deliveryList').innerHTML =
@@ -370,7 +371,7 @@ function deliveryCard(d, num) {
 async function depart(deliveryId) {
   if (!confirm('לאשר יציאה לאספקה?')) return;
   const res = await fetch(`/api/deliveries/${deliveryId}/depart`, { method: 'POST' });
-  if (!res.ok) return alert('לא ניתן לעדכן יציאה לאספקה');
+  if (!res.ok) return alert((await window.IronBendMessages.responseError(res, 'לא ניתן לעדכן יציאה לאספקה')).message);
   loadDeliveries();
 }
 
@@ -398,7 +399,7 @@ async function submitConfirm() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ signatureData: sig, notes, lat, lng }),
   });
-  if (!res.ok) return alert('לא ניתן לאשר מסירה');
+  if (!res.ok) return alert((await window.IronBendMessages.responseError(res, 'לא ניתן לאשר מסירה')).message);
   closeModal('confirmModal');
   loadDeliveries();
 }
@@ -416,7 +417,7 @@ async function submitProblem() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ problemType, problemNotes }),
   });
-  if (!res.ok) return alert('לא ניתן לדווח בעיה');
+  if (!res.ok) return alert((await window.IronBendMessages.responseError(res, 'לא ניתן לדווח בעיה')).message);
   closeModal('problemModal');
   loadDeliveries();
 }

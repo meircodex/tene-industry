@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>אימון OCR - IronBend</title>
@@ -114,12 +115,13 @@ function escapeHtml(value) {
 }
 
 function toast(message, err = false) {
+  message = window.IronBendMessages?.text(message) ?? message;
   const el = document.getElementById('toast');
   el.textContent = message;
   el.style.background = err ? 'var(--danger)' : 'var(--success)';
   el.style.opacity = '1';
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.style.opacity = '0', 2400);
+  el._t = setTimeout(() => el.style.opacity = '0', (window.IronBendMessages?.duration(message, 2400) ?? 2400));
 }
 
 async function loadOcrTraining() {
@@ -168,7 +170,7 @@ async function saveOcrTraining() {
     body: JSON.stringify(payload),
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.success) return toast(result.error || 'שמירת התיקון נכשלה', true);
+  if (!response.ok || !result.success) return toast(result.user_message || result.error || 'שמירת התיקון נכשלה', true);
   document.getElementById('ocrTrainTitle').value = '';
   document.getElementById('ocrTrainProblem').value = '';
   document.getElementById('ocrTrainCorrection').value = '';
@@ -178,7 +180,7 @@ async function saveOcrTraining() {
 
 async function deleteOcrTraining(id) {
   const response = await fetch('/api/intake/training/' + id, { method:'DELETE' });
-  if (!response.ok) return toast('מחיקה נכשלה', true);
+  if (!response.ok) return toast((await window.IronBendMessages.responseError(response, 'מחיקה נכשלה')).message, true);
   document.getElementById('ocrTrain_' + id)?.remove();
   toast('התיקון הוסר');
 }

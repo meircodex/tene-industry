@@ -3799,7 +3799,7 @@ class ShapeEditorModal {
     this._syncCatalogueMode();
     try {
       const response = await fetch('/api/shape-definitions');
-      if (!response.ok) throw new Error('catalogue unavailable');
+      if (!response.ok) throw await window.IronBendMessages.responseError(response, 'catalogue unavailable');
       const result = await response.json();
       this._sharedShapes = Array.isArray(result.entries) ? result.entries : [];
       this._canManageCatalogue = result.permissions?.canManage === true;
@@ -4439,7 +4439,7 @@ class ShapeEditorModal {
         body: JSON.stringify({ name, itemCode, definition: this.current, billingPolicy: this._currentBillingPolicy(), expectedVersion: updating ? identity.version : undefined }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'שמירת הצורה נכשלה');
+      if (!response.ok) throw new Error(result.user_message || result.error || 'שמירת הצורה נכשלה');
       const entry = result.entry;
       this.current.presetName = entry.name;
       this.current.presetId = entry.id;
@@ -4451,11 +4451,12 @@ class ShapeEditorModal {
       this._goToEdit();
       await this._loadCatalogue();
       this._showToast('הצורה נשמרה בקטלוג המשותף');
-    } catch (err) { error.textContent = err.message || 'לא ניתן לשמור כרגע'; }
+    } catch (err) { error.textContent = (window.IronBendMessages?.text(err.message) ?? err.message) || 'לא ניתן לשמור כרגע'; }
     finally { this._savingShape = false; }
   }
 
   _showToast(msg) {
+    msg = window.IronBendMessages?.text(msg) ?? msg;
     let t = document.getElementById('seToast');
     if (!t) {
       t = document.createElement('div');
@@ -4463,14 +4464,14 @@ class ShapeEditorModal {
       t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);'
         + 'background:#1a2332;color:#fff;padding:11px 22px;border-radius:10px;'
         + 'font-family:Heebo,sans-serif;font-size:14px;font-weight:700;z-index:600;'
-        + 'opacity:0;transition:opacity 0.25s;pointer-events:none;white-space:nowrap;'
+        + 'opacity:0;transition:opacity 0.25s;pointer-events:none;white-space:normal;max-width:min(90vw,640px);width:max-content;'
         + 'box-shadow:0 4px 20px rgba(0,0,0,0.35);';
       document.body.appendChild(t);
     }
     t.textContent = msg;
     t.style.opacity = '1';
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2800);
+    this._toastTimer = setTimeout(() => { t.style.opacity = '0'; }, (window.IronBendMessages?.duration(msg, 2800) ?? 2800));
   }
 
   _loadPreset(preset) {

@@ -346,7 +346,7 @@ async function openDashboardDrilldown(metric, params = {}, trigger = null) {
     const response = await fetch(`/api/dashboard/drilldown?${query.toString()}`);
     const data = await response.json().catch(() => ({}));
     if (requestId !== dashboardDrilldownRequest) return;
-    if (!response.ok) throw new Error(data.error || 'dashboard_drilldown_failed');
+    if (!response.ok) throw new Error(data.user_message || data.error || 'dashboard_drilldown_failed');
     dashboardDrilldownData = data;
     renderDashboardDrilldown(data);
   } catch (error) {

@@ -715,7 +715,7 @@ module.exports = function createOrdersRouter(deps) {
   router.post('/orders/manual', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
     const { machineId, diameter, qty, totalLengthMm, shape, note } = req.body;
     if (!machineId || !diameter || !qty || !totalLengthMm) {
-      return res.status(400).json({ error: 'חסרים פרמטרים' });
+      return res.status(400).json({ error: 'חסרים פרמטרים', details: { missing_fields: Object.entries({machineId,diameter,qty,totalLengthMm}).filter(([,value])=>!value).map(([field])=>field) } });
     }
     const orderNum = 'MAN-' + Date.now().toString(36).toUpperCase();
     const totalWeight = industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm }) * qty;
@@ -794,7 +794,7 @@ module.exports = function createOrdersRouter(deps) {
       wsBroadcast('new_order', { orderNum: result.orderNum, orderId: result.orderId });
       res.json(result);
     } catch (error) {
-      res.status(error.statusCode || 400).json({ success: false, error: error.message });
+      res.status(error.statusCode || 400).json({ success: false, error: error.message, details: error.details || null });
     }
   });
 

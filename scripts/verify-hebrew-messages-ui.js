@@ -1,0 +1,53 @@
+'use strict';
+const express=require('express'),path=require('path'),fs=require('fs'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {attachResponseMessages,apiErrorHandler}=require('../services/httpUserMessages');
+// Isolated fixture responses only. No production DB, real login, order or machine.
+(async()=>{
+  const app=express();let orderCalls=0;
+  app.use((req,res,next)=>{req.requestId='ui-reference-17';res.set('X-Request-Id',req.requestId);next();});
+  app.use(attachResponseMessages);app.use(express.json());
+  app.get(['/nav.js','/sw.js'],(req,res)=>res.type('js').send(''));
+  app.post('/api/auth/login',(req,res)=>res.status(401).json({error:'Invalid credentials'}));
+  app.post('/api/orders',(req,res)=>{orderCalls++;res.status(400).json({error:'invalid_preferred_raw_material',details:{item_sequence:2,field:'preferred_raw_material_id',value:999}});});
+  app.get('/api/procurement/plan',(req,res)=>res.status(500).json({error:'FOREIGN KEY constraint failed'}));
+  app.use('/api',(req,res)=>res.json([]));
+  app.use(express.static(path.resolve(__dirname,'../public')));app.use(apiErrorHandler);
+  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+  const base=`http://127.0.0.1:${server.address().port}`;let browser;
+  const out=process.env.HEBREW_MESSAGES_QA_OUTPUT;if(out)fs.mkdirSync(out,{recursive:true});
+  try{
+    browser=await chromium.launch({headless:true});
+    const page=await browser.newPage({viewport:{width:1366,height:900}});
+    const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(base+'/login.html');
+    await page.locator('#username').fill('fixture-user');await page.locator('#password').fill('fixture-code');
+    await page.evaluate(()=>doLogin());
+    assert.match(await page.locator('#errBanner').innerText(),/פרטי הכניסה אינם נכונים/);
+    await page.route('**/api/auth/login',route=>route.abort('failed'));
+    await page.evaluate(()=>doLogin());
+    assert.match(await page.locator('#errBanner').innerText(),/לא התקבל אישור.*החיבור/);
+    assert.doesNotMatch(await page.locator('#errBanner').innerText(),/שגויים|אינם נכונים|Failed to fetch/);
+    if(out)await page.screenshot({path:path.join(out,'login-connection-cause.png')});
+    await page.unroute('**/api/auth/login');
+    const dialogPromise=new Promise(resolve=>page.once('dialog',async d=>{const text=d.message();await d.dismiss();resolve(text);}));
+    await page.evaluate(async()=>{const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const body=await response.json();alert(body.user_message||body.error);});
+    const dialog=await dialogPromise;
+    assert.match(dialog,/שורת פריט 2.*מנת מלאי שנבחרה: 999.*לבחור/);assert.equal(orderCalls,1);
+    await page.goto(base+'/inventory.html');
+    await page.waitForFunction(()=>document.getElementById('inventoryDailyRows').textContent.includes('מספר פנייה'));
+    const inventory=await page.locator('#inventoryDailyRows').innerText();
+    assert.match(inventory,/רשומה שאינה קיימת.*מספר פנייה: ui-reference-17/s);
+    assert.doesNotMatch(inventory,/FOREIGN KEY|SQLITE/);
+    if(out)await page.screenshot({path:path.join(out,'inventory-detailed-error.png'),fullPage:true});
+    await page.goto(base+'/index.html');
+    await page.evaluate(()=>showToast('לא התקבל אישור מהשרת. יש לבדוק את החיבור, ואז לבדוק אם הפעולה נקלטה לפני ניסיון נוסף. הפרטים שהקלדת עשויים להישאר בטופס.'));
+    const toast=page.locator('#_toast');await toast.waitFor({state:'visible'});
+    const box=await toast.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=1366);
+    assert.equal(await toast.evaluate(el=>getComputedStyle(el).whiteSpace),'normal');
+    assert.ok(await toast.evaluate(el=>el._timer)>0);
+    if(out)await page.screenshot({path:path.join(out,'readable-long-toast.png')});
+    assert.deepEqual(errors,[]);
+    console.log(JSON.stringify({passed:true,scenarios:['specific login rejection','connection failure is not a bad credential','item and lot diagnosis','inline server diagnostic with reference','long toast wraps'],orderFixtureRequests:orderCalls,productionWrites:false}));
+  }finally{await browser?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+})().catch(error=>{console.error(error);process.exitCode=1;});

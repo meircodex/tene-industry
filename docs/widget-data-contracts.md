@@ -127,3 +127,12 @@ from `/api/procurement/plan` and `purchase_policy`. Min/target/order are 10/30/3
 tonnes per supply form; available stock defaults, physical is selectable. The
 operator selects other diameters to complete a supplier load. Length is separate
 from specification. Whole kg presentation never changes internal mass precision.
+
+## System error notifications (2026-11-10)
+
+Platform Core owns presentation. Source: failed API response `user_message`,
+`_requestId`, and approved numeric diagnostic details. Consumers: dialogs,
+toasts, inline error panels, worker and warehouse feedback. Raw `error` remains
+a machine code for client decisions. Messages must name a known cause and next
+action, without inventing inventory values, affected records or save outcomes.
+See [contract](hebrew-system-messages-20261110.md).

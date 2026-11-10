@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>בקרת איכות – IronBend</title>
@@ -603,7 +604,7 @@ async function saveQC() {
   };
   if (!body.item_id) return alert('נדרש מזהה פריט (item_id)');
   const r = await fetch('/api/quality', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-  if (!r.ok) return alert('שגיאה בשמירה');
+  if (!r.ok) return alert((await window.IronBendMessages.responseError(r, 'שגיאה בשמירה')).message);
   closeQCModal();
   loadStats();
   loadChecks();
@@ -676,7 +677,7 @@ function normalizeNCR(row) {
 async function loadNCR() {
   try {
     const r = await fetch('/api/ncr');
-    if (!r.ok) throw new Error('NCR API failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'NCR API failed');
     const data = await r.json();
     ncrList = Array.isArray(data) ? data.map(normalizeNCR) : [];
   } catch(e) {
@@ -751,9 +752,9 @@ async function saveNCR() {
   if (!body.description) return alert('נדרש תיאור הממצא');
   try {
     const r = await fetch('/api/ncr', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    if (!r.ok) throw new Error('NCR save failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'NCR save failed');
   } catch(e) {
-    alert('שגיאה בשמירת NCR. הרשומה לא נוספה מקומית.');
+    alert(window.IronBendMessages.text(e));
     return;
   }
   closeModal('ncrModal');
@@ -884,7 +885,7 @@ function normalizeCAPA(row) {
 async function loadCAPA() {
   try {
     const r = await fetch('/api/capa');
-    if (!r.ok) throw new Error('CAPA API failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'CAPA API failed');
     const data = await r.json();
     capaList = Array.isArray(data) ? data.map(normalizeCAPA) : [];
   } catch(e) {
@@ -965,9 +966,9 @@ async function saveCapa() {
   if (!body.title) return alert('נדרשת כותרת לפעולה');
   try {
     const r = await fetch('/api/capa', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
-    if (!r.ok) throw new Error('CAPA save failed');
+    if (!r.ok) throw await window.IronBendMessages.responseError(r, 'CAPA save failed');
   } catch(e) {
-    alert('שגיאה בשמירת CAPA. הרשומה לא נוספה מקומית.');
+    alert(window.IronBendMessages.text(e));
     return;
   }
   closeModal('capaModal');

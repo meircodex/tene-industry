@@ -162,7 +162,7 @@ router.get('/drivers', requireAnyRole(['driver', 'warehouse', 'office', 'manager
 
 router.post('/drivers', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
   const { name, phone, vehicle_id, license_expiry, notes } = req.body;
-  if (!name) return res.status(400).json({ error: '?? ??? ???' });
+  if (!name) return res.status(400).json({ error: 'לא הוזן שם נהג. יש להזין את שם הנהג לפני שמירה.' });
   const r = db.prepare('INSERT INTO drivers (name,phone,vehicle_id,license_expiry,notes) VALUES (?,?,?,?,?)').run(name, phone||null, vehicle_id||null, license_expiry||null, notes||null);
   res.json({ success: true, id: r.lastInsertRowid });
 });

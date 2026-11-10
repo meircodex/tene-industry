@@ -130,6 +130,23 @@
     return url.toString();
   }
 
+  function presentResponse(response, url, method) {
+    if (!window.IronBendMessages || !isApiUrl(url) || typeof response.json !== 'function') return response;
+    const json = response.json.bind(response);
+    const context = { status: response.status, path: url, method,
+      requestId: response.headers?.get?.('X-Request-Id') };
+    response.json = async () => {
+      let data;
+      try { data = await json(); }
+      catch (cause) { throw new Error(window.IronBendMessages.text('invalid_json_response', context), { cause }); }
+      if (data && typeof data === 'object' && typeof data.error === 'string' && !data.user_message) {
+        data.user_message = window.IronBendMessages.text(data.error, { ...context, requestId: data._requestId || context.requestId });
+      }
+      return data;
+    };
+    return response;
+  }
+
   async function authFetch(input, init = {}) {
     const url = typeof input === 'string' ? input : input.url;
     const isApi = isApiUrl(url);
@@ -143,12 +160,27 @@
     if (isApi && !isAuth && token) headers.set('Authorization', `Bearer ${token}`);
     if (isApi && device) headers.set('X-IronBend-Device', device);
 
-    let response = await nativeFetch(input, { ...init, headers, credentials: init.credentials || 'same-origin' });
+    const method = init.method || (typeof input === 'string' ? 'GET' : input.method) || 'GET';
+    const send = async () => {
+      try { return await nativeFetch(input, { ...init, headers, credentials: init.credentials || 'same-origin' }); }
+      catch (cause) {
+        if (!isApi || !window.IronBendMessages) throw cause;
+        const error = new Error(window.IronBendMessages.text(cause, { path: url, method }), { cause });
+        error.name = cause.name || 'Error';
+        throw error;
+      }
+    };
+    let response = await send();
     if (response.status === 401 && isApi && !isAuth) {
-      const refreshedToken = await refreshAccessToken();
+      let refreshedToken;
+      try { refreshedToken = await refreshAccessToken(); }
+      catch (cause) {
+        if (!window.IronBendMessages) throw cause;
+        throw new Error(window.IronBendMessages.text(cause, { path: url, method }), { cause });
+      }
       if (refreshedToken) {
         headers.set('Authorization', `Bearer ${refreshedToken}`);
-        response = await nativeFetch(input, { ...init, headers, credentials: init.credentials || 'same-origin' });
+        response = await send();
       }
     }
     if (isApi && !isAuth && !isQrWorkflowUrl(url) && (response.status === 401 || response.status === 403)) {
@@ -160,7 +192,7 @@
         window.showToast('אין הרשאה לפעולה זו', true);
       }
     }
-    return response;
+    return presentResponse(response, url, method);
   }
 
   window.IronBendAuth = {

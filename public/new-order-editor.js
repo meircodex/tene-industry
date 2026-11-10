@@ -218,6 +218,7 @@
   let intakeDraftRows = [];
 
   function showQuickImportMessage(message) {
+  message = window.IronBendMessages?.text(message) ?? message;
     if (typeof window.showToast === 'function' && document.getElementById('ib-toast')) {
       window.showToast(message);
       return;
@@ -232,7 +233,7 @@
     toast.textContent = message;
     toast.style.opacity = '1';
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 3800);
+    toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, (window.IronBendMessages?.duration(message, 3800) ?? 3800));
   }
 
   function readJsonStorage(key, fallback = null) {
@@ -925,7 +926,7 @@
           : window.intakeReviewUrl(data.conflict.existingId);
         return;
       }
-      if (!response.ok) throw new Error(data.code || data.error || 'OCR_FAILED');
+      if (!response.ok) throw new Error(data.code || data.user_message || data.error || 'OCR_FAILED');
       const intakeId = data.intakeId || data.intake_id || data.id || null;
       if (intakeId && typeof window.intakeReviewUrl === 'function') {
         window.location.href = window.intakeReviewUrl(intakeId);

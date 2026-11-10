@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>מחסן – IronBend</title>
@@ -460,6 +461,7 @@ function showModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 
 function showAlert(id, msg, ms=4000){
+  msg=window.IronBendMessages?.text(msg)??msg;
   const el=document.getElementById(id);
   el.textContent=msg;el.classList.add('show');
   if(ms>0)setTimeout(()=>el.classList.remove('show'),ms);
@@ -606,9 +608,9 @@ async function markShipped(id){
   if(!confirm('לסמן חבילה זו כנשלחה?'))return;
   try{
     const r=await fetch(`/api/packages/${id}/ship`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({shipped_at:new Date().toISOString()})});
-    if(!r.ok)throw new Error();
+    if(!r.ok)throw await window.IronBendMessages.responseError(r, 'invalid_json_response');
   }catch(e){
-    showAlert('scanAlert','שגיאה בסימון חבילה כנשלחה');
+    showAlert('scanAlert',window.IronBendMessages.text(e));
     return;
   }
   const pkg=allPackages.find(x=>x.id===id);
@@ -688,7 +690,7 @@ async function loadMultiOrderCandidates(){
   try{
     const response=await fetch('/api/loading/multi-order-candidates');
     const data=await response.json().catch(()=>[]);
-    if(!response.ok)throw new Error(data.error||'candidate_load_failed');
+    if(!response.ok)throw new Error(data.user_message || data.error||'candidate_load_failed');
     multiOrderCandidates=Array.isArray(data)?data:[];
     renderMultiOrderCandidates();
   }catch(_){list.innerHTML='<div class="empty-inline">לא ניתן לטעון הזמנות זמינות.</div>';}
@@ -721,12 +723,12 @@ async function startMultiOrderLoadingSession(){
   try{
     const response=await fetch('/api/loading/multi-order-card-sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_ids:orderIds})});
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||'multi_order_loading_failed');
+    if(!response.ok)throw new Error(data.user_message || data.error||'multi_order_loading_failed');
     useCardLoadingSession(data);
     await resumeCardCamera({quiet:true});
   }catch(error){
     const messages={multi_order_customer_mismatch:'אפשר לאחד רק הזמנות של אותו לקוח.',multi_order_destination_mismatch:'אפשר לאחד רק הזמנות לאותה כתובת מסירה.',order_already_in_loading:'אחת ההזמנות כבר נמצאת בהעמסה אחרת.',production_cards_not_completed:'באחת ההזמנות יש כרטיסי עבודה שטרם הושלמו.',order_not_ready_for_loading:'אחת ההזמנות עדיין אינה מוכנה לאיסוף.'};
-    showAlert('multiOrderAlert',messages[error.message]||'לא ניתן להתחיל את ההעמסה המשותפת.',0);
+    showAlert('multiOrderAlert',messages[error.message]||window.IronBendMessages?.text(error.message)||'לא ניתן להתחיל את ההעמסה המשותפת.',0);
   }finally{button.disabled=selectedMultiOrderIds().length<2;}
 }
 
@@ -737,7 +739,7 @@ async function startCardLoadingSession(orderId){
   try{
     const response=await fetch('/api/loading/card-sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:qrLoadingOrderId})});
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||'card_loading_session_failed');
+    if(!response.ok)throw new Error(data.user_message || data.error||'card_loading_session_failed');
     useCardLoadingSession(data);
     // Reuse the camera that read the order token so the loader can immediately
     // continue with the production-card codes.
@@ -749,7 +751,7 @@ async function startCardLoadingSession(orderId){
       no_completed_cards_to_load:'אין כרטיסי עבודה שהושלמו להעמסה.',
       legacy_package_loading_session_active:'קיימת העמסה היסטורית פעילה להזמנה זו.',
     };
-    showCardLoadingIdle(messages[error.message]||'לא ניתן לפתוח העמסה. נדרשת הרשאת מחסן, מנהל או אדמין.');
+    showCardLoadingIdle(messages[error.message]||window.IronBendMessages?.text(error.message)||'לא ניתן לפתוח העמסה.');
   }
 }
 
@@ -759,13 +761,13 @@ async function restoreCardLoadingSession(sessionUid,{quiet=false,multiOrder=fals
     const path=multiOrder?`/api/loading/multi-order-card-sessions/${encodeURIComponent(sessionUid)}`:`/api/loading/card-sessions/${encodeURIComponent(sessionUid)}`;
     const response=await fetch(path);
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||'card_loading_session_unavailable');
+    if(!response.ok)throw new Error(data.user_message || data.error||'card_loading_session_unavailable');
     useCardLoadingSession(data);
     if(activeCardLoading())await resumeCardCamera({quiet:true});
     return true;
   }catch(error){
     clearPersistedCardLoadingSession();
-    if(!quiet)showCardLoadingIdle('לא ניתן להמשיך את סשן ההעמסה שנשמר. סרוק שוב את QR ההזמנה.');
+    if(!quiet)showCardLoadingIdle(window.IronBendMessages.text(error));
     return false;
   }
 }
@@ -980,7 +982,7 @@ async function scanCardValue(code){
     const base=currentLoadingSession.multi_order?'/api/loading/multi-order-card-sessions':'/api/loading/card-sessions';
     const response=await fetch(`${base}/${encodeURIComponent(currentLoadingSession.session_uid)}/scan`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qr_data:value})});
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||'card_loading_scan_failed');
+    if(!response.ok)throw new Error(data.user_message || data.error||'card_loading_scan_failed');
     currentLoadingSession=data.state;
     const isGood=data.outcome==='loaded';
     if(isGood)showAlert('scanSuccess',`✓ ${data.message}`,2500);
@@ -990,7 +992,7 @@ async function scanCardValue(code){
     updateLoadingUI();
     if(!activeCardLoading()){stopCardCamera();clearPersistedCardLoadingSession();}
   }catch(error){
-    showAlert('scanAlert','לא ניתן לרשום את סריקת ההעמסה. נסה שוב.',4000);
+    showAlert('scanAlert',window.IronBendMessages.text(error),0);
   }
 }
 async function doScan(){

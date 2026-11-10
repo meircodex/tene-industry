@@ -1,8 +1,10 @@
-const CACHE_VERSION = 'ironbend-v25';
+const CACHE_VERSION = 'ironbend-v26';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const API_CACHE     = `${CACHE_VERSION}-api`;
 
 const STATIC_ASSETS = [
+  '/user-messages.js?v=1',
+  '/auth-client.js',
   '/index.html',
   '/dashboard.html',
   '/scan.html',

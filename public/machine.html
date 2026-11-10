@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>מסך מכונה – IronBend</title>
@@ -577,7 +578,7 @@ async function startManualWork() {
       })
     });
     const d = await r.json();
-    if (!d.success) { alert(d.error || 'שגיאה'); return; }
+    if (!d.success) { alert(d.user_message || d.error || 'שגיאה'); return; }
     hideManualForm();
     await fetchMachines();
     showToast(`✅ עבודה ידנית הוקצתה למכונה`);
@@ -594,7 +595,7 @@ async function completeJob() {
   const r=await fetch(`/api/machines/${selectedMachineId}/complete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({producedQty,wasteQty})});
   const d=await r.json();
   if (d.success) { cancelComplete(); currentJob=null; await fetchMachines(); }
-  else alert(d.error||'שגיאה');
+  else alert(d.user_message || d.error||'שגיאה');
 }
 
 async function loadQueue() {
@@ -843,12 +844,13 @@ function closeM(id) { document.getElementById(id).style.display='none'; }
 
 // ── TOAST ─────────────────────────────────────────────────────────
 function showToast(msg) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   let t=document.getElementById('_toast');
   if(!t){t=document.createElement('div');t.id='_toast';
     t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--steel-mid);border:1px solid var(--accent);border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;z-index:9999;transition:opacity .4s';
     document.body.appendChild(t);}
   t.textContent=msg; t.style.opacity='1';
-  clearTimeout(t._tm); t._tm=setTimeout(()=>{t.style.opacity='0';},2500);
+  clearTimeout(t._tm); t._tm=setTimeout(()=>{t.style.opacity='0';},(window.IronBendMessages?.duration(msg, 2500) ?? 2500));
 }
 
 connectWS();

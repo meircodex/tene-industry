@@ -560,7 +560,7 @@ module.exports = function createProductionRouter(deps) {
   // ── SCAN (QR) ─────────────────────────────────────────────────────
   router.post('/scan', requireAnyRole(['production', 'kiosk', 'manager', 'admin']), (req, res) => {
     const { qrData, machineId, workerId } = req.body;
-    if (!qrData || !machineId) return res.status(400).json({ error: 'חסרים פרמטרים' });
+    if (!qrData || !machineId) return res.status(400).json({ error: 'חסרים פרמטרים', details: { missing_fields: Object.entries({qrData,machineId}).filter(([,value])=>!value).map(([field])=>field) } });
 
     const [orderNum, itemId] = qrData.split('|');
     const itemIdNum = Number(itemId);

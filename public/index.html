@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+<script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>הזמנה חדשה – IronBend</title>
@@ -2437,7 +2438,7 @@ async function parseChannelText(source) {
       body: JSON.stringify({ text, source })
     });
     const data = await r.json();
-    if (!data.success) throw new Error(data.error || 'שגיאה');
+    if (!data.success) throw new Error(data.user_message || data.error || 'שגיאה');
     const p = data.parsed;
     // Auto-fill customer fields
     if (p.customerName) { document.getElementById('customerSearch').value = p.customerName; }
@@ -2468,7 +2469,7 @@ async function previewOrderImport() {
   try {
     const response = await fetch('/api/order-imports/preview', { method: 'POST', body: formData });
     const data = await response.json();
-    if (!data.success) throw new Error(data.error || 'שגיאה בקריאת הטבלה');
+    if (!data.success) throw new Error(data.user_message || data.error || 'שגיאה בקריאת הטבלה');
     const preview = data.preview || {};
     const duplicateCount = (preview.orders || []).filter(order => order.duplicate).length;
     const errorCount = (preview.errors || []).length;
@@ -2481,7 +2482,7 @@ async function previewOrderImport() {
       resultEl.style.color = 'var(--warning)';
     }
   } catch (error) {
-    resultEl.textContent = error.message;
+    resultEl.textContent = (window.IronBendMessages?.text(error.message) ?? error.message);
     resultEl.style.color = 'var(--danger)';
   }
 }
@@ -2492,13 +2493,13 @@ async function approveOrderImport() {
   try {
     const response = await fetch(`/api/order-imports/${pendingOrderImportId}/approve`, { method: 'POST' });
     const data = await response.json();
-    if (!data.success) throw new Error(data.error || 'שגיאה בייבוא');
+    if (!data.success) throw new Error(data.user_message || data.error || 'שגיאה בייבוא');
     resultEl.textContent = `הייבוא הושלם: נוצרו ${data.created?.length || 0} הזמנות.`;
     resultEl.style.color = 'var(--success)';
     document.getElementById('approveOrderImportBtn').style.display = 'none';
     pendingOrderImportId = null;
   } catch (error) {
-    resultEl.textContent = error.message;
+    resultEl.textContent = (window.IronBendMessages?.text(error.message) ?? error.message);
     resultEl.style.color = 'var(--danger)';
   }
 }
@@ -3844,7 +3845,7 @@ async function saveQuote() {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || !result.success) {
-      alert(result.error || 'שמירת הצעת המחיר נכשלה');
+      alert(result.user_message || result.error || 'שמירת הצעת המחיר נכשלה');
       return;
     }
     document.getElementById('successQuoteNum').textContent = result.quote?.quote_num || 'הצעת מחיר נשמרה';
@@ -3852,7 +3853,7 @@ async function saveQuote() {
     document.getElementById('quoteSuccessOverlay').classList.add('show');
   } catch (error) {
     console.error('saveQuote failed:', error);
-    alert('שמירת הצעת המחיר נכשלה. לא נוצרה הזמנה.');
+    alert(window.IronBendMessages.text(error));
   } finally {
     setActionButtonsBusy('[data-quote-submit]', false);
   }
@@ -3896,7 +3897,7 @@ async function submitOrder() {
       document.getElementById('successOverlay').classList.add('show');
       orderCounter++;
     } else {
-      alert(result.error || 'שגיאה בשמירה – נסה שוב');
+      alert(result.user_message || result.error || 'שגיאה בשמירה – נסה שוב');
       return;
     }
   } catch (err) {
@@ -3921,12 +3922,13 @@ window.addEventListener('online',  () => showToast('החיבור חזר – מס
 window.addEventListener('offline', () => showToast('אין חיבור – ממשיך במצב offline', true));
 
 function showToast(msg, isOffline = false) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   let t = document.getElementById('_toast');
-  if (!t) { t = document.createElement('div'); t.id = '_toast'; Object.assign(t.style, { position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', borderRadius:'10px', fontFamily:'Heebo,sans-serif', fontWeight:'700', fontSize:'14px', zIndex:'9999', transition:'opacity 0.3s', direction:'rtl', whiteSpace:'nowrap' }); document.body.appendChild(t); }
+  if (!t) { t = document.createElement('div'); t.id = '_toast'; Object.assign(t.style, { position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', borderRadius:'10px', fontFamily:'Heebo,sans-serif', fontWeight:'700', fontSize:'14px', zIndex:'9999', transition:'opacity 0.3s', direction:'rtl', whiteSpace:'normal',maxWidth:'min(90vw,640px)',width:'max-content' }); document.body.appendChild(t); }
   t.textContent = msg;
-  t.style.background = isOffline ? '#e74c3c' : '#27ae60';
+  t.style.background = (isOffline || window.IronBendMessages?.isFailure(msg)) ? '#e74c3c' : '#27ae60';
   t.style.color = 'white'; t.style.opacity = '1';
-  clearTimeout(t._timer); t._timer = setTimeout(() => t.style.opacity = '0', 4000);
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.style.opacity = '0', (window.IronBendMessages?.duration(msg, 4000) ?? 4000));
 }
 </script>
 <script src="/help.js"></script>
@@ -4010,7 +4012,7 @@ function analyzeOrderImage(input) {
         throw new Error('OCR_FORBIDDEN');
       }
       if (!result.ok) {
-        throw new Error(data.error || 'OCR_FAILED');
+        throw new Error(data.user_message || data.error || 'OCR_FAILED');
       }
       return data;
     })
@@ -4018,7 +4020,7 @@ function analyzeOrderImage(input) {
       document.getElementById('imgLoading').style.display = 'none';
       var intakeId = data.intakeId || data.intake_id || data.id || null;
       if (!data.success || !intakeId) {
-        showImgError(ocrErrorMessage(data.code || data.error || 'לא נוצרה פנייה במרכז הקליטה'));
+        showImgError(ocrErrorMessage(data.code || data.user_message || data.error || 'לא נוצרה פנייה במרכז הקליטה'));
         return;
       }
       _imgSavedIntakeId = intakeId;
@@ -4089,6 +4091,7 @@ function ocrErrorMessage(err) {
 }
 
 function showImgError(msg) {
+  msg = window.IronBendMessages?.text(msg) ?? msg;
   document.getElementById('imgErrorMsg').textContent = msg;
   document.getElementById('imgError').style.display = 'block';
 }
