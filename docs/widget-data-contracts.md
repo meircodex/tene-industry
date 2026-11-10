@@ -7,6 +7,11 @@ scheduling flag, with no automatic inventory transfer or selection of donors.
 Order row notes also show the declared `status='אספקה חלקית'` explicitly when
 the primary status represents production; shipment quantity summaries continue
 to use their existing progress evidence.
+Active orders place partial deliveries with outstanding quantities first in
+both desktop rows and mobile cards, preserving the server order within each
+group. Declared partial delivery also qualifies when progress is unavailable;
+explicit zero remainder and non-active orders do not. Search and live refresh
+reuse this ordering without changing order status, priority or inventory.
 
 Inventory physical-count basis (2026-11-10): the existing basis sentence in
 `inventory.html` reads `GET /api/inventory/metrics.baseline.counted_at` (falling

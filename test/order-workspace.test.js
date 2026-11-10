@@ -11,6 +11,24 @@ const actor={id:1,name:'מנהל',role:'admin'};
 function fixture(t){const db=new Database(':memory:');db.pragma('foreign_keys=ON');ensureCoreSchema(db);ensureAuthSchema(db);db.prepare('INSERT INTO users(id,username,display_name,role,pin_hash,active) VALUES(1,?,?,?,?,1)').run('test-admin','Test Admin','admin',bcrypt.hashSync('1234',4));t.after(()=>db.close());return{db,s:createOrderWorkspaceService({db})};}
 function order(db,num,status='ממתינה לאישור'){return Number(db.prepare('INSERT INTO orders(order_num,status,total_weight,delivery_date) VALUES(?,?,123.4,?)').run(num,status,'2026-10-15').lastInsertRowid);}
 const confirm=(version=1)=>({version,confirmed:true,reason:'בדיקה מקומית בלבד'});
+
+test('partial deliveries with outstanding work lead the active list while preserving each group and input',()=>{
+ const rows=[
+  {id:122,status:'בייצור',priority:'דחוף'},
+  {id:108,status:'אספקה חלקית',delivery_progress:{shipped_unit_count:48,remaining_unit_count:11}},
+  {id:107,status:'אספקה חלקית'},
+  {id:106,status:'בייצור',delivery_progress:{partially_shipped_item_count:1,remaining_unit_count:4}},
+  {id:105,status:'אספקה חלקית',delivery_progress:{remaining_unit_count:0}},
+  {id:104,status:'אספקה חלקית',delivery_progress:{remaining_item_count:0}},
+  {id:103,status:'סופק – אושר',delivery_progress:{shipped_unit_count:2,remaining_unit_count:1}},
+  {id:102,status:'אספקה חלקית',deleted_at:'2026-11-10'},
+ ];
+ const original=JSON.stringify(rows);
+ assert.deepEqual(ui.sortActiveOrders(rows).map(row=>row.id),[108,107,106,122,105,104,103,102]);
+ assert.equal(JSON.stringify(rows),original);
+ const html=fs.readFileSync(path.join(__dirname,'../public/orders.html'),'utf8');
+ assert.match(html,/if \(orderBucket === 'active'\) list = window\.IronBendOrderWorkspace\.sortActiveOrders\(list\);\s+renderTable\(list\);\s+renderCards\(list\);/);
+});
 test('workspace groups all work, delivered, paid, cancelled and trash without altering production',t=>{
  const {db,s}=fixture(t);const ids=[order(db,'ACTIVE','בייצור'),order(db,'DELIVERED','סופק – אושר'),order(db,'PAID','סופק – אושר'),order(db,'CANCELLED','בוטלה'),order(db,'TRASH')];
  s.payment(ids[2],actor,{...confirm(),payment_status:'paid'});s.trash(ids[4],actor,confirm());

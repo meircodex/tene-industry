@@ -15,7 +15,7 @@
 <script src="/auth-client.js"></script>
 <script src="/display-units.js?v=4"></script>
 <script src="/status-contracts-client.js"></script>
-<script src="/order-workspace.js?v=2"></script>
+<script src="/order-workspace.js?v=3"></script>
 <script src="/order-item-filters.js?v=1"></script>
 <link rel="stylesheet" href="/orders-workspace.css?v=1">
 <script src="/safe-dom.js" defer></script>
@@ -739,6 +739,7 @@ function applyFilter() {
     o.customer_name?.toLowerCase().includes(q) ||
     o.delivery_address?.toLowerCase().includes(q)
   );
+  if (orderBucket === 'active') list = window.IronBendOrderWorkspace.sortActiveOrders(list);
   renderTable(list);
   renderCards(list);
 }

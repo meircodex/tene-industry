@@ -7,5 +7,12 @@
   function deliveryDate(value){const m=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}.${m[2]}.${m[1]}`:'—';}
   function deliverySummary(progress){if(!progress?.total_item_count)return '';const total=progress.total_item_count,shipped=progress.shipped_item_count||0,partial=progress.partially_shipped_item_count||0;if(!shipped&&!partial)return `${total} פריטים בהזמנה`;return `נשלחו במלואם ${shipped} מתוך ${total} פריטים${partial?` · ${partial} פריטים נשלחו בחלקם`:''}`;}
   function notes(order){const parts=[];if(order.status==='אספקה חלקית')parts.push('אספקה חלקית');const summary=deliverySummary(order.delivery_progress);if(summary)parts.push(summary);if(order.priority==='דחוף')parts.push('דחוף');if(order.general_notes)parts.push(order.general_notes);if(order.driver_notes)parts.push('הערת אספקה: '+order.driver_notes);if(order.deleted_at)parts.push('בסל המחזור: '+(order.deletion_reason||''));return parts;}
-  return{bucket,rowTone,deliveryDate,notes,primaryStatus,deliverySummary,delivered,cancelled};
+  function hasPartialDeliveryRemainder(order){
+    if(bucket(order)!=='active')return false;
+    const progress=order.delivery_progress;
+    if(progress?.remaining_unit_count===0||progress?.remaining_item_count===0)return false;
+    return order.status==='אספקה חלקית'||Number(progress?.shipped_unit_count)>0||Number(progress?.shipped_item_count)>0||Number(progress?.partially_shipped_item_count)>0;
+  }
+  function sortActiveOrders(orders){return [...orders].sort((a,b)=>Number(hasPartialDeliveryRemainder(b))-Number(hasPartialDeliveryRemainder(a)));}
+  return{bucket,rowTone,deliveryDate,notes,primaryStatus,deliverySummary,hasPartialDeliveryRemainder,sortActiveOrders,delivered,cancelled};
 });
