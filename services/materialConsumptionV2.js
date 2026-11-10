@@ -133,6 +133,11 @@ function approveConsumptionReport(db, input = {}) {
     const report = db.prepare("SELECT * FROM material_consumption_reports_v2 WHERE id=? AND status='draft'").get(reportId);
     if (!report) fail('draft_consumption_report_required');
     lifecycleV2Requirement(db, report.material_requirement_id, { open: true });
+    const completion=require('./inventoryItemCompletion');
+    if(completion.policy(db)) {
+      const reason=completion.eligibility(db,completion.itemRecord(db,report.item_id));
+      if(reason)fail(`item_consumption_${reason}`);
+    }
     const lines = db.prepare('SELECT * FROM material_consumption_report_lines_v2 WHERE report_id=? ORDER BY id').all(report.id);
     if (!lines.length) fail('consumption_lines_required');
     const allocations = lines.map(line => ({ line, allocation: validateApprovalLine(db, report, line) }));

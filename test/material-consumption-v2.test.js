@@ -20,6 +20,15 @@ function draft(value, line, kgValue = 25) {
   return consumption.createConsumptionReport(value, { material_requirement_id: 1, created_by: 7, lines: [{ allocation_plan_line_id: line.allocation_sequence ? value.prepare('SELECT id FROM allocation_plan_lines_v2 WHERE allocation_plan_id=?').get(line.allocation_plan_id || 1)?.id : 1, raw_material_id: 1, consumed_kg: kgValue }] });
 }
 function allocationLineId(value) { return value.prepare('SELECT id FROM allocation_plan_lines_v2 WHERE allocation_plan_id=1').get().id; }
+test('physical-count policy gates V2 approval on eligible item completion, independently of other items',()=>{
+  const value=db();seed(value);const completion=require('../services/inventoryItemCompletion');
+  value.exec("UPDATE orders SET created_at='2026-11-04 10:00:00'; INSERT INTO items(id,order_id,status) VALUES(2,1,'ממתין'); INSERT INTO inventory_stocktakes(id,idempotency_key,payload_fingerprint,counted_at,reason,actor_id) VALUES(1,'physical','x','2026-11-08T20:56:41.574Z','count',1)");
+  completion.activatePolicy(value,{stocktake_id:1});
+  const report=consumption.createConsumptionReport(value,{material_requirement_id:1,lines:[{allocation_plan_line_id:allocationLineId(value),raw_material_id:1,consumed_kg:20}]});
+  assert.throws(()=>consumption.approveConsumptionReport(value,{report_id:report.id,approved_by:9,idempotency_key:'gate'}),/item_consumption_production_incomplete/);
+  value.exec("UPDATE items SET status='הושלם',completed_at='2026-11-09 10:00:00' WHERE id=1");
+  consumption.approveConsumptionReport(value,{report_id:report.id,approved_by:9,idempotency_key:'gate'});assert.equal(value.prepare('SELECT weight_used FROM raw_material').get().weight_used,20);value.close();
+});
 test('drafts are editable/cancellable and never change stock or lock allocations', () => {
   const value = db(); seed(value); const lineId = allocationLineId(value);
   const report = consumption.createConsumptionReport(value, { material_requirement_id: 1, created_by: 5, lines: [{ allocation_plan_line_id: lineId, raw_material_id: 1, consumed_kg: 20 }] });

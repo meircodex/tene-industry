@@ -258,11 +258,17 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
     reservations,
   };
 }
-function releaseReservationsForItems(db, { item_ids } = {}) {
+function releaseReservationsForItems(db, { item_ids, correction_reason } = {}) {
   const itemIds = normalizeItemIds(item_ids);
 
   if (!itemIds.length) {
     return { item_ids: [], released: 0 };
+  }
+  const completion=require('./inventoryItemCompletion');
+  if(correction_reason && completion.policy(db)) {
+    // Orders may revise a completed item through its existing authorized,
+    // reasoned correction. Its physical debit is reconciled in the same transaction.
+    for(const id of itemIds) if(completion.state(db,id)) db.prepare("UPDATE inventory_reservations SET status='released',updated_at=CURRENT_TIMESTAMP WHERE item_id=? AND status='consumed'").run(id);
   }
 
   const result = db.prepare(`
@@ -294,6 +300,21 @@ function consumeReservationsForProduction(db, { order_id, item_ids, actual_weigh
   const itemIds = normalizeItemIds(item_ids);
   const actualWeightKg = actualProductionWeightKg(actual_weight_kg);
   if (!orderId && !itemIds.length) throw Object.assign(new Error('order_id or item_ids is required for consuming reservations'), {statusCode:400});
+  const completion=require('./inventoryItemCompletion');
+  if(completion.policy(db)) return db.transaction(()=>{
+    const ids=itemIds.length?itemIds:db.prepare('SELECT i.id FROM items i LEFT JOIN pallets p ON p.id=i.pallet_id WHERE COALESCE(i.order_id,p.order_id)=?').all(orderId).map(i=>i.id);
+    if(actualWeightKg!==null && ids.length!==1)throw Object.assign(Error('actual_weight_requires_single_reservation'),{statusCode:400});
+    let consumed=0;const pending=[];
+    for(const id of ids){
+      const item=completion.itemRecord(db,id);
+      if(!item||orderId&&item.owner_order_id!==orderId)continue;
+      const blocked=completion.eligibility(db,item);
+      const mesh=tableExists(db,'inventory_mesh_demands')&&db.prepare("SELECT 1 FROM inventory_mesh_demands WHERE item_id=? AND status IN ('active','consumed')").get(id);
+      const result=mesh&&!blocked?require('./meshInventory').consumeMesh(db,{orderId:item.owner_order_id,itemIds:[id]}):completion.consumeItem(db,{item_id:id,actual_weight_kg:actualWeightKg});
+      consumed+=result.consumed; if(result.pending)pending.push(...(Array.isArray(result.pending)?result.pending:[result.pending]));
+    }
+    return {order_id:orderId,item_ids:ids,consumed,pending};
+  }).immediate();
   const where=["status='active'"], params=[];
   if (orderId) {where.push('order_id=?');params.push(orderId);}
   if (itemIds.length) {where.push(`item_id IN (${placeholders(itemIds)})`);params.push(...itemIds);}

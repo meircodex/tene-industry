@@ -17,6 +17,22 @@ function ensureInventoryAccountingSchema(db) {
   add('purchase_orders','specification_json','TEXT');
   add('purchase_orders','unit_price','REAL');
   db.exec(`
+    CREATE TABLE IF NOT EXISTS inventory_item_completion_policy (
+      id INTEGER PRIMARY KEY CHECK(id=1),stocktake_id INTEGER NOT NULL REFERENCES inventory_stocktakes(id),
+      counted_at TEXT NOT NULL,eligible_from TEXT NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS inventory_count_completed_items (
+      item_id INTEGER PRIMARY KEY,stocktake_id INTEGER NOT NULL REFERENCES inventory_stocktakes(id)
+    );
+    CREATE TABLE IF NOT EXISTS inventory_item_completion_state (
+      item_id INTEGER PRIMARY KEY,order_id INTEGER NOT NULL,consumed_kg REAL NOT NULL,
+      identity_json TEXT NOT NULL,allocations_json TEXT NOT NULL,revision INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS inventory_item_completion_events (
+      id INTEGER PRIMARY KEY,event_key TEXT NOT NULL UNIQUE,item_id INTEGER NOT NULL,order_id INTEGER NOT NULL,
+      delta_kg REAL NOT NULL,allocations_json TEXT NOT NULL,reason TEXT NOT NULL,actor_id INTEGER,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS inventory_mesh_stock (
       specification_key TEXT PRIMARY KEY,specification_json TEXT NOT NULL,quantity_units INTEGER NOT NULL DEFAULT 0 CHECK(quantity_units>=0),revision INTEGER NOT NULL DEFAULT 0
     );

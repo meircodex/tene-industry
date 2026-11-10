@@ -1,5 +1,9 @@
 # Event Registry
 
+`inventory_changed` is also emitted by Orders after an item correction or a
+cancellation disposition that may reconcile tracked consumption. Inventory owns
+all physical balance writes and append-only correction movements.
+
 Source-of-truth registry required by Volume 10. Current realtime events are sent
 through `wsBroadcast(type, data)` from `realtime/ws.js`; audit events are separately
 written through `auditLog(...)`. The spec requires these concepts to converge

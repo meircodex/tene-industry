@@ -6,7 +6,8 @@ const utcTime=value=>Date.parse(/[zZ]$|[+-]\d\d:\d\d$/.test(String(value))?value
 function buildInventoryMetrics(db) {
   const lots=db.prepare('SELECT * FROM raw_material').all();
   const stocked=lots.filter(l=>l.active===1 && (l.verification_status||'approved')==='approved' && materialOnHand(l)>0.0005);
-  const baseline=db.prepare('SELECT id,counted_at,created_at FROM inventory_stocktakes ORDER BY julianday(created_at) DESC,id DESC LIMIT 1').get()||null;
+  const completionPolicy=require('./inventoryItemCompletion').policy(db);
+  const baseline=completionPolicy?db.prepare('SELECT id,counted_at,created_at FROM inventory_stocktakes WHERE id=?').get(completionPolicy.stocktake_id):db.prepare('SELECT id,counted_at,created_at FROM inventory_stocktakes ORDER BY julianday(created_at) DESC,id DESC LIMIT 1').get()||null;
   const historicalUsed=kg(lots.reduce((n,l)=>n+Number(l.weight_used||0),0));
   const gaps={legacy_active_reservations:db.prepare("SELECT COUNT(*) n FROM inventory_reservations r JOIN orders o ON o.id=r.order_id WHERE r.status='active' AND COALESCE(r.consumption_mode,'legacy')='legacy' AND o.status NOT IN ('בוטל','cancelled','canceled')").get().n,
     historical_consumed_without_usage:db.prepare("SELECT COUNT(*) n FROM inventory_reservations r WHERE r.status='consumed' AND NOT EXISTS(SELECT 1 FROM raw_material_usage u WHERE u.order_id=r.order_id AND (u.item_id=r.item_id OR (u.item_id IS NULL AND r.item_id IS NULL)))").get().n};
@@ -20,9 +21,10 @@ function buildInventoryMetrics(db) {
   const add=(id,value)=>byLot.set(id,kg((byLot.get(id)||0)+Number(value)));
   for(const row of legacy)add(row.raw_material_id,row.weight_used);
   for(const row of events)add(row.raw_material_id,(row.event_type==='reversal'?-1:1)*row.consumed_kg);
-  result.recorded_net_kg=kg(legacy.filter(r=>r.allocation_policy==='production_completion').reduce((n,r)=>n+Number(r.weight_used),0)+events.reduce((n,r)=>n+(r.event_type==='reversal'?-1:1)*Number(r.consumed_kg),0));
+  const knownPolicies=new Set(['production_completion','item_completion_reconciliation']);
+  result.recorded_net_kg=kg(legacy.filter(r=>knownPolicies.has(r.allocation_policy)).reduce((n,r)=>n+Number(r.weight_used),0)+events.reduce((n,r)=>n+(r.event_type==='reversal'?-1:1)*Number(r.consumed_kg),0));
   if(gaps.legacy_active_reservations)result.issues.push('legacy_orders_not_covered');
-  if(legacy.some(r=>r.allocation_policy!=='production_completion'))result.issues.push('unverified_legacy_movements');
+  if(legacy.some(r=>!knownPolicies.has(r.allocation_policy)))result.issues.push('unverified_legacy_movements');
   const snapshots=new Map();
   for(const row of db.prepare('SELECT raw_material_id,before_snapshot_json FROM inventory_stocktake_lines WHERE stocktake_id=?').all(baseline.id)) {
     try { const s=JSON.parse(row.before_snapshot_json); if(!s.lot || !Number.isFinite(Number(s.lot.weight_used)))throw Error(); snapshots.set(row.raw_material_id,Number(s.lot.weight_used)); }

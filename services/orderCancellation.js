@@ -852,6 +852,10 @@ function createOrderCancellationService(db) {
             entry.correctionReason, JSON.stringify(sourceRefs), parsedActorId,
           );
           const correctionEventId = Number(correction.lastInsertRowid);
+          require('./inventoryItemCompletion').returnErroneousProduction(db,{
+            itemId:item.id,ratio:entry.effectiveBeforeCorrection>0?entry.correctionQty/entry.effectiveBeforeCorrection:0,
+            eventKey:`production-record-correction:${correctionEventId}`,reason:entry.correctionReason,actorId:parsedActorId,
+          });
           sourceRefs = {
             ...sourceRefs,
             production_record_correction_event_ids: [

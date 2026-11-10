@@ -38,6 +38,24 @@ function seedItem(db, { orderNum, quantity = 100, producedQty = 60, status = ITE
   return { orderId, itemId };
 }
 
+test('count-based raw consumption returns only erroneous production; real cancelled production goes to finished goods',()=>{
+  for(const erroneous of [false,true]){
+    const {db,service,actorId}=setup();
+    const {orderId,itemId}=seedItem(db,{orderNum:`COUNT-CANCEL-${erroneous}`,quantity:10,producedQty:10,status:ITEM_STATUS.DONE});
+    db.prepare("UPDATE orders SET created_at='2026-11-04 10:00:00' WHERE id=?").run(orderId);
+    db.prepare("UPDATE items SET completed_at='2026-11-09 10:00:00' WHERE id=?").run(itemId);
+    db.exec("INSERT INTO raw_material(id,diameter,material_type,weight_received) VALUES(1,12,'coil',1000);INSERT INTO inventory_stocktakes(id,idempotency_key,payload_fingerprint,counted_at,reason,actor_id) VALUES(1,'physical','x','2026-11-08T20:56:41.574Z','count',1)");
+    const inventory=require('../services/inventoryReservation'),completion=require('../services/inventoryItemCompletion');
+    inventory.reserveMaterialForOrder(db,{order_id:orderId,items:[{id:itemId,diameter:12,total_weight:20}]});completion.activatePolicy(db,{stocktake_id:1});
+    inventory.consumeReservationsForProduction(db,{order_id:orderId,item_ids:[itemId]});assert.equal(db.prepare('SELECT weight_used FROM raw_material').get().weight_used,20);
+    const review=service.review({order_id:orderId,production_record_correction_authorized:true});
+    const payload={order_id:orderId,scope:'order',reason:'ביטול מתועד',actor_id:actorId,idempotency_key:`cancel-count-${erroneous}`,production_record_correction_authorized:true,items:[{item_id:itemId,stock_disposition_qty:erroneous?0:10,scrap_disposition_qty:0,destination_warehouse_id:review.warehouses[0].id,destination_location:'A-1',...(erroneous?{production_reality:'NOT_ACTUALLY_PRODUCED',actual_produced_qty:0,production_correction_reason:'סומן בטעות ולא יוצר'}:{})}]};
+    service.cancel(payload);assert.equal(db.prepare('SELECT weight_used FROM raw_material').get().weight_used,erroneous?0:20);
+    service.cancel(payload);assert.equal(db.prepare('SELECT weight_used FROM raw_material').get().weight_used,erroneous?0:20);
+    assert.equal(db.prepare('SELECT COALESCE(SUM(quantity),0) n FROM finished_goods_movements').get().n,erroneous?0:10);db.close();
+  }
+});
+
 test('order cancellation preserves production and creates traceable stock/scrap atomically', () => {
   const { db, service, actorId } = setup();
   try {

@@ -1,5 +1,11 @@
 # Module Inventory
 
+Count-based item consumption (2026-11-10): Inventory owns
+`services/inventoryItemCompletion.js` and its policy/state/revision tables.
+Orders calls it for authorized item corrections and erroneous-production
+cancellation; real cancelled goods remain in the finished-goods disposition.
+See `docs/inventory-item-completion-20261110.md` for the D3 baseline and rollback.
+
 Shared shape selection and billing (2026-11-08): Orders owns `public/shape-editor.js`, its order-entry consumers and saved order policy snapshots. Catalog persistence is `services/savedShapeCatalog.js` via `routes/catalog.js`; steel-rebar owns the pure shared `modules/steel-rebar/shape-commercial.js`. `services/orderCommercialSummary.js` resolves policies for Orders and delivery documents. `services/pricer.js` exposes the commercial basis while retaining its current material-only monetary scope. Machine adapters and inventory are unchanged. See `docs/shape-catalog-billing-handoff.md` for D2 validation and rollback.
 
 This inventory assigns the current screens and API route families to product

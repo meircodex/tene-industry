@@ -624,6 +624,7 @@ module.exports = function createOrdersRouter(deps) {
         cancellationUid: result.cancellation_uid,
         scope: result.scope,
       });
+      wsBroadcast('inventory_changed',{order_id:result.order_id});
       if (order?.status === ORDER_STATUS.CANCELLED) {
         wsBroadcast('order_status', { id: order.id, status: order.status, orderNum: order.order_num });
         if (!result.replay && order.customer_id) {
@@ -1150,7 +1151,7 @@ module.exports = function createOrdersRouter(deps) {
     const nextShapeSnapshot = synchronizedShapeSnapshotForItem(item, req.body, cleanItem);
     const nextShapeId = shapeIdFromSnapshotJson(nextShapeSnapshot, req.body.shapeId || req.body.shape_id || item.shape_id || shapeName);
     const updateResult = db.transaction(() => {
-      const releasedReservations = releaseReservationsForItems(db, { item_ids: [item.id] });
+      const releasedReservations = releaseReservationsForItems(db, { item_ids: [item.id], correction_reason: correctionReason(req.body?.correction_reason ?? req.body?.correctionReason) });
       db.prepare(`
         UPDATE items
         SET shape_id=?, shape_name=?, diameter=?, quantity=?, production_qty=?, total_length_mm=?,
@@ -1165,13 +1166,15 @@ module.exports = function createOrdersRouter(deps) {
           id: item.id,
           item_id: item.id,
           diameter,
-          material_type: item.material_type || item.materialType || 'coil',
+          material_type: JSON.parse(nextShapeSnapshot||'{}').family==='lifts'?'straight':(item.material_type || item.materialType || 'coil'),
           total_weight: totalWeight,
           quantity,
           weight_per_unit: weightPerUnit,
           shape_snapshot_json: nextShapeSnapshot,
         }],
       });
+      const completion=require('../services/inventoryItemCompletion');
+      if(completion.policy(db)) completion.consumeItem(db,{item_id:item.id,strict:true,reason:correctionReason(req.body?.correction_reason ?? req.body?.correctionReason)||'עדכון פריט',actor_id:req.auth?.sub});
       const orderTotal = recalcOrderWeights(req.params.orderId);
       return { releasedReservations, inventoryReservations, orderTotal };
     })();
@@ -1181,6 +1184,7 @@ module.exports = function createOrdersRouter(deps) {
     const auditReason = correctionReason(req.body?.correction_reason ?? req.body?.correctionReason);
     auditLog('item', item.id, item.order_num, 'item_update', 'shape_payload', before, JSON.stringify(req.body), auditReason || note || null, req.auth?.sub || null, req.auth?.display_name || null);
     wsBroadcast('order_item_updated', { orderId: Number(req.params.orderId), itemId: Number(item.id), orderNum: item.order_num });
+    wsBroadcast('inventory_changed',{item_id:Number(item.id)});
     res.json({ success: true, itemId: Number(item.id), total_weight: totalWeight, order_total_weight: orderTotal, releasedReservations, inventoryReservations });
   });
 
@@ -1300,6 +1304,7 @@ module.exports.manifest = {
     { table: 'historical_production_reconciliation_transactions' }, { table: 'historical_production_reconciliation_items' },
   ],
   produces: [
+    { event: 'inventory_changed' },
     { event: 'new_order' },
     { event: 'order_quote_created' },
     { event: 'order_quote_converted' },

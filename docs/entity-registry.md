@@ -58,6 +58,8 @@ in the current codebase, such as auth/session and import-staging tables.
 ## Inventory And Procurement
 
 Inventory also owns `inventory_stocktakes`, `inventory_stocktake_lines`,
+`inventory_item_completion_policy`, `inventory_count_completed_items`,
+`inventory_item_completion_state`, `inventory_item_completion_events`,
 `inventory_completion_consumptions`, `inventory_mesh_stock`, `inventory_mesh_receipts`,
 `inventory_mesh_demands`, and `inventory_mesh_movements`. Kg adjustments are additive
 to historical receipts/use/scrap. Mesh stock and its movements are whole sheets.
