@@ -51,3 +51,11 @@ test('straight lengths remain distinct and cannot consume coils',()=>{
 test('a weight correction stocktake cannot move the physical count boundary',()=>{
  const db=setup();db.exec("INSERT INTO inventory_stocktakes(id,idempotency_key,payload_fingerprint,counted_at,reason,actor_id) VALUES(2,'correction','x','2026-11-10T07:29:42Z','correction',1)");consume(db);const metrics=require('../services/inventoryMetrics').inventoryMetrics(db);assert.equal(metrics.baseline.id,1);assert.equal(metrics.recorded_net_kg,100);db.close();
 });
+test('planning excludes historical completed and supplied demand but keeps current production demand',()=>{
+ const db=setup({excluded:[1]}),plan=require('../services/inventoryPlanning').planInventory;
+ assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,200);
+ db.exec("UPDATE inventory_reservations SET consumption_mode='legacy' WHERE item_id=2;INSERT INTO raw_material_usage(raw_material_id,order_id,item_id,weight_used,used_at) VALUES(1,1,2,200,'2026-11-04 10:00:00')");
+ assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,200);
+ db.exec("UPDATE orders SET status='סופק – אושר' WHERE id=1");assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,0);
+ db.exec("UPDATE orders SET status='בייצור',created_at='2026-10-08 10:00:00' WHERE id=1");assert.equal(plan(db).groups.find(g=>g.diameter===12).backlog_kg,0);db.close();
+});

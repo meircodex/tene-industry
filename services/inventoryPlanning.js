@@ -17,13 +17,24 @@ function planInventory(db,input={}) {
   };
   if (input.diameter) {if(!Number.isFinite(Number(input.diameter))||Number(input.diameter)<=0)throw new Error('invalid_diameter');group(input.diameter,input.material_type||'coil');}
   for (const lot of db.prepare("SELECT * FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved'").all()) group(lot.diameter,lot.material_type).physical_stock_kg+=materialOnHand(lot);
-  const reservations=db.prepare(`SELECT r.*,o.delivery_date,o.status AS order_status FROM inventory_reservations r JOIN orders o ON o.id=r.order_id
+  const completionPolicy=require('./inventoryItemCompletion').policy(db);
+  const countCompleted=new Set(completionPolicy?db.prepare('SELECT item_id FROM inventory_count_completed_items').all().map(r=>r.item_id):[]);
+  const reservations=db.prepare(`SELECT r.*,o.delivery_date,o.created_at AS order_created_at,o.status AS order_status FROM inventory_reservations r JOIN orders o ON o.id=r.order_id
     WHERE r.status='active' AND o.inventory_lifecycle_version=1 AND o.status NOT IN ('בוטל','cancelled','canceled') ORDER BY r.id`).all();
   const legacyUsage=db.prepare(`SELECT COALESCE(SUM(u.weight_used),0) AS kg FROM raw_material_usage u JOIN raw_material m ON m.id=u.raw_material_id
-    WHERE u.order_id=? AND u.item_id=? AND m.diameter=? AND COALESCE(m.material_type,'coil')=?`);
+    WHERE u.order_id=? AND u.item_id=? AND m.diameter=? AND COALESCE(m.material_type,'coil')=?
+    ${completionPolicy?'AND julianday(u.used_at)>julianday(?)':''}`);
   for (const row of reservations) {
+    if(completionPolicy){
+      const status=require('../status-contracts').normalizeOrderStatus(row.order_status);
+      const {ORDER_STATUS}=require('../status-contracts');
+      if([ORDER_STATUS.CANCELLED,ORDER_STATUS.DELIVERED_CONFIRMED].includes(status)||countCompleted.has(row.item_id))continue;
+      const stamp=String(row.order_created_at||'');
+      const created=Date.parse(/[zZ]$|[+-]\d\d:\d\d$/.test(stamp)?stamp:stamp.replace(' ','T')+'Z');
+      if(!Number.isFinite(created)||created<Date.parse(completionPolicy.eligible_from))continue;
+    }
     const g=group(row.diameter,row.material_type);
-    const prepaid=row.consumption_mode==='on_completion'?0:Math.min(Number(row.reserved_kg),Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type).kg));
+    const prepaid=row.consumption_mode==='on_completion'?0:Math.min(Number(row.reserved_kg),Number(legacyUsage.get(row.order_id,row.item_id,row.diameter,row.material_type,...(completionPolicy?[completionPolicy.counted_at]:[])).kg));
     g.legacy_preallocated_kg+=prepaid;
     const remaining=Math.max(0,Number(row.reserved_kg)-prepaid);
     if (!row.delivery_date) g.undated_demand_kg+=remaining;

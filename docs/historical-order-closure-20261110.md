@@ -13,6 +13,10 @@ and their uncancelled items become `סופק`. Existing completion timestamps,
 produced quantities, weights, output events and delivery certificates are
 preserved; this does not invent historical production or claim a new delivery.
 Active reservations are released so old work leaves the purchasing backlog.
+The count-aware planning projection also excludes completed-before-count items,
+orders before the configured creation window, and already supplied/cancelled
+orders, even if an old active reservation remains in their history. Current
+production demand remains in the plan.
 Inventory records a historical exemption to prevent later rescans consuming
 counted stock. No physical balance or consumption journal is changed.
 
