@@ -2,7 +2,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const number = value => Number(value || 0).toLocaleString('he-IL', {maximumFractionDigits:3});
+  const number = value => Number(value || 0).toLocaleString('he-IL', {maximumFractionDigits:0});
   const labels = {coil:'גליל',straight:'ליפט / מוטות ישרים',bent:'מכופף',mesh:'רשת'};
   let loadRevision=0;
   const state = {rows:[],sort:'label',direction:1,loaded:false,draft:[]};

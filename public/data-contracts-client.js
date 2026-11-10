@@ -61,7 +61,7 @@
     inventoryDaily: {
       screen: 'inventory.html', owner: 'Inventory',
       source: {api:'/api/procurement/plan',fields:['groups.physical_stock_kg','groups.backlog_kg','groups.incoming_kg','groups.recommended_purchase_kg','mesh_groups.physical_units','mesh_groups.required_units','mesh_groups.recommended_purchase_units']},
-      meaning:'Planning by diameter and supply form; sheets remain separate whole units. Recommendations do not place purchase orders. Bar grade, standard and length require review.',
+      meaning:'Planning by diameter and supply form; kg values display rounded to whole kilograms without changing source precision; sheets remain separate whole units. Recommendations do not place purchase orders. Bar grade, standard and length require review.',
       consumers:['inventoryDailyRows'],risk:'D1',
     },
     inventoryPhysicalTotal: {
