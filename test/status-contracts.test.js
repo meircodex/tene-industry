@@ -124,7 +124,7 @@ test('partial shipment displays the work stage and item counts without unit quan
   } };
   assert.equal(ui.primaryStatus(order), ORDER_STATUS.IN_PRODUCTION);
   assert.equal(ui.rowTone(order), 'production');
-  assert.deepEqual(ui.notes(order), ['נשלחו במלואם 16 מתוך 31 פריטים · 2 פריטים נשלחו בחלקם', 'להתקשר לפני הגעה']);
+  assert.deepEqual(ui.notes(order), ['אספקה חלקית', 'נשלחו במלואם 16 מתוך 31 פריטים · 2 פריטים נשלחו בחלקם', 'להתקשר לפני הגעה']);
   assert.equal(ui.deliverySummary({ total_item_count: 3, shipped_item_count: 0 }), '3 פריטים בהזמנה');
   assert.equal(ui.deliverySummary({ total_item_count: 3, shipped_item_count: 3 }), 'נשלחו במלואם 3 מתוך 3 פריטים');
   assert.equal(ui.primaryStatus({ status: ORDER_STATUS.PARTIAL_DELIVERY, delivery_progress: { production_status: ORDER_STATUS.PENDING_APPROVAL } }), ORDER_STATUS.PRODUCTION_QUEUE);

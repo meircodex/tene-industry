@@ -4,6 +4,9 @@ Inline order priority: `orders.html` uses the existing order-list `priority`
 field for a regular/urgent select in each editable desktop row/mobile card.
 Only the protected priority/expected_priority PATCH changes it. It is a manual
 scheduling flag, with no automatic inventory transfer or selection of donors.
+Order row notes also show the declared `status='אספקה חלקית'` explicitly when
+the primary status represents production; shipment quantity summaries continue
+to use their existing progress evidence.
 
 Inventory physical-count basis (2026-11-10): the existing basis sentence in
 `inventory.html` reads `GET /api/inventory/metrics.baseline.counted_at` (falling

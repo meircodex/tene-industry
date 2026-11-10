@@ -45,3 +45,29 @@ production without falsely treating it as a geometry correction. Locked,
 deleted, cancelled and departed orders remain guarded. Existing server role
 gates apply. A concurrent priority change is rejected and each real change is
 audited. Priority alone does not move material between orders.
+
+Applied maintenance evidence: 48 old orders and 632 item status labels were
+updated, physical fingerprint unchanged, integrity_check=ok. Server pre-close
+backup SHA256 `11e228b7694d68b35d3b2d9a01276c4eeacdb2bcc31eddde9a0f79f7bcb17aa6`.
+Persistent result: `/data/backups/historical-orders-closed-20261110.json`.
+
+Subsequent owner correction: orders 105–107 were incorrectly marked fully
+supplied. The owner clarified partial delivery, excluding diameter 12. The
+reviewed maintenance script `tools/reconcile-partial-orders-20261110.cjs` changes
+their headers to partial delivery and preserves child delivery states and
+documents because exact supplied item quantities were not provided. All 37
+uncancelled diameter-12 items receive count-bound consumption overrides; only
+post-count completed items are debited. No other diameter or supply form moves.
+Chronological replay debited 17 items, 4652.506 kg. Sixteen items await production;
+four completed items totaling 2026.896 kg remain pending due to insufficient coil
+stock. Remaining coil Ø12 is 105.494 kg; the net discrepancy for the already
+completed pending items is 1921.402 kg. These are theoretical item weights, not
+invented measured weights. The pending debt stays in procurement demand.
+No unreported receipt or negative physical stock was created. Total physical
+stock after the scoped debit: 110231.494 kg. Idempotency and item states prevent
+repeated deductions. The original 103/108 and current 121/122 remain unchanged.
+Server pre-partial backup SHA256
+`d641e65623cbf37c753a63bf99ef4ed325f2fae33d37af1d40caba95c8a350c2`;
+persistent result `/data/backups/partial-orders105-107-diameter12-20261110.json`.
+Partial delivery is also shown explicitly in the order row notes, independently
+of the primary production status and without fabricating shipment counts.

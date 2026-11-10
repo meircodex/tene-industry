@@ -52,6 +52,7 @@ test('migration is repeatable; helpers and table headings have matching eight co
  const html=fs.readFileSync(path.join(__dirname,'../public/orders.html'),'utf8');const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]);for(const script of scripts)new vm.Script(script);
  const rendering=html.slice(html.indexOf('function renderTable('),html.indexOf('// ── Mobile cards'));assert.equal((rendering.match(/<td(?:\s|>)/g)||[]).length,9); // eight row cells plus the empty state cell
  assert.match(rendering,/תאריך אספקה/);assert.match(rendering,/הערות/);assert.doesNotMatch(rendering,/channelLabel|urgentLabel/);assert.doesNotMatch(html,/id="quotesViewBtn"/);
+ assert.ok(ui.notes({status:'אספקה חלקית'}).includes('אספקה חלקית'));
  const actions=html.slice(html.indexOf('function actionBtns('),html.indexOf('function orderStatusSelect('));assert.match(actions,/kind=print-a4/);assert.doesNotMatch(actions,/openOrderEdit|setStatus\(|kind=print-cards/);
 });
 
