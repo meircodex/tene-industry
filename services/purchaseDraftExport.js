@@ -52,8 +52,9 @@ function csvCell(value) {
 }
 function exportPurchaseDraft(db,input={}) {
   const draft=normalizeDraft(db,input);
+  const wholeKg=value=>value===null||value===undefined?'':Math.round(value);
   const rows=[['ספק','אספקה מבוקשת','אסמכתה','שורה','סוג חומר','קוטר במ״מ','מפרט','אורך (מטר)','כמות להזמנה','יחידה','ק״ג ליחידה (משוער)','משקל להזמנה בק״ג (משוער)','חוסר מדויק בק״ג','הערות שורה','הערות להזמנה']];
-  for(const line of draft.lines)rows.push([draft.supplier,draft.expected_date,draft.reference,line.row,line.type_label,line.diameter,line.specification,line.length_m,line.quantity,line.unit_label,line.unit_weight_kg,line.estimated_weight_kg,line.shortage_kg,line.notes,draft.notes]);
+  for(const line of draft.lines)rows.push([draft.supplier,draft.expected_date,draft.reference,line.row,line.type_label,line.diameter,line.specification,line.length_m,line.quantity,line.unit_label,wholeKg(line.unit_weight_kg),wholeKg(line.estimated_weight_kg),wholeKg(line.shortage_kg),line.notes,draft.notes]);
   return {filename:'purchase-order-draft.csv',content:'\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n',draft};
 }
 module.exports={normalizeDraft,exportPurchaseDraft,csvCell};

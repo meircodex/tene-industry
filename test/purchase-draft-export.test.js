@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const Database=require('better-sqlite3');
 const {ensureCoreSchema}=require('../db/coreSchema');
 const {exportPurchaseDraft}=require('../services/purchaseDraftExport');
-const {suggestedQuantity}=require('../public/purchase-units');
+const {suggestedQuantity,defaultUnitWeight,displayKg}=require('../public/purchase-units');
 
 test('editable draft exports exactly the edited quantities and mixed stock units without creating purchases',()=>{
   const db=new Database(':memory:');ensureCoreSchema(db);db.exec("INSERT INTO suppliers(id,name) VALUES(1,'ספק בדיקה')");
@@ -25,11 +25,13 @@ test('invalid or ambiguous units and missing mesh specification cannot be export
 });
 
 test('shortage kg rounds up to supplier rolls and bundles; sheets stay separate',()=>{
-  assert.equal(suggestedQuantity('coil',7013.52),4);
+  assert.equal(defaultUnitWeight('coil'),1586);
+  assert.equal(defaultUnitWeight('straight'),2050);
+  assert.equal(suggestedQuantity('coil',7013.52),5);
   assert.equal(suggestedQuantity('coil',1481.564),1);
   assert.equal(suggestedQuantity('straight',4100),2);
   assert.equal(suggestedQuantity('straight',4100.001),3);
-  assert.equal(suggestedQuantity('coil',4100.00000000001),2);
+  assert.equal(suggestedQuantity('coil',3172.00000000001),2);
   assert.equal(suggestedQuantity('coil',7013.52,2000),4);
   assert.equal(suggestedQuantity('mesh',30),30);
   assert.equal(suggestedQuantity('coil',0),0);
@@ -54,10 +56,21 @@ test('supplier export preserves edited package quantity and recalculates estimat
   assert.match(result.content,/"מפרט","אורך \(מטר\)"/);
   assert.match(result.content,/"B500B","12","1.5","חבילות"/);
   assert.equal(result.draft.lines[2].estimated_weight_kg,null);
-  assert.match(result.content,/"5","גלילים","2100","10500","7013.52"/);
+  assert.match(result.content,/"5","גלילים","2100","10500","7014"/);
   assert.match(result.content,/"1.5","חבילות","2000","3000"/);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM purchase_orders').get().n,0);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM raw_material').get().n,0);
+  db.close();
+});
+
+test('whole-kg display/export retain precision for calculations and half-bundle quantities',()=>{
+  assert.equal(displayKg(8405.52),'8,406');
+  assert.equal(displayKg(1481.564),'1,482');
+  const db=new Database(':memory:');ensureCoreSchema(db);
+  const out=exportPurchaseDraft(db,{lines:[{material_type:'straight',diameter:12,length_m:6,specification:'B500B',quantity:1.5,purchase_unit:'bundle',unit_weight_kg:2050.25,shortage_kg:3000.7}]});
+  assert.equal(out.draft.lines[0].estimated_weight_kg,3075.375);
+  assert.equal(out.draft.lines[0].shortage_kg,3000.7);
+  assert.match(out.content,/"1.5","חבילות","2050","3075","3001"/);
   db.close();
 });
 

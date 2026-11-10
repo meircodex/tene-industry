@@ -6,8 +6,8 @@ schema, stock, reservation, receipt or purchase-order writes.
 
 The owner clarified that orders are discussed with suppliers in rolls for coils
 and bundles for straight bars. Preserve exact kg shortages on the daily screen;
-suggest ceil(shortage kg / estimated kg per supplier unit), initially 2050 kg as
-reported by the owner. The draft permits editing quantity and kg/unit, displays
+suggest ceil(shortage kg / estimated kg per supplier unit), initially 1586 kg per coil and 2050 kg per straight bundle as
+corrected by the owner. The draft permits editing quantity and kg/unit, displays
 the approximate resulting weight and retains the exact shortage separately.
 Mesh remains whole sheets; bent material retains kg because no package form was
 specified. Roll quantities must be whole; straight bundles permit half bundles.
@@ -41,3 +41,8 @@ Owner correction 2026-11-09: specification and length are separate fields.
 The draft preview has distinct specification and length (meters) columns; CSV exports
 length_m separately. Length applies to straight/bent bars, not coils or mesh sheets.
 Unit export tests pass, including independent B500B / 12-meter values.
+
+Corrections 2026-11-10: average coil weight is 1586 kg; bundles remain 2050 kg.
+Display and CSV mass columns use whole kilograms, while exact kg values remain
+internally available for calculation. Half-bundle quantities and meter lengths
+retain their independent precision. Updated visual approval is still pending.
