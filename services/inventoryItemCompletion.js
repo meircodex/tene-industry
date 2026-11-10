@@ -118,4 +118,11 @@ function returnErroneousProduction(db,{itemId,ratio,eventKey,reason,actorId}){
     return {returned_kg:kg(previous.consumed_kg-weight)};
   }).immediate();
 }
-module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction};
+function exemptHistoricalItems(db,{item_ids,reason}){
+  if(!reason||!Array.isArray(item_ids))throw Error('historical_inventory_exemption_reason_required');
+  const rule=policy(db);if(!rule)return {exempted:0};
+  const insert=db.prepare('INSERT OR IGNORE INTO inventory_count_completed_items(item_id,stocktake_id) VALUES(?,?)');
+  let exempted=0;for(const id of new Set(item_ids))exempted+=insert.run(id,rule.stocktake_id).changes;
+  return {exempted};
+}
+module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction,exemptHistoricalItems};

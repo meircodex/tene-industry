@@ -1,5 +1,11 @@
 # Module Inventory
 
+Historical delivery status reconciliation and inline priority (2026-11-10):
+Orders owns `services/historicalOrderClosure.js` and `services/orderPriority.js`.
+Historical delivery calls Inventory's explicit exemption/release services without
+creating production, material usage or delivery certificates. See
+`docs/historical-order-closure-20261110.md` for scope, backup and validation.
+
 Count-based item consumption (2026-11-10): Inventory owns
 `services/inventoryItemCompletion.js` and its policy/state/revision tables.
 Orders calls it for authorized item corrections and erroneous-production

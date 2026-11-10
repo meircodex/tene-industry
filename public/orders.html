@@ -378,6 +378,10 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   .commercial-breakdown-overlay{padding:0;}
   .commercial-breakdown-panel{height:100%;max-height:100%;border-radius:0;}
 }
+.order-priority-select{font-family:inherit;font-size:12px;min-height:34px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--card);color:var(--dim);cursor:pointer}
+.order-priority-select.is-urgent{background:#fff5f3;border-color:#f1c5c0;color:var(--danger);font-weight:700}
+.order-priority-select:disabled{opacity:.6;cursor:wait}
+.order-priority-select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body data-page="orders">
@@ -413,7 +417,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
           </tr>
         </thead>
         <tbody id="ordersBody">
-          <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--dim)">טוען...</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">טוען...</td></tr>
         </tbody>
       </table>
     </div>
@@ -837,6 +841,29 @@ function urgentLabel(o) {
     ? '<span style="color:var(--danger);font-weight:700">⚡ דחוף</span>'
     : '<span style="color:var(--muted)">רגיל</span>';
 }
+function prioritySelect(o) {
+  const role=window.IronBendAuth?.currentUser()?.role;
+  const departed=[ORDER_STATUS.SENT,ORDER_STATUS.ON_THE_WAY,ORDER_STATUS.DELIVERED_CONFIRMED,ORDER_STATUS.CANCELLED];
+  const status=STATUS_CONTRACT.normalizeOrderStatus?.(o.status)||o.status;
+  if(!['office','manager','admin'].includes(role)||o.deleted_at||o.locked||departed.includes(status))return urgentLabel(o);
+  const current=o.priority==='דחוף'?'דחוף':'רגיל';
+  return `<select class="order-priority-select ${current==='דחוף'?'is-urgent':''}" aria-label="דחיפות הזמנה ${escHtml(o.order_num)}" data-order-priority="${o.id}" data-previous="${current}" onclick="event.stopPropagation()" onchange="changeOrderPriority(this,event)"><option value="רגיל"${current==='רגיל'?' selected':''}>רגיל</option><option value="דחוף"${current==='דחוף'?' selected':''}>דחוף</option></select>`;
+}
+async function changeOrderPriority(select,event) {
+  event?.stopPropagation();
+  const id=Number(select.dataset.orderPriority),previous=select.dataset.previous,priority=select.value;
+  if(priority===previous)return;
+  select.disabled=true;
+  try{
+    const response=await fetch(`/api/orders/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({priority,expected_priority:previous})});
+    if(!response.ok)throw await window.IronBendMessages.responseError(response,'invalid_json_response');
+    const result=await response.json(),order=allOrders.find(o=>o.id===id);
+    if(order){order.priority=result.order.priority;order.workspace_version=result.order.workspace_version;}
+    if(currentDetailOrder?.id===id)currentDetailOrder.priority=result.order.priority;
+    applyFilter();showToast(priority==='דחוף'?'ההזמנה סומנה כדחופה':'ההזמנה הוחזרה לדחיפות רגילה');
+  }catch(error){select.value=previous;showToast(error.message||'לא ניתן לעדכן דחיפות. יש לרענן ולנסות שוב',true);}
+  finally{select.disabled=false;}
+}
 function channelLabel(o) {
   if (Number(o.portal_order) === 1 || o.channel === 'פורטל לקוח') {
     return '<span class="badge s-wait">פורטל לקוח</span>';
@@ -890,10 +917,10 @@ function setTableHead(labels) {
 }
 
 function renderTable(orders) {
-  setTableHead(['מספר הזמנה', 'לקוח', 'תאריך אספקה', 'משקל (ק״ג)', 'סטטוס הזמנה', 'הערות', 'פעולות']);
+  setTableHead(['מספר הזמנה', 'לקוח', 'תאריך אספקה', 'דחיפות', 'משקל (ק״ג)', 'סטטוס הזמנה', 'הערות', 'פעולות']);
   const body = document.getElementById('ordersBody');
   if (!orders.length) {
-    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--dim)">אין הזמנות בלשונית זו</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">אין הזמנות בלשונית זו</td></tr>';
     return;
   }
   body.innerHTML = orders.map(o => `
@@ -901,6 +928,7 @@ function renderTable(orders) {
       <td><span class="order-num">${escHtml(o.order_num)}</span></td>
       <td>${escHtml(o.customer_name ?? '—')}</td>
       <td class="delivery-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</td>
+      <td>${prioritySelect(o)}</td>
       <td class="weight-tag">${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})}</td>
       <td>${orderStatusSelect(o)}</td>
       <td><div class="order-notes" title="${escHtml(window.IronBendOrderWorkspace.notes(o).join('\n'))}">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||'—'}</div></td>
@@ -928,7 +956,7 @@ function renderCards(orders) {
         ${Number(o.portal_order) === 1 || o.channel === 'פורטל לקוח' ? '<span>🌐 פורטל לקוח</span>' : ''}
         ${o.delivery_date ? `<span>תאריך אספקה: ${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span>` : ''}
         <span>⚖️ ${(o.total_weight||0).toFixed(0)} ק"ג</span>
-        ${o.priority === 'דחוף' ? '<span style="color:var(--danger);font-weight:700">⚡ דחוף</span>' : ''}
+        <span>${prioritySelect(o)}</span>
       </div>
       <div class="order-notes">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||''}</div>
       <div class="m-card-actions">

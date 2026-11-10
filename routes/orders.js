@@ -942,6 +942,13 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   router.patch('/orders/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
+    if(req.body?.priority!==undefined && Object.keys(req.body).every(key=>['priority','expected_priority'].includes(key)) && req.body.expected_priority!==undefined){
+      try{
+        const result=require('../services/orderPriority').updatePriority(db,{order_id:Number(req.params.id),...req.body,actor_id:req.auth?.sub||req.userId,actor_name:req.auth?.display_name});
+        if(result.changed)wsBroadcast('order_updated',{id:Number(req.params.id),orderNum:result.order.order_num});
+        return res.json(result);
+      }catch(error){return res.status(error.statusCode||400).json({success:false,error:error.message});}
+    }
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(req.params.id);
     if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
     const blocked = orderHeaderEditError(order, {

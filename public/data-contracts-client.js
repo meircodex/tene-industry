@@ -4,6 +4,11 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    orderInlinePriority: {
+      screen:'orders.html',owner:'Orders',source:{api:'/api/orders',fields:['priority','workspace_version','status','locked','deleted_at']},
+      meaning:'Editable regular/urgent scheduling priority in each authorized open order row or mobile card. PATCH priority with expected_priority guards concurrent updates and does not move or consume inventory.',
+      consumers:['order-priority-select'],risk:'D1',
+    },
     inventoryPurchaseDraft: {
       screen:'inventory.html',owner:'Procurement',
       source:{api:'/api/procurement/plan',fields:['groups.recommended_purchase_kg','purchase_policy.basis','purchase_policy.types.recommended_order_kg']},

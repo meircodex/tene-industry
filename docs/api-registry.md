@@ -73,6 +73,12 @@ Orders owns `/api/operations/*` in `routes/orders.js`: authenticated proposal, v
 
 ## Orders
 
+`PATCH /api/orders/:id` accepts `{priority,expected_priority}` as a guarded
+scheduling-only change for office/manager/admin. This records a priority audit
+and emits `order_updated`; it does not edit production, allocations or inventory.
+The existing full header-edit contract and production correction permissions
+remain unchanged for other payloads. A stale expected priority returns 409.
+
 | Route Family | Module | Expected Security | Current Concern |
 | --- | --- | --- | --- |
 | `/api/customers*` | Orders / CRM | auth-required; writes office/manager/admin | Protected; still needs CRM vs portal-token ownership cleanup. |

@@ -1,0 +1,11 @@
+'use strict';
+const Database=require('better-sqlite3'),fs=require('node:fs');
+const closure=require('../services/historicalOrderClosure');
+const [dbPath,planPath,reportPath]=process.argv.slice(2);
+if(!dbPath||!planPath||!reportPath)throw Error('Usage: node tools/close-historical-orders.cjs DB REVIEWED_PLAN_JSON REPORT_JSON');
+const db=new Database(dbPath,{fileMustExist:true});
+if(db.pragma('integrity_check',{simple:true})!=='ok')throw Error('database_integrity_failed');
+const plan=JSON.parse(fs.readFileSync(planPath,'utf8').replace(/^\uFEFF/,''));
+const report=closure.closeHistoricalOrders(db,plan);
+report.integrity=db.pragma('integrity_check',{simple:true});
+fs.writeFileSync(reportPath,JSON.stringify(report,null,2));console.log(JSON.stringify(report));db.close();
