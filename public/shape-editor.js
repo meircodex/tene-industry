@@ -3567,6 +3567,23 @@ class ShapeEditorModal {
   #seModal.se-pile-editor .se-zone-engineering-row{grid-template-columns:38px 56px 52px minmax(76px,1fr) 24px;}
 }
 
+/* Billing controls must not inherit full-width, 44px form inputs from host pages. */
+#seModal #seBillingDetails{padding:5px 12px!important;flex:0 0 auto;min-height:26px;max-height:42vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;font-size:12px;line-height:1.35;}
+#seModal #sePageEdit .se-data-panel:has(.se-billing-options){overflow-y:auto;}
+#seModal #sePageEdit .se-data-panel:has(.se-billing-options) .se-table-wrap{flex-shrink:0;min-height:140px;}
+#seModal #seBillingDetails>summary{padding:2px 0;}
+#seModal #seBillingBasis{display:flex;flex-wrap:wrap;gap:2px 10px;padding-top:3px;}
+#seModal #seBillingBasis>div{padding:0!important;font-size:11px;line-height:1.4;}
+#seModal #seBillingBasis>small{flex-basis:100%;font-size:10px;line-height:1.35;color:#526070;}
+#seModal #seBillingControls details{margin-top:4px;}
+#seModal #seBillingControls summary{padding:2px 0;}
+#seModal .se-billing-help{margin:2px 0 5px;font-size:11px;line-height:1.35;}
+#seModal .se-billing-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 8px;}
+#seModal #seBillingControls .se-billing-option{display:flex;flex-direction:row;align-items:center;gap:6px;margin:0;padding:3px 0;min-height:26px;box-sizing:border-box;font-size:11px;line-height:1.3;font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer;border:0;}
+#seModal #seBillingControls .se-billing-option input[type="checkbox"]{appearance:auto;display:block;position:static;flex:0 0 16px;width:16px!important;height:16px!important;min-width:16px!important;max-width:16px!important;min-height:16px!important;max-height:16px!important;padding:0!important;margin:0!important;box-shadow:none;border-radius:3px;accent-color:#c9621a;}
+#seModal .se-billing-option span{min-width:0;overflow-wrap:anywhere;}
+#seModal #seBillingControls select{display:block;width:100%;box-sizing:border-box;min-height:28px;height:28px;margin-top:4px;padding:2px 5px;font-family:inherit;font-size:11px;color:#243047;background:#fff;border:1px solid #c5cbd4;border-radius:5px;}
+@media(max-height:760px){#seModal #seBillingDetails{max-height:36vh;}}
 </style>
 <div id="seModal">
   <!-- ── Header ── -->
@@ -4036,7 +4053,7 @@ class ShapeEditorModal {
       row.textContent = line.label + ' · לפי ' + (line.unit === 'kg' ? 'משקל' : 'יחידות') + ' · ' + line.value.toLocaleString('he-IL', { maximumFractionDigits: 3 }) + (line.unit === 'kg' ? ' ק״ג' : ' יח׳');
       out.append(row);
     }
-    const note = document.createElement('small'); note.textContent = 'המשקל הוא בסיס משותף לחומר ולעיבודים; הוא נספר פעם אחת במשקל המשלוח.'; out.append(note);
+    const note = document.createElement('small'); note.textContent = 'משקל הברזל נספר פעם אחת; העיבודים מחושבים על אותו משקל.'; out.append(note);
   }
 
   _renderBillingControls() {
@@ -4049,10 +4066,11 @@ class ShapeEditorModal {
     const details = document.createElement('details');
     details.open=true;
     const heading = document.createElement('summary'); heading.textContent = 'הגדרת סעיפי חיוב'; details.append(heading);
-    const explanation=document.createElement('p');explanation.textContent='בחר לאילו סעיפי חומר, עיבוד ויחידות הצורה תצורף בסיכום תעודת המשלוח. התעודה מוצגת ללא מחירים.';details.append(explanation);
+    const explanation=document.createElement('p');explanation.className='se-billing-help';explanation.textContent='סמן את סעיפי העיבוד והיחידות לתעודת המשלוח, ללא מחירים.';details.append(explanation);
+    const options=document.createElement('div');options.className='se-billing-options';details.append(options);
     // The product family owns its material basis. Processing and unit add-ons are explicit choices.
     for (const line of commercial.POLICY_LINES.filter(line => line.section === 'processing')) {
-      const label = document.createElement('label'); label.style.cssText = 'display:block;padding:3px 0;';
+      const label = document.createElement('label'); label.className='se-billing-option';
       const input = document.createElement('input'); input.type = 'checkbox'; input.checked = policy.lines.includes(line.key); input.dataset.billingKey = line.key;
       input.onchange = () => {
         const next = this._currentBillingPolicy();
@@ -4062,7 +4080,8 @@ class ShapeEditorModal {
         this.current.billingPolicy = next; this._renderBillingBasis();
         const cuttingSelect = out.querySelector('select'); if (cuttingSelect) cuttingSelect.value = next.cuttingMode;
       };
-      label.append(input, document.createTextNode(line.label + (line.unit === 'kg' ? ' · ק״ג' : ' · יחידות'))); details.append(label);
+      const text=document.createElement('span');text.textContent=line.label + (line.unit === 'kg' ? ' · ק״ג' : ' · יחידות');
+      label.append(input,text); options.append(label);
     }
     const select = document.createElement('select'); select.setAttribute('aria-label', 'מתי מחייבים חיתוך');
     for (const [value, text] of [['always','חיתוך בכל אורך'],['non_standard','חיתוך למעט מוט שלם 6 או 12 מטר'],['none','ללא חיתוך']]) {

@@ -22,7 +22,10 @@ const root = path.resolve(__dirname,'..');
   app.post('/api/shape-definitions/:id/archive',(req,res)=>{const r=catalog.archive(req.params.id,req.body);res.status(r.status).json(r);});
   app.post('/api/shape-definitions/:id/restore',(req,res)=>{const r=catalog.restore(req.params.id,req.body);res.status(r.status).json(r);});
   for (const [url,file] of Object.entries({shapeSnapshot:'services/shapeSnapshot.js',steelRebarShapes:'modules/steel-rebar/shapes.js',shapeCommercial:'modules/steel-rebar/shape-commercial.js'})) app.get('/'+url+'.js',(_req,res) => res.sendFile(path.join(root,file)));
-  app.get('/',(_req,res) => res.send(`<!doctype html><html dir="rtl" lang="he"><meta charset="utf-8"><body><script src="/user-messages.js"></script><script src="/rebar-weights.js"></script><script src="/display-units.js"></script><script src="/shapeSnapshot.js"></script><script src="/steelRebarShapes.js"></script><script src="/shapeCommercial.js"></script><script src="/shape-editor.js"></script><script>window.editor = new ShapeEditorModal(data => window.approved = data); editor.open();</script></body></html>`));
+  app.get('/',(req,res) => {
+    const hostCss=['index','orders'].includes(req.query.host)?[...fs.readFileSync(path.join(root,'public',req.query.host+'.html'),'utf8').matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(match=>match[0]).join('\n'):'';
+    res.send(`<!doctype html><html dir="rtl" lang="he"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${hostCss}<body><script src="/user-messages.js"></script><script src="/rebar-weights.js"></script><script src="/display-units.js"></script><script src="/shapeSnapshot.js"></script><script src="/steelRebarShapes.js"></script><script src="/shapeCommercial.js"></script><script src="/shape-editor.js"></script><script>window.editor = new ShapeEditorModal(data => window.approved = data); editor.open();</script></body></html>`);
+  });
   app.use(express.static(path.join(root,'public')));
   const server = await new Promise(resolve => { const running = app.listen(0,'127.0.0.1',() => resolve(running)); });
   let browser;
@@ -244,6 +247,29 @@ const root = path.resolve(__dirname,'..');
     assert.equal(await page.locator('[data-catalog-code="001"]').count(),1,'failed removal cannot hide an active entry');
     assert.equal(catalog.list().find(row=>row.id===sharedId).version,versionBeforeCancel);
     assert.equal(approved.catalogIdentity.version,1,'historical order snapshot remains version 1');
+    // Check actual host CSS, including its global input width and minimum height.
+    for(const host of ['index','orders']) for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:390,height:844}]) {
+      const layoutPage=await browser.newPage({viewport});
+      await layoutPage.goto(`http://127.0.0.1:${server.address().port}/?host=${host}`);
+      await layoutPage.waitForFunction(()=>editor._canManageCatalogue===true);
+      await layoutPage.locator('#seCatalogArrow').click();
+      await layoutPage.getByRole('button',{name:'עריכה צורה 8',exact:true}).click();
+      const checks=layoutPage.locator('#seBillingControls input[type=checkbox]');
+      assert.equal(await checks.count(),8);
+      for(const check of await checks.all()) {
+        const box=await check.boundingBox();
+        assert.equal(box.width,16,host+' checkbox width');assert.equal(box.height,16,host+' checkbox height');
+      }
+      const last=checks.last(),key=await last.getAttribute('data-billing-key');await last.check();
+      assert.ok(await layoutPage.evaluate(key=>editor.current.billingPolicy.lines.includes(key),key),'compact controls still change the policy');
+      await layoutPage.locator('#seBillingControls select').scrollIntoViewIfNeeded();
+      const geometry=await layoutPage.locator('#seBillingDetails').evaluate(el=>{const b=el.getBoundingClientRect(),s=el.querySelector('select').getBoundingClientRect();return {height:b.height,max:innerHeight*(innerHeight<=760?.36:.42),selectVisible:s.top>=b.top&&s.bottom<=b.bottom+1,withinViewport:b.top>=0&&b.bottom<=innerHeight};});
+      assert.ok(geometry.height<=geometry.max+1,JSON.stringify(geometry));
+      if(shotDir)await layoutPage.screenshot({path:path.join(shotDir,`compact-billing-${host}-${viewport.width}.png`)});
+      assert.ok(geometry.selectVisible&&geometry.withinViewport,host+' all options reachable at '+viewport.width+' '+JSON.stringify(geometry));
+      if(viewport.width===1920)assert.equal(await layoutPage.locator('#seBillingDetails').evaluate(el=>el.scrollHeight<=el.clientHeight+1),true,'desktop billing fits without clipping');
+      await layoutPage.close();
+    }
     assert.deepEqual(errors,[]);
     console.log('PASS: existing identity retained across geometry changes; rename and delivery-policy update; direct edit/remove buttons; removal and restoration of shared, default and overridden shapes; no builtin fallback after removal; permissions and historical snapshots preserved; geometry, keyboard and overlap regressions passed.');
   } finally { await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); db.close(); }

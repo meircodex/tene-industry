@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ironbend-v27';
+const CACHE_VERSION = 'ironbend-v28';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const API_CACHE     = `${CACHE_VERSION}-api`;
 

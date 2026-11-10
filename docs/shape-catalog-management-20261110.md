@@ -50,3 +50,20 @@ rows and all order snapshots remain recoverable. An old client does not
 understand hiddenBuiltinIds and can show a static builtin fallback again; reload
 clients after deploying the fix. Restore through the supported UI for normal
 undo. Do not delete retained rows to roll back.
+
+## Compact billing layout follow-up
+
+Owner: Orders. D0, presentation only. Host `index.html` applies full-width and
+44px minimum heights to form inputs, which inflated billing checkboxes. Scoped
+checkbox sizing and a two-column option grid now keep each control beside its
+full Hebrew label. Repeated explanations and summary spacing are reduced. The
+billing section scrolls when needed; the authoring sidebar can scroll to keep
+dimensions reachable. No policy keys, defaults, calculations, API, permissions,
+or saved data change. Widget sources and meanings are unchanged.
+
+Scope: shape-editor, four asset references, service worker cache, existing
+browser regression script and its asset-version assertions. Browser validation
+uses actual index/orders styles at 1920x1080, 1366x768 and 390x844, checks all
+eight controls, policy changes, compact checkbox bounds and access to the last
+option. Client and targeted geometry/catalogue tests also pass. Rollback: revert
+this follow-up commit and redeploy; no data restoration is needed.
