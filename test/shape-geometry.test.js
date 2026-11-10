@@ -49,6 +49,52 @@ test('shape geometry closes a square when all four bends are 90 degrees', () => 
     [0, 0],
   ]));
 });
+test('six equal orthogonal sides stay a six-segment walk with two exact overlaps, without invented hooks', () => {
+  const geometry=loadShapeEditorGeometry();
+  const units=require('../public/display-units');
+  const sides=[500,500,500,500,500,500],angles=[90,90,90,90,90];
+  const {pts,path:barPath}=geometry.shapeSVGPath(sides,angles,300,260,24);
+  assert.equal(pts.length,7);
+  const lengths=pts.slice(1).map((p,i)=>distance(p,pts[i]));
+  for(const len of lengths) assert.ok(Math.abs(len-lengths[0])<0.00001);
+  assert.deepEqual(units.overlappingSegments(pts),[[0,4],[1,5]]);
+  for(let i=0;i<pts.length-2;i++) {
+    const a=pts[i],b=pts[i+1],c=pts[i+2];
+    assert.ok(Math.abs((b[0]-a[0])*(c[0]-b[0])+(b[1]-a[1])*(c[1]-b[1]))<0.00001);
+  }
+  assert.equal(units.rectangularLoopParts(sides,angles),null);
+  const thumbnail=geometry.shapeCataloguePreview({family:'bars',sides,angles});
+  assert.ok(thumbnail.includes(`d="${barPath}"`));
+  const printed=shapeSvg(sides.map((length_mm,i)=>({length_mm,angle_deg:angles[i]??180})),300,260,{showDims:true});
+  assert.doesNotMatch(printed,/closed-stirrup/);
+  assert.deepEqual(sides,[500,500,500,500,500,500]);
+});
+test('overlap detection ignores crossings and endpoint contacts and preserves all coordinates', () => {
+  const {overlappingSegments,rectangularLoopParts,diagramDimensionPositions}=require('../public/display-units');
+  const points=[[0,0],[100,0],[50,0],[50,100]];
+  const before=JSON.stringify(points);
+  assert.deepEqual(overlappingSegments(points),[[0,1]]);
+  assert.equal(JSON.stringify(points),before);
+  assert.deepEqual(overlappingSegments([[0,0],[100,0],[100,100],[50,-100]]),[]);
+  assert.deepEqual(overlappingSegments([[0,0],[100,0],[200,0]]),[]);
+  assert.equal(rectangularLoopParts([40,20,40,20],[90,-90,90]),null);
+  assert.equal(rectangularLoopParts([40,20,41,20],[90,90,90]),null);
+  assert.ok(rectangularLoopParts([40,20,40,20],[90,90,90]));
+  const labels=diagramDimensionPositions(points,['A · 50','B · 50','C · 50'],24,{rotated:true,width:()=>60,height:16});
+  for(let i=0;i<labels.length;i++)for(let j=i+1;j<labels.length;j++) {
+    const a=labels[i].box,b=labels[j].box;
+    assert.ok(a.right<=b.left || b.right<=a.left || a.bottom<=b.top || b.bottom<=a.top);
+  }
+});
+test('overlap color covers only the shared interval and leaves a partial remainder untouched',()=>{
+  const units=require('../public/display-units');
+  const points=[[0,0],[100,0],[100,50],[40,50],[40,0],[160,0]];
+  const original=JSON.stringify(points);
+  assert.deepEqual(units.overlapSpans(points),[{sides:[0,4],start:[40,0],end:[100,0]}]);
+  assert.equal(JSON.stringify(points),original);
+  assert.deepEqual(units.overlapSpans([[0,0],[100,0],[40,0]])[0],{sides:[0,1],start:[40,0],end:[100,0]});
+  assert.deepEqual(units.overlapSpans([[0,0],[100,0],[200,0]]),[]);
+});
 
 test('shape editor 2D preview rotates U bars so the long bridge is the bottom base', () => {
   const { shapeSVGPath } = loadShapeEditorGeometry();
@@ -455,7 +501,7 @@ test('shape editor has mesh and pile families with icon-only preset buttons', ()
   assert.match(editor, /id="seFamilyTabs"/);
   const presetRender = editor.match(/_renderPresets\(countFilter\) \{[\s\S]*?_renderSavedShapes\(countFilter\) \{/);
   assert.ok(presetRender, 'expected preset renderer block');
-  assert.match(presetRender[0], /shapePresetIconSVG\(s\.icon \|\| 'straight'\)/);
+  assert.match(presetRender[0], /shapeCataloguePreview\(s\)/);
   assert.match(presetRender[0], /class="se-preset-name"/);
   assert.doesNotMatch(presetRender[0], /font-size:12px;font-weight:700;line-height:1\.3;word-break:break-word;color:inherit/);
 });
@@ -541,13 +587,13 @@ test('shape editor keeps default 90-degree 3D turns positive, not negative', () 
   assert.doesNotMatch(editor, /azAngles\[i \+ 1\] = -\(180 - a\)/);
 });
 
-test('shape editor renders closed stirrup overlap instead of drawing the overlap as another polygon side', () => {
+test('shape editor renders exact four-sided rectangles without inventing an overlap marker', () => {
   const editor = fs.readFileSync(path.join(__dirname, '..', 'public', 'shape-editor.js'), 'utf8');
 
   assert.match(editor, /function detectClosedStirrupParts/);
   assert.match(editor, /function renderClosedStirrupEditor2D/);
   assert.match(editor, /data-shape-kind="closed-stirrup"/);
-  assert.match(editor, /data-stirrup-marker="overlap"/);
+  assert.doesNotMatch(editor, /data-stirrup-marker="overlap"/);
   assert.match(editor, /const stirrupParts = detectClosedStirrupParts\(sides, angles\)/);
   assert.match(editor, /renderClosedStirrupEditor2D\(stirrupParts, sides, 300, 260/);
 });
@@ -568,7 +614,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=84/);
+  assert.match(index, /shape-editor\.js\?v=88/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
@@ -1915,7 +1961,7 @@ test('production card keeps short bent legs visually readable next to a long bar
   assert.match(svg, />7.5</);
 });
 
-test('production card renders closed stirrups as a closed rectangular hoop', () => {
+test('production card retains all six source sides instead of inventing hoop hooks', () => {
   const svg = shapeSvg(JSON.stringify([
     { length_mm: 100, angle_deg: 90 },
     { length_mm: 950, angle_deg: 90 },
@@ -1925,18 +1971,16 @@ test('production card renders closed stirrups as a closed rectangular hoop', () 
     { length_mm: 100, angle_deg: 0 },
   ]));
 
-  assert.match(svg, /data-shape-kind="closed-stirrup"/);
-  assert.match(svg, /Z/);
+  assert.match(svg, /data-shape-kind="generic-bar"/);
   assert.match(svg, />30</);
   assert.match(svg, />95</);
-  assert.match(svg, /stroke="#a8b0ba"/);
-  assert.match(svg, /data-stirrup-marker="overlap"/);
+  assert.doesNotMatch(svg, /data-stirrup-marker="overlap"/);
   assert.doesNotMatch(svg, /data-tail=/);
   assert.doesNotMatch(svg, /end tails/);
   assert.doesNotMatch(svg, /<circle/);
 });
 
-test('production card accepts closed stirrup OCR with one visible overlap tail', () => {
+test('production card retains all five source sides instead of guessing a hoop', () => {
   const svg = shapeSvg(JSON.stringify([
     { length_mm: 100, angle_deg: 90 },
     { length_mm: 950, angle_deg: 90 },
@@ -1945,11 +1989,10 @@ test('production card accepts closed stirrup OCR with one visible overlap tail',
     { length_mm: 300, angle_deg: 0 },
   ]));
 
-  assert.match(svg, /data-shape-kind="closed-stirrup"/);
+  assert.match(svg, /data-shape-kind="generic-bar"/);
   assert.match(svg, />30</);
   assert.match(svg, />95</);
-  assert.match(svg, /stroke="#a8b0ba"/);
-  assert.match(svg, /data-stirrup-marker="overlap"/);
+  assert.doesNotMatch(svg, /data-stirrup-marker="overlap"/);
   assert.doesNotMatch(svg, /data-tail=/);
   assert.doesNotMatch(svg, /end tails/);
   assert.doesNotMatch(svg, /<circle/);

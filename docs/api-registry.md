@@ -1,13 +1,18 @@
 # API Registry
 
+Order creation material-source contract (2026-11-10): `POST /api/orders` accepts the existing client `items[].raw_material_id: 'auto'` sentinel. Inventory reservation persists null for automatic source selection, retaining FIFO choice at completion. A valid explicit lot ID is preserved; an invalid/missing explicit lot returns HTTP 400 with a readable message, and the entire order transaction rolls back. Saving reserves demand without consuming physical stock.
+
+`GET /api/inventory/metrics` (Inventory, 2026-11-09): warehouse/office/manager/admin; read-only stocktake-period journal/control report. Returns stocked_lots, stocked_diameters, baseline{id,counted_at,created_at}, recorded_net_kg (null without baseline), verified_consumption_kg (null; actual use is not inferred), status (no_baseline/needs_reconciliation/recorded_only), issues, historical counters and legacy coverage diagnostics. Uses approval time as the explicit period boundary. Existing inventory/summary response remains unchanged.
+
 ## Shared shape definitions — 2026-11-08
 
 Owner: Orders / Catalog. `routes/catalog.js` delegates persistence to `services/savedShapeCatalog.js`.
 
 | Route | Access | Contract |
 | --- | --- | --- |
-| `GET /api/shape-definitions` | office, sales, production, manager, admin | `{entries:[{id,itemCode,name,version,definition,billingPolicy}]}`; active shared definitions only. Built-in templates remain in the editor; local legacy templates are labelled separately. |
-| `POST /api/shape-definitions` | manager, admin | Name, unique itemCode, family definition and explicit billingPolicy. 201 saved, 400 invalid, 409 duplicate. |
+| `GET /api/shape-definitions` | office, sales, production, manager, admin | `{entries:[{id,itemCode,name,version,definition,billingPolicy}],permissions:{canManage}}`; active definitions. Trusted definition.builtinPresetId replaces the corresponding built-in template. Local legacy templates are labelled separately. |
+| `POST /api/shape-definitions` | manager, admin | Name, unique itemCode (1–40 ASCII digits), family definition and explicit billingPolicy. Built-in SKUs 1–20 reserved; leading zeros retained. 201 saved, 400 invalid, 409 duplicate. |
+| `PUT /api/shape-definitions/builtin/:id` | manager, admin | Revise a whitelisted built-in ID with expectedVersion=1 on first edit (creates version 2). Later edits enforce stored version. Server assigns builtinPresetId; client cannot forge it. Legacy rows and existing order snapshots are retained. |
 | `PUT /api/shape-definitions/:id` | manager, admin | Same fields plus expectedVersion. Optimistic version check, 409 on stale write, increments version. Existing order snapshots remain unchanged. |
 
 `GET /shapeCommercial.js` serves the same pure rules used by commercial summaries. It contains no prices or private data. Legacy `POST /api/shapes` cannot overwrite a shared definition.

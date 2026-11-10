@@ -93,6 +93,9 @@ module.exports = function createInventoryRouter(deps) {
   router.get('/inventory/summary', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
     res.json(db.prepare(`SELECT diameter,material_type,nominal_length_mm,SUM(stock_adjustment_kg) as total_adjustments,SUM(weight_received) as total_received,SUM(weight_used) as total_used,SUM(weight_scrapped) as total_scrapped,ROUND(SUM(${materialOnHandSql(db)}),2) as available,COUNT(*) as batches FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved' GROUP BY diameter,material_type,nominal_length_mm ORDER BY diameter,material_type,nominal_length_mm`).all());
   });
+  router.get('/inventory/metrics', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
+    res.json(require('../services/inventoryMetrics').inventoryMetrics(db));
+  });
 
   router.get('/inventory/mesh', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
     const page=listPage(req.query,{limit:100,max:500});

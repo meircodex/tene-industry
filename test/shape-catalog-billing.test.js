@@ -28,13 +28,13 @@ test('shared catalogue migrates existing rows without loss, preserves codes and 
   assert.deepEqual(created.entry.billingPolicy, hoopPolicy);
   assert.equal(catalog.create(definition()).status, 409);
   assert.equal(catalog.create(definition({ itemCode: 'S8' })).status, 400);
-  assert.equal(catalog.create(definition({ itemCode: 'ABC' })).status, 201);
-  assert.equal(catalog.create(definition({ itemCode: 'abc' })).status, 409);
+  assert.equal(catalog.create(definition({ itemCode: '123' })).status, 201);
+  assert.equal(catalog.create(definition({ itemCode: '123' })).status, 409);
   const updated = catalog.update(created.entry.id, definition({ expectedVersion: 1, name: 'שם חדש', billingPolicy: commercial.defaultPolicy({ shapeType: 'bench_bar' }) }));
   assert.equal(updated.status, 200); assert.equal(updated.entry.version, 2);
   assert.equal(catalog.update(created.entry.id, definition({ expectedVersion: 1 })).status, 409);
   assert.deepEqual(created.entry.billingPolicy, hoopPolicy, 'earlier order snapshots remain independent');
-  const lift = catalog.create(definition({itemCode:'LIFT-1',definition:{family:'lifts',diameter:12,barLength:12000,weighedKg:900,quantity:3},billingPolicy:commercial.defaultPolicy({family:'lifts'})}));
+  const lift = catalog.create(definition({itemCode:'1001',definition:{family:'lifts',diameter:12,barLength:12000,weighedKg:900,quantity:3},billingPolicy:commercial.defaultPolicy({family:'lifts'})}));
   assert.equal(lift.status,201); assert.equal(lift.entry.definition.weighedKg,0,'a past order weighing must not become a template default');
   assert.equal(db.pragma('integrity_check', { simple: true }), 'ok');
 });
@@ -47,6 +47,30 @@ test('invalid geometry and ambiguous material basis cannot enter shared catalogu
   assert.equal(catalog.create(definition({ billingPolicy: { ...hoopPolicy, lines: [...hoopPolicy.lines,'mesh_kg'] } })).status, 400);
   assert.equal(catalog.create(definition({ billingPolicy: { ...hoopPolicy, lines: ['material_by_steel_type','invented'] } })).status, 400);
   assert.equal(catalog.list().length, 0);
+});
+test('numeric catalogue codes and built-in revisions preserve source identity and reject stale writes', t => {
+  const db = new Database(':memory:'); t.after(() => db.close());
+  db.exec('CREATE TABLE shapes(id TEXT PRIMARY KEY,name TEXT,bends INTEGER,sides_default TEXT,angles_default TEXT,active INTEGER DEFAULT 1)'); ensureSavedShapeCatalogSchema(db);
+  const catalog = createSavedShapeCatalog(db);
+  const codes = Object.values(commercial.BUILTIN_CODES);
+  assert.equal(new Set(codes).size,codes.length);
+  for(const code of codes) assert.match(code,/^[0-9]+$/);
+  for(const code of ['s10','ABC','1-2','1.5','+5','1e3','１２','1'.repeat(41),'8']) assert.equal(catalog.create(definition({itemCode:code})).status,400,code);
+  const input = definition({itemCode:'8',expectedVersion:1});
+  const first = catalog.updateBuiltin('s8',input);
+  assert.equal(first.status,200); assert.equal(first.entry.version,2);
+  assert.equal(first.entry.definition.builtinPresetId,'s8');
+  assert.equal(catalog.updateBuiltin('s8',input).status,409);
+  assert.equal(catalog.updateBuiltin('unknown',input).status,404);
+  assert.equal(catalog.update(first.entry.id,{...input,itemCode:'9',expectedVersion:2}).status,400);
+  const second = catalog.update(first.entry.id,{...input,itemCode:'101',expectedVersion:2,name:'מעודכן',definition:{...input.definition,builtinPresetId:'s9'}});
+  assert.equal(second.status,200); assert.equal(second.entry.version,3);
+  assert.equal(second.entry.definition.builtinPresetId,'s8');
+  assert.equal(first.entry.itemCode,'8'); assert.equal(first.entry.version,2);
+  assert.equal(catalog.create(definition({itemCode:'101'})).status,409);
+  const forged = catalog.create(definition({itemCode:'102',definition:{...input.definition,builtinPresetId:'s10'}}));
+  assert.equal(forged.status,201); assert.equal(forged.entry.definition.builtinPresetId,undefined);
+  assert.equal(db.pragma('integrity_check',{simple:true}),'ok');
 });
 test('hoop and bench coexist, smooth steel is distinct and processing does not multiply material weight', () => {
   const hoop = row(1, hoopPolicy, 100, 20);

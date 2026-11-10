@@ -2,7 +2,7 @@
   'use strict';
   const workspace=window.InventoryWorkspace,$=id=>document.getElementById(id),esc=workspace.escape;
   let lots=[],sheets=[],pending=null;
-  const fmt=value=>Number(value||0).toLocaleString('he-IL',{maximumFractionDigits:3});
+  const fmt=value=>Number(value||0).toLocaleString('he-IL',{maximumFractionDigits:0});
   const uid=()=>crypto.randomUUID();
   $('tab-batches').insertAdjacentHTML('afterend',`<div id="tab-stocktake" class="tab-panel"><div class="card"><div class="card-header"><span class="card-title">ספירת מלאי — יתרה בפועל</span><button class="btn btn-outline btn-sm" id="countReload">רענן אצוות</button></div>
     <div class="inventory-toolbar"><div class="form-row"><label for="countTime">מועד הספירה</label><input id="countTime" type="datetime-local" step="1"></div><div class="form-row"><label for="countReason">סיבת ההתאמה</label><input id="countReason" value="ספירת מלאי"></div></div>
@@ -20,7 +20,7 @@
       lots=[];for(let offset=0;;offset+=1000){const rows=await workspace.api(`/api/inventory?limit=1000&offset=${offset}`);lots.push(...rows);if(rows.length<1000)break;}
       sheets=[];for(let offset=0;;offset+=500){const rows=await workspace.api(`/api/inventory/mesh?limit=500&offset=${offset}`);sheets.push(...rows);if(rows.length<500)break;}
       if(!$('countTime').value)$('countTime').value=localTime();
-      $('countRows').innerHTML=lots.map(row=>`<tr data-count-lot="${row.id}"><td>${esc(row.material_type==='coil'?'גליל':row.material_type==='straight'?'ליפט / ישר':'מכופף')} Ø${esc(row.diameter)} · ${esc(row.lot_number||row.id)}</td><td>${esc(row.warehouse_loc||'')}</td><td>${fmt(row.weight_available)} ק״ג</td><td><input class="inventory-count-input" type="number" min="0" step="0.001" data-count-value aria-label="נספר באצווה ${row.id}"></td><td><input class="inventory-count-input" type="number" step="0.001" data-count-net aria-label="תנועות מאז הספירה באצווה ${row.id}"></td><td><input class="inventory-count-input" data-count-note aria-label="פירוט תנועות באצווה ${row.id}"></td></tr>`).join('')||'<tr><td colspan="6" class="inventory-message">אין אצוות פעילות לספירה.</td></tr>';
+      $('countRows').innerHTML=lots.map(row=>`<tr data-count-lot="${row.id}"><td>${esc(row.material_type==='coil'?'גליל':row.material_type==='straight'?'ליפט / ישר':'מכופף')} Ø${esc(row.diameter)} · ${esc(row.lot_number||row.id)}</td><td>${esc(row.warehouse_loc||'')}</td><td>${fmt(row.weight_available)} ק״ג</td><td><input class="inventory-count-input" type="number" min="0" step="1" data-count-value aria-label="נספר באצווה ${row.id}"></td><td><input class="inventory-count-input" type="number" step="1" data-count-net aria-label="תנועות מאז הספירה באצווה ${row.id}"></td><td><input class="inventory-count-input" data-count-note aria-label="פירוט תנועות באצווה ${row.id}"></td></tr>`).join('')||'<tr><td colspan="6" class="inventory-message">אין אצוות פעילות לספירה.</td></tr>';
       $('meshCountRows').innerHTML=sheets.map((row,i)=>`<tr><td>${esc(workspace.meshDescription(row.specification))}</td><td>${fmt(row.physical_units)} יחידות</td><td><input class="inventory-count-input" type="number" min="0" step="1" id="meshCount-${i}" aria-label="נספר במפרט רשת ${i+1}"></td><td><button class="btn btn-outline btn-sm" data-mesh-count="${i}">בדיקת הפרש</button></td></tr>`).join('')||'<tr><td colspan="4" class="inventory-message">אין מפרטי רשת במלאי.</td></tr>';
       $('countMessage').textContent='';
     }catch(error){$('countMessage').textContent=error.message;}

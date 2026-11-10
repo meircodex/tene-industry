@@ -6,9 +6,9 @@
   const WIDGET_CONTRACTS = Object.freeze({
     shapeCatalogueBilling: {
       screen: 'shape-editor.js', owner: 'Orders',
-      source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy'] },
-      meaning: 'Only the arrow opens a floating catalogue. Fixed bar templates retain topology while lengths remain proportional. Billing policy and catalogue identity/version are copied into each approved order snapshot. Material kg is counted once; cutting/bending use that kg basis and product add-ons use item quantity. Existing snapshots are not reclassified when the catalogue changes.',
-      consumers: ['seItemCode', 'seCatalogPopup', 'seBillingBasis', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
+      source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy', 'permissions.canManage'] },
+      meaning: 'Only the arrow opens a floating catalogue. Numeric SKUs are separate from internal IDs. Thumbnails use template geometry; overlapping sides keep source coordinates and separate labels. Fixed templates retain topology while lengths remain proportional. Managers/admins explicitly edit a versioned catalogue definition. Billing policy and catalogue identity/version are copied into each approved order snapshot. Material kg is counted once; cutting/bending use that kg basis and product add-ons use item quantity. Existing snapshots are not reclassified when the catalogue changes.',
+      consumers: ['seItemCode', 'seCatalogPopup', 'seEditCatalogShape', 'seBillingBasis', 'data-overlap-segment', 'data-overlap-span', 'data-overlap-leader', 'order-commercial-summary', 'delivery-certificate'], risk: 'D2',
     },
     shapeSideDimensions: {
       screen: 'orders.html', owner: 'Production Cards',
@@ -61,12 +61,17 @@
     inventoryDaily: {
       screen: 'inventory.html', owner: 'Inventory',
       source: {api:'/api/procurement/plan',fields:['groups.physical_stock_kg','groups.backlog_kg','groups.incoming_kg','groups.recommended_purchase_kg','mesh_groups.physical_units','mesh_groups.required_units','mesh_groups.recommended_purchase_units']},
-      meaning:'Planning by diameter and supply form; sheets remain separate whole units. Recommendations do not place purchase orders. Bar grade, standard and length require review.',
+      meaning:'Planning by diameter and supply form; kg values display rounded to whole kilograms without changing source precision; sheets remain separate whole units. Recommendations do not place purchase orders. Bar grade, standard and length require review.',
       consumers:['inventoryDailyRows'],risk:'D1',
     },
     inventoryPhysicalTotal: {
       screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','total_adjustments']},
-      meaning:'Current approved physical bar stock in kg, including audited count adjustments. Excludes sheet units and does not subtract order reservations.',consumers:['kpiTotal'],risk:'D1',
+      meaning:'Recorded approved bar stock balance in kg, including audited count adjustments. Depends on count accuracy and recorded movements; unreported consumption is not known. Excludes sheet units and does not subtract order reservations.',consumers:['kpiTotal'],risk:'D1',
+    },
+    inventoryStockBasis: {
+      screen:'inventory.html',owner:'Inventory',source:{api:'/api/inventory/summary',fields:['available','diameter']},
+      meaning:'The user-approved count is the opening stock basis. Current stock follows approved receipts minus recorded consumption and scrap, with audited count adjustments. Reservations are separate demand and not physical removal. Positive-balance groups define the diameter count. Latest stocktake approval from /api/inventory/stocktakes supplies the displayed basis date. Historic usage and uncertain consumption diagnostics are not displayed on the main inventory screen.',
+      consumers:['inventoryStockBasis','kpiDiam'],risk:'D0',
     },
     kpiOrdersToday: {
       screen: 'dashboard.html',

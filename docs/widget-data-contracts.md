@@ -1,10 +1,22 @@
 # Widget Data Contracts
 
+Order material-source selector (2026-11-10): automatic selection remains the existing string `auto` in new-order drafts/payloads; the server normalizes it to a null preferred lot reference. Explicit lot selection retains its numeric identity. Order save reserves demand; it does not deduct physical inventory. Failed transaction leaves the draft available for retry and commits no partial order. See `docs/order-auto-material-fk-20261110.md`.
+
+## Inventory consumption evidence — 2026-11-09
+
+Owner: Inventory; `inventoryConsumptionEvidence` contract. `/api/inventory/metrics` replaces the unbounded historic usage counter on the main screen. `kpiUsed` shows recorded net kg since the stated stocktake approval only when reporting checks pass; otherwise „לא מאומת”. Journal zero is never described as proof of zero actual production. Missing baseline or failed request cannot fall back to history or zero. Source events: production_completion usage plus signed V2 consumption/reversals. Reservations and stocktake adjustments are excluded. Detail text exposes legacy coverage gaps. `kpiBatches` and `kpiDiam` count only positive-balance, active, approved lot records, not packages or coils.
+
+**Superseded by the user's final clarification on 2026-11-09:** the count supplied by the user is the authoritative opening stock. Main screen now shows only current stock and diameters with positive stock, plus an explicit stocktake basis date and balance definition (`inventoryStockBasis`). Consumption, lot-record counts and „לא מאומת” explanations are removed from the main screen. The diagnostic /inventory/metrics API and research evidence remain internal/read-only and are not called by that screen. A failed basis-date lookup does not invalidate a successful balance read; a failed balance read shows unavailable rather than zero.
+
 ## Shape catalogue and billing bases — 2026-11-08
 
 Owner: Orders. Definition: `shapeCatalogueBilling` in `public/data-contracts-client.js`.
 
 - The code field selects on Enter. Focus, typing and ArrowDown do not open the catalogue. Only the adjacent arrow button opens a fixed-position floating panel. Escape, outside click and selection close it without moving the editor layout.
+- SKUs contain digits only, independently of legacy internal IDs. Preview thumbnails are generated from the actual template geometry. Explicit selection loads the template dimensions; editing order lengths keeps its topology. Overlap handling never changes vertices or invents hooks; labels identify coincident sides and fit inside the viewport.
+- Overlapping sides use a darker stroke, matching labelled dimension borders and input outlines. Leader annotations connect side midpoints to their value windows. Selecting a window focuses its side input and darkens the matching link; the drawing coordinates are preserved.
+- Clarification: body coloring applies only to the exact shared interval, shown as orange over a wider dark base so two layers remain visible. The nonshared remainder stays blue; participating sides are not darkened over their full lengths. This applies in both 2D and projected 3D.
+- `permissions.canManage` controls catalogue-edit/save controls and billing configuration. Manager/admin may explicitly edit built-in or shared definitions, including topology, name, numeric SKU and charge bases. The server enforces the same roles and expected revision. An override replaces its built-in choice without duplicating it; existing orders retain their original snapshots.
 - Built-in and saved bar templates expose exactly their configured side count; Enter/Tab go through lengths, diameter and quantity. Geometry stays proportional. New shape mode retains add-side/angle and real 3D authoring.
 - `seBillingBasis` resolves material by ribbed/smooth steel, processing by total item kg and additions by item quantity. Lifts use whole-line weighed kg without multiplying by package quantity. Expanded settings allow explicit cutting conditions and processing/unit choices. Saving a shared definition requires its name and unique code.
 - Approved snapshot stores the exact policy and catalogue revision. Orders, the order summary, A4 and delivery certificate read the saved policy. Renaming a hoop does not turn it into a chair. Changing catalogue defaults affects future selections, not prior order snapshots.

@@ -209,6 +209,18 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
 
       if (reservedKg <= 0) continue;
 
+      // Browser drafts use 'auto' for FIFO selection, not a raw-material key.
+      const rawPreference=item.preferred_raw_material_id;
+      const source=typeof rawPreference==='string'?rawPreference.trim():rawPreference;
+      let preferredId=null;
+      if(modern && source!==null && source!==undefined && source!=='' && source!==0 && String(source).toLowerCase()!=='auto') {
+        const id=Number(source);
+        if(!['string','number'].includes(typeof source) || !Number.isSafeInteger(id) || id<=0 || !db.prepare('SELECT id FROM raw_material WHERE id=?').get(id)) {
+          throw Object.assign(new Error('מנת המלאי שנבחרה אינה תקינה או אינה קיימת. יש לבחור מקור ברזל מחדש או בחירה אוטומטית.'),{statusCode:400,code:'invalid_preferred_raw_material'});
+        }
+        preferredId=id;
+      }
+
       if (modern && reservationItemId(item)) {
         const prior = db.prepare("SELECT status FROM inventory_reservations WHERE order_id=? AND item_id=? AND consumption_mode='on_completion' AND status IN ('active','consumed')").get(orderId,reservationItemId(item));
         if (prior) throw Object.assign(new Error('item_already_reserved_or_consumed'), {statusCode:409});
@@ -219,7 +231,7 @@ function reserveMaterialForOrder(db, { order_id, items } = {}) {
         diameter,
         material_type,
         reservedKg,
-        ...(modern ? [item.preferred_raw_material_id || null] : [])
+        ...(modern ? [preferredId] : [])
       );
 
       reservations.push({

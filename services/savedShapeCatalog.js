@@ -13,14 +13,13 @@ function readEntry(row) {
   return { id: row.id, itemCode: row.item_code, name: row.name, version: row.definition_version,
     definition: JSON.parse(row.definition_json), billingPolicy: JSON.parse(row.billing_json) };
 }
-function validateDefinition(input) {
+function validateDefinition(input, builtinId = null) {
   const errors = [];
   const name = String(input.name || '').trim();
   const itemCode = String(input.itemCode || '').trim();
   if (!name || name.length > 120) errors.push('יש להזין שם צורה עד 120 תווים');
-  if (!/^[\p{L}\p{N}_-]{1,40}$/u.test(itemCode)) errors.push('מספר צורה חייב להכיל עד 40 אותיות, ספרות, מקף או קו תחתון');
-  // Built-in IDs remain reserved; new user codes never shadow a shipped shape.
-  if (/^s(?:[1-9]|1[0-6])$/i.test(itemCode) || ['mesh1','spiral1','ring1','round-pile-cage','lift-package'].includes(itemCode.toLowerCase())) errors.push('קוד זה שייך לצורה מובנית');
+  if (!commercial.numericItemCode(itemCode)) errors.push('מק״ט חייב להכיל ספרות בלבד, עד 40 ספרות');
+  if (Object.entries(commercial.BUILTIN_CODES).some(([id,code]) => code === itemCode && id !== builtinId)) errors.push('מק״ט זה שייך לצורה מובנית');
   const definition = input.definition;
   if (!definition || typeof definition !== 'object' || Array.isArray(definition)) errors.push('חסרה הגדרת צורה');
   else {
@@ -57,7 +56,7 @@ function validateDefinition(input) {
 function createSavedShapeCatalog(db) {
   function cleanDefinition(input) {
     const definition = { ...input };
-    for (const key of ['quantity','qty','structElement','shapeId','approvedAt','catalogIdentity','billingPolicy','custom']) delete definition[key];
+    for (const key of ['quantity','qty','structElement','shapeId','approvedAt','catalogIdentity','billingPolicy','custom','builtinPresetId']) delete definition[key];
     if (definition.family === 'lifts') definition.weighedKg = 0;
     return definition;
   }
@@ -75,8 +74,26 @@ function createSavedShapeCatalog(db) {
         return { status: 201, entry: readEntry(db.prepare('SELECT * FROM shapes WHERE id=?').get(id)) };
       })();
     },
+    updateBuiltin(builtinId, input) {
+      if (!Object.hasOwn(commercial.BUILTIN_CODES,builtinId)) return {status:404,error:'הצורה לא נמצאה'};
+      const id = 'catalog-builtin-' + builtinId;
+      const normalized = validateDefinition(input,builtinId);
+      if (normalized.errors.length) return {status:400,error:normalized.errors.join('; ')};
+      return db.transaction(() => {
+        const row = db.prepare('SELECT * FROM shapes WHERE id=?').get(id);
+        if (row) return this.update(id,input);
+        if (input.expectedVersion !== 1) return {status:409,error:'גרסת הצורה השתנתה; יש לפתוח אותה מחדש'};
+        if (db.prepare('SELECT id FROM shapes WHERE item_code=?').get(normalized.itemCode)) return {status:409,error:'מספר הצורה כבר קיים'};
+        const definition = {...cleanDefinition(normalized.definition),builtinPresetId:builtinId};
+        db.prepare('INSERT INTO shapes(id,name,bends,sides_default,angles_default,item_code,definition_json,billing_json,definition_version) VALUES(?,?,?,?,?,?,?,?,2)').run(id,normalized.name,definition.angles?.length||0,JSON.stringify(definition.sides||[]),JSON.stringify(definition.angles||[]),normalized.itemCode,JSON.stringify(definition),JSON.stringify(normalized.billingPolicy));
+        return {status:200,entry:readEntry(db.prepare('SELECT * FROM shapes WHERE id=?').get(id))};
+      })();
+    },
     update(id, input) {
-      const normalized = validateDefinition(input);
+      const existing = db.prepare('SELECT * FROM shapes WHERE id=? AND active=1 AND definition_json IS NOT NULL').get(id);
+      if (!existing) return { status: 404, error: 'הצורה לא נמצאה' };
+      const builtinId = JSON.parse(existing.definition_json).builtinPresetId || null;
+      const normalized = validateDefinition(input,builtinId);
       if (normalized.errors.length) return { status: 400, error: normalized.errors.join('; ') };
       return db.transaction(() => {
         const row = db.prepare('SELECT * FROM shapes WHERE id=? AND active=1 AND definition_json IS NOT NULL').get(id);
@@ -84,6 +101,7 @@ function createSavedShapeCatalog(db) {
         if (row.definition_version !== input.expectedVersion) return { status: 409, error: 'הצורה השתנתה מאז שנפתחה. יש לבחור אותה מחדש מהקטלוג' };
         if (db.prepare('SELECT id FROM shapes WHERE item_code=? COLLATE NOCASE AND id<>?').get(normalized.itemCode, id)) return { status: 409, error: 'מספר הצורה כבר קיים' };
         const definition = cleanDefinition(normalized.definition);
+        if (builtinId) definition.builtinPresetId = builtinId;
         db.prepare('UPDATE shapes SET name=?,item_code=?,definition_json=?,billing_json=?,sides_default=?,angles_default=?,bends=?,definition_version=definition_version+1 WHERE id=?')
           .run(normalized.name, normalized.itemCode, JSON.stringify(definition), JSON.stringify(normalized.billingPolicy), JSON.stringify(definition.sides || []), JSON.stringify(definition.angles || []), definition.angles?.length || 0, id);
         return { status: 200, entry: readEntry(db.prepare('SELECT * FROM shapes WHERE id=?').get(id)) };

@@ -21,11 +21,22 @@ test('authorized catalogue editing and order/delivery consumers share immutable 
     return {'Content-Type':'application/json',Authorization:'Bearer '+token};
   }
   const manager = await login('manager'),office = await login('office');
+  const admin = await login('admin');
+  for(const [headers,canManage] of [[manager,true],[admin,true],[office,false]]) {
+    const response = await request('/api/shape-definitions',{headers});
+    assert.equal((await response.json()).permissions.canManage,canManage);
+  }
   const input = {itemCode:'001',name:'חישוק',definition:{family:'bars',sides:[400,200,400,200],angles:[90,90,90,90]},billingPolicy:commercial.defaultPolicy({presetId:'s8'})};
   assert.equal((await request('/api/shape-definitions')).status,401);
   assert.equal((await request('/api/shape-definitions',{method:'POST',headers:office,body:JSON.stringify(input)})).status,403);
   const created = await request('/api/shape-definitions',{method:'POST',headers:manager,body:JSON.stringify(input)}); assert.equal(created.status,201);
   const entry = (await created.json()).entry;
+  const builtin = {...input,itemCode:'8',expectedVersion:1};
+  assert.equal((await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:office,body:JSON.stringify(builtin)})).status,403);
+  const override = await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:manager,body:JSON.stringify(builtin)});
+  assert.equal(override.status,200); assert.equal((await override.json()).entry.version,2);
+  assert.equal((await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:admin,body:JSON.stringify({...builtin,expectedVersion:2})})).status,200);
+  assert.equal((await request('/api/shape-definitions/builtin/s8',{method:'PUT',headers:manager,body:JSON.stringify(builtin)})).status,409);
   const listed = await request('/api/shape-definitions',{headers:office}); assert.equal(listed.status,200); assert.equal((await listed.json()).entries[0].itemCode,'001');
   const customerId = db.prepare("INSERT INTO customers(name,phone) VALUES('Catalog customer','0500000000')").run().lastInsertRowid;
   const orderId = db.prepare("INSERT INTO orders(order_num,customer_id,channel,status,total_weight) VALUES('CATALOG-1',?,'משרד','ממתין',150)").run(customerId).lastInsertRowid;
