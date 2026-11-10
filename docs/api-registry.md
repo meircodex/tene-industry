@@ -180,3 +180,9 @@ See `inventory-accounting-20261108.md` for quantities, cutoff and replay contrac
 accepts explicit per-line purchase_unit (coil/bundle/sheet/kg), unit_weight_kg and optional
 shortage_kg. Edited quantity/unit are exported directly; estimated_weight_kg is computed
 on the server. Omitting purchase_unit retains legacy kg/sheet semantics. No DB writes. -->
+
+Procurement plan: `stock_basis=available|physical` defaults to available and adds
+read-only `purchase_policy` with 10000/30000/30000 kg thresholds per supply form.
+Supplier-unit draft export with `enforce_supplier_policy:true` rejects mixed forms,
+coil/straight orders below 30000 estimated kg and straight-package rows without
+`length_m`. Other diameters may complete the minimum without mixing supply forms.

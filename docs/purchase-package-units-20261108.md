@@ -46,3 +46,34 @@ Corrections 2026-11-10: average coil weight is 1586 kg; bundles remain 2050 kg.
 Display and CSV mass columns use whole kilograms, while exact kg values remain
 internally available for calculation. Half-bundle quantities and meter lengths
 retain their independent precision. Updated visual approval is still pending.
+
+
+## Integration authorized by operational correction — 2026-11-10
+
+The owner reports the active purchase dialog still has fractional kg and no bar
+length and requests completing that behavior. The reviewed supplier-unit screen
+is now integrated in the existing style. Roll and bundle drafts are separate;
+length_m is mandatory for final straight-package exports. Kg summaries use whole
+kg, while half bundles and internal shortage precision are retained.
+
+Procurement policy starts at 10000 kg min stock, 30000 kg target, 30000 kg min order
+per supply form, with available stock default and physical stock selectable. A
+true diameter shortage also requires procurement even if another diameter has
+surplus. Confirmed incoming is credited. The minimum is completed by a clearly
+marked editable row; its diameter/spec/length are not invented. The user can split
+or edit that row into other diameters of the same supply form. Export validates the
+minimum and form on the server. CSV only; no supplier message or PO is sent.
+
+The separate demand/consumption cutoff correction is NOT implemented by this UI
+release. Inspection confirms current calls occur on item production completion,
+and legacy reservations do not debit stock. The owner requires whole-order closure
+after physical count with an order-creation eligibility window. Two facts are
+pending: production-finished vs shipment closure; rolling seven days vs calendar
+week. Do not silently activate or backfill either interpretation. The physical
+count basis is 2026-11-08; its average-weight correction on 2026-11-10 must never
+reset that cutoff. Preserve receipts, usage and previous count/correction history.
+
+Verification: isolated browser fixture checks separate supplier form, whole counts,
+bar length 12 in its own field, and CSV export for 15 bundles at 2050 kg (30750 kg).
+Full suite before final small changes: 1167 passed. Rerun relevant checks for the
+final diff. Reverting this UI release does not revert the owner's stock correction.

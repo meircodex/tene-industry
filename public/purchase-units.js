@@ -16,7 +16,7 @@
       // Both operands are integer grams: exact multiples must not round up twice.
       return Math.ceil(Math.round(n*1000)/Math.round(weight*1000));
     }
-    return type==='mesh'?Math.ceil(n):n;
+    return Math.ceil(n);
   }
   function estimatedWeight(quantity,unitWeight){return Math.round(Number(quantity)*Number(unitWeight)*1000)/1000;}
   function displayKg(value){return Number(value||0).toLocaleString('he-IL',{maximumFractionDigits:0});}

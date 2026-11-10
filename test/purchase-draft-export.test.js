@@ -82,3 +82,17 @@ test('supplier units reject incompatible material, fractional rolls and invalid 
   assert.throws(()=>exportPurchaseDraft(db,{lines:[{material_type:'mesh',quantity:2,purchase_unit:'kg',specification:'mesh'}]}),/invalid_purchase_unit/);
   db.close();
 });
+
+test('final supplier draft enforces separate loads, 30 tonnes and explicit straight-bar length',()=>{
+  const db=new Database(':memory:');ensureCoreSchema(db);
+  const coil={material_type:'coil',diameter:12,quantity:19,purchase_unit:'coil',unit_weight_kg:1586};
+  const lift={material_type:'straight',diameter:12,length_m:12,quantity:15,purchase_unit:'bundle',unit_weight_kg:2050};
+  const send=lines=>exportPurchaseDraft(db,{enforce_supplier_policy:true,lines});
+  assert.equal(send([coil]).draft.lines[0].estimated_weight_kg,30134);
+  assert.equal(send([lift]).draft.lines[0].length_m,12);
+  assert.throws(()=>send([coil,lift]),/mixed_purchase_material_types/);
+  assert.throws(()=>send([{...coil,quantity:18}]),/minimum_purchase_30_tonnes/);
+  assert.throws(()=>send([{...lift,length_m:''}]),/purchase_length_required/);
+  assert.equal(send([{...coil,quantity:9},{...coil,diameter:16,quantity:10}]).draft.lines.length,2);
+  db.close();
+});

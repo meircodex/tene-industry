@@ -16,3 +16,5 @@
 
 .inventory-plan-options summary{cursor:pointer;color:var(--text-dim);font-size:12px;font-weight:700}.inventory-plan-options[open]{flex-basis:100%}.inventory-plan-fields{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.tabs{overflow-x:auto}.tab-btn{flex:0 0 auto}
 @media(max-width:650px){.kpi-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.kpi-card{padding:10px 6px}.kpi-val{font-size:20px}.kpi-label,.kpi-sub{font-size:10px}.inventory-plan-options{flex-basis:100%}}
+
+.inventory-modal td:nth-child(3) input{min-width:150px}.inventory-modal td:nth-child(4) input{min-width:75px;max-width:95px}.inventory-modal .material-shape{white-space:nowrap;font-size:11px;margin-top:6px}

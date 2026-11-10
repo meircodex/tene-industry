@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    inventoryPurchaseDraft: {
+      screen:'inventory.html',owner:'Procurement',
+      source:{api:'/api/procurement/plan',fields:['groups.recommended_purchase_kg','purchase_policy.basis','purchase_policy.types.recommended_order_kg']},
+      meaning:'Exact shortage kg drives editable supplier roll/bundle counts. Default basis is available stock; physical stock is optional. Min stock 10000 kg, target 30000 kg and minimum supplier order 30000 kg are evaluated separately for coils and straight stock. Other diameters of the same type may fill the minimum; operator must choose them. Length is separate from specification. Export recomputes estimated kg and enforces type/minimum/length; no business data is written.',
+      consumers:['purchaseDraftRows','purchaseTotals','inventoryStockBasisSelect'],risk:'D0',
+    },
     shapeCatalogueBilling: {
       screen: 'shape-editor.js', owner: 'Orders',
       source: { api: '/api/shape-definitions', fields: ['entries[].itemCode', 'entries[].version', 'entries[].definition', 'entries[].billingPolicy', 'permissions.canManage'] },

@@ -148,7 +148,7 @@ tr:hover td{background:rgba(0,0,0,0.015);}
         <div class="form-row"><label for="inventoryType">סוג חומר</label><select id="inventoryType"><option value="">כל הסוגים</option><option value="coil">גלילים</option><option value="straight">ליפטים / מוטות ישרים</option><option value="mesh">רשתות</option><option value="bent">מכופף</option></select></div>
         <div class="form-row"><label for="inventoryDiameter">קוטר</label><select id="inventoryDiameter"><option value="">כל הקטרים</option></select></div>
         <label><input id="inventoryShortages" type="checkbox"> רק חוסרים</label>
-        <details class="inventory-plan-options"><summary>אפשרויות תכנון</summary><div class="inventory-plan-fields">
+        <details class="inventory-plan-options"><summary>אפשרויות תכנון</summary><div class="inventory-plan-fields"><div class="form-row"><label for="inventoryStockBasisSelect">בסיס החלטה להזמנה</label><select id="inventoryStockBasisSelect"><option value="available">מלאי פנוי — לאחר הזמנות</option><option value="physical">מלאי פיזי במחסן</option></select></div>
         <div class="form-row"><label for="inventoryThrough">תכנון עד</label><input id="inventoryThrough" type="date"></div>
         <div class="form-row"><label for="inventoryWaste">פחת לתכנון (%)</label><input id="inventoryWaste" type="number" min="0" max="100" step="0.1" value="0"></div>
         <div class="form-row"><label for="inventorySafety">מלאי ביטחון (ק״ג לכל סוג וקוטר)</label><input id="inventorySafety" type="number" min="0" value="0"></div>
@@ -229,10 +229,10 @@ tr:hover td{background:rgba(0,0,0,0.015);}
 </div>
 
 <div class="modal-overlay inventory-overlay" id="inventoryPurchaseModal" role="dialog" aria-modal="true" aria-labelledby="purchaseTitle"><div class="modal inventory-modal">
-<h2 id="purchaseTitle">הזמנת רכש — בדיקה ושינוי כמויות</h2><p class="muted" style="margin-bottom:16px">הטיוטה נבנתה מהחוסרים המוצגים. אפשר לשנות כמויות ומפרט, להוסיף ולהסיר שורות לפני הוצאת הקובץ.</p>
-<div class="form-grid"><div class="form-row"><label for="purchaseSupplier">ספק</label><select id="purchaseSupplier"><option value="">ללא בחירת ספק</option></select></div><div class="form-row"><label for="purchaseDate">אספקה מבוקשת</label><input type="date" id="purchaseDate"></div><div class="form-row"><label for="purchaseReference">אסמכתה</label><input id="purchaseReference"></div><div class="form-row"><label for="purchaseNotes">הערות להזמנה</label><input id="purchaseNotes"></div></div>
-<div class="inventory-table-wrap"><table><thead><tr><th>סוג חומר</th><th>קוטר</th><th>מפרט ואורך</th><th>כמות להזמנה</th><th>יחידה</th><th>הערות</th><th></th></tr></thead><tbody id="purchaseDraftRows"></tbody></table></div>
-<div class="inventory-form-actions"><button class="btn btn-outline" id="purchaseAddRow">+ הוספת שורה</button><div><button class="btn btn-outline" data-inventory-close="inventoryPurchaseModal">סגירה</button> <button class="btn btn-primary" id="purchaseDownload">הוצאת קובץ לאקסל</button></div></div><p id="purchaseMessage" class="muted" role="status" style="margin-top:12px"></p><p class="muted">הקובץ ניתן לעריכה באקסל (CSV). הכנת הטיוטה אינה משנה מלאי ואינה שולחת הזמנה לספק.</p>
+<h2 id="purchaseTitle">הזמנת רכש — בדיקה ושינוי כמויות</h2><p class="muted" style="margin-bottom:16px">הטיוטה נבנית בגלילים או בחבילות. אפשר להשלים את מינימום ההזמנה בקטרים אחרים מאותו סוג. אורך ומפרט נרשמים בנפרד.</p>
+<div class="form-grid"><div class="form-row"><label for="purchaseMaterialType">הזמנה עבור</label><select id="purchaseMaterialType"><option value="coil">גלילים</option><option value="straight">ליפטים</option><option value="mesh">רשתות</option><option value="bent">מכופף</option></select></div><div class="form-row"><label for="purchaseSupplier">ספק</label><select id="purchaseSupplier"><option value="">ללא בחירת ספק</option></select></div><div class="form-row"><label for="purchaseDate">אספקה מבוקשת</label><input type="date" id="purchaseDate"></div><div class="form-row"><label for="purchaseReference">אסמכתה</label><input id="purchaseReference"></div><div class="form-row"><label for="purchaseNotes">הערות להזמנה</label><input id="purchaseNotes"></div></div>
+<div class="inventory-table-wrap"><table><thead><tr><th>סוג חומר</th><th>קוטר</th><th>מפרט</th><th>אורך (מטר)</th><th>כמות להזמנה</th><th>יחידה</th><th>ק״ג ליחידה (משוער)</th><th>הערות</th><th></th></tr></thead><tbody id="purchaseDraftRows"></tbody></table></div>
+<datalist id="purchaseLengths"><option value="6"><option value="12"></datalist><p id="purchaseTotals" class="inventory-caption" aria-live="polite"></p><p class="muted">אפשר להשלים את מינימום ההזמנה בקטרים נוספים מאותו סוג. אין ערבוב בין גלילים וליפטים. משקל לחישוב: 1,586 ק״ג לגליל ו־2,050 ק״ג לחבילה; ניתן לעריכה.</p><div class="inventory-form-actions"><button class="btn btn-outline" id="purchaseAddRow">+ הוספת שורה</button><div><button class="btn btn-outline" data-inventory-close="inventoryPurchaseModal">סגירה</button> <button class="btn btn-primary" id="purchaseDownload">הוצאת קובץ לאקסל</button></div></div><p id="purchaseMessage" class="muted" role="status" style="margin-top:12px"></p><p class="muted">הקובץ ניתן לעריכה באקסל (CSV). הכנת הטיוטה אינה משנה מלאי ואינה שולחת הזמנה לספק.</p>
 </div></div>
 <!-- ADD BATCH MODAL -->
 <div class="modal-overlay" id="modalBatch">
@@ -854,7 +854,8 @@ loadSuppliers();
 openInitialInventoryTab();
 </script>
 <script src="/data-contracts-client.js"></script>
-<script src="/inventory-workspace.js?v=20261110"></script>
+<script src="/purchase-units.js?v=20261110"></script>
+<script src="/inventory-workspace.js?v=20261110-purchase"></script>
 <script src="/inventory-counts.js?v=20261110"></script>
 </body>
 </html>

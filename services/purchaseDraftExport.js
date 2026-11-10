@@ -41,6 +41,16 @@ function normalizeDraft(db,input={}) {
     return {row:index+1,material_type:line.material_type,type_label:TYPE_LABELS[line.material_type],diameter,specification,length_m:length,quantity,unit,unit_label:unit==='kg'?'ק״ג':unit==='sheet'?'יחידות':expected.label,unit_weight_kg:unitWeight,estimated_weight_kg:totalWeight,shortage_kg:shortage,notes:string(line.notes)};
   });
   const deliveryDate=string(input.expected_date);
+  if(input.enforce_supplier_policy===true){
+    const types=new Set(lines.map(line=>line.material_type));
+    if(types.size!==1)fail('mixed_purchase_material_types');
+    const type=lines[0].material_type;
+    if(['coil','straight'].includes(type)){
+      if(lines.some(line=>line.unit!==(type==='coil'?'coil':'bundle')))fail('supplier_package_unit_required');
+      if(type==='straight'&&lines.some(line=>!line.length_m))fail('purchase_length_required');
+      if(lines.reduce((sum,line)=>sum+line.estimated_weight_kg,0)<30000)fail('minimum_purchase_30_tonnes');
+    }
+  }
   if(deliveryDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)||!Number.isFinite(Date.parse(deliveryDate))||new Date(deliveryDate).toISOString().slice(0,10)!==deliveryDate))fail('invalid_expected_date');
   return {supplier:supplier?.name||string(input.supplier_name),expected_date:deliveryDate,reference:string(input.reference),notes:string(input.notes),lines};
 }

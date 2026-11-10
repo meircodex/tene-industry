@@ -47,6 +47,6 @@ function planInventory(db,input={}) {
     const demand=mode==='backlog'?g.backlog_kg:0, waste=kg(demand*percent/100);
     return {...Object.fromEntries(Object.entries(g).map(([k,v])=>[k,k.endsWith('_kg')?kg(v):v])),waste_kg:waste,safety_stock_kg:kg(safety),recommended_purchase_kg:kg(Math.max(0,demand+waste+safety-g.physical_stock_kg-g.incoming_kg))};
   }).sort((a,b)=>a.diameter-b.diameter||a.material_type.localeCompare(b.material_type));
-  return {mode,through_date:through,read_only:true,identity_scope:'diameter_material_type',specification_warning:'יש לבדוק אורך, דרגה ותקן לפני פתיחת רכש; אין קיזוז אוטומטי בין מפרטים.',groups:rows};
+  return {mode,through_date:through,read_only:true,identity_scope:'diameter_material_type',specification_warning:'יש לבדוק אורך, דרגה ותקן לפני פתיחת רכש; אין קיזוז אוטומטי בין מפרטים.',groups:rows,purchase_policy:require('./purchasePolicy').purchasePolicy(rows,input.stock_basis||'available')};
 }
 module.exports={planInventory,CONFIRMED_INCOMING};

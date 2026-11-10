@@ -119,3 +119,11 @@ length, grade or standard. Physical stock includes audited count adjustments.
 are never added to kg totals. Sorting/filtering changes presentation only.
 The editable export uses the operator's final rows, not stale recommendation
 quantities, and does not write to purchase or inventory tables.
+
+## Supplier-unit purchase draft
+
+`inventoryPurchaseDraft` owns the editable roll/bundle quantity and estimated kg
+from `/api/procurement/plan` and `purchase_policy`. Min/target/order are 10/30/30
+tonnes per supply form; available stock defaults, physical is selectable. The
+operator selects other diameters to complete a supplier load. Length is separate
+from specification. Whole kg presentation never changes internal mass precision.
