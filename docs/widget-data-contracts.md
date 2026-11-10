@@ -1,5 +1,10 @@
 # Widget Data Contracts
 
+Inventory physical-count basis (2026-11-10): the existing basis sentence in
+`inventory.html` reads `GET /api/inventory/metrics.baseline.counted_at` (falling
+back to `created_at`). With an activated item-consumption policy, this is the
+explicit physical stocktake, not the latest partial count/weight correction.
+
 Order material-source selector (2026-11-10): automatic selection remains the existing string `auto` in new-order drafts/payloads; the server normalizes it to a null preferred lot reference. Explicit lot selection retains its numeric identity. Order save reserves demand; it does not deduct physical inventory. Failed transaction leaves the draft available for retry and commits no partial order. See `docs/order-auto-material-fk-20261110.md`.
 
 ## Inventory consumption evidence — 2026-11-09

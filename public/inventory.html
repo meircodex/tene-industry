@@ -548,9 +548,10 @@ async function loadSummary() {
   document.getElementById('kpiDiam').textContent = new Set(r.filter(row=>Number(row.available)>0).map(row=>Number(row.diameter))).size;
   document.getElementById('inventoryStockBasis').textContent='מלאי נוכחי = המלאי בספירה + כניסות שאושרו − צריכות שנרשמו − גרוטאות שנרשמו. שריון להזמנה מוצג בנפרד ואינו יציאת חומר.';
   try {
-    const response=await fetch('/api/inventory/stocktakes?limit=1');if(!response.ok)throw await window.IronBendMessages.responseError(response, 'invalid_json_response');const counts=await response.json();
-    if(counts[0]) {
-      const at=new Date(counts[0].created_at.replace(' ','T')+'Z').toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
+    const response=await fetch('/api/inventory/metrics');if(!response.ok)throw await window.IronBendMessages.responseError(response, 'invalid_json_response');const {baseline}=await response.json();
+    if(baseline) {
+      const stamp=baseline.counted_at||baseline.created_at;
+      const at=new Date(/[zZ]$|[+-]\d\d:\d\d$/.test(stamp)?stamp:stamp.replace(' ','T')+'Z').toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'});
       document.getElementById('inventoryStockBasis').textContent='בסיס המלאי: הספירה שאושרה ב־'+at+'. '+document.getElementById('inventoryStockBasis').textContent;
     }
   } catch(_) { /* Current balance remains sourced from the successful summary request. */ }
