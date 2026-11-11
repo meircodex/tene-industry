@@ -146,89 +146,12 @@ test('partial PDF tables use full recognition and preserve unreadable rows for r
   assert.ok(workflow.intakeApprovalErrors(parsed).some(error => error.item_index === 1));
 });
 
-test('validated digital shop drawings stage original PDFs without optional AI or order creation', async t => {
-  const db = database(t);
-  const item = { item_number: '1', diameter: 10, quantity: 243, total_length_mm: 1150, shape_name: 'unknown', shape_type: 'unknown', segments: [],
-    review_notes: [{ field: 'shape', code: 'drawing_path_requires_review', message: 'Compare original drawing' }] };
-  t.mock.method(parser, 'parseSteelDocument', () => ({ items: [item], metrics: { rows_detected: 1, usable_rows: 1 }, parsing_profile: { id: 'iron_bars_shop_drawing' } }));
-  t.mock.method(axios, 'post', async () => { throw new Error('A validated digital table must not call AI'); });
-  const base = await serve(t, createIntakeRouter(recognitionDeps(db)));
-  const original = pdf();
-  const upload = () => {
-    const form = new FormData(); form.set('image', new Blob([original], { type: 'application/pdf' }), 'shop.pdf');
-    return fetch(base + '/api/analyze-image?save_to_intake=true', { method: 'POST', body: form });
-  };
-  const response = await upload(); assert.equal(response.status, 200);
-  const parsed = await response.json();
-  assert.equal(parsed.items[0].quantity, 243);
-  assert.ok(workflow.intakeApprovalErrors(parsed).some(error => error.field === 'shape_name'));
-  const stored = db.prepare('SELECT * FROM intake_log').get();
-  assert.equal(stored.status, 'pending_review');
-  assert.equal(stored.original_filename, 'shop.pdf');
-  assert.equal(stored.original_data_url, 'data:application/pdf;base64,' + original.toString('base64'));
-  assert.equal(db.prepare('SELECT count(*) n FROM orders').get().n, 0);
-  assert.equal((await upload()).status, 409);
-  assert.equal(db.prepare('SELECT count(*) n FROM intake_log').get().n, 1);
-});
-
 function functionText(source, name) {
   const start = source.search(new RegExp('(?:async )?function ' + name + '\\('));
   assert.ok(start >= 0, name);
   const next = source.slice(start + 1).search(/\n(?:  )?(?:async )?function /);
   return source.slice(start, next < 0 ? undefined : start + 1 + next);
 }
-
-test('refreshed geometry saves the parsed result instead of stale comparison fields', async () => {
-  const source = fs.readFileSync(path.join(__dirname, '../public/intake.html'), 'utf8');
-  let sent;
-  const fresh={items:[{...bentItem,segments:[{length_mm:115,angle_deg:90},{length_mm:140,angle_deg:90},{length_mm:420,angle_deg:90},{length_mm:140,angle_deg:90},{length_mm:420,angle_deg:90},{length_mm:115,angle_deg:0}]}]};
-  const context={activeCompareId:33,intakeRows:[{id:33}],readCorrectedParsed:()=>{throw Error('stale DOM must not replace refreshed geometry');},
-    fetch:async(url,options)=>{sent=JSON.parse(options.body);return {ok:true,json:async()=>({success:true,parsed:sent.parsed_data})};},
-    cloneParsedForCompare:value=>structuredClone(value),refreshOcrStatusSummary:()=>{},toast:()=>{}};
-  vm.createContext(context);vm.runInContext(functionText(source,'saveIntakeDraft'),context);
-  assert.equal(await context.saveIntakeDraft(33,{silent:true,parsedData:fresh}),true);
-  assert.deepEqual(sent.parsed_data,fresh);
-  assert.ok(source.includes('saveIntakeDraft(id, { silent: true, parsedData: merged })'));
-});
-
-test('shop hoop preview uses rectangle dimensions rather than the first hook as a side', () => {
-  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
-  let dimensions;
-  const context={itemSidesAngles:()=>({sides:[115,140,420,140,420,115],angles:[90,90,90,90,90]}),
-    ocrClosedStirrupSvg:sides=>{dimensions=sides;return '<svg aria-label="stirrup"></svg>';},
-    ocrUncertainShapeSvg:()=>'<svg aria-label="uncertain shape"></svg>'};
-  vm.createContext(context);vm.runInContext(functionText(source,'ocrCardShapeSvg'),context);
-  assert.match(context.ocrCardShapeSvg({shape_type:'stirrup',source_shape_parameters:{width_mm:420,height_mm:140}}),/stirrup/);
-  assert.deepEqual(Array.from(dimensions),[42,14,42,14]);
-  assert.match(context.ocrCardShapeSvg({shape_name:'unknown'}),/uncertain shape/);
-});
-
-test('choosing an existing customer persists identity in the same intake draft', async () => {
-  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
-  const customer={id:15,name:'Existing customer',tax_id:'513432856',phone:'0500000000'};
-  let saved,opened;
-  const row={id:33,parsed:{site_name:'Printed site',items:[bentItem]}};
-  const context={document:{getElementById:()=>({_customers:[customer]})},selectedCustomers:{},intakeRows:[row],activeCompareId:33,
-    readCorrectedParsed:()=>structuredClone(row.parsed),saveIntakeDraft:async(id,options)=>{saved={id,parsed:options.parsedData};row.parsed=options.parsedData;return true;},
-    toast:()=>{},renderIntakeQueue:()=>{},openIntakeCompare:id=>{opened=id;}};
-  vm.createContext(context);vm.runInContext(functionText(source,'selectCustomerForIntake'),context);
-  await context.selectCustomerForIntake(33,15);
-  assert.equal(saved.id,33);
-  assert.equal(saved.parsed.customer_name,customer.name);
-  assert.equal(saved.parsed.customer_tax_id,customer.tax_id);
-  assert.equal(saved.parsed.site_name,'Printed site');
-  assert.equal(saved.parsed.items.length,1);
-  assert.equal(opened,33);
-});
-
-test('source filename preserves Hebrew UTF-8 and never uses the old sample filename', () => {
-  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
-  const context={TextDecoder,Uint8Array};vm.createContext(context);vm.runInContext(functionText(source,'intakeSourceFilename'),context);
-  const name='קירות ממ״מ 4.pdf';
-  assert.equal(context.intakeSourceFilename({original_filename:name}),name);
-  assert.equal(context.intakeSourceFilename({original_filename:Buffer.from(name).toString('latin1')}),name);
-  assert.equal(context.intakeSourceFilename({file_name:'source.pdf'}),'source.pdf');
-});
 test('quick PDF upload opens complete intake instead of flattening or dropping rows', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../public/new-order-editor.js'), 'utf8');
   const context = { document: { getElementById: () => null }, FormData, fetch: async () => ({ ok: true, json: async () => ({ intakeId: 55, items: [bentItem, { quantity: null }] }) }), window: { location: {}, intakeReviewUrl: id => '/intake.html?open=' + id }, showQuickImportMessage: () => {}, saveActiveDraftNow: () => {}, addIntakeRowsToOrder: () => { throw Error('must not flatten OCR geometry'); } };

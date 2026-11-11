@@ -1081,12 +1081,6 @@ function ocrUncertainShapeSvg(item, width = 300, height = 210) {
 }
 function ocrCardShapeSvg(item, width = 78, height = 50) {
   const { sides, angles } = itemSidesAngles(item);
-  const sourceShape = item?.source_shape_parameters;
-  if (item?.shape_type === 'stirrup' && sourceShape?.width_mm > 0 && sourceShape?.height_mm > 0 && sides.length === 6) {
-    const w = sourceShape.width_mm / 10, h = sourceShape.height_mm / 10;
-    return ocrClosedStirrupSvg([w, h, w, h], item, 300, 210);
-  }
-  if (item?.shape_name === 'unknown') return ocrUncertainShapeSvg(item, 300, 210);
   const clean = sides.map(toNumber).filter(Boolean);
   const navy = '#173862';
   const label = value => escapeHtml(ocrSegmentLabel(value));
@@ -2253,23 +2247,13 @@ async function searchCustomerForIntake(id) {
   results._customers = rows;
 }
 
-async function selectCustomerForIntake(id, customerId) {
+function selectCustomerForIntake(id, customerId) {
   const results = document.getElementById('customerResults_' + id);
   const customer = (results._customers || []).find(row => row.id === customerId);
   if (!customer) return;
   selectedCustomers[id] = customer;
-  const row = intakeRows.find(item => item.id === id);
-  if (row && !row.post_order_review) {
-    const parsed = activeCompareId === id ? readCorrectedParsed() : cloneParsedForCompare(parsedOf(row));
-    parsed.customer_name = customer.name;
-    if (customer.tax_id) parsed.customer_tax_id = customer.tax_id;
-    if (customer.phone) parsed.customer_phone = customer.phone;
-    if (!await saveIntakeDraft(id, { silent: true, parsedData: parsed })) return;
-    row.customer_match = { customer, candidates: [customer], needs_customer_review: false };
-  }
   toast('לקוח שויך להזמנה');
   renderIntakeQueue();
-  if (activeCompareId === id) openIntakeCompare(id);
 }
 
 
@@ -2433,7 +2417,7 @@ function ocrSourceTargetsHtml(row) {
   return '<div class="ocr-source-targets">' + headerTargets.concat(itemTargets).join('') + '</div>';
 }
 function intakeCompareSourceHtml(row) {
-  return '<div class="ocr-source-toolbar"><strong>' + escapeHtml(intakeSourceFilename(row)) + '</strong><button class="btn" onclick="setIntakeCompareZoom(-0.15)">-</button><span class="meta" id="intakeCompareZoomLabel">100%</span><button class="btn" onclick="setIntakeCompareZoom(0.15)">+</button><button class="btn" onclick="resetIntakeCompareZoom()">\u05d4\u05ea\u05d0\u05dd \u05e8\u05d5\u05d7\u05d1</button></div><div class="ocr-source-stage" id="ocrSourceStage"><div class="ocr-source-zoom" id="intakeCompareZoomTarget"><div class="ocr-source-highlight" id="ocrSourceHighlight"></div>' + ocrSourceTargetsHtml(row) + intakeSourceHtml(row) + '</div></div>';
+  return '<div class="ocr-source-toolbar"><strong>' + escapeHtml(row?.file_name || row?.original_name || 'order105.pdf') + '</strong><button class="btn" onclick="setIntakeCompareZoom(-0.15)">-</button><span class="meta" id="intakeCompareZoomLabel">100%</span><button class="btn" onclick="setIntakeCompareZoom(0.15)">+</button><button class="btn" onclick="resetIntakeCompareZoom()">\u05d4\u05ea\u05d0\u05dd \u05e8\u05d5\u05d7\u05d1</button></div><div class="ocr-source-stage" id="ocrSourceStage"><div class="ocr-source-zoom" id="intakeCompareZoomTarget"><div class="ocr-source-highlight" id="ocrSourceHighlight"></div>' + ocrSourceTargetsHtml(row) + intakeSourceHtml(row) + '</div></div>';
 }
 function highlightOcrTableTarget(path) {
   const raw = String(path || '');
@@ -2571,13 +2555,6 @@ function intakeDataUrlToBlob(dataUrl) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new Blob([bytes], { type: mime });
 }
-function intakeSourceFilename(row) {
-  const name = row?.original_filename || row?.file_name || row?.original_name || row?.parsed?.source_document_name || 'מסמך המקור';
-  if (Array.from(name).every(char => char.charCodeAt(0) <= 255)) {
-    try { return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(name, char => char.charCodeAt(0))); } catch {}
-  }
-  return name;
-}
 function ocrReviewedItemKey(item, index) {
   return String(ocrItemNumber(item || {}, index) || index + 1).trim();
 }
@@ -2625,7 +2602,7 @@ async function reprocessIntakeOcr(id, options = {}) {
   }
   const currentParsed = activeCompareId === id ? readCorrectedParsed() : parsedOf(row);
   const formData = new FormData();
-  formData.append('image', blob, intakeSourceFilename(row));
+  formData.append('image', blob, row.file_name || row.original_name || 'source.pdf');
   formData.append('target_module', 'orders');
   formData.append('source_context', 'intake_review_reprocess');
   const summary = document.getElementById('ocrCorrectionSummary');
@@ -2639,7 +2616,7 @@ async function reprocessIntakeOcr(id, options = {}) {
     row.parsed = merged;
     row.parsed_data = JSON.stringify(merged);
     activeCompareOriginal = cloneParsedForCompare(merged);
-    await saveIntakeDraft(id, { silent: true, parsedData: merged });
+    await saveIntakeDraft(id, { silent: true });
     renderIntakeQueue();
     if (options.openAfter || activeCompareId === id) openIntakeCompare(id);
     toast('\u05e2\u05d9\u05d1\u05d5\u05d3 \u05de\u05d7\u05d3\u05e9 \u05d4\u05d5\u05e9\u05dc\u05dd. \u05e1\u05d9\u05de\u05d5\u05e0\u05d9\u05dd \u05e7\u05d9\u05d9\u05de\u05d9\u05dd \u05e0\u05e9\u05de\u05e8\u05d5.');
@@ -2658,7 +2635,7 @@ function refreshIntakeOcr(id) {
 
 
 async function saveIntakeDraft(id, options = {}) {
-  const parsed = options.parsedData || (activeCompareId === id ? readCorrectedParsed() : {});
+  const parsed = activeCompareId === id ? readCorrectedParsed() : {};
   const row = intakeRows.find(item => item.id === id);
   const endpoint = row?.post_order_review ? `/api/intake/${id}/order-review` : `/api/intake/${id}/draft`;
   const response = await fetch(endpoint, {
