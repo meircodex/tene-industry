@@ -1,5 +1,6 @@
 const SUPPORTED_DIAMETERS = new Set([6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 32, 36, 40]);
 const PARSER_VERSION = 'steel-document-parser-v1';
+const shopDrawingParser = require('./shopDrawingParser');
 
 function toNumber(value) {
   if (value === null || value === undefined) return null;
@@ -90,6 +91,9 @@ function detectDocumentType({ text = '', tokens = [] } = {}) {
 }
 
 function detectParsingProfile({ text = '', tokens = [] } = {}) {
+  if (shopDrawingParser.isShopDrawing({ text, tokens })) {
+    return { id: 'iron_bars_shop_drawing', confidence: 0.98, reason: 'Compact digital shop-drawing columns with source numeric checks.' };
+  }
   const content = `${text}\n${tokens.map(token => token.text).join(' ')}`.toLowerCase();
   if (/tassa|טסה|\bdp2\b|easybar/.test(content)) {
     return {
@@ -365,7 +369,8 @@ function parseSteelDocument(input = {}) {
   const profile = detectParsingProfile({ text, tokens });
   const parsed = profile.id === 'tassa_easybar_bending_schedule'
     ? parseTassaEasybar(tokens, input)
-    : { items: [], row_reconstruction: [] };
+    : profile.id === 'iron_bars_shop_drawing' ? shopDrawingParser.parseShopDrawing(tokens)
+      : { items: [], row_reconstruction: [] };
   const reviewNotes = [];
   if (!tokens.length) {
     reviewNotes.push({ scope: 'order', field: 'source_layout', code: 'row_boundary_uncertain', severity: 'review', message: 'No positioned OCR tokens were available; parser cannot reconstruct rows by coordinates.', source: 'steel_document_parser' });
@@ -399,7 +404,7 @@ function parseSteelDocument(input = {}) {
     metrics: {
       positioned_tokens: tokens.length,
       rows_detected: parsed.items.length,
-      usable_rows: parsed.items.filter(item => item.diameter > 0 && item.quantity > 0 && item.total_length_cm > 0).length,
+      usable_rows: parsed.items.filter(item => item.diameter > 0 && item.quantity > 0 && item.total_length_cm > 0 && item.source_numeric_checks_passed !== false).length,
       fields_marked_for_review: parsed.items.reduce((sum, item) => sum + (item.review_notes || []).length, 0),
     },
   };

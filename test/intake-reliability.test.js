@@ -146,6 +146,31 @@ test('partial PDF tables use full recognition and preserve unreadable rows for r
   assert.ok(workflow.intakeApprovalErrors(parsed).some(error => error.item_index === 1));
 });
 
+test('validated digital shop drawings stage original PDFs without optional AI or order creation', async t => {
+  const db = database(t);
+  const item = { item_number: '1', diameter: 10, quantity: 243, total_length_mm: 1150, shape_name: 'unknown', shape_type: 'unknown', segments: [],
+    review_notes: [{ field: 'shape', code: 'drawing_path_requires_review', message: 'Compare original drawing' }] };
+  t.mock.method(parser, 'parseSteelDocument', () => ({ items: [item], metrics: { rows_detected: 1, usable_rows: 1 }, parsing_profile: { id: 'iron_bars_shop_drawing' } }));
+  t.mock.method(axios, 'post', async () => { throw new Error('A validated digital table must not call AI'); });
+  const base = await serve(t, createIntakeRouter(recognitionDeps(db)));
+  const original = pdf();
+  const upload = () => {
+    const form = new FormData(); form.set('image', new Blob([original], { type: 'application/pdf' }), 'shop.pdf');
+    return fetch(base + '/api/analyze-image?save_to_intake=true', { method: 'POST', body: form });
+  };
+  const response = await upload(); assert.equal(response.status, 200);
+  const parsed = await response.json();
+  assert.equal(parsed.items[0].quantity, 243);
+  assert.ok(workflow.intakeApprovalErrors(parsed).some(error => error.field === 'shape_name'));
+  const stored = db.prepare('SELECT * FROM intake_log').get();
+  assert.equal(stored.status, 'pending_review');
+  assert.equal(stored.original_filename, 'shop.pdf');
+  assert.equal(stored.original_data_url, 'data:application/pdf;base64,' + original.toString('base64'));
+  assert.equal(db.prepare('SELECT count(*) n FROM orders').get().n, 0);
+  assert.equal((await upload()).status, 409);
+  assert.equal(db.prepare('SELECT count(*) n FROM intake_log').get().n, 1);
+});
+
 function functionText(source, name) {
   const start = source.search(new RegExp('(?:async )?function ' + name + '\\('));
   assert.ok(start >= 0, name);

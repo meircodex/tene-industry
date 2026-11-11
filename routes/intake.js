@@ -169,7 +169,7 @@ module.exports = function createIntakeRouter(deps) {
           }, { sourceIdentity: identity });
           // Keep the deterministic rows, but read the document header when AI is
           // available so office staff do not have to retype customer/site/date.
-          if (!getOpenAiApiKey()) {
+          if (steelPdfParsed.parsing_profile?.id === 'iron_bars_shop_drawing' || !getOpenAiApiKey()) {
             if (shouldSaveToIntake(req)) payload.intakeId = saveAnalysisToIntake(req, payload);
             return res.json(payload);
           }
