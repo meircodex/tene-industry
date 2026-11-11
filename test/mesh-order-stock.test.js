@@ -15,6 +15,7 @@ test('mesh creation recalculates the uniform diameter, counts quantities once an
  assert.equal(db.prepare('SELECT total_weight FROM orders').get().total_weight,355.556);assert.equal(db.prepare('SELECT total_weight FROM pallets').get().total_weight,355.556);
  assert.equal(db.prepare('SELECT COUNT(*) n FROM inventory_reservations').get().n,0);
  assert.equal(db.prepare('SELECT quantity_units FROM inventory_mesh_demands').get().quantity_units,3);
+ assert.equal(mesh.planMesh(db)[0].specification.calculation.weightKg.toFixed(2),'118.52');
  assert.equal(itemShapeMetrics(item).totalWeightKg,355.556);assert.ok(result.success);
 });
 test('invalid mesh and fractional sheet quantities roll back the whole order',t=>{
