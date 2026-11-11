@@ -79,6 +79,7 @@
       'משמרת פעילה': 'Active shift',
       'מפעיל': 'Operator',
       'פריטים הושלמו': 'Completed items',
+      'פריטים בתור': 'Items in queue',
       'טון היום': 'Tons today',
       'פתח משמרת': 'Start shift',
       'סגור משמרת': 'End shift',
@@ -264,6 +265,7 @@
       'משמרת פעילה': 'กะที่เปิด',
       'מפעיל': 'ผู้ควบคุม',
       'פריטים הושלמו': 'รายการเสร็จแล้ว',
+      'פריטים בתור': 'รายการในคิว',
       'טון היום': 'ตันวันนี้',
       'פתח משמרת': 'เปิดกะ',
       'סגור משמרת': 'ปิดกะ',
@@ -404,9 +406,12 @@
     return next;
   }
 
+  function attributeDatasetKey(prefix, attr) {
+    return prefix + String(attr || 'text').replace(/(^|-)([a-z])/g, (_match, _separator, letter) => letter.toUpperCase());
+  }
   function rememberOriginal(node, attr) {
-    const key = attr ? 'i18nOriginal' + attr[0].toUpperCase() + attr.slice(1) : 'i18nOriginalText';
-    const renderedKey = attr ? 'i18nRendered' + attr[0].toUpperCase() + attr.slice(1) : 'i18nRenderedText';
+    const key = attributeDatasetKey('i18nOriginal', attr);
+    const renderedKey = attributeDatasetKey('i18nRendered', attr);
     const current = attr ? (node.getAttribute(attr) || '') : (node.textContent || '');
     if (!(key in node.dataset) || (renderedKey in node.dataset && current !== node.dataset[renderedKey])) {
       node.dataset[key] = current;
@@ -443,7 +448,7 @@
       if (attr === 'value' && el.tagName === 'INPUT' && !['button', 'submit', 'reset'].includes((el.type || '').toLowerCase())) return;
       const original = rememberOriginal(el, attr);
       const translated = translateText(original, activeLang);
-      const renderedKey = 'i18nRendered' + attr[0].toUpperCase() + attr.slice(1);
+      const renderedKey = attributeDatasetKey('i18nRendered', attr);
       el.dataset[renderedKey] = translated;
       if (el.getAttribute(attr) !== translated) el.setAttribute(attr, translated);
     });

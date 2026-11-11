@@ -398,6 +398,6 @@
     function ws(){try{const socket=new WebSocket(window.IronBendAuth?.webSocketUrl?.('/')||`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);socket.onmessage=event=>{try{if(['item_status','item_progress','new_order','order_status','order_updated','order_deleted','order_cancellation_disposition','delivery_confirm'].includes(JSON.parse(event.data).type))load()}catch{}};socket.onclose=()=>setTimeout(ws,2000)}catch{}}
     load();if(!SCAN_ENTRY)ws();
   </script>
-<script src="/production-i18n.js" defer></script>
+<script src="/production-i18n.js?v=2" defer></script>
 </body>
 </html>

@@ -43,6 +43,12 @@ WebSocket removal, machine-filter preservation, failed reads, zero counts and
 slow-response races. Full suite and read-only before/after integrity checks are
 required before reporting deployment complete.
 
+Live validation additionally exposed a pre-existing translation failure on
+`aria-label`: hyphenated attribute names were used as invalid dataset keys.
+The shared production translator now normalizes those keys to camel case. The
+actual UI test includes an accessible SVG and an English/Hebrew switch so a
+translation exception cannot silently break subsequent dynamic updates.
+
 Rollback: redeploy the previous commit; there are no schema or data migrations
 to undo. Handoff: Orders owns opening/closing/restoring, Production only consumes
 that decision. Do not restore a specific customer record just to hide this bug.
