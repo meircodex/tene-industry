@@ -156,6 +156,7 @@
     const totalLengthMm = metrics.totalLengthMm ?? positiveNumberOrNull(item.totalLengthMm ?? item.total_length_mm ?? item.length_mm ?? item.length);
     const snapUnit = metrics.weightKg ?? null;
     const snapTotal = metrics.totalWeightKg ?? null;
+    if(parseJsonObject(snapshot)?.family==='mesh'&&snapUnit!==null)return {totalLengthMm,unitWeightKg:snapUnit,totalWeightKg:Number((snapUnit*quantity).toFixed(3)),quantity};
     const dbUnit = positiveNumberOrNull(item.weightPerUnit ?? item.weight_per_unit);
     let unitWeightKg = snapUnit ?? dbUnit ?? (snapTotal !== null ? snapTotal / quantity : null);
     let totalWeightKg;

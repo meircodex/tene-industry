@@ -852,6 +852,7 @@ function createOrderCancellationService(db) {
             entry.correctionReason, JSON.stringify(sourceRefs), parsedActorId,
           );
           const correctionEventId = Number(correction.lastInsertRowid);
+          require('./meshInventory').returnErroneousMesh(db,{itemId:item.id,quantity:entry.correctionQty,eventKey:`mesh-production-record-correction:${correctionEventId}`,reason:entry.correctionReason,actorId:parsedActorId});
           require('./inventoryItemCompletion').returnErroneousProduction(db,{
             itemId:item.id,ratio:entry.effectiveBeforeCorrection>0?entry.correctionQty/entry.effectiveBeforeCorrection:0,
             eventKey:`production-record-correction:${correctionEventId}`,reason:entry.correctionReason,actorId:parsedActorId,
@@ -946,6 +947,7 @@ function createOrderCancellationService(db) {
           WHERE id=?
         `).run(ITEM_STATUS.CANCELLED, parsedActorId, reason, entry.reviewItem.cancelled_unproduced_qty, item.id);
         const released = releaseActiveReservations({ transactionId, orderId, item, reviewItem: entry.reviewItem, actorId: parsedActorId });
+        if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='inventory_mesh_demands'").get())require('./meshInventory').releaseMeshDemand(db,item.id);
         releasedReservationCount += released.released_reservations;
         releasedReservationKg = round(releasedReservationKg + released.released_kg);
         db.prepare(`UPDATE material_requirements_v2 SET status='cancelled' WHERE order_id=? AND item_id=? AND status='open'`).run(orderId, item.id);

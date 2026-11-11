@@ -16,10 +16,10 @@
 <script src="/display-units.js?v=4"></script>
 <script src="/order-delivery-date.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
-<script src="/steelRebarShapes.js?v=1"></script>
+<script src="/steelRebarShapes.js?v=2-mesh"></script>
 <script src="/shapeCommercial.js?v=2"></script>
 <script src="/shapeRecognition.js?v=1"></script>
-<script src="/shape-editor.js?v=91"></script>
+<script src="/shape-editor.js?v=92-mesh"></script>
 <script src="/offline-db.js"></script>
 <script src="/auth-client.js"></script>
 <script src="/nav.js" defer></script>
@@ -2218,11 +2218,11 @@ function renderLiveInventoryPanel() {
     return;
   }
   const byDiameter = latestReservationPreview?.by_diameter || {};
-  const relevantDiameters = Array.from(new Set(visibleItems.map(({ item }) => Number(item.diameter || 0)).filter(Boolean)));
+  const relevantDiameters = Array.from(new Set(visibleItems.filter(({item})=>itemShapeContract(item)?.family!=='mesh').map(({ item }) => Number(item.diameter || 0)).filter(Boolean)));
   const rows = relevantDiameters.map(d => {
     const row = byDiameter[String(d)] || byDiameter[d] || {};
     const requiredFromItems = visibleItems
-      .filter(({ item }) => Number(item.diameter || 0) === d)
+      .filter(({ item }) => itemShapeContract(item)?.family!=='mesh' && Number(item.diameter || 0) === d)
       .reduce((sum, { item }) => sum + calcItemWeight(item), 0);
     const required = Number(row.required_kg ?? row.requiredKg ?? requiredFromItems) || 0;
     const available = Number(row.available_kg ?? row.availableKg ?? liveInventoryPhysicalKg(d)) || 0;
@@ -2231,10 +2231,11 @@ function renderLiveInventoryPanel() {
     const status = shortage > 0 ? 'חסר ' + formatKg(shortage) : 'תקין';
     return '<div class="inventory-compact-row '+cls+'"><strong>Ø'+d+'</strong><span>נדרש '+formatKg(required)+'</span><em>'+status+'</em></div>';
   }).join('');
-  const hasShortage = rows.includes('shortage');
+  const meshRows=(latestReservationPreview?.mesh_groups||[]).map(row=>'<div class="inventory-compact-row '+(row.shortage_units?'shortage':'ok')+'"><strong>רשת Ø'+row.specification.longitudinal_diameter_mm+' · '+row.specification.length_mm/1000+'×'+row.specification.width_mm/1000+' מ׳</strong><span>פנוי '+row.available_units+' · נדרש '+row.required_units+' רשתות</span><em>'+(row.shortage_units?'חסרות '+row.shortage_units:'יש מלאי')+'</em></div>').join('');
+  const hasShortage = rows.includes('shortage') || meshRows.includes('shortage');
   panel.innerHTML = '<section class="inspector-card"><h3>מלאי</h3>' +
     (hasShortage ? '<p>נמצאו חוסרים להזמנה.</p>' : '<p>מלאי תקין להזמנה.</p>') +
-    '<div class="inventory-compact-list">' + rows + '</div></section>';
+    '<div class="inventory-compact-list">' + rows + meshRows + '</div></section>';
 }
 function collectPricePreviewItems() {
   return pallets.flatMap(p => p.items).map(item => {
@@ -2255,7 +2256,7 @@ function collectReservationPreviewItems() {
     return {
       order_item_temp_id: item.id,
       diameter: Number(item.diameter) || null,
-      material_type: item.material_type || item.materialType || 'coil',
+      material_type: itemShapeContract(item)?.family==='mesh'?'mesh':(item.material_type || item.materialType || 'coil'),
       total_weight_kg: Number(weightKg.toFixed(3)),
       quantity: Math.max(1, Number(item.qty || item.quantity || 1) || 1),
       shape_snapshot_json: item.shapeSnapshot ? JSON.stringify(item.shapeSnapshot) : null,
@@ -3280,6 +3281,8 @@ function itemPreviewShapeData(item = {}) {
 }
 
 function itemPreviewSvg(item, sides, angles) {
+  const meshContract=itemShapeContract(item);if(meshContract?.family==='mesh')return '<svg viewBox="0 0 300 260" style="width:100%;height:100%">'+MeshEngine.render(meshContract.data,300,240)+'</svg>';
+
   if (isRoundPileCageItem(item)) return roundPileCagePreviewSvg(item);
   if (isStandaloneRingItem(item)) return engineeringRingSketchSvg(item);
   if (sides.length) {
@@ -3355,6 +3358,9 @@ function openShapeEditor(palletId, itemId) {
   const allItems = pallets.flatMap(p => p.items || []);
   const itemNumber = allItems.findIndex(i => i.id == itemId) + 1;
   const itemTotal = allItems.length;
+  if (contract?.family === 'mesh') {
+    shapeEditor.open({...contract.data,...commercialData,family:'mesh',shapeType:'mesh_rectangular',presetId:item.shapeId||contract.shapeId||'mesh1',presetName:'רשת',quantity:item.qty||item.quantity||1,structElement:elementName,itemNumber,itemTotal}); return;
+  }
   if (contract?.family === 'piles' && contract?.shapeType === 'round_pile_cage') {
     const pileCage = roundPileCageEditorData(item || {});
     if (pileCage) shapeEditor.open({ ...pileCage, ...commercialData });
@@ -3429,6 +3435,11 @@ function shapeSelected(data) {
   item.family      = data.family || 'bars';
   item.shapeSnapshot = approvedShapeContract(data);
   item.steelFinish = data.steelFinish || data.data?.steelFinish || 'ribbed';
+  if(item.shapeSnapshot?.family === 'mesh') {
+    const c=item.shapeSnapshot;
+    Object.assign(item,{shapeSides:[],shapeAngles:[],is3d:0,azAngles:null,elAngles:null,diameter:c.data.longitudinalDiameter,length:c.calculated.totalLengthMm,totalLengthMm:c.calculated.totalLengthMm,qty:Number(data.orderItemQuantity||1),structElement:data.structElement||'',material_type:'mesh'});
+    _shapeTarget=null;renderPallets();return;
+  }
   const isPileCage = item.shapeSnapshot?.family === 'piles' && item.shapeSnapshot?.shapeType === 'round_pile_cage';
   if (isPileCage) {
     const pile = roundPileCageVisualData(item);
@@ -3632,6 +3643,11 @@ function updateItem(palletId, itemId, field, value) {
   if (!pallet) return;
   const item = pallet.items.find(i => i.id == itemId);
   if (!item) return;
+  if(field==='diameter' && itemShapeContract(item)?.family==='mesh') {
+    const old=itemShapeContract(item),data={...old.data,longitudinalDiameter:Number(value),transverseDiameter:Number(value)};
+    const calc=window.IronBendSteelRebarShapes.calculateMesh(data);
+    item.shapeSnapshot={...old,data:calc.data,calculated:calc.calculated};
+  }
   item[field] = ['diameter','length','qty'].includes(field) ? Number(value) : value;
   if (field === 'diameter') item.raw_material_id = 'auto';
   renderPallets();
@@ -3651,6 +3667,9 @@ function isSpiralOrderItem(item = {}) {
 }
 
 function calcItemWeight(item) {
+  const mesh=itemShapeContract(item);
+  if(mesh?.family==='mesh')return Number(mesh.calculated?.unitWeightKg??mesh.calculated?.weightKg??0)*Number(item.qty||item.quantity||0);
+
   if (isRoundPileCageItem(item)) {
     const contract = itemShapeContract(item) || item.shapeSnapshot || {};
     const unitWeightKg = Number(contract?.calculated?.totalWeightKg ?? contract?.calculated?.weightKg ?? contract?.data?.assemblySummary?.totalWeightKg ?? 0);
@@ -4318,6 +4337,6 @@ document.getElementById('imgAnalyzeOverlay').addEventListener('click', function(
 });
 </script>
 <script src="/order-line-renderer.js?v=2"></script>
-<script src="/new-order-editor.js?v=9"></script>
+<script src="/new-order-editor.js?v=10-mesh"></script>
 </body>
 </html>

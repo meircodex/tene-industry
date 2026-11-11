@@ -158,7 +158,7 @@ const SHAPE_PRESETS = [
   { id: 's13', name: 'צורה 12', family: 'bars', category: 'פיגורה', icon: 'w', bends: 4, sides: [200, 300, 300, 300, 200], angles: [135, 90, 90, 135], emoji: 'W' },
   { id: 's14', name: 'צורה 13',    family: 'bars', category: 'פיגורה', icon: 'c', bends: 4, sides: [300, 200, 400, 200, 300], angles: [90, 90, 90, 90],   emoji: 'C' },
   { id: 's15', name: 'ספסל',       family: 'bars', category: 'פיגורה', icon: 'bench', bends: 4, sides: [280, 170, 300, 170, 280], angles: [90, 90, 90, 90], is3d: 1, azAngles: [0, 90, 90, 90, 90], elAngles: [90, 0, 0, 0, 90], shapeType: 'bench_bar', emoji: '🪑' },
-  { id: 'mesh1', name: 'רשת', family: 'mesh', icon: 'mesh', bends: 0, length: 600, width: 250, longitudinalDiameter: 8, longitudinalSpacing: 20, transverseDiameter: 8, transverseSpacing: 20, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0, emoji: '#', specialty: 'mesh' },
+  { id: 'mesh1', name: 'רשת', family: 'mesh', icon: 'mesh', bends: 0, length: 6000, width: 2500, longitudinalDiameter: 8, longitudinalSpacing: 100, transverseDiameter: 8, transverseSpacing: 100, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0, emoji: '#', specialty: 'mesh' },
   { id: 'round-pile-cage', name: 'כלוב כלונס עגול', family: 'piles', icon: 'pile', bends: 0, roundPileCage: true, pileDiameter: 60, pileLength: 1200, longitudinalBars: 10, longitudinalDiameter: 20, straightBarCount: 5, bentBarCount: 5, straightBarLength: 1200, bentBarLength: 1220, bendLength: 20, barPattern: 'alternate', barSpacingDisplayMode: 'center', spiralDiameter: 8, spiralOuterDiameter: 48, spiralPitch: 20, spiralZones: buildRoundPileCageStandardZones(1200), hoopsEnabled: true, hoopDiameter: 18, hoopOuterDiameter: 42, hoopQuantity: '', hoopStart: 150, hoopSpacing: 300, emoji: '◎', specialty: 'pile' },
   { id: 'spiral1', name: 'ספיראלה', family: 'spirals', icon: 'spiral', bends: 0, barDiameter: 8, spiralDiameter: 400, turns: 20, emoji: '🌀', specialty: 'spiral' },
   { id: 'ring1', name: 'טבעת עגולה', family: 'spirals', icon: 'ring', bends: 0, barDiameter: 18, ringDiameter: 420, spiralDiameter: 420, overlap: 200, turns: 1, shapeType: 'ring', emoji: '⭕', specialty: 'ring' },
@@ -820,34 +820,31 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
   const innerRight = Math.max(innerLeft, length - Math.min(length, edgeRight));
   const innerTop = Math.min(width, edgeTop);
   const innerBottom = Math.max(innerTop, width - Math.min(width, edgeBottom));
-  const verticalPositions = [];
-  for (let x = innerLeft; x <= innerRight + 0.001; x += longSpacing) verticalPositions.push(Math.min(innerRight, x));
-  if (!verticalPositions.length || verticalPositions[verticalPositions.length - 1] !== innerRight) verticalPositions.push(innerRight);
-  const horizontalPositions = [];
-  for (let y = innerTop; y <= innerBottom + 0.001; y += transSpacing) horizontalPositions.push(Math.min(innerBottom, y));
-  if (!horizontalPositions.length || horizontalPositions[horizontalPositions.length - 1] !== innerBottom) horizontalPositions.push(innerBottom);
+  let counts;try{counts=canonicalSteelRebarShapes().calculateMesh(mesh).calculated;}catch{counts={transverseBarCount:Math.min(100,Math.ceil(length/transSpacing)),longitudinalBarCount:Math.min(100,Math.ceil(width/longSpacing))};}
+  const verticalPositions = Array.from({length:Math.min(2000,counts.transverseBarCount)},(_,i)=>Math.min(innerRight,innerLeft+i*transSpacing));
+  const horizontalPositions = Array.from({length:Math.min(2000,counts.longitudinalBarCount)},(_,i)=>Math.min(innerBottom,innerTop+i*longSpacing));
   const verticals = verticalPositions.map(mm => {
     const x = x0 + mm * box.scale;
-    return `<line class="mesh-longitudinal-bar" data-se-focus="mesh-longitudinal-bars mesh-longitudinal-diameter mesh-longitudinal-spacing" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, longDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
+    return `<line class="mesh-longitudinal-bar" data-se-focus="mesh-longitudinal-bars mesh-longitudinal-diameter mesh-longitudinal-spacing" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(1,Math.min(2.2,transDia*0.1)).toFixed(1)}" stroke-linecap="round"/>`;
   }).join('');
   const horizontals = horizontalPositions.map(mm => {
     const y = y0 + mm * box.scale;
-    return `<line class="mesh-transverse-bar" data-se-focus="mesh-transverse-bars mesh-transverse-diameter mesh-transverse-spacing" x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(2, transDia * 0.22).toFixed(1)}" stroke-linecap="round"/>`;
+    return `<line class="mesh-transverse-bar" data-se-focus="mesh-transverse-bars mesh-transverse-diameter mesh-transverse-spacing" x1="${x0.toFixed(1)}" y1="${y.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(1,Math.min(2.2,longDia*0.1)).toFixed(1)}" stroke-linecap="round"/>`;
   }).join('');
-  const longitudinalSpec = `Ø${longDia}@${formatLengthCm(longSpacing)}`;
-  const transverseSpec = `Ø${transDia}@${formatLengthCm(transSpacing)}`;
+  const longitudinalSpec = `Ø${longDia}@${formatLengthCmFromMm(longSpacing)}`;
+  const transverseSpec = `Ø${transDia}@${formatLengthCmFromMm(transSpacing)}`;
   const spacingHelperPath = `M ${(x1 - 61).toFixed(1)} ${(y1 + 18).toFixed(1)} H ${(x1 - 20).toFixed(1)}
     M ${(x1 - 61).toFixed(1)} ${(y1 + 28).toFixed(1)} H ${(x1 - 20).toFixed(1)}
     M ${(x1 - 50).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}
     M ${(x1 - 34).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}`;
   return `<g data-engine="MeshEngine" data-family="mesh" data-length="${length}" data-width="${width}"
       data-longitudinal="${longitudinalSpec}" data-transverse="${transverseSpec}"
-      data-longitudinal-count="${verticalPositions.length}" data-transverse-count="${horizontalPositions.length}"
+      data-longitudinal-count="${horizontalPositions.length}" data-transverse-count="${verticalPositions.length}"
       data-edge-left="${edgeLeft}" data-edge-right="${edgeRight}" data-edge-top="${edgeTop}" data-edge-bottom="${edgeBottom}">
     <rect data-se-focus="mesh-length mesh-width mesh-edge" x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${box.drawW.toFixed(1)}" height="${box.drawH.toFixed(1)}" fill="#fff" stroke="#d8dde5"/>
     ${horizontals}${verticals}
-    <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">L ${formatLengthCm(length)}</text>
-    <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">W ${formatLengthCm(width)}</text>
+    <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">אורך ${formatLengthCmFromMm(length)}</text>
+    <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">רוחב ${formatLengthCmFromMm(width)}</text>
     <g class="se-engineer-helper" data-se-focus="mesh-longitudinal-spacing mesh-transverse-spacing">
       <rect class="se-helper-panel" x="${(x1 - 72).toFixed(1)}" y="${(y1 + 8).toFixed(1)}" width="64" height="34" rx="4"/>
       <path d="${spacingHelperPath}" stroke="#475569" stroke-width="1.5" fill="none"/>
@@ -1659,16 +1656,6 @@ function resolveShapeId(shape) {
   return String(shape?.shapeId || shape?.approvedShapeId || shapeContractGuid());
 }
 
-function countMeshBars(total, spacing, edgeStart = 0, edgeEnd = 0) {
-  const length = Math.max(1, Number(total) || 1);
-  const pitch = Math.max(1, Number(spacing) || 1);
-  const start = Math.min(length, Math.max(0, Number(edgeStart) || 0));
-  const end = Math.max(start, length - Math.min(length, Math.max(0, Number(edgeEnd) || 0)));
-  const positions = [];
-  for (let mm = start; mm <= end + 0.001; mm += pitch) positions.push(Math.min(end, mm));
-  if (!positions.length || positions[positions.length - 1] !== end) positions.push(end);
-  return positions.length;
-}
 
 function pileSpiralLengthMm(pileDiameter, zoneLength, pitch) {
   const diameter = Math.max(1, Number(pileDiameter) || 1);
@@ -1746,31 +1733,12 @@ function buildBarsShapeContract(shape) {
 }
 
 function buildMeshShapeContract(shape) {
-  const data = {
-    length: Math.max(1, Number(shape?.length || 600)),
-    width: Math.max(1, Number(shape?.width || 250)),
-    longitudinalDiameter: Math.max(1, Number(shape?.longitudinalDiameter || 8)),
-    longitudinalSpacing: Math.max(1, Number(shape?.longitudinalSpacing || 20)),
-    transverseDiameter: Math.max(1, Number(shape?.transverseDiameter || 8)),
-    transverseSpacing: Math.max(1, Number(shape?.transverseSpacing || 20)),
-    edgeLeft: Math.max(0, Number(shape?.edgeLeft || 0)),
-    edgeRight: Math.max(0, Number(shape?.edgeRight || 0)),
-    edgeTop: Math.max(0, Number(shape?.edgeTop || 0)),
-    edgeBottom: Math.max(0, Number(shape?.edgeBottom || 0)),
-  };
-  const longitudinalBarCount = countMeshBars(data.width, data.longitudinalSpacing, data.edgeTop, data.edgeBottom);
-  const transverseBarCount = countMeshBars(data.length, data.transverseSpacing, data.edgeLeft, data.edgeRight);
-  const longitudinalTotalLengthMm = longitudinalBarCount * data.length;
-  const transverseTotalLengthMm = transverseBarCount * data.width;
-  const totalLengthMm = longitudinalTotalLengthMm + transverseTotalLengthMm;
-  const weightKg = Number((((longitudinalTotalLengthMm / 1000) * sharedKgPerMeter(data.longitudinalDiameter)) + ((transverseTotalLengthMm / 1000) * sharedKgPerMeter(data.transverseDiameter))).toFixed(3));
-  const calculated = { longitudinalBarCount, transverseBarCount, longitudinalTotalLengthMm, transverseTotalLengthMm, totalLengthMm, weightKg };
-  return {
-    data,
-    calculated,
-    generic: { family: 'mesh', shapeType: 'mesh_rectangular', ...data, longitudinalBarCount, transverseBarCount, totalLengthMm },
-    validation: validateShapeContractData('mesh', data),
-  };
+  try {
+    const canonical = canonicalSteelRebarShapes().calculateMesh(shape || {});
+    return {...canonical, generic:{family:'mesh',shapeType:'mesh_rectangular',...canonical.data,...canonical.calculated}, validation:{valid:canonical.calculated.countingVerified,errors:canonical.calculated.countingVerified?[]:['mesh_bar_count_confirmation_required'],warnings:[]}};
+  } catch (error) {
+    return {data:{...shape},calculated:{},generic:{family:'mesh',shapeType:'mesh_rectangular'},validation:{valid:false,errors:[error.message],warnings:[]}};
+  }
 }
 
 function buildPileShapeContract(shape) {
@@ -1868,8 +1836,8 @@ function normalizeCalculatedPayload(calculated = {}) {
     payload.totalLengthMm = roundShapeMetric(payload.totalLengthMm);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'weightKg')) {
-    payload.weightKg = roundShapeMetric(payload.weightKg);
-    payload.totalWeightKg = payload.weightKg;
+    payload.weightKg = payload.calculationVersion==='mesh-count-v2'?Number(payload.weightKg):roundShapeMetric(payload.weightKg);
+    if (payload.calculationVersion !== 'mesh-count-v2') payload.totalWeightKg = payload.weightKg;
   } else if (Object.prototype.hasOwnProperty.call(payload, 'totalWeightKg')) {
     payload.totalWeightKg = roundShapeMetric(payload.totalWeightKg);
     payload.weightKg = payload.totalWeightKg;
@@ -3592,6 +3560,23 @@ class ShapeEditorModal {
 #seModal #seRecognitionDetails button{min-height:28px;margin:3px;padding:3px 6px;font-family:inherit;font-size:11px;cursor:pointer;border:1px solid #c5cbd4;border-radius:5px;background:#fff;color:#243047;}
 #seModal #seRecognitionDetails select{width:100%;min-height:28px;padding:3px;font-family:inherit;font-size:12px;background:#fff;color:#243047;}
 @media(max-height:760px){#seModal #seBillingDetails{max-height:36vh;}}
+/* Mesh uses the established editor shell with larger, compact paired fields. */
+#seModal.se-mesh-editor .se-family-editor-table tr{display:block!important}
+#seModal.se-mesh-editor .se-family-editor-table td{display:block!important;padding:12px!important}
+#seModal.se-mesh-editor .se-mesh-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 10px}
+#seModal.se-mesh-editor .se-mesh-grid label{display:grid;gap:7px;font-size:13px;line-height:1.45;font-weight:700;color:#526070}
+#seModal.se-mesh-editor .se-mesh-grid .se-input{width:100%;min-width:0;height:46px;font-size:23px!important;font-weight:800;text-align:center;padding:5px;border:1px solid #c5cbd4;border-radius:8px;background:white}
+#seModal.se-mesh-editor .se-mesh-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 10px;border-top:1px solid #c5cbd4;margin-top:20px;padding-top:20px}
+#seModal.se-mesh-editor .se-mesh-results div{display:grid;gap:7px}
+#seModal.se-mesh-editor .se-mesh-results span{font-size:12px;color:#526070}
+#seModal.se-mesh-editor .se-mesh-results strong{font-size:24px;color:#1a2332}
+#seModal.se-mesh-editor .se-mesh-results p{grid-column:1/-1;font-size:12px;line-height:1.6;margin:0;color:#6b7280}
+#seModal.se-mesh-editor .se-mesh-advanced{font-size:12px;line-height:1.7;margin-top:18px;color:#526070}
+#seModal.se-mesh-editor .se-mesh-advanced summary{cursor:pointer;font-weight:700;margin-bottom:12px}
+#seModal.se-mesh-editor .se-mesh-confirm{display:flex;gap:8px;align-items:center;margin:12px 0}
+#seModal.se-mesh-editor .se-mesh-confirm input{width:18px;height:18px;min-width:18px}
+#seModal.se-mesh-editor .se-bottom-summary .se-summary-item:not(:has(#seTotalWeight)){display:none!important}
+#seModal.se-mesh-editor .se-bottom-summary:before{content:'משקל תיאורטי לרשת';font-size:13px;color:#526070}
 </style>
 <div id="seModal">
   <!-- ── Header ── -->
@@ -4885,6 +4870,13 @@ class ShapeEditorModal {
     set('sePerimeter', (totalMm / 10).toLocaleString('he-IL', { maximumFractionDigits: 1 }));
     set('seBarLength', (totalMm / 10).toLocaleString('he-IL', { maximumFractionDigits: 2 }));
     set('seTotalWeight', weightKg.toFixed(2));
+    if (this.current.family === 'mesh') {
+      const c=contract.calculated, target=document.getElementById('seMeshComputed');
+      const result=(label,value)=>`<div><span>${label}</span><strong>${value}</strong></div>`;
+      for(const key of ['longitudinalBarCount','transverseBarCount']){const input=document.querySelector('[data-mesh-field="'+key+'"]');if(input&&document.activeElement!==input)input.value=c[key]||'';}
+      if(target) target.innerHTML = c.weightKg != null ? result('מוטות באורך '+this.current.length/1000+' מ׳',c.longitudinalBarCount)+result('מוטות באורך '+this.current.width/1000+' מ׳',c.transverseBarCount)+result('משקל תיאורטי לרשת',weightKg.toFixed(2)+' ק״ג')+result('משקל כולל', (weightKg*qty).toFixed(2)+' ק״ג')+`<p>${(totalMm/1000).toLocaleString('he-IL')} מטר רץ · ${c.countingVerified?'ספירת מוטות מאומתת':'ספירה מוצעת — יש לבדוק ולאשר בפרטי המפרט'}</p>` : '<p>יש להזין מידות, קוטר ומרווחים תקינים.</p>';
+    }
+
     const qtyInput = document.getElementById('seQuantityInput');
     if (qtyInput && document.activeElement !== qtyInput) qtyInput.value = qty > 0 ? String(qty) : '';
     const diaSelect = document.getElementById('seDiameterSelect');
@@ -4976,8 +4968,9 @@ class ShapeEditorModal {
     const modeNote = document.querySelector('#seModal .se-mode-note');
     const summary = document.querySelector('#seModal .se-panel-summary');
     const title = document.querySelector('#seModal .se-data-panel-head');
+    document.getElementById('seModal')?.classList.toggle('se-mesh-editor', kind === 'mesh');
     const isBars = kind === 'bars';
-    const showsOrderQuantity = isBars || kind === 'ring' || kind === 'lifts';
+    const showsOrderQuantity = isBars || kind === 'ring' || kind === 'lifts' || kind === 'mesh';
     document.getElementById('seModal')?.classList.toggle('se-ring-editor', kind === 'ring');
     document.getElementById('seModal')?.classList.toggle('se-pile-editor', kind === 'piles');
     if (table) table.classList.toggle('se-family-editor-table', !isBars);
@@ -5035,27 +5028,19 @@ class ShapeEditorModal {
   _renderMeshEditor() {
     this._setFamilyEditorChrome('mesh');
     const mesh = this.current;
-    const body = document.getElementById('seTableBody');
-    if (!body) return;
-    const meta = {
-      length: ['📏','אורך רשת','ס״מ','לדוגמה 60'], width: ['↕','רוחב רשת','ס״מ','לדוגמה 25'],
-      longitudinalDiameter: ['Ø','קוטר לאורך','מ״מ','לדוגמה 8'], longitudinalSpacing: ['↔','מרווח לאורך','ס״מ','לדוגמה 20'],
-      transverseDiameter: ['Ø','קוטר לרוחב','מ״מ','לדוגמה 8'], transverseSpacing: ['↕','מרווח לרוחב','ס״מ','לדוגמה 20'],
-      edgeLeft: ['←','שול שמאל','ס״מ','לדוגמה 0'], edgeRight: ['→','שול ימין','ס״מ','לדוגמה 0'],
-      edgeTop: ['↑','שול עליון','ס״מ','לדוגמה 0'], edgeBottom: ['↓','שול תחתון','ס״מ','לדוגמה 0'],
-    };
-    const field = (key, min = 0) => {
-      const m = meta[key] || ['•', key, 'ס״מ', 'לדוגמה 10'];
-      const isSteelDiameter = key === 'longitudinalDiameter' || key === 'transverseDiameter';
-      const value = isSteelDiameter ? (mesh[key] ?? 0) : (Number(mesh[key] ?? 0) / 10);
-      return '<td colspan="2">' + this._fieldShell({ icon:m[0], label:m[1], unit:m[2], example:m[3], focusKey:m[4], number:m[5], code:m[6], input:`<input class="se-input" type="number" min="${min}" step="0.1" value="${value}" data-mesh-field="${key}" onfocus="window._seEditor._focusFamilyField('${key}')" oninput="window._seEditor._setMeshField('${key}', this.value)">` }) + '</td>';
-    };
-    body.innerHTML = `
-      <tr class="se-family-row">${field('length', 1)}${field('width', 1)}</tr>
-      <tr class="se-family-row">${field('longitudinalDiameter', 1)}${field('longitudinalSpacing', 1)}</tr>
-      <tr class="se-family-row">${field('transverseDiameter', 1)}${field('transverseSpacing', 1)}</tr>
-      <tr class="se-family-row">${field('edgeLeft', 0)}${field('edgeRight', 0)}</tr>
-      <tr class="se-family-row">${field('edgeTop', 0)}${field('edgeBottom', 0)}</tr>`;
+    const field = (key, label, scale, value = mesh[key]) => `<label class="se-mesh-field">${label}<input class="se-input" type="number" min="0.001" step="any" value="${Number(value || 0)/scale}" data-mesh-field="${key}" oninput="window._seEditor._setMeshField('${key}',this.value)"></label>`;
+    document.getElementById('seTableBody').innerHTML = `<tr><td colspan="4"><div class="se-mesh-grid">
+      ${field('longitudinalDiameter','קוטר ברזל (מ״מ)',1)}${field('quantity','כמות רשתות',1)}
+      ${field('length','אורך רשת (מטר)',1000)}${field('width','רוחב רשת (מטר)',1000)}
+      ${field('longitudinalSpacing','מרווח בין מוטות האורך (ס״מ)',10)}${field('transverseSpacing','מרווח בין מוטות הרוחב (ס״מ)',10)}
+      </div><div id="seMeshComputed" class="se-mesh-results" aria-live="polite"></div>
+      <details class="se-mesh-advanced"><summary>ספירת מוטות ופרטי מפרט</summary><div class="se-mesh-grid">
+      ${field('longitudinalBarCount','מספר מוטות באורך הרשת',1,mesh.longitudinalBarCount || buildMeshShapeContract(mesh).calculated.longitudinalBarCount)}
+      ${field('transverseBarCount','מספר מוטות ברוחב הרשת',1,mesh.transverseBarCount || buildMeshShapeContract(mesh).calculated.transverseBarCount)}
+      </div><label class="se-mesh-confirm"><input type="checkbox" ${mesh.countingConfirmed?'checked':''} onchange="window._seEditor.current.countingConfirmed=this.checked;window._seEditor._updatePreview()">בדקתי ומאשר את מספר המוטות</label>
+      <div class="se-mesh-grid"><label>דרגת פלדה<input class="se-input" value="${String(mesh.grade||'').replace(/[^a-zA-Z0-9 ._-]/g,'')}" oninput="window._seEditor.current.grade=this.value"></label><label>תקן<input class="se-input" value="${String(mesh.standard_code||'').replace(/[^a-zA-Z0-9 ._-]/g,'')}" oninput="window._seEditor.current.standard_code=this.value"></label></div>
+      <p>המשקל תיאורטי. כשאין חלוקה מדויקת נדרשת בדיקת הספירה. מידות ושוליים קיימים נשמרים.</p></details>
+      </td></tr>`;
   }
 
   _renderRingEditor() {
@@ -5709,12 +5694,15 @@ class ShapeEditorModal {
   }
 
   _setMeshField(key, val) {
-    if (!this.current || this.current.family !== 'mesh') return;
-    const min = key === 'edgeLeft' || key === 'edgeRight' || key === 'edgeTop' || key === 'edgeBottom' ? 0 : 1;
-    const isSteelDiameter = key === 'longitudinalDiameter' || key === 'transverseDiameter';
-    this.current[key] = isSteelDiameter
-      ? Math.max(min, Number(val) || min)
-      : Math.max(min, (Number(val) || min / 10) * 10);
+    if (this.current?.family !== 'mesh') return;
+    const scale = ['length','width'].includes(key) ? 1000 : key.endsWith('Spacing') ? 10 : 1;
+    this.current[key] = Number(val) * scale;
+    if(key === 'longitudinalDiameter') this.current.transverseDiameter = this.current.longitudinalDiameter;
+    if(!['quantity','longitudinalBarCount','transverseBarCount'].includes(key)) {
+      delete this.current.longitudinalBarCount; delete this.current.transverseBarCount;
+    }
+    if(!['quantity','longitudinalDiameter'].includes(key))this.current.countingConfirmed = false;
+    const check=document.querySelector('.se-mesh-confirm input');if(check)check.checked=this.current.countingConfirmed===true;
     this._updatePreview();
   }
 
@@ -6675,6 +6663,12 @@ class ShapeEditorModal {
 
   _confirm() {
     if (!this.current || !this.onSelect) return;
+    if(this.current.family === 'mesh') {
+      const result=buildMeshShapeContract(this.current);
+      if(!result.validation.valid || !Number.isSafeInteger(this.current.quantity) || this.current.quantity<1) {
+        this._showToast('יש להשלים נתוני רשת תקינים, כמות שלמה ולאשר את ספירת המוטות לפי הצורך'); return;
+      }
+    }
     if(this._catalogueEditTarget && this._shapeMode==='authoring'){this._showSaveBar();return;}
     const enteredCode = document.getElementById('seItemCode')?.value.trim() || '';
     const identity=this.current.catalogIdentity;

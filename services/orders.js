@@ -197,7 +197,10 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
 
       (pallet.items || []).forEach(rawItem => {
         globalItemSequence += 1;
-        const item = withShapeContractLegacyFields(rawItem);
+        const meshMetrics=require('./meshOrder').metrics(rawItem);
+        const item = withShapeContractLegacyFields(meshMetrics?{...rawItem,shapeSnapshot:meshMetrics.snapshot,diameter:meshMetrics.diameter}:rawItem);
+        if(meshMetrics)item.qty=Number(rawItem.qty??rawItem.quantity??1);
+        if(meshMetrics&&(!Number.isSafeInteger(Number(item.qty))||Number(item.qty)<=0))throw Object.assign(Error('invalid_mesh_quantity'),{statusCode:400});
         const pileCageMetrics = roundPileCageOrderMetrics(rawItem);
         // A lift carries no bends and no cut list - it is a bought bundle, so it
         // skips the geometry checks the same way a cage does.
@@ -205,16 +208,16 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
         const spiral = normalizeSpiralParams(item);
         const sourceLengthMm = Number(item.length ?? item.total_length_mm ?? 0) || 0;
         const sourceSides = Array.isArray(item.sides) ? item.sides : [];
-        const longSimpleCoil = !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
+        const longSimpleCoil = !meshMetrics && !spiral.isSpiral && sourceLengthMm > 20000 && sourceSides.length <= 2;
         const isSpiralLike = spiral.isSpiral || longSimpleCoil;
         const sides = isSpiralLike
           ? []
           : ((item.sides && item.sides.length) ? item.sides : (item.length ? [item.length] : []));
-        const totalLengthMm = pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
+        const totalLengthMm = meshMetrics ? meshMetrics.totalLengthMm : pileCageMetrics ? pileCageMetrics.physicalLengthMm : liftMetrics ? liftMetrics.barLengthMm : isSpiralLike
           ? (sourceLengthMm || spiralCutLengthMm(spiral.spiralDiameterMm, spiral.turns))
           : (sides.reduce((s, v) => s + Number(v), 0) || Number(item.length) || 0);
         const angles = item.angles || [];
-        const segmentsArr = pileCageMetrics || liftMetrics || isSpiralLike
+        const segmentsArr = meshMetrics || pileCageMetrics || liftMetrics || isSpiralLike
           ? []
           : normalizeSegments(
               item.shapeName,
@@ -228,14 +231,14 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
               spiral_turns: spiral.turns || null,
             })
           : normalizeShapeName(item.shapeName, segmentsArr);
-        if (!isSpiralLike && !pileCageMetrics && !liftMetrics) {
+        if (!isSpiralLike && !pileCageMetrics && !liftMetrics && !meshMetrics) {
           const geoCheck = validateShapeGeometry(segmentsArr);
           if (!geoCheck.valid) throw Object.assign(new Error(geoCheck.error), { statusCode: 400 });
         }
         const segments = JSON.stringify(segmentsArr);
         const hasShapeV2Envelope = isShapeDataContractV2(item.shapeSnapshot ?? item.shape_snapshot ?? item.shapeData ?? item.shape_data ?? item.shapeContract ?? item.shape_contract ?? item.shape_snapshot_json);
         const persistedShapeName = pileCageMetrics ? 'PILE CAGE' : (hasShapeV2Envelope ? item.shapeName : shapeName);
-        const weightPerUnit = pileCageMetrics
+        const weightPerUnit = meshMetrics ? meshMetrics.weightKg : pileCageMetrics
           ? pileCageMetrics.weightKg
           : (liftMetrics ? liftMetrics.weightPerUnit : calcWeightPerUnit(item.diameter, totalLengthMm));
         // Waste is an order-level billing adjustment only. Production must use
@@ -243,7 +246,7 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
         const productionQty = item.qty || 1;
         const machine = assignResource(item.diameter);
 
-        const totalWeight = weightPerUnit * (item.qty || 1);
+        const totalWeight = meshMetrics?Number((weightPerUnit*(item.qty||1)).toFixed(3)):weightPerUnit * (item.qty || 1);
         const reviewNotes = Array.isArray(item.reviewNotes || item.review_notes) ? (item.reviewNotes || item.review_notes) : [];
         const reviewNotesJson = reviewNotes.length ? JSON.stringify(reviewNotes) : null;
         const reviewStatus = reviewNotes.length ? (item.reviewStatus || item.review_status || 'pending') : (item.reviewStatus || item.review_status || null);
@@ -288,8 +291,8 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
           id: itemResult.lastInsertRowid,
           item_id: itemResult.lastInsertRowid,
           diameter: item.diameter,
-          material_type: item.material_type || item.materialType || (JSON.parse(shapeSnapshot||'{}').family==='lifts'?'straight':'coil'),
-          mesh_specification: item.mesh_specification || null,
+          material_type: meshMetrics?'mesh':item.material_type || item.materialType || (JSON.parse(shapeSnapshot||'{}').family==='lifts'?'straight':'coil'),
+          mesh_specification: meshMetrics?.specification || item.mesh_specification || null,
           quantity_units: item.qty || 1,
           total_weight: totalWeight,
           quantity: item.qty || 1,
@@ -301,6 +304,11 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
       });
     });
 
+    if(reservationItems.some(item=>item.material_type==='mesh')){
+      const actualTotal=db.prepare('SELECT COALESCE(SUM(total_weight),0) kg FROM items WHERE order_id=?').get(orderId).kg;
+      db.prepare('UPDATE orders SET total_weight=?,billing_weight=? WHERE id=?').run(actualTotal,actualTotal*(1+wastePct/100),orderId);
+      db.prepare('UPDATE pallets SET total_weight=(SELECT COALESCE(SUM(total_weight),0) FROM items WHERE pallet_id=pallets.id) WHERE order_id=?').run(orderId);
+    }
     const inventoryReservations = reserveMaterialForOrder(db, {
       order_id: orderId,
       items: reservationItems,

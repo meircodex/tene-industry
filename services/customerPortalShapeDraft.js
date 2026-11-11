@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { VALID_DIAMETERS, rebarKgPerMeter } = require('../constants');
 const {
+  calculateMesh,
   buildBarsShapeContract,
   buildSpiralShapeContract,
   buildRingShapeContract,
@@ -236,16 +237,6 @@ function canonicalShapeId(value, fallback) {
   return cleaned || fallback;
 }
 
-function meshBarCount(total, spacing, edgeStart = 0, edgeEnd = 0) {
-  const length = Math.max(1, Number(total) || 1);
-  const pitch = Math.max(1, Number(spacing) || 1);
-  const start = Math.min(length, Math.max(0, Number(edgeStart) || 0));
-  const end = Math.max(start, length - Math.min(length, Math.max(0, Number(edgeEnd) || 0)));
-  const positions = [];
-  for (let mm = start; mm <= end + 0.001; mm += pitch) positions.push(Math.min(end, mm));
-  if (!positions.length || positions[positions.length - 1] !== end) positions.push(end);
-  return positions.length;
-}
 
 function normalizeMeshData(data = {}) {
   const length = positiveNumber(data.length, 'mesh length');
@@ -278,23 +269,11 @@ function normalizeMeshData(data = {}) {
 }
 
 function buildMeshSnapshot(snapshot, data) {
-  const longitudinalBarCount = meshBarCount(data.width, data.longitudinalSpacing, data.edgeTop, data.edgeBottom);
-  const transverseBarCount = meshBarCount(data.length, data.transverseSpacing, data.edgeLeft, data.edgeRight);
-  const longitudinalTotalLengthMm = longitudinalBarCount * data.length;
-  const transverseTotalLengthMm = transverseBarCount * data.width;
-  const totalLengthMm = longitudinalTotalLengthMm + transverseTotalLengthMm;
-  const weightKg = rounded(
-    (longitudinalTotalLengthMm / 1000) * rebarKgPerMeter(data.longitudinalDiameter)
-      + (transverseTotalLengthMm / 1000) * rebarKgPerMeter(data.transverseDiameter),
-  );
-  const calculated = {
-    longitudinalBarCount,
-    transverseBarCount,
-    longitudinalTotalLengthMm,
-    transverseTotalLengthMm,
-    totalLengthMm,
-    weightKg,
-  };
+  const canonical=calculateMesh({...data,countingConfirmed:snapshot.data?.countingConfirmed,longitudinalBarCount:snapshot.data?.longitudinalBarCount,transverseBarCount:snapshot.data?.transverseBarCount});
+  if(!canonical.calculated.countingVerified)throw portalDraftError('mesh_bar_count_confirmation_required');
+  data=canonical.data;
+  const calculated=canonical.calculated;
+  const {longitudinalBarCount,transverseBarCount,totalLengthMm,weightKg}=calculated;
   const shapeType = snapshot.shapeType || 'mesh_rectangular';
   return {
     shapeSnapshot: buildFullShapeSnapshot({

@@ -2172,3 +2172,13 @@
   - `node --check modules\steel-rebar\pile-cage-engine.js`
   - `node --test test\shape-geometry.test.js`
   - `node --test test\pile-cage-engine.test.js`
+
+
+### LIVE-MESH-20261111 — משקל רשתות והקצאת רשתות להזמנות
+
+- status: in_progress
+- owner: codex/mesh-order-stock-20261111
+- authorization: מאיר אישר ״תכניס חשוב תצוגה יפה״, 11.11.2026.
+- scope: חישוב Steel/Rebar משותף; חלון רשת קיים; Orders; שירות מלאי רשתות, קליטה ותצוגה; ציור במסמכי הזמנה.
+- input/output/DB/API/events/screens/DoD: docs/mesh-order-stock-20261111.md.
+- production data: אין הסבה או שינוי יזום של מלאי והזמנות קיימים.

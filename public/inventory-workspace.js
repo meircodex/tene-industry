@@ -21,6 +21,8 @@
     invalid_unit_weight:'יש להזין משקל חיובי לגליל או לחבילה.',
     invalid_purchase_length:'יש להזין אורך תקין במטרים.',
     mesh_specification_required:'יש להשלים את מפרט הרשת.',
+    mesh_uniform_diameter_required:'יש להזין קוטר אחיד לכל הרשת.',
+    mesh_bar_count_confirmation_required:'יש לבדוק ולאשר את מספר המוטות לפני שמירה.',
   };
   async function api(path, options) {
     const response = await fetch(path, options && {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(options)});
@@ -30,7 +32,7 @@
     return data;
   }
   function meshDescription(s) {
-    return `${s.length_mm/1000} × ${s.width_mm/1000} מ׳ · Ø${s.longitudinal_diameter_mm}/Ø${s.transverse_diameter_mm} · מרווח ${s.longitudinal_spacing_mm/10} × ${s.transverse_spacing_mm/10} ס״מ${s.grade?' · '+s.grade:''}${s.standard_code?' · '+s.standard_code:''}`;
+    return `${s.length_mm/1000} × ${s.width_mm/1000} מ׳ · Ø${s.longitudinal_diameter_mm} · מרווח ${s.longitudinal_spacing_mm/10} × ${s.transverse_spacing_mm/10} ס״מ${s.grade?' · '+s.grade:''}${s.standard_code?' · '+s.standard_code:''}`;
   }
   function visibleRows() {
     const type=$('inventoryType').value,diameter=$('inventoryDiameter').value;
@@ -45,7 +47,7 @@
   function render() {
     const rows=visibleRows();
     $('inventoryDailyRows').innerHTML=rows.map(row=>`<tr>
-      <td><button class="inventory-link" data-filter-type="${row.type}" data-filter-diameter="${row.diameter}">${escape(row.label)}</button><div class="material-shape">${escape(row.specification)}</div></td>
+      <td><button class="inventory-link" data-filter-type="${row.type}" data-filter-diameter="${row.diameter}">${escape(row.label)}</button><div class="material-shape">${escape(row.specification)}</div>${row.type==='mesh'?`<div class="material-shape">${row.theoreticalWeight!=null?`תיאורטי לרשת: ${row.theoreticalWeight.toFixed(2)} ק״ג · במלאי: ${(row.theoreticalWeight*row.stock).toFixed(2)} ק״ג`:'משקל היסטורי — נדרשת בדיקת מפרט'}</div>`:''}</td>
       <td>${row.type==='straight'?(row.lengthMm?escape(row.lengthMm/1000):'אורך לא צוין'):'—'}</td>
       <td>${number(row.stock)} ${row.unitLabel}</td><td title="מספר מוטות משוער לפי משקל המלאי, אורך המוט ומשקל למטר לפי הקוטר; מעוגל מטה">${row.barCount==null?'—':`≈ ${number(row.barCount)}`}</td><td>${number(row.demand)} ${row.unitLabel}</td>
       <td><span class="badge ${row.available<0?'badge-danger':'badge-ok'}">${row.available<0?'חוסר':'פנוי'} ${number(Math.abs(row.available))} ${row.unitLabel}</span></td>
@@ -68,7 +70,7 @@
       state.policy=plan.purchase_policy;
       if(revision!==loadRevision)return;
       state.rows=plan.groups.map(row=>({type:row.material_type,diameter:row.diameter,lengthMm:row.nominal_length_mm??null,barCount:row.estimated_bar_count??null,label:`${labels[row.material_type]||row.material_type} Ø${row.diameter}`,stock:row.physical_stock_kg,demand:row.backlog_kg,available:row.available_stock_kg??(row.physical_stock_kg-row.backlog_kg),incoming:row.incoming_kg,buy:row.recommended_purchase_kg,unitLabel:'ק״ג',specification:row.requires_length_review?'יש להשלים אורך ולבדוק דרגה ותקן לפני הזמנה':'יש לבדוק דרגה ותקן לפני הזמנה'}));
-      state.rows.push(...(plan.mesh_groups||[]).map(row=>({type:'mesh',diameter:row.specification.longitudinal_diameter_mm,label:`רשת Ø${row.specification.longitudinal_diameter_mm}/Ø${row.specification.transverse_diameter_mm}`,specification:meshDescription(row.specification),stock:row.physical_units,demand:row.required_units,available:row.available_units,incoming:row.incoming_units,buy:row.recommended_purchase_units,unitLabel:'יחידות',meshSpecification:row.specification})));
+      state.rows.push(...(plan.mesh_groups||[]).map(row=>({type:'mesh',diameter:row.specification.longitudinal_diameter_mm,label:`רשת Ø${row.specification.longitudinal_diameter_mm}`,specification:meshDescription(row.specification),stock:row.physical_units,demand:row.required_units,available:row.available_units,incoming:row.incoming_units,buy:row.recommended_purchase_units,unitLabel:'יחידות',meshSpecification:row.specification,theoreticalWeight:row.specification.calculation?.weightKg})));
       const previous=$('inventoryDiameter').value;
       $('inventoryDiameter').innerHTML='<option value="">כל הקטרים</option>'+[...new Set(state.rows.map(row=>row.diameter))].sort((a,b)=>a-b).map(d=>`<option value="${d}">Ø${d}</option>`).join('');
       $('inventoryDiameter').value=previous;state.loaded=true;render();

@@ -616,8 +616,8 @@ test('shape editor active segment selection does not recolor the drawn bar', () 
 test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
-  assert.match(index, /steelRebarShapes\.js\?v=1/);
-  assert.match(index, /shape-editor\.js\?v=91/);
+  assert.match(index, /steelRebarShapes\.js\?v=2-mesh/);
+  assert.match(index, /shape-editor\.js\?v=92-mesh/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 
@@ -878,26 +878,26 @@ test('ShapeEngineRouter renders ח 35/120/35 with PolylineBarEngine', () => {
   assert.match(svg, />\+90°</);
 });
 
-test('ShapeEngineRouter renders Mesh 600x250 Ø8@20 as grid with MeshEngine', () => {
+test('ShapeEngineRouter renders Mesh 600x250 Ø8@10 as grid with MeshEngine', () => {
   const { ShapeEngineRouter, MeshEngine } = loadShapeEditorGeometry();
   const mesh = {
     family: 'mesh',
-    length: 600,
-    width: 250,
+    length: 6000,
+    width: 2500,
     longitudinalDiameter: 8,
-    longitudinalSpacing: 20,
+    longitudinalSpacing: 100,
     transverseDiameter: 8,
-    transverseSpacing: 20,
+    transverseSpacing: 100,
   };
   const svg = ShapeEngineRouter.render(mesh, 300, 260);
 
   assert.equal(ShapeEngineRouter(mesh), MeshEngine);
   assert.match(svg, /data-engine="MeshEngine"/);
   assert.match(svg, /data-family="mesh"/);
-  assert.match(svg, /data-length="600"/);
-  assert.match(svg, /data-width="250"/);
-  assert.match(svg, /data-longitudinal="Ø8@20 ס״מ"/);
-  assert.match(svg, /data-transverse="Ø8@20 ס״מ"/);
+  assert.match(svg, /data-length="6000"/);
+  assert.match(svg, /data-width="2500"/);
+  assert.match(svg, /data-longitudinal="Ø8@10 ס״מ"/);
+  assert.match(svg, /data-transverse="Ø8@10 ס״מ"/);
   assert.ok((svg.match(/<line /g) || []).length >= 40, 'expected mesh grid lines');
 });
 
@@ -907,7 +907,7 @@ test('shape editor switches to a mesh editor without side or angle fields', () =
   const block = editor.match(/_renderMeshEditor\(\) \{[\s\S]*?[\r\n]+  \}[\r\n]+[\r\n]+  _renderPileCageEditor/);
 
   assert.ok(block, 'expected mesh editor renderer');
-  for (const field of ['length', 'width', 'longitudinalDiameter', 'longitudinalSpacing', 'transverseDiameter', 'transverseSpacing', 'edgeLeft', 'edgeRight', 'edgeTop', 'edgeBottom']) {
+  for (const field of ['length', 'width', 'longitudinalDiameter', 'longitudinalSpacing', 'transverseSpacing']) {
     assert.ok(block[0].includes(`'${field}'`));
   }
   assert.doesNotMatch(block[0], /data-side=/);
@@ -1018,17 +1018,17 @@ test('PileCageEngine counts hoop spacing from the selected side', () => {
 });
 test('MeshEngine spacing changes grid count while diameter changes bar thickness', () => {
   const { ShapeEngineRouter } = loadShapeEditorGeometry();
-  const base = { family: 'mesh', length: 600, width: 250, longitudinalDiameter: 8, longitudinalSpacing: 20, transverseDiameter: 8, transverseSpacing: 20 };
-  const widerSpacing = { ...base, longitudinalSpacing: 30 };
-  const thicker = { ...base, longitudinalDiameter: 16 };
+  const base = { family: 'mesh', length: 6000, width: 2500, longitudinalDiameter: 8, longitudinalSpacing: 100, transverseDiameter: 8, transverseSpacing: 100 };
+  const widerSpacing = { ...base, longitudinalSpacing: 200 };
+  const thicker = { ...base, longitudinalDiameter: 16, transverseDiameter:16 };
   const baseSvg = ShapeEngineRouter.render(base, 300, 260);
   const spacingSvg = ShapeEngineRouter.render(widerSpacing, 300, 260);
   const thickSvg = ShapeEngineRouter.render(thicker, 300, 260);
 
-  assert.match(baseSvg, /data-longitudinal-count="31"/);
-  assert.match(spacingSvg, /data-longitudinal-count="21"/);
-  assert.match(thickSvg, /stroke-width="3\.5"/);
-  assert.match(thickSvg, /data-longitudinal-count="31"/);
+  assert.match(baseSvg, /data-longitudinal-count="25"/);
+  assert.match(spacingSvg, /data-longitudinal-count="13"/);
+  assert.match(thickSvg, /stroke-width="1\.6"/);
+  assert.match(thickSvg, /data-longitudinal-count="25"/);
 });
 
 test('PileCageEngine treats pile editor dimension fields as centimeters', () => {
@@ -1794,12 +1794,12 @@ test('buildShapeDataContractV2 returns mesh envelope with counts and machine pro
   const { buildShapeDataContractV2 } = loadShapeEditorGeometry();
   const contract = buildShapeDataContractV2({
     family: 'mesh',
-    length: 600,
-    width: 250,
+    length: 6000,
+    width: 2500,
     longitudinalDiameter: 8,
-    longitudinalSpacing: 20,
+    longitudinalSpacing: 100,
     transverseDiameter: 8,
-    transverseSpacing: 20,
+    transverseSpacing: 100,
     edgeLeft: 0,
     edgeRight: 0,
     edgeTop: 0,
@@ -1809,13 +1809,13 @@ test('buildShapeDataContractV2 returns mesh envelope with counts and machine pro
 
   assert.equal(contract.shapeType, 'mesh_rectangular');
   assert.equal(contract.family, 'mesh');
-  assert.equal(contract.data.length, 600);
-  assert.equal(contract.data.width, 250);
-  assert.equal(contract.calculated.longitudinalBarCount, 14);
-  assert.equal(contract.calculated.transverseBarCount, 31);
-  assert.equal(contract.calculated.totalLengthMm, 16150);
-  assert.equal(contract.machineOutput.generic.longitudinalBarCount, 14);
-  assert.equal(contract.machineOutput.generic.transverseBarCount, 31);
+  assert.equal(contract.data.length, 6000);
+  assert.equal(contract.data.width, 2500);
+  assert.equal(contract.calculated.longitudinalBarCount, 25);
+  assert.equal(contract.calculated.transverseBarCount, 60);
+  assert.equal(contract.calculated.totalLengthMm, 300000);
+  assert.equal(contract.machineOutput.generic.longitudinalBarCount, 25);
+  assert.equal(contract.machineOutput.generic.transverseBarCount, 60);
   assert.equal(contract.validation.valid, true);
   assert.equal('quantity' in contract.data, false);
   assert.deepEqual(Object.keys(contract.machineOutput.machineProfiles).sort(), ['MEP', 'PEDAX', 'SCHNELL']);

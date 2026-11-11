@@ -666,7 +666,19 @@ function liftPackageProductionSvg(item = {}) {
   return '<svg data-shape-kind="lift-package" data-scale-mode="print-fit" preserveAspectRatio="xMidYMid meet" viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:100%;max-height:100px;overflow:visible">' + svg + '</svg>';
 }
 
+function meshProductionSvg(item) {
+  const raw=item.shape_snapshot_json||item.shapeSnapshot;
+  let snapshot;try{snapshot=typeof raw==='string'?JSON.parse(raw):raw;}catch{return null;}
+  if(snapshot?.family!=='mesh')return null;
+  const d=snapshot.data||{},length=Number(d.length),width=Number(d.width);if(!(length>0&&width>0))return null;
+  const ratio=Math.min(210/length,70/width),w=length*ratio,h=width*ratio,x=(260-w)/2,y=(120-h)/2;
+  let lines='';for(let i=0;i<=12;i++){const xx=x+w*i/12;lines+=`<line x1="${xx}" x2="${xx}" y1="${y}" y2="${y+h}"/>`;}
+  for(let i=0;i<=5;i++){const yy=y+h*i/5;lines+=`<line x1="${x}" x2="${x+w}" y1="${yy}" y2="${yy}"/>`;}
+  return `<svg data-shape-kind="mesh" viewBox="0 0 260 120" style="width:100%;height:100%"><g stroke="#1a2332" stroke-width="1">${lines}</g><g fill="#1a2332" font-family="Arial" font-size="11" text-anchor="middle"><text x="130" y="${y-8}">אורך ${length/1000} מ׳ · רוחב ${width/1000} מ׳</text><text x="130" y="${y+h+16}">Ø${Number(d.longitudinalDiameter)||0} · ${Number(d.longitudinalSpacing)/10}×${Number(d.transverseSpacing)/10} ס״מ</text></g></svg>`;
+}
+
 function itemShapeSvg(item = {}) {
+  const meshSvg=meshProductionSvg(item);if(meshSvg)return meshSvg;
   if (isLiftPackageItem(item)) return liftPackageProductionSvg(item);
   if (isRoundPileCageItem(item)) return pileCageProductionSvg(item);
   const spiralSvg = spiralShapeSvg(item);

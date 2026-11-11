@@ -28,10 +28,10 @@
 <script src="/rebar-weights.js"></script>
 <script src="/straight-stock-cutting.js?v=2"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
-<script src="/steelRebarShapes.js?v=1"></script>
+<script src="/steelRebarShapes.js?v=2-mesh"></script>
 <script src="/shapeCommercial.js?v=2"></script>
 <script src="/shapeRecognition.js?v=1"></script>
-<script src="/shape-editor.js?v=91"></script>
+<script src="/shape-editor.js?v=92-mesh"></script>
 <style>
 :root{
   --accent:#c9621a; --accent-light:#e07b39;
@@ -3095,7 +3095,7 @@ function buildDetailHTML(o, pkgs) {
           <div class="item-kpis">
             <div class="item-kpi"><div class="item-kpi-label">כמות</div><div class="item-kpi-value" id="qtyVal-${item.id}" onclick="startQtyEdit(event, ${o.id}, ${item.id}, ${qty})" style="cursor:pointer" title="לחץ לשינוי כמות">${qty} יח' <span style="font-size:11px;opacity:0.55">✎</span></div></div>
             <div class="item-kpi"><div class="item-kpi-label">אורך פתיחה</div><div class="item-kpi-value">${IronBendDisplayUnits.formatLengthCmFromMm(length)}</div></div>
-            <div class="item-kpi"><div class="item-kpi-label">משקל רצוי</div><div class="item-kpi-value">${weight.toFixed(1)} ק"ג</div></div>
+            <div class="item-kpi"><div class="item-kpi-label">משקל רצוי</div><div class="item-kpi-value">${weight.toFixed(orderShapeSnapshot(item)?.family==='mesh'?2:1)} ק"ג</div></div>
             <div class="item-kpi" title="כמות מאושרת לפי דיווח ייצור או סטטוס מתקדם; התצוגה אינה משנה רשומות ייצור"><div class="item-kpi-label">ייצור מאושר</div><div class="item-kpi-value">${produced}/${qty}</div></div>
           </div>
           <div class="raw-data"><b>מה שמור לפריט:</b> ${escHtml(itemMachineSequence(item))}</div>
@@ -3325,6 +3325,7 @@ function orderShapeSegmentsFromEditor(data) {
 function orderShapeDataFromItem(item) {
   const snapshot = orderShapeSnapshot(item) || {};
   const snapshotData = snapshot.data && typeof snapshot.data === 'object' ? snapshot.data : {};
+  if(snapshot.family==='mesh')return {...snapshotData,family:'mesh',shapeType:'mesh_rectangular',presetId:snapshot.shapeId||'mesh1',presetName:'רשת',billingPolicy:snapshot.billingPolicy,catalogIdentity:snapshot.catalogIdentity,quantity:item.quantity||1,structElement:item.struct_element||''};
   const segments = rawItemSegments(item);
   const snapshotSides = Array.isArray(snapshotData.sides) ? snapshotData.sides.map(Number).filter(value => Number.isFinite(value) && value > 0) : [];
   const snapshotAngles = Array.isArray(snapshotData.angles) ? snapshotData.angles.map(Number).filter(Number.isFinite) : [];
@@ -3391,15 +3392,16 @@ async function shapeSelectedFromOrder(data) {
   const isShapeContractV2 = Number(data?.contractVersion) === 2
     && data?.data && data?.calculated && data?.machineOutput;
   const isSpiral = data?.family === 'spirals';
-  const segments = isSpiral ? [] : orderShapeSegmentsFromEditor(data);
-  const totalLength = isSpiral
-    ? (Number(data?.total_length_mm) || 0)
+  const isMesh = data?.family === 'mesh';
+  const segments = isSpiral || isMesh ? [] : orderShapeSegmentsFromEditor(data);
+  const totalLength = isSpiral || isMesh
+    ? (Number(data?.calculated?.totalLengthMm || data?.total_length_mm) || 0)
     : segments.reduce((sum, segment) => sum + Number(segment.length_mm || 0), 0);
   const orderItemQuantity = Math.max(1, Number(data?.orderItemQuantity || ctx.quantity || 1) || 1);
   const payload = {
     shape_name: String(data?.shapeName || data?.presetName || '\u05d9\u05e9\u05e8').trim(),
     structElement: String(data?.structElement || '').trim(),
-    diameter: Number(data?.diameter) || 12,
+    diameter: Number(isMesh?data?.data?.longitudinalDiameter:data?.diameter) || 12,
     quantity: orderItemQuantity,
     total_length_mm: totalLength,
     spiral_diameter_mm: isSpiral ? (Number(data?.spiralDiameter) || null) : null,

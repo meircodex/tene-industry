@@ -111,7 +111,7 @@ test('portal accepts a factory Shape V2 mesh and recalculates its weight server-
     shapeType: 'mesh_rectangular',
     family: 'mesh',
     displayName: 'רשת',
-    data: { length: 600, width: 250, longitudinalDiameter: 8, longitudinalSpacing: 20, transverseDiameter: 8, transverseSpacing: 20, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0 },
+    data: { length: 6000, width: 2500, longitudinalDiameter: 8, longitudinalSpacing: 100, transverseDiameter: 8, transverseSpacing: 100, edgeLeft: 0, edgeRight: 0, edgeTop: 0, edgeBottom: 0 },
     calculated: { totalLengthMm: 1, weightKg: 1 },
     machineOutput: { generic: {} },
     validation: { valid: true, errors: [] },
@@ -119,9 +119,9 @@ test('portal accepts a factory Shape V2 mesh and recalculates its weight server-
   const item = portalShapeDraftToOrderItem({ shapeSnapshot: editorSnapshot, qty: 4 });
 
   assert.equal(item.shapeSnapshot.family, 'mesh');
-  assert.equal(item.shapeSnapshot.calculated.longitudinalBarCount, 14);
-  assert.equal(item.shapeSnapshot.calculated.transverseBarCount, 31);
-  assert.equal(item.totalLengthMm, 16150);
+  assert.equal(item.shapeSnapshot.calculated.longitudinalBarCount, 25);
+  assert.equal(item.shapeSnapshot.calculated.transverseBarCount, 60);
+  assert.equal(item.totalLengthMm, 300000);
   assert.equal(item.totalWeight, item.weightPerUnit * 4);
   assert.equal(item.shapeSnapshot.calculated.weightKg, item.weightPerUnit);
 });

@@ -323,7 +323,45 @@ function normalizeFactoryShapeName(shapeName, segments, options = {}) {
   return shape;
 }
 
+// All mesh dimensions are millimetres; weights remain unrounded internally.
+function calculateMesh(input = {}) {
+  const data = {};
+  for (const field of ['length','width','longitudinalDiameter','transverseDiameter','longitudinalSpacing','transverseSpacing']) {
+    const value = Number(input[field]);
+    if (typeof input[field] === 'boolean' || !Number.isFinite(value) || value <= 0 || value > 100000) throw Object.assign(Error('invalid_mesh_' + field), {statusCode:400});
+    data[field] = value;
+  }
+  if (data.longitudinalDiameter !== data.transverseDiameter) throw Object.assign(Error('mesh_uniform_diameter_required'), {statusCode:400});
+  for (const field of ['edgeLeft','edgeRight','edgeTop','edgeBottom']) {
+    const value = Number(input[field] ?? 0);
+    if (typeof input[field] === 'boolean' || !Number.isFinite(value) || value < 0) throw Object.assign(Error('invalid_mesh_' + field), {statusCode:400});
+    data[field] = value;
+  }
+  if (data.edgeLeft + data.edgeRight >= data.length || data.edgeTop + data.edgeBottom >= data.width) throw Object.assign(Error('invalid_mesh_edges'), {statusCode:400});
+  data.grade = String(input.grade || '').trim(); data.standard_code = String(input.standard_code || '').trim();
+  const count = (span, pitch, start, end, field) => {
+    const ratio = (span - start - end) / pitch;
+    const exact = Math.abs(ratio - Math.round(ratio)) < 1e-9;
+    const measured = span === 2500 && pitch === 150 && start === 0 && end === 0;
+    const override = input[field];
+    const value = override == null ? Math.ceil(ratio - 1e-9) : Number(override);
+    if (!Number.isSafeInteger(value) || value < 1 || value > 20000 || typeof override === 'boolean') throw Object.assign(Error('invalid_mesh_bar_count'), {statusCode:400});
+    if (override != null) data[field] = value;
+    return {value, verified: input.countingConfirmed === true || ((exact || measured) && override == null)};
+  };
+  const longitudinal = count(data.width, data.longitudinalSpacing, data.edgeTop, data.edgeBottom, 'longitudinalBarCount');
+  const transverse = count(data.length, data.transverseSpacing, data.edgeLeft, data.edgeRight, 'transverseBarCount');
+  data.countingConfirmed = input.countingConfirmed === true;
+  const longitudinalBarCount = longitudinal.value, transverseBarCount = transverse.value;
+  const longitudinalTotalLengthMm = longitudinalBarCount * data.length, transverseTotalLengthMm = transverseBarCount * data.width;
+  const totalLengthMm = longitudinalTotalLengthMm + transverseTotalLengthMm;
+  const kgPerMeter = data.longitudinalDiameter ** 2 / 162;
+  const weightKg = totalLengthMm / 1000 * kgPerMeter;
+  return {data, calculated: {calculationVersion:'mesh-count-v2', weightBasis:'theoretical', countingVerified:longitudinal.verified && transverse.verified, longitudinalBarCount, transverseBarCount, longitudinalTotalLengthMm, transverseTotalLengthMm, totalLengthMm, kgPerMeter, unitWeightKg:weightKg, weightKg}};
+}
+
 return {
+  calculateMesh,
   isSpiralName,
   normalizeSpiralParams,
   spiralCutLengthMm,

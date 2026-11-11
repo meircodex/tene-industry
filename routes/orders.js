@@ -102,6 +102,7 @@ function hasShapeDefinitionChange(body = {}) {
 }
 
 function synchronizedShapeSnapshotForItem(existingItem = {}, body = {}, cleanItem = {}) {
+  if(cleanItem.meshMetrics)return JSON.stringify(cleanItem.meshMetrics.snapshot);
   // A complete editor envelope is already the current canonical snapshot.
   // It is validated and normalized by the existing order-contract helpers.
   if (shapeSnapshotCandidate(body) != null) {
@@ -310,6 +311,8 @@ module.exports = function createOrdersRouter(deps) {
 
   function normalizeReservationPreviewItem(item = {}) {
     return {
+      shape_snapshot_json:item.shape_snapshot_json??item.shapeSnapshot,
+      quantity:item.quantity??item.qty??1,
       diameter: Number(item.diameter),
       material_type: String(item.material_type || item.materialType || 'coil').trim() || 'coil',
       required_kg: Number(item.required_kg ?? item.total_weight_kg ?? item.totalWeightKg ?? item.totalWeight ?? item.total_weight ?? 0) || 0,
@@ -329,6 +332,7 @@ module.exports = function createOrdersRouter(deps) {
   }
 
   function cleanItemPayload(body, existingItem = {}) {
+    const meshMetrics=require('../services/meshOrder').metrics({...existingItem,...body});
     const pileCageMetrics = roundPileCageOrderMetrics({ ...existingItem, ...body });
     body = withShapeContractLegacyFields(body || {});
     let segments = existingItem.segments || '[]';
@@ -346,9 +350,9 @@ module.exports = function createOrdersRouter(deps) {
     }
 
     const shapeName = pileCageMetrics ? 'PILE CAGE' : (body.shape_name !== undefined ? String(body.shape_name || '').trim() : existingItem.shape_name);
-    const diameter = body.diameter !== undefined ? Number(body.diameter) : Number(existingItem.diameter);
+    const diameter = meshMetrics?meshMetrics.diameter:body.diameter !== undefined ? Number(body.diameter) : Number(existingItem.diameter);
     const quantity = body.quantity !== undefined ? Number(body.quantity) : Number(existingItem.quantity);
-    const totalLengthMm = pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
+    const totalLengthMm = meshMetrics?meshMetrics.totalLengthMm:pileCageMetrics ? pileCageMetrics.physicalLengthMm : body.total_length_mm !== undefined
       ? Number(body.total_length_mm)
       : (Array.isArray(body.segments)
         ? body.segments.reduce((sum, segment) => sum + Number(segment?.length_mm ?? segment?.length ?? 0), 0)
@@ -371,10 +375,15 @@ module.exports = function createOrdersRouter(deps) {
     if (!Number.isFinite(quantity) || quantity <= 0) throw Object.assign(new Error('invalid quantity'), { statusCode: 400 });
     if (!Number.isFinite(totalLengthMm) || totalLengthMm < 0) throw Object.assign(new Error('invalid total_length_mm'), { statusCode: 400 });
 
-    if (pileCageMetrics) segments = '[]';
-    const weightPerUnit = pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
-    const totalWeight = weightPerUnit * quantity;
-    return { shapeName, diameter, quantity, totalLengthMm, segments, spiralDiameter, spiralTurns, note, structElement, structFloor, sheetNum, weightPerUnit, totalWeight };
+    if(meshMetrics&&!Number.isSafeInteger(quantity))throw Object.assign(Error('invalid_mesh_quantity'),{statusCode:400});
+    if(existingItem.id){
+      const issued=db.prepare("SELECT * FROM inventory_mesh_demands WHERE item_id=? AND status='consumed' ORDER BY id DESC LIMIT 1").get(existingItem.id);
+      if(issued&&(!meshMetrics||issued.quantity_units!==quantity||issued.specification_key!==require('../services/meshInventory').meshSpecification(meshMetrics.specification).specification_key))throw Object.assign(Error('הרשת כבר נופקה מהמלאי; יש לברר את הניפוק לפני שינוי כמות או מפרט'),{statusCode:409});
+    }
+    if (pileCageMetrics||meshMetrics) segments = '[]';
+    const weightPerUnit = meshMetrics?meshMetrics.weightKg:pileCageMetrics ? pileCageMetrics.weightKg : industry.weightPerUnit({ diameter, total_length_mm: totalLengthMm });
+    const totalWeight = meshMetrics?Number((weightPerUnit*quantity).toFixed(3)):weightPerUnit * quantity;
+    return { shapeName, diameter, quantity, totalLengthMm, segments, spiralDiameter, spiralTurns, note, structElement, structFloor, sheetNum, weightPerUnit, totalWeight,meshMetrics };
   }
 
   function recalcOrderWeights(orderId) {
@@ -408,7 +417,7 @@ module.exports = function createOrdersRouter(deps) {
       const items = Array.isArray(req.body?.items) ? req.body.items.map(normalizeReservationPreviewItem) : [];
       const requiredByDiameter = new Map();
 
-      for (const item of items) {
+      for (const item of items.filter(item=>!require('../services/meshOrder').metrics(item))) {
         if (!Number.isFinite(item.diameter) || item.diameter <= 0 || item.required_kg <= 0) continue;
         const key = String(item.diameter);
         const current = requiredByDiameter.get(key) || { diameter: item.diameter, material_type: item.material_type, required_kg: 0 };
@@ -443,7 +452,7 @@ module.exports = function createOrdersRouter(deps) {
         for (const field of Object.keys(total)) total[field] = roundKg(total[field] + row[field]);
       }
 
-      res.json({ by_diameter: byDiameter, total });
+      res.json({ by_diameter: byDiameter, total,mesh_groups:require('../services/meshInventory').previewMesh(db,items) });
     } catch (err) {
       console.error('reservation preview failed:', err);
       res.status(err.statusCode || 500).json({ error: 'reservation_preview_failed', message: err.message });
@@ -1105,9 +1114,10 @@ module.exports = function createOrdersRouter(deps) {
 
     try {
       const item = cleanItemPayload(req.body, { shape_name: '', diameter: 12, quantity: 1, total_length_mm: 0, segments: '[]' });
+      const added=db.transaction(()=>{
       const pallet = firstOrCreatePallet(order.id);
       const hasOrderIdColumn = db.prepare("PRAGMA table_info(items)").all().some(column => column.name === 'order_id');
-      const shapeSnapshot = buildOrderItemShapeSnapshotJson(req.body, { shapeId: req.body.shapeId || req.body.shape_id || item.shapeName, shapeName: item.shapeName, diameter: item.diameter, segments: item.segments, totalLengthMm: item.totalLengthMm, spiralDiameterMm: item.spiralDiameter || null, spiralTurns: item.spiralTurns || null, note: item.note, structElement: item.structElement, structFloor: item.structFloor, sheetNum: item.sheetNum });
+      const shapeSnapshot = item.meshMetrics?JSON.stringify(item.meshMetrics.snapshot):buildOrderItemShapeSnapshotJson(req.body, { shapeId: req.body.shapeId || req.body.shape_id || item.shapeName, shapeName: item.shapeName, diameter: item.diameter, segments: item.segments, totalLengthMm: item.totalLengthMm, spiralDiameterMm: item.spiralDiameter || null, spiralTurns: item.spiralTurns || null, note: item.note, structElement: item.structElement, structFloor: item.structFloor, sheetNum: item.sheetNum });
       const columns = ['pallet_id', 'shape_snapshot_json', 'shape_id', 'shape_name', 'diameter', 'quantity', 'production_qty', 'segments', 'total_length_mm', 'weight_per_unit', 'total_weight', 'note', 'status', 'spiral_diameter_mm', 'spiral_turns', 'review_status', 'struct_element', 'struct_floor', 'sheet_num'];
       const values = [pallet.id, shapeSnapshot, item.shapeName, item.shapeName, item.diameter, item.quantity, item.quantity, item.segments, item.totalLengthMm, item.weightPerUnit, item.totalWeight, item.note, 'ממתין', item.spiralDiameter || null, item.spiralTurns || null, 'pending', item.structElement || null, item.structFloor || null, item.sheetNum || null];
       if (hasOrderIdColumn) {
@@ -1117,11 +1127,14 @@ module.exports = function createOrdersRouter(deps) {
       const placeholders = columns.map(() => '?').join(',');
       const result = db.prepare(`INSERT INTO items (${columns.join(',')}) VALUES (${placeholders})`).run(...values);
       db.prepare('UPDATE items SET item_uid=COALESCE(item_uid, ?) WHERE id=?').run(buildOrderItemUid(order.id, result.lastInsertRowid), result.lastInsertRowid);
+      if(item.meshMetrics)reserveMaterialForOrder(db,{order_id:order.id,items:[{id:Number(result.lastInsertRowid),material_type:'mesh',mesh_specification:item.meshMetrics.specification,quantity:item.quantity}]});
       const orderTotal = recalcOrderWeights(order.id);
+      return {id:Number(result.lastInsertRowid),orderTotal};
+      })();
 
-      auditLog('item', result.lastInsertRowid, order.order_num, 'item_add', 'shape_payload', null, JSON.stringify(req.body), item.note || null, req.auth?.sub || null, req.auth?.display_name || null);
-      wsBroadcast('order_item_added', { orderId: Number(order.id), itemId: Number(result.lastInsertRowid), orderNum: order.order_num });
-      res.json({ success: true, itemId: Number(result.lastInsertRowid), total_weight: item.totalWeight, order_total_weight: orderTotal });
+      auditLog('item', added.id, order.order_num, 'item_add', 'shape_payload', null, JSON.stringify(req.body), item.note || null, req.auth?.sub || null, req.auth?.display_name || null);
+      wsBroadcast('order_item_added', { orderId: Number(order.id), itemId: added.id, orderNum: order.order_num });
+      res.json({ success: true, itemId: added.id, total_weight: item.totalWeight, order_total_weight: added.orderTotal });
     } catch (error) {
       res.status(error.statusCode || 400).json({ success: false, error: error.message });
     }
@@ -1177,7 +1190,8 @@ module.exports = function createOrdersRouter(deps) {
           id: item.id,
           item_id: item.id,
           diameter,
-          material_type: JSON.parse(nextShapeSnapshot||'{}').family==='lifts'?'straight':(item.material_type || item.materialType || 'coil'),
+          material_type: cleanItem.meshMetrics?'mesh':JSON.parse(nextShapeSnapshot||'{}').family==='lifts'?'straight':(item.material_type || item.materialType || 'coil'),
+          mesh_specification:cleanItem.meshMetrics?.specification,
           total_weight: totalWeight,
           quantity,
           weight_per_unit: weightPerUnit,
@@ -1185,7 +1199,7 @@ module.exports = function createOrdersRouter(deps) {
         }],
       });
       const completion=require('../services/inventoryItemCompletion');
-      if(completion.policy(db)) completion.consumeItem(db,{item_id:item.id,strict:true,reason:correctionReason(req.body?.correction_reason ?? req.body?.correctionReason)||'עדכון פריט',actor_id:req.auth?.sub});
+      if(completion.policy(db)&&!cleanItem.meshMetrics) completion.consumeItem(db,{item_id:item.id,strict:true,reason:correctionReason(req.body?.correction_reason ?? req.body?.correctionReason)||'עדכון פריט',actor_id:req.auth?.sub});
       const orderTotal = recalcOrderWeights(req.params.orderId);
       return { releasedReservations, inventoryReservations, orderTotal };
     })();
@@ -1218,6 +1232,7 @@ module.exports = function createOrdersRouter(deps) {
       total_length_mm: item.total_length_mm,
       segments: item.segments,
     });
+    if(db.prepare('SELECT 1 FROM inventory_mesh_demands WHERE item_id=? LIMIT 1').get(item.id)) return res.status(409).json({error:'mesh_cancellation_required',user_message:'לביטול רשת יש להשתמש בביטול פריט, כדי לשמור את היסטוריית המלאי',cancellation_review_url:`/api/orders/${item.order_id}/items/${item.id}/cancellation-review`});
     const deleteResult = db.transaction(() => {
       const releasedReservations = releaseReservationsForItems(db, { item_ids: [item.id] });
       db.prepare("UPDATE inventory_reservations SET item_id=NULL, updated_at=CURRENT_TIMESTAMP WHERE item_id=? AND status='released'").run(item.id);

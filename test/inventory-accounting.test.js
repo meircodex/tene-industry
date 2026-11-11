@@ -8,7 +8,7 @@ const counts=require('../services/inventoryStocktake');
 const reservation=require('../services/inventoryReservation');
 const {planInventory}=require('../services/inventoryPlanning');
 const mesh=require('../services/meshInventory');
-const spec={length_mm:6000,width_mm:2500,longitudinal_diameter_mm:8,transverse_diameter_mm:8,longitudinal_spacing_mm:200,transverse_spacing_mm:200,grade:'B500A',standard_code:'SI-4466'};
+const spec={counting_confirmed:true,length_mm:6000,width_mm:2500,longitudinal_diameter_mm:8,transverse_diameter_mm:8,longitudinal_spacing_mm:200,transverse_spacing_mm:200,grade:'B500A',standard_code:'SI-4466'};
 function setup(){const db=new Database(':memory:');db.pragma('foreign_keys=ON');ensureCoreSchema(db);db.exec("INSERT INTO orders(id,order_num) VALUES(1,'ACCOUNTING');INSERT INTO items(id,order_id,diameter,total_weight,quantity) VALUES(1,1,12,100,10);INSERT INTO raw_material(id,diameter,material_type,weight_received) VALUES(1,12,'coil',1000)");return db;}
 function reserve(db,amount=100){return reservation.reserveMaterialForOrder(db,{order_id:1,items:[{id:1,diameter:12,material_type:'coil',total_weight:amount}]});}
 function count(db,value){const input={counted_at:new Date().toISOString(),reason:'ספירה',lines:[{raw_material_id:1,counted_kg:value}]};return {...input,preview_token:counts.previewStocktake(db,input).preview_token,idempotency_key:'count-1',actor_id:1};}
