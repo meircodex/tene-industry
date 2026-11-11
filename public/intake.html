@@ -2253,13 +2253,23 @@ async function searchCustomerForIntake(id) {
   results._customers = rows;
 }
 
-function selectCustomerForIntake(id, customerId) {
+async function selectCustomerForIntake(id, customerId) {
   const results = document.getElementById('customerResults_' + id);
   const customer = (results._customers || []).find(row => row.id === customerId);
   if (!customer) return;
   selectedCustomers[id] = customer;
+  const row = intakeRows.find(item => item.id === id);
+  if (row && !row.post_order_review) {
+    const parsed = activeCompareId === id ? readCorrectedParsed() : cloneParsedForCompare(parsedOf(row));
+    parsed.customer_name = customer.name;
+    if (customer.tax_id) parsed.customer_tax_id = customer.tax_id;
+    if (customer.phone) parsed.customer_phone = customer.phone;
+    if (!await saveIntakeDraft(id, { silent: true, parsedData: parsed })) return;
+    row.customer_match = { customer, candidates: [customer], needs_customer_review: false };
+  }
   toast('לקוח שויך להזמנה');
   renderIntakeQueue();
+  if (activeCompareId === id) openIntakeCompare(id);
 }
 
 
@@ -2423,7 +2433,7 @@ function ocrSourceTargetsHtml(row) {
   return '<div class="ocr-source-targets">' + headerTargets.concat(itemTargets).join('') + '</div>';
 }
 function intakeCompareSourceHtml(row) {
-  return '<div class="ocr-source-toolbar"><strong>' + escapeHtml(row?.file_name || row?.original_name || 'order105.pdf') + '</strong><button class="btn" onclick="setIntakeCompareZoom(-0.15)">-</button><span class="meta" id="intakeCompareZoomLabel">100%</span><button class="btn" onclick="setIntakeCompareZoom(0.15)">+</button><button class="btn" onclick="resetIntakeCompareZoom()">\u05d4\u05ea\u05d0\u05dd \u05e8\u05d5\u05d7\u05d1</button></div><div class="ocr-source-stage" id="ocrSourceStage"><div class="ocr-source-zoom" id="intakeCompareZoomTarget"><div class="ocr-source-highlight" id="ocrSourceHighlight"></div>' + ocrSourceTargetsHtml(row) + intakeSourceHtml(row) + '</div></div>';
+  return '<div class="ocr-source-toolbar"><strong>' + escapeHtml(intakeSourceFilename(row)) + '</strong><button class="btn" onclick="setIntakeCompareZoom(-0.15)">-</button><span class="meta" id="intakeCompareZoomLabel">100%</span><button class="btn" onclick="setIntakeCompareZoom(0.15)">+</button><button class="btn" onclick="resetIntakeCompareZoom()">\u05d4\u05ea\u05d0\u05dd \u05e8\u05d5\u05d7\u05d1</button></div><div class="ocr-source-stage" id="ocrSourceStage"><div class="ocr-source-zoom" id="intakeCompareZoomTarget"><div class="ocr-source-highlight" id="ocrSourceHighlight"></div>' + ocrSourceTargetsHtml(row) + intakeSourceHtml(row) + '</div></div>';
 }
 function highlightOcrTableTarget(path) {
   const raw = String(path || '');
@@ -2561,6 +2571,13 @@ function intakeDataUrlToBlob(dataUrl) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new Blob([bytes], { type: mime });
 }
+function intakeSourceFilename(row) {
+  const name = row?.original_filename || row?.file_name || row?.original_name || row?.parsed?.source_document_name || 'מסמך המקור';
+  if (Array.from(name).every(char => char.charCodeAt(0) <= 255)) {
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(name, char => char.charCodeAt(0))); } catch {}
+  }
+  return name;
+}
 function ocrReviewedItemKey(item, index) {
   return String(ocrItemNumber(item || {}, index) || index + 1).trim();
 }
@@ -2608,7 +2625,7 @@ async function reprocessIntakeOcr(id, options = {}) {
   }
   const currentParsed = activeCompareId === id ? readCorrectedParsed() : parsedOf(row);
   const formData = new FormData();
-  formData.append('image', blob, row.file_name || row.original_name || 'source.pdf');
+  formData.append('image', blob, intakeSourceFilename(row));
   formData.append('target_module', 'orders');
   formData.append('source_context', 'intake_review_reprocess');
   const summary = document.getElementById('ocrCorrectionSummary');

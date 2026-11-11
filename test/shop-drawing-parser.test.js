@@ -52,6 +52,20 @@ test('generic documents cannot opt into shop drawing columns by numeric coincide
   assert.equal(parseSteelDocument(input).items.length, 0);
 });
 
+test('shop drawing reads printed customer, project and site without inventing a date', () => {
+  const input=source();
+  input.tokens.push(word('בית ספר על יסודי, מגרש',490,111),word('801',448,111),word('– כרמי גת (מכרז/חוזה',420,111),word('03/2026 )',450,119),word('י.ד. עשוש תשתיות בע״מ',490,135));
+  const parsed=parseSteelDocument(input);
+  assert.equal(parsed.customer_name,'י.ד. עשוש תשתיות בע״מ');
+  assert.equal(parsed.project_name,'בית ספר על יסודי, מגרש 801 – כרמי גת (מכרז/חוזה 03/2026 )');
+  assert.equal(parsed.site_name,'בית ספר על יסודי, מגרש 801 – כרמי גת');
+  assert.equal(parsed.source_customer_name,parsed.customer_name);
+  assert.equal(parsed.delivery_date,null);
+  const emptyHeader=parseSteelDocument(source());
+  assert.equal(emptyHeader.customer_name,null);
+  assert.equal(emptyHeader.site_name,null);
+});
+
 test('closed hoop callouts preserve rectangle dimensions and separate printed closure allowance', () => {
   const input = source();
   input.tokens = [word(1,545),word(1,282),word(10,258),word(38,226),word('3.56',160),word('135.3',121),word('.617',88),word('83.5',58),

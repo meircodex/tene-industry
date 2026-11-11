@@ -86,6 +86,11 @@ function parseShopDrawing(tokens) {
     item.review_notes.push({ scope: 'item', field: 'item_number', code: 'non_contiguous_serials', severity: 'review',
       message: 'Shop-drawing serial numbers are duplicated, missing or out of order.', source: 'shop_drawing_parser' });
   }
-  return { items, row_reconstruction: items.map((item, index) => ({ index, ...item.source_ref })) };
+  const firstPage = tokens.filter(word => word.page === 1);
+  const projectName = firstPage.filter(word => word.top > 105 && word.top < 130 && inBand(word, 370, 535)).map(word => word.text).join(' ').trim();
+  const customerName = firstPage.filter(word => word.top > 130 && word.top < 146 && inBand(word, 460, 535)).map(word => word.text).join(' ').trim();
+  const siteName = projectName.replace(/\s*\(מכרז\/חוזה[\s\S]*$/, '').trim();
+  return { items, row_reconstruction: items.map((item, index) => ({ index, ...item.source_ref })),
+    header: { customer_name: customerName || null, project_name: projectName || null, site_name: siteName || null } };
 }
 module.exports = { isShopDrawing, parseShopDrawing };

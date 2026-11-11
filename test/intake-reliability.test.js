@@ -202,6 +202,33 @@ test('shop hoop preview uses rectangle dimensions rather than the first hook as 
   assert.deepEqual(Array.from(dimensions),[42,14,42,14]);
   assert.match(context.ocrCardShapeSvg({shape_name:'unknown'}),/uncertain shape/);
 });
+
+test('choosing an existing customer persists identity in the same intake draft', async () => {
+  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
+  const customer={id:15,name:'Existing customer',tax_id:'513432856',phone:'0500000000'};
+  let saved,opened;
+  const row={id:33,parsed:{site_name:'Printed site',items:[bentItem]}};
+  const context={document:{getElementById:()=>({_customers:[customer]})},selectedCustomers:{},intakeRows:[row],activeCompareId:33,
+    readCorrectedParsed:()=>structuredClone(row.parsed),saveIntakeDraft:async(id,options)=>{saved={id,parsed:options.parsedData};row.parsed=options.parsedData;return true;},
+    toast:()=>{},renderIntakeQueue:()=>{},openIntakeCompare:id=>{opened=id;}};
+  vm.createContext(context);vm.runInContext(functionText(source,'selectCustomerForIntake'),context);
+  await context.selectCustomerForIntake(33,15);
+  assert.equal(saved.id,33);
+  assert.equal(saved.parsed.customer_name,customer.name);
+  assert.equal(saved.parsed.customer_tax_id,customer.tax_id);
+  assert.equal(saved.parsed.site_name,'Printed site');
+  assert.equal(saved.parsed.items.length,1);
+  assert.equal(opened,33);
+});
+
+test('source filename preserves Hebrew UTF-8 and never uses the old sample filename', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
+  const context={TextDecoder,Uint8Array};vm.createContext(context);vm.runInContext(functionText(source,'intakeSourceFilename'),context);
+  const name='קירות ממ״מ 4.pdf';
+  assert.equal(context.intakeSourceFilename({original_filename:name}),name);
+  assert.equal(context.intakeSourceFilename({original_filename:Buffer.from(name).toString('latin1')}),name);
+  assert.equal(context.intakeSourceFilename({file_name:'source.pdf'}),'source.pdf');
+});
 test('quick PDF upload opens complete intake instead of flattening or dropping rows', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../public/new-order-editor.js'), 'utf8');
   const context = { document: { getElementById: () => null }, FormData, fetch: async () => ({ ok: true, json: async () => ({ intakeId: 55, items: [bentItem, { quantity: null }] }) }), window: { location: {}, intakeReviewUrl: id => '/intake.html?open=' + id }, showQuickImportMessage: () => {}, saveActiveDraftNow: () => {}, addIntakeRowsToOrder: () => { throw Error('must not flatten OCR geometry'); } };
