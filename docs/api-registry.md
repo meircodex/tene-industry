@@ -1,5 +1,13 @@
 # API Registry
 
+Shared editor drafts (2026-11-11): Orders owns GET
+`/api/operations/editor-drafts?before=<id>`, PUT
+`/api/operations/editor-drafts/:id`, POST
+`/api/operations/editor-drafts/:id/close`. Existing JWT office/manager/admin only;
+versioned full editor snapshots, 200-record pagination, 2 MB/1000-item bound,
+soft closure, audit and `editor_draft_updated`. No order or inventory creation.
+Details: `docs/editor-drafts-recovery-20261111.md`.
+
 Orders creation default (2026-11-11): the canonical `services/orders.js` creation
 service resolves missing/null/blank `order.deliveryDate` (or `delivery_date`) to
 today + two calendar days in Asia/Jerusalem. An explicit date remains explicit.

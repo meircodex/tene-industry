@@ -254,6 +254,10 @@ module.exports = function createOrdersRouter(deps) {
   const opActor=req=>({id:req.userId||req.auth?.sub,name:req.auth?.display_name||req.auth?.username||String(req.userId)});
   const opRun=fn=>(req,res)=>{try{fn(req,res);}catch(e){if(!e.statusCode)console.error('[OrderOperations]',e.message);res.status(e.statusCode||500).json({error:e.statusCode?e.message:'הפעולה נכשלה; לא נשמרה פעולה חלקית'});}};
   const opLimiter=rateLimit({windowMs:60000,limit:40,standardHeaders:true,legacyHeaders:false});
+  const editorDrafts = require('../services/editorDrafts').createEditorDraftService(db);
+  router.get('/operations/editor-drafts',requireAnyRole(['office','manager','admin']),opRun((req,res)=>{res.set('Cache-Control','no-store');res.json(editorDrafts.list(req.query.before));}));
+  router.put('/operations/editor-drafts/:id',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>{const draft=editorDrafts.save(req.params.id,req.body,opActor(req));wsBroadcast('editor_draft_updated',{draftId:draft.draftId});res.json(draft);}));
+  router.post('/operations/editor-drafts/:id/close',requireAnyRole(['office','manager','admin']),opLimiter,opRun((req,res)=>{const draft=editorDrafts.close(req.params.id,req.body,opActor(req));wsBroadcast('editor_draft_updated',{draftId:draft.draftId});res.json(draft);}));
   router.get('/operations/capabilities',requireAnyRole(['office','manager','admin']),(_req,res)=>res.json({version:1,authentication:'Existing user Bearer JWT; no new agent credentials are provisioned',order_drafts:'/api/operations/order-drafts',delivery_preview:'/api/operations/delivery-preview',delivery_issue:'/api/operations/delivery-notes',spreadsheet_preview:'/api/order-imports/preview',spreadsheet_approve:'/api/order-imports/:id/approve',image_intake:'/api/intake/image',text_intake:'/api/intake/parse-text',approval_required:true,ui:'/order-operations.html'}));
   router.get('/operations/orders',requireAnyRole(['office','warehouse','manager','admin']),opRun((_req,res)=>res.json({orders:db.prepare('SELECT o.id,o.order_num,o.customer_id,o.status,o.delivery_address,o.company_id,c.name customer_name FROM orders o LEFT JOIN customers c ON c.id=o.customer_id WHERE o.deleted_at IS NULL ORDER BY o.id DESC LIMIT 2000').all()})));
   router.get('/operations/order-drafts',requireAnyRole(['office','manager','admin']),opRun((_req,res)=>res.json({drafts:operations.listDrafts()})));
@@ -1311,6 +1315,7 @@ module.exports.manifest = {
     { table: 'historical_production_reconciliation_transactions' }, { table: 'historical_production_reconciliation_items' },
   ],
   produces: [
+    { event: 'editor_draft_updated' },
     { event: 'inventory_changed' },
     { event: 'new_order' },
     { event: 'order_quote_created' },

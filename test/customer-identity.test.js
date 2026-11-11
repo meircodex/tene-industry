@@ -120,7 +120,7 @@ test('new-order form keeps tax ID through customer selection, draft restore and 
   const context = vm.createContext({
     document: { getElementById: get, querySelectorAll: () => [] }, window: {},
     IronBendOrderDeliveryDate: require('../public/order-delivery-date'),
-    selectedCustomerSites: [], selectedCustomerAccountSummary: null,
+    selectedCustomerSites: [], selectedCustomerAccountSummary: null, customerHydrationGeneration: 0,
     pallets: [{ items: [{ diameter: 12, qty: 2, length: 1000 }] }],
     setInputValue: (id, value) => { get(id).value = value; },
     setInputValueIfEmpty: (id, value) => { if (!get(id).value) get(id).value = value; },

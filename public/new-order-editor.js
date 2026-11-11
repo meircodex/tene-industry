@@ -6,11 +6,16 @@
   const LEGACY_ORDER_DRAFT_KEY = 'ironbend:new-order:draft:v1';
   const DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
   const DRAFT_AUTOSAVE_MS = 2000;
-  const MAX_LOCAL_DRAFTS = 20;
   let currentDraftId = null;
   let draftAutosaveTimer = null;
   let draftStatusTimer = null;
   let isRestoringDraft = false;
+  let draftRestoreGeneration = 0;
+  let draftSyncQueue = Promise.resolve();
+  let sharedDraftsLoading = null;
+  let draftSubmitted = false;
+  let draftSubmissionInFlight = false;
+  const DRAFT_SYNC_URL = '/api/operations/editor-drafts';
 
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -268,10 +273,9 @@
     };
     const now = Date.now();
     store.drafts = store.drafts
-      .filter(draft => draft && draft.status !== 'deleted')
+      .filter(Boolean)
       .filter(draft => draft.status === 'submittedOffline' || now - draftTime(draft.updatedAt || draft.createdAt) <= DRAFT_TTL_MS)
-      .sort((a, b) => draftTime(b.updatedAt || b.createdAt) - draftTime(a.updatedAt || a.createdAt))
-      .slice(0, MAX_LOCAL_DRAFTS);
+      .sort((a, b) => draftTime(b.updatedAt || b.createdAt) - draftTime(a.updatedAt || a.createdAt));
 
     const legacy = readJsonStorage(LEGACY_ORDER_DRAFT_KEY, null);
     const legacySavedAt = legacy?.savedAt || '';
@@ -296,36 +300,36 @@
       version: 2,
       activeDraftId: store?.activeDraftId || '',
       drafts: (Array.isArray(store?.drafts) ? store.drafts : [])
-        .filter(draft => draft && draft.status !== 'deleted')
-        .sort((a, b) => draftTime(b.updatedAt || b.createdAt) - draftTime(a.updatedAt || a.createdAt))
-        .slice(0, MAX_LOCAL_DRAFTS),
+        .filter(Boolean)
+        .sort((a, b) => draftTime(b.updatedAt || b.createdAt) - draftTime(a.updatedAt || a.createdAt)),
     };
     writeJsonStorage(NEW_ORDER_DRAFTS_KEY, normalized);
     return normalized;
   }
 
   function visibleDrafts() {
-    return getDraftStore().drafts.filter(draft => draft.status === 'active');
+    return getDraftStore().drafts.filter(draft => draft.status === 'active' && isMeaningfulOrderDraft(draft.payload || {}));
   }
 
   function draftItemCount(payload = {}) {
-    return (payload.pallets || []).reduce((sum, pallet) => sum + ((pallet.items || []).length), 0);
+    return draftItems(payload).length;
   }
 
   function draftEstimatedWeight(payload = {}) {
     let total = 0;
-    (payload.pallets || []).forEach(pallet => (pallet.items || []).forEach(item => {
+    draftItems(payload).forEach(item => {
       if (typeof window.calcItemWeight === 'function') {
         try { total += Number(window.calcItemWeight(item)) || 0; } catch {}
       } else {
         total += Number(item.totalWeight || item.total_weight || item.weight || 0) || 0;
       }
-    }));
+    });
     return total;
   }
 
   function draftItems(payload = {}) {
-    return (payload.pallets || []).flatMap(pallet => Array.isArray(pallet?.items) ? pallet.items : []);
+    return (payload.pallets || []).flatMap(pallet => Array.isArray(pallet?.items) ? pallet.items : [])
+      .filter(item => item && !(typeof window.isPristineOrderItemPlaceholder === 'function' && window.isPristineOrderItemPlaceholder(item)));
   }
 
   function firstNonEmpty(values = []) {
@@ -399,6 +403,7 @@
   }
 
   function buildDraftRecord(payload = {}, meta = {}) {
+    payload = JSON.parse(JSON.stringify(payload));
     const now = new Date().toISOString();
     const summary = buildDraftSummary(payload);
     return {
@@ -451,10 +456,88 @@
   }
 
   function draftDisplaySummary(draft = {}) {
-    return {
-      ...buildDraftSummary(draft.payload || {}),
-      ...(draft.summary || {}),
-    };
+    return draft.payload ? buildDraftSummary(draft.payload) : (draft.summary || {});
+  }
+
+  async function draftRequest(path = '', options = {}) {
+    const response = await fetch(DRAFT_SYNC_URL + path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error(data.error || 'שמירת הטיוטה במערכת נכשלה; העותק המקומי נשמר במחשב'), { status: response.status });
+    return data;
+  }
+
+  function queueDraftSync(draftId, closeOptions = null) {
+    draftSyncQueue = draftSyncQueue.catch(() => {}).then(async () => {
+      let store = getDraftStore();
+      let record = store.drafts.find(draft => draft.draftId === draftId);
+      if (!record || !isMeaningfulOrderDraft(record.payload || {}) || record.status === 'submittedOffline') return;
+      try {
+        if (record.status === 'active' || (closeOptions && !record.serverVersion)) {
+          const remote = await draftRequest('/' + encodeURIComponent(draftId), { method: 'PUT', body: JSON.stringify({ record, version: record.serverVersion || 0 }) });
+          store = getDraftStore();
+          store.drafts = store.drafts.map(draft => draft.draftId === draftId ? { ...draft, serverVersion: remote.serverVersion, syncPending: JSON.stringify(draft.payload) !== JSON.stringify(remote.payload), syncError: '', syncConflict: false } : draft);
+          saveDraftStore(store);
+          record = store.drafts.find(draft => draft.draftId === draftId);
+        }
+        if (closeOptions && record?.serverVersion) {
+          const remote = await draftRequest('/' + encodeURIComponent(draftId) + '/close', { method: 'POST', body: JSON.stringify({ version: record.serverVersion, ...closeOptions }) });
+          store = getDraftStore();
+          store.drafts = store.drafts.map(draft => draft.draftId === draftId ? { ...draft, status: remote.status, serverVersion: remote.serverVersion, orderId: remote.orderId, syncPending: false } : draft);
+          saveDraftStore(store);
+        }
+        if (currentDraftId === draftId && !closeOptions) setDraftStatus('הטיוטה נשמרה במערכת');
+      } catch (error) {
+        const message = error.status ? error.message : 'אין חיבור לשמירת הטיוטה במערכת. השינויים נשמרו במחשב זה ויסתנכרנו כשהחיבור יחזור';
+        store = getDraftStore();
+        store.drafts = store.drafts.map(draft => draft.draftId === draftId ? { ...draft, syncPending: true, syncError: message, syncConflict: error.status === 409 } : draft);
+        saveDraftStore(store);
+        if (!closeOptions || currentDraftId === draftId) setDraftStatus(message);
+      }
+      updateDraftsButton();
+      if (!document.getElementById('orderDraftsPopover')?.hidden) renderDraftsPopover();
+    });
+    return draftSyncQueue;
+  }
+
+  async function loadSharedDrafts() {
+    if (sharedDraftsLoading) return sharedDraftsLoading;
+    sharedDraftsLoading = (async () => {
+      try {
+        const remotes = []; let cursor = '';
+        do {
+          const page = await draftRequest(cursor ? '?before=' + cursor : '');
+          remotes.push(...page.drafts); cursor = page.nextCursor;
+        } while (cursor);
+        const store = getDraftStore();
+        for (const remote of remotes) {
+          const local = store.drafts.find(draft => draft.draftId === remote.draftId);
+          if (!local) store.drafts.push(remote);
+          else if (local.syncConflict && local.status === 'active' || (remote.status !== 'active' && local.status === 'active' && local.syncPending && JSON.stringify(local.payload) !== JSON.stringify(remote.payload))) {
+            // Keep the unsynced edits as a separate recoverable draft, then
+            // expose the authoritative version without overwriting either.
+            const copyId = createDraftId();
+            store.drafts.push({ ...local, draftId: copyId, serverVersion: 0, syncPending: true, syncConflict: false, syncError: '', legacyKey: '', recoveredFromDraftId: local.draftId });
+            if (currentDraftId === local.draftId) currentDraftId = copyId;
+            Object.assign(local, remote, { syncPending: false, syncConflict: false, syncError: '' });
+            setDraftStatus('הטיוטה נערכה בחלון אחר; השינויים שלך נשמרו בטיוטה נפרדת');
+          } else if (remote.status !== 'active' || !local.syncPending) {
+            Object.assign(local, remote);
+            if (remote.status !== 'active' && currentDraftId === remote.draftId) { draftSubmitted = true; clearTimeout(draftAutosaveTimer); }
+          }
+        }
+        saveDraftStore(store);
+        for (const draft of store.drafts) {
+          if (draft.status === 'active' && isMeaningfulOrderDraft(draft.payload || {}) && (!draft.serverVersion || draft.syncPending)) queueDraftSync(draft.draftId);
+          if (draft.status === 'submitted' && draft.syncPending && draft.orderId) queueDraftSync(draft.draftId, { orderId: draft.orderId });
+        }
+        updateDraftsButton();
+        if (!document.getElementById('orderDraftsPopover')?.hidden) renderDraftsPopover();
+        if (!currentDraftId && visibleDrafts().length) showDraftRestoreBanner();
+      } catch {
+        setDraftStatus('אין חיבור לטיוטות שבמערכת; הטיוטות המקומיות זמינות במחשב זה');
+      } finally { sharedDraftsLoading = null; }
+    })();
+    return sharedDraftsLoading;
   }
 
   function draftPrimaryLine(summary = {}) {
@@ -611,6 +694,7 @@
     const btn = document.getElementById('orderDraftsButton');
     if (popover) popover.hidden = false;
     if (btn) btn.setAttribute('aria-expanded', 'true');
+    loadSharedDrafts();
   }
 
   function closeDraftsPopover() {
@@ -620,25 +704,31 @@
     if (btn) btn.setAttribute('aria-expanded', 'false');
   }
 
-  function restoreDraftPayload(payload = {}) {
+  async function restoreDraftPayload(payload = {}) {
+    const generation = ++draftRestoreGeneration;
+    clearTimeout(draftAutosaveTimer);
     isRestoringDraft = true;
     try {
       localStorage.setItem(LEGACY_ORDER_DRAFT_KEY, JSON.stringify(payload));
       if (typeof window.restoreOrderDraft === 'function') window.restoreOrderDraft();
       else if (Array.isArray(payload.pallets)) { pallets = payload.pallets; minRenderPallets(); }
+      await window.orderDraftHydration;
     } finally {
-      setTimeout(() => { isRestoringDraft = false; }, 600);
+      if (generation === draftRestoreGeneration) isRestoringDraft = false;
     }
   }
 
   function continueDraft(draftId) {
+    if (currentDraftId !== draftId) saveActiveDraftNow({ silent: true });
+    clearTimeout(draftAutosaveTimer);
     const store = getDraftStore();
     const draft = store.drafts.find(row => row.draftId === draftId);
     if (!draft) return;
+    draftSubmitted = false;
     currentDraftId = draft.draftId;
     store.activeDraftId = draft.draftId;
     saveDraftStore(store);
-    restoreDraftPayload(draft.payload || {});
+    restoreDraftPayload(JSON.parse(JSON.stringify(draft.payload || {})));
     hideDraftRestoreBanner();
     closeDraftsPopover();
     setDraftStatus('טיוטה שוחזרה');
@@ -649,10 +739,11 @@
     if (!draftId) return;
     if (!confirm('למחוק את הטיוטה?')) return;
     const store = getDraftStore();
-    store.drafts = store.drafts.filter(draft => draft.draftId !== draftId);
+    store.drafts = store.drafts.map(draft => draft.draftId === draftId ? { ...draft, status: 'deleted' } : draft);
     if (store.activeDraftId === draftId) store.activeDraftId = '';
     if (currentDraftId === draftId) currentDraftId = null;
     saveDraftStore(store);
+    queueDraftSync(draftId, {});
     updateDraftsButton();
     renderDraftsPopover();
     if (!visibleDrafts().length) hideDraftRestoreBanner();
@@ -662,26 +753,30 @@
     const store = getDraftStore();
     const now = Date.now();
     store.drafts = store.drafts.filter(draft => {
-      if (draft.status === 'submitted' || draft.status === 'deleted') return false;
       return now - draftTime(draft.updatedAt || draft.createdAt) <= DRAFT_TTL_MS;
     });
     saveDraftStore(store);
     updateDraftsButton();
   }
 
-  function removeActiveDraft({ submittedOffline = false } = {}) {
+  function removeActiveDraft({ submittedOffline = false, orderId = null } = {}) {
+    clearTimeout(draftAutosaveTimer);
+    clearTimeout(draftStatusTimer);
+    draftSubmitted = true;
     if (!currentDraftId) return;
+    const submittedId = currentDraftId;
     const store = getDraftStore();
     if (submittedOffline) {
       store.drafts = store.drafts.map(draft => draft.draftId === currentDraftId ? { ...draft, status: 'submittedOffline', updatedAt: new Date().toISOString() } : draft);
     } else {
-      store.drafts = store.drafts.filter(draft => draft.draftId !== currentDraftId);
+      store.drafts = store.drafts.map(draft => draft.draftId === currentDraftId ? { ...draft, status: 'submitted', orderId, syncPending: Boolean(orderId) } : draft);
     }
     if (store.activeDraftId === currentDraftId) store.activeDraftId = '';
     currentDraftId = null;
     saveDraftStore(store);
     try { localStorage.removeItem(LEGACY_ORDER_DRAFT_KEY); } catch {}
     updateDraftsButton();
+    if (orderId) queueDraftSync(submittedId, { orderId });
   }
 
   function captureCurrentDraftRecord() {
@@ -692,7 +787,7 @@
   }
 
   function saveActiveDraftNow(options = {}) {
-    if (isRestoringDraft) return null;
+    if (isRestoringDraft || draftSubmitted) return null;
     const record = captureCurrentDraftRecord();
     if (!record) {
       if (!options.silent) setDraftStatus('אין טיוטה לשמירה');
@@ -703,21 +798,23 @@
     record.draftId = existing?.draftId || currentDraftId || record.draftId;
     record.createdAt = existing?.createdAt || record.createdAt;
     record.legacyKey = existing?.legacyKey || '';
+    record.serverVersion = existing?.serverVersion || 0;
+    record.syncPending = true;
     currentDraftId = record.draftId;
     store.activeDraftId = record.draftId;
     store.drafts = [record, ...store.drafts.filter(draft => draft.draftId !== record.draftId && draft.legacyKey !== LEGACY_ORDER_DRAFT_KEY)];
     saveDraftStore(store);
     try { localStorage.setItem(LEGACY_ORDER_DRAFT_KEY, JSON.stringify(record.payload)); } catch {}
-    setDraftStatus(options.silent ? 'נשמר לפני רגע' : 'טיוטה נשמרה');
+    setDraftStatus('הטיוטה נשמרה במחשב; מסנכרן למערכת...');
     clearTimeout(draftStatusTimer);
-    draftStatusTimer = setTimeout(() => setDraftStatus('נשמר לפני רגע'), 1200);
+    queueDraftSync(record.draftId);
     updateDraftsButton();
     hideDraftRestoreBanner();
     return record;
   }
 
   function scheduleDraftAutosave() {
-    if (isRestoringDraft) return;
+    if (isRestoringDraft || draftSubmitted) return;
     clearTimeout(draftAutosaveTimer);
     const pending = typeof window.captureOrderDraft === 'function' ? window.captureOrderDraft() : null;
     if (!pending || !isMeaningfulOrderDraft(pending)) return;
@@ -1362,10 +1459,8 @@
 
   function wrapDraftAwareGlobals() {
     if (window.NewOrderEditorDrafts?.wrapped) return;
-    const originalSaveDraftNow = window.saveDraftNow;
     window.saveDraftNow = function saveDraftNowV2() {
       const record = saveActiveDraftNow({ silent: false });
-      if (!record && typeof originalSaveDraftNow === 'function') return originalSaveDraftNow();
       if (record && typeof showQuickImportMessage === 'function') showQuickImportMessage('הטיוטה נשמרה');
       return record;
     };
@@ -1373,17 +1468,22 @@
     const originalClearOrderDraft = window.clearOrderDraft;
     window.clearOrderDraft = function clearOrderDraftV2() {
       if (typeof originalClearOrderDraft === 'function') originalClearOrderDraft();
-      removeActiveDraft();
+      if (!draftSubmissionInFlight) removeActiveDraft();
     };
 
     const originalSubmitOrder = window.submitOrder;
     if (typeof originalSubmitOrder === 'function') {
       window.submitOrder = async function submitOrderDraftAware(...args) {
-        const result = await originalSubmitOrder.apply(this, args);
+        clearTimeout(draftAutosaveTimer);
+        saveActiveDraftNow({ silent: true });
+        draftSubmissionInFlight = true;
+        let result;
+        try { result = await originalSubmitOrder.apply(this, args); }
+        finally { draftSubmissionInFlight = false; }
         const successOverlay = document.getElementById('successOverlay');
         if (successOverlay?.classList.contains('show')) {
           const offline = /ממתין|סנכרון|offline/i.test(document.getElementById('successOrderNum')?.textContent || '');
-          removeActiveDraft({ submittedOffline: offline });
+          removeActiveDraft({ submittedOffline: offline, orderId: Number(successOverlay.getAttribute('data-order-id')) || null });
         }
         return result;
       };
@@ -1392,6 +1492,8 @@
     const originalNewOrder = window.newOrder;
     if (typeof originalNewOrder === 'function') {
       window.newOrder = function newOrderDraftAware(...args) {
+        clearTimeout(draftAutosaveTimer);
+        draftSubmitted = false;
         currentDraftId = null;
         closeDraftsPopover();
         hideDraftRestoreBanner();
@@ -1475,6 +1577,7 @@
     window.showDraftRestoreBanner = showDraftRestoreBanner;
     window.hideDraftRestoreBanner = hideDraftRestoreBanner;
     window.isMeaningfulOrderDraft = isMeaningfulOrderDraft;
+    window.loadSharedOrderDrafts = loadSharedDrafts;
   }
 
   function boot() {
@@ -1483,12 +1586,15 @@
     deleteAllSubmittedOrExpiredDrafts();
     minUpdateContextStrip(); minRenderDefaultInspector(); minRenderPallets();
     if (visibleDrafts().length) showDraftRestoreBanner();
+    loadSharedDrafts();
     window.NewOrderEditor = { installed: true, applyMinimalLayout, renderInspector: minRenderInspector };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
   window.addEventListener('load', () => { setupDom(); bindDraftAutosaveTriggers(); applyMinimalLayout(); minUpdateContextStrip(); minRenderPricingSummary(); minRenderInventorySummary(); updateDraftsButton(); if (visibleDrafts().length && !currentDraftId) showDraftRestoreBanner(); });
   window.addEventListener('resize', applyMinimalLayout);
+  window.addEventListener('online', loadSharedDrafts);
+  window.addEventListener('storage', event => { if (event.key === NEW_ORDER_DRAFTS_KEY) { updateDraftsButton(); if (!document.getElementById('orderDraftsPopover')?.hidden) renderDraftsPopover(); } });
   setTimeout(() => { setupDom(); bindDraftAutosaveTriggers(); applyMinimalLayout(); minUpdateContextStrip(); minRenderPricingSummary(); minRenderInventorySummary(); updateDraftsButton(); if (visibleDrafts().length && !currentDraftId) showDraftRestoreBanner(); }, 250);
   setTimeout(() => { setupDom(); bindDraftAutosaveTriggers(); applyMinimalLayout(); minUpdateContextStrip(); minRenderPricingSummary(); minRenderInventorySummary(); updateDraftsButton(); if (visibleDrafts().length && !currentDraftId) showDraftRestoreBanner(); }, 800);
 })();

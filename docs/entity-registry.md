@@ -1,5 +1,10 @@
 # Entity Registry
 
+`direct_order_drafts` (Orders, 2026-11-11) also stores complete shape-editor UI
+snapshots under source `new-order-editor-v2`. `external_id` is the client draft
+ID, `version` guards concurrent writes, and `submitted`/`deleted` retain payload
+as cross-browser closure tombstones. These rows never represent production orders.
+
 ## Shared shape catalogue extension — 2026-11-08
 
 Owner: Orders / Catalog. Additive D2 columns on `shapes`: `item_code` (unique, case-insensitive text; leading zeros retained), `definition_json` (complete editor family payload), `billing_json` (policy version 1), `definition_version` (optimistic update counter). Null definition marks legacy rows; no automatic conversion or deletion occurs. Quantity, order identity and element name are excluded from a reusable definition.

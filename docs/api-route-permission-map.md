@@ -1,5 +1,10 @@
 # API Route Permission Map
 
+`GET /api/operations/editor-drafts`, `PUT .../:id`, `POST .../:id/close`
+(2026-11-11): office/manager/admin existing JWT only. Production, warehouse,
+portal and unauthenticated clients cannot read/write these shared editor
+snapshots. Same internal-office scope as existing direct order proposals.
+
 Working baseline for turning the current API surface into a role-governed product.
 
 Source files:

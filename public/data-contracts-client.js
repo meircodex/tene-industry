@@ -4,6 +4,11 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    editorDrafts: {
+      screen:'index.html',owner:'Orders',source:{api:'/api/operations/editor-drafts',fields:['draftId','payload.customer','payload.delivery','payload.pallets','serverVersion','status','orderId']},
+      meaning:'Authenticated office/manager/admin users share editor snapshots before an official order exists. Local cache remains available during disconnects. Untouched startup rows do not create/count as drafts. Payload is authoritative for summary fields; restore preserves saved delivery/site/contact values while customer sites load. Optimistic versions prevent silent overwrites; a conflict keeps a separate copy. Successful submission closes the linked draft and cancels pending autosave. Draft writes create no orders and consume no stock.',
+      consumers:['orderDraftsButton','orderDraftsCount','orderDraftsPopover','orderDraftRestoreBanner','orderDraftAutosaveState'],risk:'D1',
+    },
     orderDeliveryDate: {
       screen:'index.html',owner:'Orders',source:{api:'/api/orders',fields:['order.deliveryDate','orders.delivery_date']},
       meaning:'An explicit delivery date is retained. Missing/null/blank date becomes two calendar days after the factory local date (Asia/Jerusalem), including weekends. New form and save use the same pure calendar policy; the canonical order service also applies it. Existing orders are not rewritten.',

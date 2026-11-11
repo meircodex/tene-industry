@@ -2588,11 +2588,17 @@ function applyCustomerSite(site = {}) {
   updateDeliverySummary();
 }
 
-function renderCustomerSiteChoice(sites = [], customer = {}) {
+function renderCustomerSiteChoice(sites = [], customer = {}, options = {}) {
   selectedCustomerSites = activeCustomerSites(sites);
   const wrap = document.getElementById('customerSiteChoiceWrap');
   const select = document.getElementById('customerSiteChoice');
   if (!wrap || !select) return;
+  if (options.preserveDelivery) {
+    wrap.style.display = selectedCustomerSites.length > 1 ? '' : 'none';
+    select.innerHTML = '<option value="">בחר אתר...</option>' + selectedCustomerSites.map(site => '<option value="' + escapeHtml(site.id) + '">' + escapeHtml([site.name,site.address,site.city].filter(Boolean).join(' - ')) + '</option>').join('');
+    select.value = document.getElementById('orderSiteId')?.value || '';
+    return;
+  }
   if (!selectedCustomerSites.length) {
     wrap.style.display = 'none';
     select.innerHTML = '';
@@ -2623,7 +2629,9 @@ function applySelectedCustomerSite() {
   if (site) applyCustomerSite(site);
 }
 
-async function hydrateSelectedCustomer(customerId, seed = {}) {
+let customerHydrationGeneration = 0;
+async function hydrateSelectedCustomer(customerId, seed = {}, options = {}) {
+  const generation = ++customerHydrationGeneration;
   const id = Number(customerId || seed.id || 0);
   if (!id) return;
   try {
@@ -2632,10 +2640,11 @@ async function hydrateSelectedCustomer(customerId, seed = {}) {
       fetch('/api/customers/' + encodeURIComponent(id) + '/portal-sites'),
     ]);
     const customer = customerRes.ok ? await customerRes.json() : seed;
-    if (customerRes.ok && Number(customer.id) && Number(customer.id) !== id) return hydrateSelectedCustomer(Number(customer.id), customer);
+    if (generation !== customerHydrationGeneration || Number(window._selectedCustomerId) !== id) return;
+    if (customerRes.ok && Number(customer.id) && Number(customer.id) !== id) { window._selectedCustomerId = Number(customer.id); return hydrateSelectedCustomer(Number(customer.id), customer, options); }
     const sitesData = sitesRes.ok ? await sitesRes.json() : { sites: [] };
-    applyCustomerDetails({ ...seed, ...customer, id });
-    renderCustomerSiteChoice(sitesData.sites || [], { ...seed, ...customer, id });
+    if (!options.preserveDelivery) applyCustomerDetails({ ...seed, ...customer, id });
+    renderCustomerSiteChoice(sitesData.sites || [], { ...seed, ...customer, id }, options);
     const copy = selectedCustomerSites.length > 1
       ? '\u05e0\u05d1\u05d7\u05e8 \u05dc\u05e7\u05d5\u05d7 \u05e7\u05d9\u05d9\u05dd. \u05d9\u05e9 \u05dc\u05d5 \u05db\u05de\u05d4 \u05d0\u05ea\u05e8\u05d9\u05dd - \u05d1\u05d7\u05e8 \u05d0\u05ea\u05e8 \u05d1\u05e4\u05e8\u05d8\u05d9 \u05d4\u05d0\u05e1\u05e4\u05e7\u05d4.'
       : '\u05e0\u05d1\u05d7\u05e8 \u05dc\u05e7\u05d5\u05d7 \u05e7\u05d9\u05d9\u05dd. \u05e4\u05e8\u05d8\u05d9 \u05dc\u05e7\u05d5\u05d7 \u05d5\u05d0\u05ea\u05e8 \u05de\u05d5\u05dc\u05d0\u05d5 \u05d0\u05dd \u05e7\u05d9\u05d9\u05de\u05d9\u05dd.';
@@ -2643,7 +2652,8 @@ async function hydrateSelectedCustomer(customerId, seed = {}) {
     loadCustomerAccountSummary(id);
     schedulePricePreview();
   } catch (err) {
-    applyCustomerDetails(seed);
+    if (generation !== customerHydrationGeneration || Number(window._selectedCustomerId) !== id) return;
+    if (!options.preserveDelivery) applyCustomerDetails(seed);
     setCustomerState(seed.priority_id ? '\u05dc\u05e7\u05d5\u05d7 \u05e7\u05d9\u05d9\u05dd: ' + seed.priority_id : '\u05dc\u05e7\u05d5\u05d7 \u05e7\u05d9\u05d9\u05dd \u05e9\u05d5\u05d9\u05da', '\u05d4\u05dc\u05e7\u05d5\u05d7 \u05e0\u05d1\u05d7\u05e8. \u05dc\u05d0 \u05d4\u05e6\u05dc\u05d7\u05e0\u05d5 \u05dc\u05d8\u05e2\u05d5\u05df \u05d0\u05ea\u05e8\u05d9\u05dd \u05db\u05e8\u05d2\u05e2.');
   }
 }
@@ -2679,6 +2689,8 @@ function saveOrderDraftForCustomerHandoff() {
 }
 
 function restoreOrderDraft() {
+  ++customerHydrationGeneration;
+  window.orderDraftHydration = null;
   const draft = readOrderDraft();
   if (!draft || draftAgeMs(draft) > ORDER_DRAFT_MAX_AGE_MS) {
     if (draft) clearOrderDraft();
@@ -2709,7 +2721,7 @@ function restoreOrderDraft() {
     pallets = draft.pallets;
     renderPallets();
   }
-  if (c.id) hydrateSelectedCustomer(c.id, { id: c.id, name: c.name, phone: c.phone, tax_id: c.taxId, priority_id: c.priorityId, contact_name: c.contactName, contact_phone: c.contactPhone });
+  if (c.id) window.orderDraftHydration = hydrateSelectedCustomer(c.id, { id: c.id, name: c.name, phone: c.phone, tax_id: c.taxId, priority_id: c.priorityId, contact_name: c.contactName, contact_phone: c.contactPhone }, { preserveDelivery: true });
   setCustomerState(c.id ? '\u05d8\u05d9\u05d5\u05d8\u05d4 \u05e9\u05d5\u05d7\u05d6\u05e8\u05d4' : '\u05dc\u05e7\u05d5\u05d7 \u05de\u05d8\u05d9\u05d5\u05d8\u05d4', '\u05d4\u05d8\u05d5\u05e4\u05e1 \u05e9\u05d5\u05d7\u05d6\u05e8 \u05de\u05e9\u05de\u05d9\u05e8\u05d4 \u05de\u05e7\u05d5\u05de\u05d9\u05ea.');
   updateDeliverySummary();
   updateCustomerSummary();
@@ -4306,6 +4318,6 @@ document.getElementById('imgAnalyzeOverlay').addEventListener('click', function(
 });
 </script>
 <script src="/order-line-renderer.js?v=2"></script>
-<script src="/new-order-editor.js?v=8"></script>
+<script src="/new-order-editor.js?v=9"></script>
 </body>
 </html>

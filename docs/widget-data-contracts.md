@@ -1,5 +1,11 @@
 # Widget Data Contracts
 
+`editorDrafts` (2026-11-11, Orders) uses shared versioned editor snapshots from
+`/api/operations/editor-drafts` and a local offline cache. Counts exclude empty
+startup rows; labels/weights come from the saved payload, not stale summaries.
+Restoration preserves manual delivery/site/contact fields. See
+`docs/editor-drafts-recovery-20261111.md` for sync/conflict/submission semantics.
+
 `orderDeliveryDate` (2026-11-11, Orders): explicit dates are retained; an empty
 delivery field does not block order creation. Initial form and save resolve the
 date through the shared policy, two factory calendar days ahead including

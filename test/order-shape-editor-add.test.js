@@ -83,14 +83,15 @@ test('new order first shape consumes the temporary startup row', () => {
   assert.match(js, /pallet\.items = pallet\.items\.filter\(item => !window\.isPristineOrderItemPlaceholder\(item\)\)/);
 });
 
-test('new order local multi-drafts stay client-side and expose compact draft actions', () => {
+test('new order shared drafts retain a local cache and expose compact draft actions', () => {
   const js = newOrderEditor();
   assert.match(js, /NEW_ORDER_DRAFTS_KEY = 'ironbend:new-order:drafts:v2'/);
   assert.match(js, /function scheduleDraftAutosave\(\)/);
   assert.match(js, /function continueDraft\(draftId\)/);
   assert.match(js, /function deleteDraft\(draftId\)/);
   assert.match(js, /function showDraftRestoreBanner\(\)/);
-  assert.match(js, /MAX_LOCAL_DRAFTS = 20/);
+  assert.match(js, /DRAFT_SYNC_URL = '\/api\/operations\/editor-drafts'/);
+  assert.doesNotMatch(js, /slice\(0, MAX_LOCAL_DRAFTS\)/);
   assert.match(js, /DRAFT_TTL_MS = 14 \* 24 \* 60 \* 60 \* 1000/);
   assert.match(js, /writeJsonStorage\(NEW_ORDER_DRAFTS_KEY/);
   assert.doesNotMatch(js, /\/api\/order-drafts|\/api\/drafts|order_drafts|draft_orders/);

@@ -5,6 +5,14 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('shared editor drafts stay within Orders and require office roles', () => {
+  const source = fs.readFileSync(path.join(root, 'routes/orders.js'), 'utf8');
+  for (const method of ['get', 'put', 'post']) {
+    assert.match(source, new RegExp("router\\." + method + "\\('/operations/editor-drafts[^']*',requireAnyRole\\(\\['office','manager','admin'\\]\\)"));
+  }
+  assert.match(source, /services\/editorDrafts/);
+});
+
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }

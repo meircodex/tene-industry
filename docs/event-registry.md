@@ -1,5 +1,9 @@
 # Event Registry
 
+`editor_draft_updated` (Orders, 2026-11-11): emitted after shared editor snapshot
+save/close, payload `{draftId}` only. It does not signal order creation or stock
+movement. Lists refresh through the authenticated draft API.
+
 `inventory_changed` is also emitted by Orders after an item correction or a
 cancellation disposition that may reconcile tracked consumption. Inventory owns
 all physical balance writes and append-only correction movements.

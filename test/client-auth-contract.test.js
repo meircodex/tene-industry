@@ -892,7 +892,7 @@ test('new order screen uses compact workspace layout with sticky summary', () =>
   assert.match(index, /id="customerSiteChoice"/);
   assert.match(index, /id="orderSiteId"/);
   assert.match(index, /\/api\/customers\/.*\/portal-sites/);
-  assert.match(index, /function hydrateSelectedCustomer\(customerId, seed = \{\}\)/);
+  assert.match(index, /function hydrateSelectedCustomer\(customerId, seed = \{\}, options = \{\}\)/);
   assert.match(index, /function clearSelectedCustomerBinding\(\)/);
   assert.match(index, /function onCustomerSearchInput\(value\)/);
   assert.match(index, /window\._selectedCustomerName = c\.name \|\| ''/);
