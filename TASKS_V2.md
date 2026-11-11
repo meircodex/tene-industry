@@ -1,7 +1,7 @@
 # TASKS_V2 — IronBend V2
 
 ### Intake compact shop drawings — 2026-11-11
-- status: in_progress
+- status: done
 - owner: codex/seven-order-intake-20261111
 - module: Intake / Orders
 - Input: original digital SHOP DRAWING PDFs and positioned text.
@@ -9,6 +9,7 @@
 - Scope: new shop-drawing adapter, parser dispatch and deterministic intake branch.
 - DB/API/events/screens: existing intake_log, authenticated analyze-image, new_intake and comparison workspace; no schema or UI changes.
 - Done: all numeric rows match source quantities, lengths and weights; unverified bends remain blocked for review; existing parser/auth tests pass.
+- Verified: 1,214 tests pass; live deploy fa2a97f; original sources staged once as intake IDs 33–39, with 31/35/25/21/21/21/23 rows (177 total). Browser values for diameter, quantity and cut length match all source rows. Closed-hoop callouts retain width, height and closure allowance separately. Final shape review and order approval remain pending; no production orders were created by this task.
 
 לוח המשימות המרכזי לבנייה מחדש. אין לעבוד ממשימות בצ'אט בלבד.
 
