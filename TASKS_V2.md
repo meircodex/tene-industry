@@ -10,8 +10,9 @@
 - DB/API/events/screens: existing intake_log, authenticated analyze-image, new_intake and comparison workspace; no schema or UI changes.
 - Done: all numeric rows match source quantities, lengths and weights; unverified bends remain blocked for review; existing parser/auth tests pass.
 - Verified: 1,214 tests pass; live deploy fa2a97f; original sources staged once as intake IDs 33–39, with 31/35/25/21/21/21/23 rows (177 total). Browser values for diameter, quantity and cut length match all source rows. Closed-hoop callouts retain width, height and closure allowance separately. Final shape review and order approval remain pending; no production orders were created by this task.
-- Follow-up in progress: product owner clarified symmetric hoop closure allowance is shared by both ends (23 cm means 11.5 cm per end). Preserve six-segment geometry, display the rectangle rather than a U, and refresh the same seven drafts without duplicating them or approving production.
+- Follow-up verified: product owner clarified symmetric hoop closure allowance is shared by both ends (23 cm means 11.5 cm per end). All 38 hoops in intake IDs 33–39 now retain six-segment geometry and display the rectangle with equal ends. Same drafts refreshed, with no duplicate or production-order creation.
 - Metadata follow-up: extract printed customer/project/site from the positioned header, preserve source values, persist an explicit existing-customer choice in the same draft, and display/reprocess the original Hebrew filename. Missing delivery dates stay empty. No customer/site master records are created automatically.
+- Live verification 2026-11-11: existing customer י.ד עשוש selected and persisted in all seven drafts; site בית ספר על יסודי, מגרש 801 – כרמי גת and project/contract 03/2026 saved from the source. All 177 diameter/quantity/cut-length tuples and 38 symmetric hoop end pairs match after update. 1,227 merged tests pass; live code f09bc0d. Other bend shapes and final production approval remain pending.
 
 לוח המשימות המרכזי לבנייה מחדש. אין לעבוד ממשימות בצ'אט בלבד.
 
