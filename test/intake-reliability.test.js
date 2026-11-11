@@ -177,6 +177,31 @@ function functionText(source, name) {
   const next = source.slice(start + 1).search(/\n(?:  )?(?:async )?function /);
   return source.slice(start, next < 0 ? undefined : start + 1 + next);
 }
+
+test('refreshed geometry saves the parsed result instead of stale comparison fields', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../public/intake.html'), 'utf8');
+  let sent;
+  const fresh={items:[{...bentItem,segments:[{length_mm:115,angle_deg:90},{length_mm:140,angle_deg:90},{length_mm:420,angle_deg:90},{length_mm:140,angle_deg:90},{length_mm:420,angle_deg:90},{length_mm:115,angle_deg:0}]}]};
+  const context={activeCompareId:33,intakeRows:[{id:33}],readCorrectedParsed:()=>{throw Error('stale DOM must not replace refreshed geometry');},
+    fetch:async(url,options)=>{sent=JSON.parse(options.body);return {ok:true,json:async()=>({success:true,parsed:sent.parsed_data})};},
+    cloneParsedForCompare:value=>structuredClone(value),refreshOcrStatusSummary:()=>{},toast:()=>{}};
+  vm.createContext(context);vm.runInContext(functionText(source,'saveIntakeDraft'),context);
+  assert.equal(await context.saveIntakeDraft(33,{silent:true,parsedData:fresh}),true);
+  assert.deepEqual(sent.parsed_data,fresh);
+  assert.ok(source.includes('saveIntakeDraft(id, { silent: true, parsedData: merged })'));
+});
+
+test('shop hoop preview uses rectangle dimensions rather than the first hook as a side', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../public/intake.html'),'utf8');
+  let dimensions;
+  const context={itemSidesAngles:()=>({sides:[115,140,420,140,420,115],angles:[90,90,90,90,90]}),
+    ocrClosedStirrupSvg:sides=>{dimensions=sides;return '<svg aria-label="stirrup"></svg>';},
+    ocrUncertainShapeSvg:()=>'<svg aria-label="uncertain shape"></svg>'};
+  vm.createContext(context);vm.runInContext(functionText(source,'ocrCardShapeSvg'),context);
+  assert.match(context.ocrCardShapeSvg({shape_type:'stirrup',source_shape_parameters:{width_mm:420,height_mm:140}}),/stirrup/);
+  assert.deepEqual(Array.from(dimensions),[42,14,42,14]);
+  assert.match(context.ocrCardShapeSvg({shape_name:'unknown'}),/uncertain shape/);
+});
 test('quick PDF upload opens complete intake instead of flattening or dropping rows', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../public/new-order-editor.js'), 'utf8');
   const context = { document: { getElementById: () => null }, FormData, fetch: async () => ({ ok: true, json: async () => ({ intakeId: 55, items: [bentItem, { quantity: null }] }) }), window: { location: {}, intakeReviewUrl: id => '/intake.html?open=' + id }, showQuickImportMessage: () => {}, saveActiveDraftNow: () => {}, addIntakeRowsToOrder: () => { throw Error('must not flatten OCR geometry'); } };

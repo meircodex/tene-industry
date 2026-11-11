@@ -1081,6 +1081,12 @@ function ocrUncertainShapeSvg(item, width = 300, height = 210) {
 }
 function ocrCardShapeSvg(item, width = 78, height = 50) {
   const { sides, angles } = itemSidesAngles(item);
+  const sourceShape = item?.source_shape_parameters;
+  if (item?.shape_type === 'stirrup' && sourceShape?.width_mm > 0 && sourceShape?.height_mm > 0 && sides.length === 6) {
+    const w = sourceShape.width_mm / 10, h = sourceShape.height_mm / 10;
+    return ocrClosedStirrupSvg([w, h, w, h], item, 300, 210);
+  }
+  if (item?.shape_name === 'unknown') return ocrUncertainShapeSvg(item, 300, 210);
   const clean = sides.map(toNumber).filter(Boolean);
   const navy = '#173862';
   const label = value => escapeHtml(ocrSegmentLabel(value));
@@ -2616,7 +2622,7 @@ async function reprocessIntakeOcr(id, options = {}) {
     row.parsed = merged;
     row.parsed_data = JSON.stringify(merged);
     activeCompareOriginal = cloneParsedForCompare(merged);
-    await saveIntakeDraft(id, { silent: true });
+    await saveIntakeDraft(id, { silent: true, parsedData: merged });
     renderIntakeQueue();
     if (options.openAfter || activeCompareId === id) openIntakeCompare(id);
     toast('\u05e2\u05d9\u05d1\u05d5\u05d3 \u05de\u05d7\u05d3\u05e9 \u05d4\u05d5\u05e9\u05dc\u05dd. \u05e1\u05d9\u05de\u05d5\u05e0\u05d9\u05dd \u05e7\u05d9\u05d9\u05de\u05d9\u05dd \u05e0\u05e9\u05de\u05e8\u05d5.');
@@ -2635,7 +2641,7 @@ function refreshIntakeOcr(id) {
 
 
 async function saveIntakeDraft(id, options = {}) {
-  const parsed = activeCompareId === id ? readCorrectedParsed() : {};
+  const parsed = options.parsedData || (activeCompareId === id ? readCorrectedParsed() : {});
   const row = intakeRows.find(item => item.id === id);
   const endpoint = row?.post_order_review ? `/api/intake/${id}/order-review` : `/api/intake/${id}/draft`;
   const response = await fetch(endpoint, {

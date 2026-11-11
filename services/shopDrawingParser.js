@@ -37,7 +37,7 @@ function parseShopDrawing(tokens) {
         .map(w => ({ value_cm: numeric(w.text), source_page: page, source_bbox: sourceBox([w]) }));
       // This export denotes a closed hoop with a small corner closure symbol.
       // Its five callouts are two widths, two heights and one printed closure
-      // allowance. Keep that allowance separate; never turn it into a side.
+      // allowance. The two symmetric closing ends share this total equally.
       const left = dimensionWords.filter(w => inBand(w, 290, 315)).map(w => numeric(w.text));
       const middle = dimensionWords.filter(w => inBand(w, 330, 430)).map(w => numeric(w.text));
       const right = dimensionWords.filter(w => inBand(w, 440, 455)).map(w => numeric(w.text));
@@ -63,13 +63,17 @@ function parseShopDrawing(tokens) {
         confidence: entry.word ? 0.98 : 0.2, source_page: page, source_bbox: entry.word ? sourceBox([entry.word]) : null });
       const mm = length.value ? Math.round(length.value * 1000) : null;
       const cm = length.value ? Math.round(length.value * 100000) / 1000 : null;
+      const endMm = hoop ? Math.round(allowance * 5000) / 1000 : null;
+      const hoopSides = hoop ? [endMm, right[0] * 10, middle[0] * 10, right[0] * 10, middle[0] * 10, endMm] : [];
       items.push({ original_row_number: mark.text, item_number: mark.text, element_name: description,
         diameter: diameter.value, quantity: quantity.value, qty: quantity.value,
         total_length_mm: mm, length_mm: mm, length: mm, total_length_cm: cm, unit_length_cm: cm,
         row_total_length_m: total.value, weight_kg: weight.value, source_kg_per_m: rate.value,
-        shape_name: straight ? 'straight bar' : hoop ? 'חישוק סגור' : 'unknown', shape_type: straight ? 'straight' : hoop ? 'stirrup' : 'unknown', segments: [],
-        shape_description: straight ? 'straight bar' : hoop ? `חישוק סגור ${middle[0]}×${right[0]} ס״מ; תוספת סגירה ${Math.round(allowance * 1000) / 1000} ס״מ` : 'כיפוף — יש לבדוק מול שרטוט המקור',
-        ...(hoop ? { source_shape_parameters: { width_mm: middle[0] * 10, height_mm: right[0] * 10, closure_allowance_mm: Math.round(allowance * 10) } } : {}),
+        shape_name: straight ? 'straight bar' : hoop ? 'חישוק סגור' : 'unknown', shape_type: straight ? 'straight' : hoop ? 'stirrup' : 'unknown',
+        segments: hoopSides.map((value, sideIndex) => ({ length_mm: value, length_cm: value / 10, angle_deg: sideIndex < 5 ? 90 : 0 })),
+        shape_description: straight ? 'straight bar' : hoop ? `חישוק סגור ${middle[0]}×${right[0]} ס״מ; תוספת סגירה כוללת ${Math.round(allowance * 1000) / 1000} ס״מ; כל קצה ${endMm / 10} ס״מ` : 'כיפוף — יש לבדוק מול שרטוט המקור',
+        ...(hoop ? { note: `חישוק סגור ${middle[0]}×${right[0]} ס״מ; שני קצוות של ${endMm / 10} ס״מ כל אחד; אורך כולל ${cm} ס״מ.`,
+          source_shape_parameters: { width_mm: middle[0] * 10, height_mm: right[0] * 10, closure_allowance_mm: Math.round(allowance * 10), end_length_mm: endMm } } : {}),
         source_drawing_dimensions: dimensions, review_status: 'needs_review', confidence: straight ? 0.98 : 0.4,
         uncertain_fields: reviewNotes.map(note => note.field), review_notes: reviewNotes,
         fields: { item_number: field({ value: serial, word: mark }), diameter: field(diameter), quantity: field(quantity), total_length_cm: field(length, 100), weight_kg: field(weight) },
