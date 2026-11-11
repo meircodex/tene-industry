@@ -97,6 +97,11 @@ Current risks:
 
 ## Orders
 
+2026-11-11: `public/order-delivery-date.js` is the Orders-owned pure shared
+calendar policy (UMD browser/CommonJS server); `services/orders.js` and
+`public/index.html` consume it. Missing delivery dates default to factory local
+today + two calendar days. Explicit dates and existing records are retained.
+
 2026-11-11: Orders owns mailbox selection and local ascending/descending header
 sorting (`public/order-batch-actions.js`, `public/order-list-sorting.js`) and
 multi-order cutting orchestration (`public/order-cutting-planner.js`). Inventory

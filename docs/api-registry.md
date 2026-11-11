@@ -1,5 +1,13 @@
 # API Registry
 
+Orders creation default (2026-11-11): the canonical `services/orders.js` creation
+service resolves missing/null/blank `order.deliveryDate` (or `delivery_date`) to
+today + two calendar days in Asia/Jerusalem. An explicit date remains explicit.
+This affects new customer orders through existing creation callers only, not
+historical rows or date edits. No new route/permission/schema; existing order
+transaction, audit and new_order event remain unchanged. The immediate manual
+machine-job route retains its deliberate current-day operational semantics.
+
 2026-11-11 — Inventory: `GET /api/inventory/cutting-stock?order_ids=1,2` is a
 read-only approved straight-lot projection for cutting. Access: warehouse,
 office, manager, admin. Optional comma-separated positive safe integer order IDs

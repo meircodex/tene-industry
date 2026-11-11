@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="/rebar-weights.js"></script>
 <script src="/display-units.js?v=4"></script>
+<script src="/order-delivery-date.js?v=1"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=1"></script>
 <script src="/shapeCommercial.js?v=2"></script>
@@ -1980,11 +1981,9 @@ function init() {
     if (orderNumDisplay) orderNumDisplay.textContent = `HZ-${new Date().getFullYear()}-${next}`;
   });
 
-  // Default delivery date (tomorrow)
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // Default: two factory calendar days ahead; an explicit date is retained.
   const deliveryDate = document.getElementById('deliveryDate');
-  if (deliveryDate) deliveryDate.value = tomorrow.toISOString().split('T')[0];
+  if (deliveryDate) deliveryDate.value = IronBendOrderDeliveryDate.resolve(deliveryDate.value);
   updateDeliverySummary();
   updateCustomerSummary();
   updateNotesSummary();
@@ -3742,11 +3741,12 @@ loadInventoryBatches();
 function buildOrderPayload() {
   const customer = document.getElementById('customerSearch').value;
   const address = document.getElementById('deliveryAddress').value;
-  const date = document.getElementById('deliveryDate').value;
+  const deliveryDateInput = document.getElementById('deliveryDate');
 
   if (!customer) { openCustomerDetails(); alert('נא להזין שם לקוח'); return null; }
   if (!address) { openDeliveryDetails(); alert('נא להזין כתובת אספקה'); return null; }
-  if (!date) { openDeliveryDetails(); alert('נא להזין תאריך אספקה'); return null; }
+  deliveryDateInput.value = IronBendOrderDeliveryDate.resolve(deliveryDateInput.value);
+  updateDeliverySummary();
   const hasItems = pallets.some(p => p.items.length > 0);
   if (!hasItems) { alert('נא להוסיף לפחות פריט ברזל אחד'); return null; }
 

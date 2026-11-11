@@ -119,6 +119,7 @@ test('new-order form keeps tax ID through customer selection, draft restore and 
   const get = id => { if (!nodes.has(id)) nodes.set(id, { value: '', style: {} }); return nodes.get(id); };
   const context = vm.createContext({
     document: { getElementById: get, querySelectorAll: () => [] }, window: {},
+    IronBendOrderDeliveryDate: require('../public/order-delivery-date'),
     selectedCustomerSites: [], selectedCustomerAccountSummary: null,
     pallets: [{ items: [{ diameter: 12, qty: 2, length: 1000 }] }],
     setInputValue: (id, value) => { get(id).value = value; },
@@ -155,6 +156,11 @@ test('new-order form keeps tax ID through customer selection, draft restore and 
   const payload = vm.runInContext('buildOrderPayload()', context);
   assert.equal(payload.customer.taxId, '012345678');
   assert.equal(payload.customer.id, 7);
+  assert.equal(payload.order.deliveryDate, '2026-10-01');
+  get('deliveryDate').value = '';
+  const defaulted = vm.runInContext('buildOrderPayload()', context);
+  assert.equal(defaulted.order.deliveryDate, require('../public/order-delivery-date').defaultDate());
+  assert.equal(defaulted.customer.id, 7);
 });
 
 test('edited customer and order pages have valid inline JavaScript', () => {

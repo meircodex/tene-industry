@@ -24,6 +24,7 @@ function validateShapeGeometry(segments) {
 }
 
 const steelModule = require('../modules/steel-rebar');
+const {resolve:resolveOrderDeliveryDate}=require('../public/order-delivery-date');
 const { normalizeSpiralParams, spiralCutLengthMm } = require('../modules/steel-rebar/shapes');
 const { calculatePileCage } = require('../modules/steel-rebar/pile-cage-engine');
 const { createStableOrderId, buildOrderItemUid, shapeSnapshotJson, isShapeDataContractV2, withShapeContractLegacyFields } = require('./orderContracts');
@@ -88,6 +89,7 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
 
   function createOrderFromPayload(payload) {
     const { customer = {}, order = {}, pallets = [] } = payload || {};
+    const deliveryDate=resolveOrderDeliveryDate(order.deliveryDate ?? order.delivery_date);
     if (!customer.name?.trim()) throw Object.assign(new Error('customer.name is required'), { statusCode: 400 });
     if (!pallets.length || !pallets.some(pallet => pallet.items?.length)) {
       throw Object.assign(new Error('At least one order item is required'), { statusCode: 400 });
@@ -181,7 +183,7 @@ function createOrderFactory(db, { generateOrderNum, industry }) {
     const orderResult = db.prepare(`
       INSERT INTO orders (order_num,stable_order_id,quote_id,quote_num,customer_id,site_id,channel,delivery_date,delivery_time,delivery_address,priority,driver_notes,general_notes,total_weight,waste_pct_charged,billing_weight,sale_price,created_by)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `).run(orderNum, createStableOrderId(orderNum), quoteId, quoteNum, customerId, orderSiteId, order.channel, order.deliveryDate, order.deliveryTime,
+    `).run(orderNum, createStableOrderId(orderNum), quoteId, quoteNum, customerId, orderSiteId, order.channel, deliveryDate, order.deliveryTime,
       order.deliveryAddress, order.priority, order.driverNotes, order.generalNotes,
       totalWeight, wastePct, billingWeight, salePrice, order.createdBy || null);
 

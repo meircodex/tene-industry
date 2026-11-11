@@ -4,6 +4,11 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    orderDeliveryDate: {
+      screen:'index.html',owner:'Orders',source:{api:'/api/orders',fields:['order.deliveryDate','orders.delivery_date']},
+      meaning:'An explicit delivery date is retained. Missing/null/blank date becomes two calendar days after the factory local date (Asia/Jerusalem), including weekends. New form and save use the same pure calendar policy; the canonical order service also applies it. Existing orders are not rewritten.',
+      consumers:['deliveryDate','noDeliveryContextCard'],risk:'D1',
+    },
     orderBatchActions: {
       screen:'orders.html',owner:'Orders',source:{api:'/api/orders',fields:['id','order_num','customer_id','deleted_at','delivery_date','priority','total_weight','status','delivery_progress','general_notes','driver_notes']},
       meaning:'Mailbox checkbox selection; numeric/date-aware asc/desc header sorting preserves selected IDs. Default partial-delivery ordering remains until explicit sorting. Same-customer IDs open the existing delivery preview; mixed-customer document icon has a red slash and explains only on click. Selection/navigation issue no documents.',

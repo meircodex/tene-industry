@@ -1,5 +1,11 @@
 # Widget Data Contracts
 
+`orderDeliveryDate` (2026-11-11, Orders): explicit dates are retained; an empty
+delivery field does not block order creation. Initial form and save resolve the
+date through the shared policy, two factory calendar days ahead including
+weekends. Server applies the same fallback to creation callers. No data migration
+or historical-date update. See `docs/order-delivery-date-default-20261111.md`.
+
 2026-11-11: `orderBatchActions` documents checkbox IDs and local header sorting.
 Natural order-number sorting, numeric weight sorting, chronological delivery
 dates, Hebrew customer/status/notes and regular-before-urgent ascending priority
