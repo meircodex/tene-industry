@@ -1,5 +1,10 @@
 # Event Registry
 
+Production queue consumers (2026-11-11) refetch after `order_updated` and
+`order_deleted`, as well as the existing order/item lifecycle events. Closing,
+paying, trashing or restoring an order therefore changes queue membership through
+the shared Orders lifecycle, without writing historical child records.
+
 `editor_draft_updated` (Orders, 2026-11-11): emitted after shared editor snapshot
 save/close, payload `{draftId}` only. It does not signal order creation or stock
 movement. Lists refresh through the authenticated draft API.

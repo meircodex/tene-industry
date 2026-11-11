@@ -1,5 +1,12 @@
 # API Registry
 
+Production queue lifecycle fix (2026-11-11): GET `/api/production-queue`, including
+visual/machine filters, consumes the canonical Orders active bucket before
+checking released production/item status. Paid, trashed, cancelled and delivered
+orders are excluded. The same service guards scans, machine assignment and stale
+worker/item production writes. Existing auth remains unchanged; no new routes.
+See `docs/production-queue-eligibility-20261111.md`.
+
 Shared editor drafts (2026-11-11): Orders owns GET
 `/api/operations/editor-drafts?before=<id>`, PUT
 `/api/operations/editor-drafts/:id`, POST

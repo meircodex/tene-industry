@@ -5,7 +5,7 @@ function fail(statusCode,message){throw Object.assign(new Error(message),{status
 function text(value,max=1000){if(typeof value!=='string'||!value.trim()||value.length>max)fail(400,'נדרשת סיבה תקינה לפעולה');return value.trim();}
 function bucketCondition(bucket){
   const quoted=list=>list.map(s=>"'"+s.replace(/'/g,"''")+"'").join(',');
-  const paid="(o.payment_status='paid' OR o.status='שולם')",supplied=`o.status IN (${quoted(delivered)})`,voided=`o.status IN (${quoted(cancelled)})`;
+  const paid="(COALESCE(o.payment_status,'unpaid')='paid' OR o.status='שולם')",supplied=`o.status IN (${quoted(delivered)})`,voided=`o.status IN (${quoted(cancelled)})`;
   const visible='o.deleted_at IS NULL';
   const conditions={active:`${visible} AND NOT ${paid} AND NOT (${supplied}) AND NOT (${voided})`,delivered:`${visible} AND NOT ${paid} AND (${supplied})`,closed:`${visible} AND ${paid}`,cancelled:`${visible} AND NOT ${paid} AND (${voided})`,trash:'o.deleted_at IS NOT NULL',all:visible};
   if(bucket && !conditions[bucket])fail(400,'לשונית הזמנות לא תקינה');

@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { consumeReservationsForProduction } = require('../services/inventoryReservation');
+const { isActiveOrder, isProductionGateOpen, productionGateError } = require('../services/productionEligibility');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/productionMachines missing dependency: ${name}`);
@@ -66,12 +67,17 @@ module.exports = function createProductionMachinesRouter(deps) {
   });
 
   router.post('/machines/:id/assign', requireAnyRole(['production', 'manager', 'admin']), (req, res) => {
-    const { itemId, orderNum } = req.body;
+    const { itemId } = req.body;
+    const item = db.prepare(`SELECT i.*,o.status AS order_status,o.order_num,o.payment_status AS order_payment_status,o.deleted_at AS order_deleted_at
+      FROM items i JOIN pallets p ON p.id=i.pallet_id JOIN orders o ON o.id=p.order_id WHERE i.id=?`).get(itemId);
+    if (!item) return res.status(404).json({error:'הפריט לא נמצא במערכת'});
+    if (!isProductionGateOpen(item)) return res.status(409).json(productionGateError(item));
+    if (!db.prepare('SELECT id FROM machines WHERE id=?').get(req.params.id)) return res.status(404).json({error:'המכונה לא נמצאה במערכת'});
     db.prepare('UPDATE machines SET current_item_id=?,current_order_num=? WHERE id=?')
-      .run(itemId, orderNum, req.params.id);
+      .run(itemId, item.order_num, req.params.id);
     db.prepare('UPDATE items SET status=?,started_at=?,machine_id=? WHERE id=?')
       .run('בייצור', new Date().toISOString(), req.params.id, itemId);
-    wsBroadcast('machine_assign', { machineId: Number(req.params.id), itemId, orderNum });
+    wsBroadcast('machine_assign', { machineId: Number(req.params.id), itemId, orderNum: item.order_num });
     res.json({ success: true });
   });
 
@@ -126,7 +132,10 @@ module.exports = function createProductionMachinesRouter(deps) {
     const machine = db.prepare('SELECT * FROM machines WHERE id=?').get(machineId);
     if (!machine?.current_item_id) return res.status(400).json({ error: 'אין פריט פעיל' });
 
-    const item       = db.prepare('SELECT * FROM items WHERE id=?').get(machine.current_item_id);
+    const item = db.prepare(`SELECT i.*,o.status AS order_status,o.order_num,o.payment_status AS order_payment_status,o.deleted_at AS order_deleted_at
+      FROM items i JOIN pallets p ON p.id=i.pallet_id JOIN orders o ON o.id=p.order_id WHERE i.id=?`).get(machine.current_item_id);
+    if (!item) return res.status(404).json({error:'הפריט המשויך למכונה לא נמצא במערכת'});
+    if (!isActiveOrder(item)) return res.status(409).json(productionGateError(item));
     const actualWaste = Math.max(0, (producedQty || 0) - (item?.quantity || 0));
 
     db.prepare('UPDATE items SET status=?,completed_at=?,produced_qty=?,actual_waste=? WHERE id=?')

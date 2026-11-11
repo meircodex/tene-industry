@@ -1,5 +1,12 @@
 # Widget Data Contracts
 
+`productionQueue` (2026-11-11, Production) uses `/api/production-queue` for every
+machine/visual consumer. Membership requires an open Orders workspace record and
+the applicable released production status, with stopped/cancelled items excluded.
+`shift-pieces` counts queued item rows and is labelled `פריטים בתור`; it is not
+a shift-completion total and is never submitted as one. Lifecycle events refresh
+the list, failed reads clear stale cards, and empty queue count resets to zero.
+
 `editorDrafts` (2026-11-11, Orders) uses shared versioned editor snapshots from
 `/api/operations/editor-drafts` and a local offline cache. Counts exclude empty
 startup rows; labels/weights come from the saved payload, not stale summaries.

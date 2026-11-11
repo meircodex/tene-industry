@@ -34,8 +34,8 @@ module.exports = function createProductionShiftsRouter(deps) {
 
   router.patch('/shifts/:id/end', requireAnyRole(['production', 'kiosk', 'manager', 'admin']), (req, res) => {
     const { total_pieces, total_weight, notes } = req.body;
-    db.prepare(`UPDATE shifts SET ended_at=CURRENT_TIMESTAMP, total_pieces=?, total_weight=?, notes=COALESCE(?,notes) WHERE id=?`)
-      .run(total_pieces || 0, total_weight || 0, notes || null, req.params.id);
+    db.prepare(`UPDATE shifts SET ended_at=CURRENT_TIMESTAMP, total_pieces=COALESCE(?,total_pieces), total_weight=COALESCE(?,total_weight), notes=COALESCE(?,notes) WHERE id=?`)
+      .run(total_pieces ?? null, total_weight ?? null, notes || null, req.params.id);
     res.json({ ok: true });
   });
 

@@ -5,6 +5,17 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('production eligibility consumes the Orders workspace lifecycle contract', () => {
+  const policy = fs.readFileSync(path.join(root, 'services/productionEligibility.js'), 'utf8');
+  assert.match(policy, /require\('\.\/orderWorkspace'\)/);
+  assert.match(policy, /bucketCondition\('active'\)/);
+  assert.match(policy, /workspace\.bucket/);
+  const route = fs.readFileSync(path.join(root, 'routes/production.js'), 'utf8');
+  const machine = fs.readFileSync(path.join(root, 'routes/productionMachines.js'), 'utf8');
+  assert.match(route, /productionQueueCondition\(\{ visual:/);
+  assert.match(machine, /services\/productionEligibility/);
+});
+
 test('shared editor drafts stay within Orders and require office roles', () => {
   const source = fs.readFileSync(path.join(root, 'routes/orders.js'), 'utf8');
   for (const method of ['get', 'put', 'post']) {

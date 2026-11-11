@@ -209,7 +209,7 @@
       <span class="value" id="shift-operator">—</span>
     </div>
     <div class="shift-stat">
-      <span class="label">פריטים הושלמו</span>
+      <span class="label">פריטים בתור</span>
       <span class="value" id="shift-pieces">0</span>
     </div>
     <div class="shift-stat">
@@ -350,6 +350,9 @@ let currentShift = null;
 let selectedReason = null;
 let currentMachineFilter = 'all';
 let currentWasteItemId = null;
+let queueRequestSequence = 0;
+let queueRefreshTimer = null;
+let queueSocket = null;
 const ITEM_STATUS = (window.IronBendStatus && window.IronBendStatus.ITEM_STATUS) || {
   WAITING: 'ממתין',
   IN_PRODUCTION: 'בייצור',
@@ -373,6 +376,7 @@ async function init() {
   populateShiftOperators();
   loadQueue();
   loadTonsToday();
+  connectQueueUpdates();
   setInterval(() => { loadQueue(); loadTonsToday(); }, 30000);
 }
 
@@ -419,12 +423,39 @@ function selectReason(code, el) {
 }
 
 async function loadQueue() {
+  const sequence = ++queueRequestSequence;
   const url = currentMachineFilter === 'all'
     ? `${API}/api/production-queue`
     : `${API}/api/production-queue?machine=${encodeURIComponent(currentMachineFilter)}`;
-  queueData = await fetch(url).then(r=>r.json());
-  renderQueue();
+  try {
+    const response = await fetch(url, { cache:'no-store' });
+    if (!response.ok) throw new Error('queue_unavailable');
+    const data = await response.json();
+    if (!Array.isArray(data.items) || !data.grouped || typeof data.grouped !== 'object') throw new Error('invalid_queue');
+    if (sequence !== queueRequestSequence) return;
+    queueData = data;
+    renderQueue();
+  } catch {
+    if (sequence !== queueRequestSequence) return;
+    queueData = {items:[],grouped:{}};
+    document.getElementById('shift-pieces').textContent = '—';
+    document.getElementById('machines-grid').innerHTML = '<div class="empty-state">לא ניתן לעדכן את תור הייצור מהמערכת. בדוק את החיבור ולחץ על ״רענן״.</div>';
+  }
 }
+
+function scheduleQueueRefresh() { clearTimeout(queueRefreshTimer); queueRefreshTimer=setTimeout(loadQueue,150); }
+function connectQueueUpdates() {
+  try {
+    queueSocket = new WebSocket(window.IronBendAuth?.webSocketUrl?.('/') || `${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
+    queueSocket.onopen = scheduleQueueRefresh;
+    queueSocket.onmessage = event => { try {
+      if (['new_order','order_status','order_updated','order_deleted','order_review','item_status','item_progress','order_cancellation_disposition','delivery_confirm'].includes(JSON.parse(event.data).type)) scheduleQueueRefresh();
+    } catch {} };
+    queueSocket.onclose = () => setTimeout(connectQueueUpdates,2000);
+  } catch { /* The existing 30-second refresh remains available. */ }
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleQueueRefresh();});
+window.addEventListener('pageshow',scheduleQueueRefresh);
 
 async function loadTonsToday() {
   try {
@@ -448,6 +479,7 @@ function renderQueue() {
   const grid = document.getElementById('machines-grid');
   const grouped = queueData.grouped || {};
   const keys = Object.keys(grouped);
+  document.getElementById('shift-pieces').textContent = (queueData.items || []).length;
 
   if (keys.length === 0) {
     grid.innerHTML = `<div class="empty-state">✅ אין פריטים ממתינים לייצור</div>`;
@@ -461,9 +493,6 @@ function renderQueue() {
     const col = createMachineColumn(machineKey, machineInfo, items);
     grid.appendChild(col);
   });
-  // Update shift pieces count
-  const totalPending = queueData.items ? queueData.items.length : 0;
-  document.getElementById('shift-pieces').textContent = totalPending;
 }
 
 function createMachineColumn(machineName, machineInfo, items) {
@@ -683,7 +712,7 @@ async function endCurrentShift() {
   await fetch(`${API}/api/shifts/${currentShift.id}/end`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ total_pieces: parseInt(document.getElementById('shift-pieces').textContent) || 0 })
+    body: JSON.stringify({})
   });
   currentShift = null;
   document.getElementById('shift-type-label').textContent = '—';

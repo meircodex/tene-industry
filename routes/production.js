@@ -5,6 +5,7 @@ const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
 const { consumeReservationsForProduction, calculateMaterialStockPosition, normalizeMaterialType } = require('../services/inventoryReservation');
 const { expandProductionCardsForOrder } = require('../services/productionCardPrintPage');
 const { itemStatusCorrectionPreview, cancelUnshippedCertificatesForCorrection, reopenOrderAfterItemCorrection, isBackwardItemStatus, isPreviouslyReopenedItem } = require('../services/itemStatusCorrection');
+const { isActiveOrder, canReopenDeliveredOrder, isProductionOrderOpen, isProductionGateOpen, productionGateError, productionQueueCondition } = require('../services/productionEligibility');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/production missing dependency: ${name}`);
@@ -33,15 +34,6 @@ module.exports = function createProductionRouter(deps) {
   const workerCardActivity = required('workerCardActivity', deps.workerCardActivity);
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
 
-  const productionOrderGateStatuses = new Set([
-    ORDER_STATUS.PRODUCTION_QUEUE,
-    ORDER_STATUS.IN_PRODUCTION,
-    ORDER_STATUS.PARTIAL_DELIVERY,
-  ]);
-  const productionStartItemStatuses = new Set([
-    ITEM_STATUS.WAITING,
-    ITEM_STATUS.IN_PRODUCTION,
-  ]);
   const productionWritableItemStatuses = new Set([
     ITEM_STATUS.WAITING,
     ITEM_STATUS.IN_PRODUCTION,
@@ -80,13 +72,6 @@ module.exports = function createProductionRouter(deps) {
     'deliveryNoteReference',
   ]);
 
-  function isProductionGateOpen(item) {
-    return Boolean(item)
-      && !isCancellationStopped(item)
-      && productionOrderGateStatuses.has(statusContracts.normalizeOrderStatus(item.order_status))
-      && productionStartItemStatuses.has(item.status);
-  }
-
   function isCancellationStopped(item) {
     return item?.status === ITEM_STATUS.CANCELLED || item?.cancelled_at != null || item?.production_stopped_at != null;
   }
@@ -100,11 +85,7 @@ module.exports = function createProductionRouter(deps) {
   }
 
   function sendProductionGateError(res, item) {
-    return res.status(409).json({
-      error: 'item_not_released_to_production',
-      item_status: item?.status || null,
-      order_status: item?.order_status || null,
-    });
+    return res.status(409).json(productionGateError(item));
   }
 
   function forbiddenProductionPatchFields(body) {
@@ -138,7 +119,7 @@ module.exports = function createProductionRouter(deps) {
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
              i.total_length_mm, i.note, i.qc_status,
              p.order_id, p.pallet_num,
-             o.order_num, o.priority, o.delivery_date, o.customer_id, o.status AS order_status,
+             o.order_num, o.priority, o.delivery_date, o.customer_id, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at,
              c.name as customer_name
       FROM items i
       JOIN pallets p ON i.pallet_id=p.id
@@ -149,6 +130,9 @@ module.exports = function createProductionRouter(deps) {
     if (item) {
       item.shape_svg = productionCards.itemShapeSvg(item);
       item.order_status = statusContracts.normalizeOrderStatus(item.order_status);
+      // Lifecycle fields are needed by server guards, not the public QR DTO.
+      delete item.order_payment_status;
+      delete item.order_deleted_at;
     }
     return item;
   }
@@ -160,7 +144,7 @@ module.exports = function createProductionRouter(deps) {
       return null;
     }
     const item = db.prepare(`
-      SELECT i.*, p.order_id, o.order_num, o.status AS order_status
+      SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
       FROM items i
       JOIN pallets p ON i.pallet_id=p.id
       JOIN orders o ON p.order_id=o.id
@@ -445,6 +429,7 @@ module.exports = function createProductionRouter(deps) {
     if (statusContracts.normalizeOrderStatus(item.order_status) === ORDER_STATUS.CANCELLED) return sendCancellationStoppedError(res, item);
     if (req.body.expected_status !== undefined && req.body.expected_status !== item.status) return res.status(409).json({ error: 'worker_status_changed' });
     const backwards = isBackwardItemStatus(item.status, status);
+    if (!isActiveOrder(item) && !(backwards && canReopenDeliveredOrder(item))) return sendProductionGateError(res, item);
     const previouslyReopened = status === ITEM_STATUS.IN_PRODUCTION && isPreviouslyReopenedItem(db, item);
     const pendingApproval = [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(statusContracts.normalizeOrderStatus(item.order_status));
     if (status === ITEM_STATUS.IN_PRODUCTION && (pendingApproval || (!backwards && !previouslyReopened && !isProductionGateOpen(item)))) return sendProductionGateError(res, item);
@@ -479,6 +464,7 @@ module.exports = function createProductionRouter(deps) {
     }
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
+    if (!isActiveOrder(item)) return sendProductionGateError(res, item);
     const replay = workerCardActivity.replay(req, item.id, 'updated');
     if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
     if (isCancellationStopped(item)) return sendCancellationStoppedError(res, item);
@@ -534,7 +520,7 @@ module.exports = function createProductionRouter(deps) {
     })();
     if (nextItemStatus) {
       const savedItem = db.prepare(`
-        SELECT i.*, p.order_id, o.order_num, o.status AS order_status
+        SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
         FROM items i
         JOIN pallets p ON i.pallet_id=p.id
         JOIN orders o ON p.order_id=o.id
@@ -572,7 +558,7 @@ module.exports = function createProductionRouter(deps) {
     if (!machine) return res.status(404).json({ error: 'מכונה לא נמצאה' });
 
     const item = db.prepare(`
-      SELECT i.*, p.order_id, o.status AS order_status
+      SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
       FROM items i
       JOIN pallets p ON i.pallet_id=p.id
       JOIN orders o ON p.order_id=o.id
@@ -586,7 +572,9 @@ module.exports = function createProductionRouter(deps) {
     // Close previous item on this machine
     if (machine.current_item_id && machine.current_item_id !== itemIdNum) {
       const liveCounter = modbus.getState(machineIdNum)?.counter ?? machine.counter ?? 0;
-      const prevItem = db.prepare('SELECT * FROM items WHERE id=?').get(machine.current_item_id);
+      const prevItem = db.prepare(`SELECT i.*,o.order_num,o.status AS order_status,o.payment_status AS order_payment_status,o.deleted_at AS order_deleted_at
+        FROM items i JOIN pallets p ON p.id=i.pallet_id JOIN orders o ON o.id=p.order_id WHERE i.id=?`).get(machine.current_item_id);
+      if (prevItem && !isActiveOrder(prevItem)) return sendProductionGateError(res, prevItem);
       const actualWaste = Math.max(0, liveCounter - (prevItem?.quantity || 0));
 
       db.prepare('UPDATE items SET status=?,completed_at=?,produced_qty=?,actual_waste=? WHERE id=?')
@@ -674,7 +662,7 @@ module.exports = function createProductionRouter(deps) {
       return res.status(409).json({ error: 'cancellation_review_required' });
     }
     const item = db.prepare(`
-      SELECT i.*, p.order_id, o.order_num, o.status AS order_status
+      SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
       FROM items i
       JOIN pallets p ON i.pallet_id=p.id
       JOIN orders o ON p.order_id=o.id
@@ -688,13 +676,14 @@ module.exports = function createProductionRouter(deps) {
     const stages = [ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED];
     const afterStage = stages.indexOf(status);
     const backwards = isBackwardItemStatus(item.status, status);
+    if (!isActiveOrder(item) && !(backwards && canReopenDeliveredOrder(item))) return sendProductionGateError(res, item);
     const correctionReason = String(req.body.correction_reason || '').trim();
     if (backwards && correctionReason.length < 3) return res.status(409).json({ error: 'יש להזין סיבת תיקון להחזרת סטטוס לאחור' });
     const correctionMode = req.body.correction_mode || 'keep_documents';
     if (!['keep_documents', 'cancel_unshipped_certificate'].includes(correctionMode)) return res.status(400).json({ error: 'סוג תיקון לא תקין' });
     if (correctionMode === 'cancel_unshipped_certificate' && !backwards) return res.status(409).json({ error: 'ביטול תעודה זמין רק בהחזרה לשלב קודם' });
     const previouslyReopened = status === ITEM_STATUS.IN_PRODUCTION && isPreviouslyReopenedItem(db, item);
-    const resumeFromHold = item.status === ITEM_STATUS.ON_HOLD && productionOrderGateStatuses.has(statusContracts.normalizeOrderStatus(item.order_status));
+    const resumeFromHold = item.status === ITEM_STATUS.ON_HOLD && isProductionOrderOpen(item);
     if (status === ITEM_STATUS.IN_PRODUCTION && !backwards && !previouslyReopened && !resumeFromHold && !isProductionGateOpen(item)) return sendProductionGateError(res, item);
     const completed = afterStage >= stages.indexOf(ITEM_STATUS.DONE);
     const now = new Date().toISOString();
@@ -744,7 +733,7 @@ module.exports = function createProductionRouter(deps) {
     function loadProductionItem() {
       if (!loadedItem) {
         loadedItem = db.prepare(`
-          SELECT i.*, p.order_id, o.order_num, o.status AS order_status
+          SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
           FROM items i
           JOIN pallets p ON i.pallet_id=p.id
           JOIN orders o ON p.order_id=o.id
@@ -819,6 +808,7 @@ module.exports = function createProductionRouter(deps) {
     if (!fields.length) return res.json({ ok: true });
     const cancellationCheckItem = loadProductionItem();
     if (!cancellationCheckItem) return res.status(404).json({ error: 'not found' });
+    if (!isActiveOrder(cancellationCheckItem)) return sendProductionGateError(res, cancellationCheckItem);
     if (isCancellationStopped(cancellationCheckItem)) return sendCancellationStoppedError(res, cancellationCheckItem);
     vals.push(req.params.id);
     db.transaction(() => {
@@ -837,7 +827,7 @@ module.exports = function createProductionRouter(deps) {
     })();
 
     const savedItem = nextItemStatus ? db.prepare(`
-      SELECT i.*, p.order_id, o.order_num, o.status AS order_status
+      SELECT i.*, p.order_id, o.order_num, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at
       FROM items i
       JOIN pallets p ON i.pallet_id=p.id
       JOIN orders o ON p.order_id=o.id
@@ -855,13 +845,8 @@ module.exports = function createProductionRouter(deps) {
   // ── PRODUCTION QUEUE ──────────────────────────────────────────────
   // Returns pending items grouped and sorted by machine, diameter priority
   router.get('/production-queue', requireAnyRole(['production', 'kiosk', 'office', 'manager', 'admin']), (req, res) => {
+    res.set('Cache-Control', 'no-store');
     const { machine } = req.query;
-    const visibleItemStatuses = req.query.visual === '1'
-      ? "('ממתין','בייצור','הושלם','הועמס','נשלח','סופק')"
-      : "('ממתין','בייצור')";
-    const visibleOrderStatuses = req.query.visual === '1'
-      ? "('אושרה – ממתין לייצור','בתור ייצור','בייצור','אספקה חלקית','הושלם – ממתין לאיסוף','בהעמסה','נשלחה','בדרך ללקוח','בעיה באספקה','סופק – אושר')"
-      : "('אושרה – ממתין לייצור','בתור ייצור','בייצור','אספקה חלקית')";
     let q = `
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
@@ -869,7 +854,7 @@ module.exports = function createProductionRouter(deps) {
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
              i.total_length_mm, i.note, i.qc_status,
              p.order_id, p.pallet_num,
-             o.order_num, o.priority, o.delivery_date, o.customer_id, o.status AS order_status,
+             o.order_num, o.priority, o.delivery_date, o.customer_id, o.status AS order_status, o.payment_status AS order_payment_status, o.deleted_at AS order_deleted_at,
              c.name as customer_name,
              COALESCE(o.priority='דחוף',0)*100 +
              COALESCE(JULIANDAY('now') - JULIANDAY(o.delivery_date), 0)*10 as priority_score
@@ -877,8 +862,7 @@ module.exports = function createProductionRouter(deps) {
       JOIN pallets p ON i.pallet_id=p.id
       JOIN orders o ON p.order_id=o.id
       LEFT JOIN customers c ON o.customer_id=c.id
-      WHERE i.status IN ${visibleItemStatuses}
-      AND o.status IN ${visibleOrderStatuses}
+      WHERE ${productionQueueCondition({ visual: req.query.visual === '1' })}
     `;
     const params = [];
     if (machine) { q += ' AND i.machine=?'; params.push(machine); }
@@ -928,7 +912,7 @@ module.exports.manifest = {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'read', production: 'edit', kiosk: 'edit' },
   },
-  consumes: [{ event: 'new_order' }, { event: 'order_status' }, { table: 'items' }, { table: 'machines' }],
+  consumes: [{ event: 'new_order' }, { event: 'order_status' }, { event: 'order_updated' }, { event: 'order_deleted' }, { table: 'orders' }, { table: 'items' }, { table: 'machines' }],
   produces: [
     { event: 'inventory_changed' },
     { event: 'machine_assign' },

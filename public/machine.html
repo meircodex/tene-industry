@@ -471,6 +471,10 @@ function connectWS() {
     if (type==='machines_state') { machines=data; renderTabs(); updateSelected(); }
     if (type==='machine_update') updateMachineState(data);
     if (type==='machine_complete') fetchMachines();
+    if (['new_order','order_status','order_updated','order_deleted','item_status','item_progress','order_cancellation_disposition','delivery_confirm'].includes(type)) {
+      if (currentView==='queue') loadFullQueue();
+      if (document.getElementById('queueCard')?.style.display==='block') loadQueue();
+    }
   };
 }
 

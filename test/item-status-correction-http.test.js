@@ -50,6 +50,60 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
   const patch = (f, body, role) => request(`/items/${f.item}/status`, 'PATCH', body, role);
   const correction = (p, mode = 'keep_documents') => ({ status: p.target_status, expected_status: p.current_status, correction_reason: 'תיקון לצורך המשך עבודה', correction_mode: mode, correction_fingerprint: p.fingerprint });
 
+  await t.test('all queues and stale production actions follow the canonical open-order lifecycle', async () => {
+    db.prepare("INSERT INTO settings(key,value) VALUES('QR_ACCESS_MODE','open') ON CONFLICT(key) DO UPDATE SET value='open'").run();
+    const machine = db.prepare('SELECT id FROM machines ORDER BY id LIMIT 1').get().id;
+    const blocked = [
+      {status:'בייצור',deleted_at:'2026-11-01T00:00:00Z',payment_status:'unpaid'},
+      {status:'בייצור',deleted_at:null,payment_status:'paid'},
+      {status:'שולם',deleted_at:null,payment_status:'unpaid'},
+      {status:'סופק – אושר',deleted_at:null,payment_status:'unpaid'},
+      {status:'סופק',deleted_at:null,payment_status:'unpaid'},
+      {status:'בוטלה',deleted_at:null,payment_status:'unpaid'},
+    ];
+    for (const state of blocked) {
+      const f = await fixture({certificate:false});
+      db.prepare('UPDATE orders SET status=?,deleted_at=?,payment_status=? WHERE id=?').run(state.status,state.deleted_at,state.payment_status,f.order);
+      db.prepare("UPDATE items SET status='ממתין',produced_qty=0,started_at=NULL,completed_at=NULL WHERE id=?").run(f.item);
+      for (const query of ['', '?visual=1', '?machine=A', '?visual=1&machine=A']) {
+        const response=await request('/production-queue'+query);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
+        const data=await response.json();assert.ok(!data.items.some(i=>i.id===f.item),'closed order leaked into '+query);assert.ok(!Object.values(data.grouped).flat().some(i=>i.id===f.item));
+      }
+      const itemBefore=readItem(f),machinesBefore=db.prepare('SELECT * FROM machines').all(),stockBefore=db.prepare('SELECT * FROM raw_material').all();
+      for (const [url,method,body] of [
+        [`/items/${f.item}/status`,'PATCH',{status:'בייצור'}],
+        [`/items/${f.item}`,'PATCH',{produced_qty:2,actual_weight_kg:2}],
+        [`/worker-card/${f.item}/status`,'PATCH',{card:String(f.item),status:'בייצור'}],
+        [`/worker-card/${f.item}`,'PATCH',{card:String(f.item),produced_qty:2}],
+        ['/scan','POST',{qrData:`QA|${f.item}`,machineId:machine}],
+        [`/machines/${machine}/assign`,'POST',{itemId:f.item,orderNum:'QA'}],
+      ]) { const response=await request(url,method,body,'manager');assert.equal(response.status,409,url);const error=await response.json();assert.ok(/[א-ת]/.test(error.user_message||error.error),url); }
+      const originalMachine=machinesBefore.find(m=>m.id===machine);
+      db.prepare('UPDATE machines SET current_item_id=?,current_order_num=? WHERE id=?').run(f.item,'QA',machine);
+      const assignedBefore=db.prepare('SELECT * FROM machines WHERE id=?').get(machine);
+      const completion=await request(`/machines/${machine}/complete`,'POST',{producedQty:10,wasteQty:0},'manager');assert.equal(completion.status,409);
+      assert.deepEqual(db.prepare('SELECT * FROM machines WHERE id=?').get(machine),assignedBefore);
+      if(state.deleted_at){
+        const next=await fixture({certificate:false});db.prepare("UPDATE items SET status='ממתין',produced_qty=0 WHERE id=?").run(next.item);
+        const nextBefore=readItem(next);const scan=await request('/scan','POST',{qrData:`QA|${next.item}`,machineId:machine},'manager');assert.equal(scan.status,409);assert.deepEqual(readItem(next),nextBefore);
+      }
+      db.prepare('UPDATE machines SET current_item_id=?,current_order_num=? WHERE id=?').run(originalMachine.current_item_id,originalMachine.current_order_num,machine);
+      assert.deepEqual(readItem(f),itemBefore);assert.deepEqual(db.prepare('SELECT * FROM machines').all(),machinesBefore);assert.deepEqual(db.prepare('SELECT * FROM raw_material').all(),stockBefore);
+    }
+    const live=await fixture({certificate:false});db.prepare("UPDATE orders SET status='אספקה חלקית' WHERE id=?").run(live.order);db.prepare("UPDATE items SET status='ממתין',produced_qty=0,cancelled_at=NULL,production_stopped_at=NULL WHERE id=?").run(live.item);
+    assert.ok((await (await request('/production-queue')).json()).items.some(i=>i.id===live.item));
+    db.prepare("UPDATE orders SET payment_status='paid' WHERE id=?").run(live.order);assert.ok(!(await (await request('/production-queue')).json()).items.some(i=>i.id===live.item));
+    db.prepare("UPDATE orders SET payment_status='unpaid',deleted_at=CURRENT_TIMESTAMP WHERE id=?").run(live.order);assert.ok(!(await (await request('/production-queue')).json()).items.some(i=>i.id===live.item));
+    db.prepare("UPDATE orders SET deleted_at=NULL,status='approved' WHERE id=?").run(live.order);assert.ok((await (await request('/production-queue')).json()).items.some(i=>i.id===live.item));
+    db.prepare('UPDATE items SET production_stopped_at=CURRENT_TIMESTAMP WHERE id=?').run(live.item);assert.ok(!(await (await request('/production-queue?visual=1')).json()).items.some(i=>i.id===live.item));
+    db.prepare('UPDATE items SET production_stopped_at=NULL,cancelled_at=CURRENT_TIMESTAMP WHERE id=?').run(live.item);assert.ok(!(await (await request('/production-queue')).json()).items.some(i=>i.id===live.item));
+  });
+  await t.test('ending a shift without reported totals preserves its verified totals rather than copying queue size', async () => {
+    const id=db.prepare("INSERT INTO shifts(shift_type,date,total_pieces,total_weight) VALUES('morning','2026-11-11',23,77.5)").run().lastInsertRowid;
+    assert.equal((await request(`/shifts/${id}/end`,'PATCH',{},'manager')).status,200);
+    const saved=db.prepare('SELECT * FROM shifts WHERE id=?').get(id);assert.equal(saved.total_pieces,23);assert.equal(saved.total_weight,77.5);assert.ok(saved.ended_at);
+  });
+
   await t.test('keep certificate, reopen shipped order, restart production without erasing delivered quantities', async () => {
     const f = await fixture(); const before = readItem(f); const p = await preview(f);
     assert.equal(p.documented_qty, 10); assert.equal(p.can_cancel_certificates, true);

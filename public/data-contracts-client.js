@@ -4,6 +4,11 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    productionQueue: {
+      screen:'production-queue.html',owner:'Production',source:{api:'/api/production-queue',fields:['items','grouped','order_status','order_payment_status','order_deleted_at','status','cancelled_at','production_stopped_at']},
+      meaning:'Queue membership consumes the canonical Orders active-workspace condition and released production status. Paid/closed, trashed, cancelled and delivered orders are excluded in both normal and visual modes. Cancelled/stopped items are excluded. Visual mode retains finished/loading items only for still-open orders. The header counts queued item rows, not pieces completed during a shift. Order/item lifecycle events refetch the queue; failed fetches clear stale actions and out-of-order responses are discarded. All consumers use the same endpoint and production-start guard.',
+      consumers:['machines-grid','shift-pieces','machine.queueList','worker-visual'],risk:'D1',
+    },
     editorDrafts: {
       screen:'index.html',owner:'Orders',source:{api:'/api/operations/editor-drafts',fields:['draftId','payload.customer','payload.delivery','payload.pallets','serverVersion','status','orderId']},
       meaning:'Authenticated office/manager/admin users share editor snapshots before an official order exists. Local cache remains available during disconnects. Untouched startup rows do not create/count as drafts. Payload is authoritative for summary fields; restore preserves saved delivery/site/contact values while customer sites load. Optimistic versions prevent silent overwrites; a conflict keeps a separate copy. Successful submission closes the linked draft and cancels pending autosave. Draft writes create no orders and consume no stock.',
