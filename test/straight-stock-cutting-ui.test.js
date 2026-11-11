@@ -6,7 +6,7 @@ const path = require('node:path');
 const ordersHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'orders.html'), 'utf8');
 
 test('order detail exposes the straight-stock cutting plan next to print actions', () => {
-  assert.match(ordersHtml, /straight-stock-cutting\.js\?v=1/);
+  assert.match(ordersHtml, /straight-stock-cutting\.js\?v=2/);
   assert.match(ordersHtml, /תוכנית חיתוך ממוטות/);
   assert.match(ordersHtml, /openStraightStockCutting\(event,\$\{o\.id\}\)/);
   assert.match(ordersHtml, /id="straightStockOverlay"/);
@@ -18,11 +18,11 @@ test('cutting dialog supports item quantities and a per-diameter 600cm or 1200cm
   assert.match(ordersHtml, /רק מוט 600 CM/);
   assert.match(ordersHtml, /רק מוט 1200 CM/);
   assert.match(ordersHtml, /אפשר לשלב 600 ו־1200 CM/);
-  assert.match(ordersHtml, /מינימום פחת הוא היעד הראשון/);
-  assert.match(ordersHtml, /אוטומטי — מינימום פחת, כולל שילוב 600 ו־1200 CM/);
+  assert.match(ordersHtml, /המלאי/);
+  assert.match(ordersHtml, /אוטומטי — לפי האורכים והכמויות במלאי/);
   assert.match(ordersHtml, /אורך אחד בלבד לקוטר/);
   assert.match(ordersHtml, /else policies\[diameter\] = \{ stockLengthsMm: \[6000, 12000\], allowMixedStockLengths: true \}/);
-  assert.match(ordersHtml, /groupPolicies/);
+  assert.match(fs.readFileSync(path.join(__dirname,'..','public','order-cutting-planner.js'),'utf8'), /groupPolicies/);
 });
 
 test('cutting bars show only lengths inside colored segments and place shapes side by side below', () => {
@@ -41,7 +41,7 @@ test('cutting bars show only lengths inside colored segments and place shapes si
   assert.match(ordersHtml, /renderStraightStockShapePreviews/);
   assert.match(ordersHtml, /straightStockBarPatterns/);
   assert.match(ordersHtml, /× \$\{barPattern\.count\} PCS/);
-  assert.match(ordersHtml, /פחת למוט/);
+  assert.match(ordersHtml, /שארית למוט/);
 });
 
 test('cutting plan renders every length in CM, every quantity in PCS, and highlights very short pieces', () => {
@@ -59,8 +59,8 @@ test('cutting plan renders every length in CM, every quantity in PCS, and highli
 test('cutting plan renders waste as rebar weight by diameter', () => {
   assert.match(ordersHtml, /function straightStockWasteWeightKg\(wasteMm, diameter\)/);
   assert.match(ordersHtml, /IronBendRebar\?\.kgPerMeter\?\.\(diameterNumber\)/);
-  assert.match(ordersHtml, /פחת למוט<br>\$\{straightStockWeightText\(straightStockWasteWeightKg\(bar\.wasteMm, group\.diameter\)\)\}/);
-  assert.match(ordersHtml, /<span>פחת כולל<\/span><b>\$\{straightStockWeightText\(totalWasteKg\)\}<\/b>/);
+  assert.match(ordersHtml, /שארית למוט<br>\$\{straightStockWeightText\(straightStockWasteWeightKg\(bar\.wasteMm, group\.diameter\)\)\}/);
+  assert.match(ordersHtml, /<span>שארית מוטות<\/span><b>\$\{straightStockWeightText\(totalWasteKg\)\}<\/b>/);
   assert.match(ordersHtml, /\.cut-summary-card b\{display:block;direction:ltr;text-align:right/);
 });
 
@@ -74,7 +74,7 @@ test('cutting plan prints as compact A4 landscape without splitting a cutting pa
 
 test('cutting plan totals required stock bars in a table by diameter and stock length', () => {
   assert.match(ordersHtml, /const stockQuantities = new Map\(\)/);
-  assert.match(ordersHtml, /const key = `\$\{group\.diameter\}\|\$\{stockLengthMm\}`/);
+  assert.match(ordersHtml, /const key = `\$\{group\.key\}\|\$\{stockLengthMm\}`/);
   assert.match(ordersHtml, /class="cut-quantity-table"/);
   assert.match(ordersHtml, /<th>קוטר<\/th><th>אורך מוט<\/th><th>כמות מוטות<\/th>/);
   assert.match(ordersHtml, /\$\{straightStockLengthText\(row\.stockLengthMm\)\}<\/td><td class="cut-table-number">\$\{row\.count\} PCS/);

@@ -13,6 +13,11 @@ Source files:
 
 ## Current Code Snapshot
 
+`GET /api/inventory/cutting-stock`: warehouse/office/manager/admin, read-only;
+production/sales do not gain Inventory access. Optional validated order_ids only
+adjusts exclusion of other orders' confirmed lot allocations; it grants no write
+or delivery-issuance permission.
+
 `/api/operations/order-drafts*`: office/manager/admin. Delivery preview and order selection also allow warehouse; official issuance/cancellation require office/manager/admin. Delivery document reads additionally allow driver. Every endpoint retains the Orders module boundary and existing JWT enforcement. No new persistent access is provisioned.
 
 Automated scan of active API sources found:

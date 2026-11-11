@@ -1,5 +1,18 @@
 # API Registry
 
+2026-11-11 — Inventory: `GET /api/inventory/cutting-stock?order_ids=1,2` is a
+read-only approved straight-lot projection for cutting. Access: warehouse,
+office, manager, admin. Optional comma-separated positive safe integer order IDs
+(max 500); malformed IDs return 400. Returns current physical kg, other orders'
+remaining confirmed lot allocations, available kg, recorded nominal length,
+canonical kg/m and calculated whole bars using Inventory `barEstimate`. Missing
+length produces null count, never a guessed length. No prices or writes; no
+audit/event is emitted for this read. All eligible lots form one planning snapshot.
+
+Orders: mixed-customer `POST /api/operations/delivery-notes` retains the existing
+block and now returns 409 with `לא ניתן לעשות תעודת משלוח אחת ללקוחות שונים`.
+Existing customer/company/destination, quantity and approval checks remain.
+
 Order creation material-source contract (2026-11-10): `POST /api/orders` accepts the existing client `items[].raw_material_id: 'auto'` sentinel. Inventory reservation persists null for automatic source selection, retaining FIFO choice at completion. A valid explicit lot ID is preserved; an invalid/missing explicit lot returns HTTP 400 with a readable message, and the entire order transaction rolls back. Saving reserves demand without consuming physical stock.
 
 `GET /api/inventory/metrics` (Inventory, 2026-11-09): warehouse/office/manager/admin; read-only stocktake-period journal/control report. Returns stocked_lots, stocked_diameters, baseline{id,counted_at,created_at}, recorded_net_kg (null without baseline), verified_consumption_kg (null; actual use is not inferred), status (no_baseline/needs_reconciliation/recorded_only), issues, historical counters and legacy coverage diagnostics. Uses approval time as the explicit period boundary. Existing inventory/summary response remains unchanged.

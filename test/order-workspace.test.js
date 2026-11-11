@@ -27,7 +27,7 @@ test('partial deliveries with outstanding work lead the active list while preser
  assert.deepEqual(ui.sortActiveOrders(rows).map(row=>row.id),[108,107,106,122,105,104,103,102]);
  assert.equal(JSON.stringify(rows),original);
  const html=fs.readFileSync(path.join(__dirname,'../public/orders.html'),'utf8');
- assert.match(html,/if \(orderBucket === 'active'\) list = window\.IronBendOrderWorkspace\.sortActiveOrders\(list\);\s+renderTable\(list\);\s+renderCards\(list\);/);
+ assert.match(html,/if \(orderBucket === 'active'\) list = window\.IronBendOrderWorkspace\.sortActiveOrders\(list\);\s+list=IronBendOrderSorting\.sort\(list,orderListSort,window\.IronBendOrderWorkspace\);\s+window\.IronBendOrderBatch\.sync\([^;]+;\s+renderTable\(list\);\s+renderCards\(list\);/);
 });
 test('workspace groups all work, delivered, paid, cancelled and trash without altering production',t=>{
  const {db,s}=fixture(t);const ids=[order(db,'ACTIVE','בייצור'),order(db,'DELIVERED','סופק – אושר'),order(db,'PAID','סופק – אושר'),order(db,'CANCELLED','בוטלה'),order(db,'TRASH')];
@@ -64,11 +64,12 @@ test('purge protects production, delivery, invoice, inventory and source records
   s.trash(id,actor,confirm());assert.throws(()=>s.purge(id,actor,{...confirm(2),password:'1234'}),{statusCode:409});assert.ok(s.read(id));assert.ok(db.prepare('SELECT id FROM items WHERE id=?').get(item));
  }
 });
-test('migration is repeatable; helpers and table headings have matching eight columns including inline priority',t=>{
+test('migration is repeatable; helpers and table headings have nine columns including selection and inline priority',t=>{
  const {db}=fixture(t),id=order(db,'KEEP');ensureOrderWorkspaceSchema(db);ensureOrderWorkspaceSchema(db);assert.equal(db.prepare('SELECT total_weight FROM orders WHERE id=?').get(id).total_weight,123.4);
  assert.equal(ui.deliveryDate('2026-10-15'),'15.10.2026');assert.equal(ui.rowTone({status:'בייצור'}),'production');assert.match(ui.notes({delivery_progress:{shipped_unit_count:646,total_unit_count:917,remaining_unit_count:271,shipped_item_count:16,total_item_count:31}})[0],/16 מתוך 31/);
  const html=fs.readFileSync(path.join(__dirname,'../public/orders.html'),'utf8');const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]);for(const script of scripts)new vm.Script(script);
- const rendering=html.slice(html.indexOf('function renderTable('),html.indexOf('// ── Mobile cards'));assert.equal((rendering.match(/<td(?:\s|>)/g)||[]).length,9); // eight row cells plus the empty state cell
+ const rendering=html.slice(html.indexOf('function renderTable('),html.indexOf('// ── Mobile cards'));assert.equal((rendering.match(/<td(?:\s|>)/g)||[]).length,10); // nine row cells plus the empty state cell
+ assert.match(rendering,/selectionHead/);assert.match(rendering,/colspan="9"/);
  assert.match(rendering,/תאריך אספקה/);assert.match(rendering,/הערות/);assert.doesNotMatch(rendering,/channelLabel|urgentLabel/);assert.doesNotMatch(html,/id="quotesViewBtn"/);
  assert.ok(ui.notes({status:'אספקה חלקית'}).includes('אספקה חלקית'));
  const actions=html.slice(html.indexOf('function actionBtns('),html.indexOf('function orderStatusSelect('));assert.match(actions,/kind=print-a4/);assert.doesNotMatch(actions,/openOrderEdit|setStatus\(|kind=print-cards/);

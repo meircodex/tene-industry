@@ -296,6 +296,9 @@ test('inventory receiving API routes are split out of the server monolith', () =
   const server = read('server.js');
 
   assert.match(route, /module\.exports = function createInventoryRouter/);
+  assert.match(route, /router\.get\('\/inventory\/cutting-stock', requireAnyRole\(\['warehouse','office','manager','admin'\]\)/);
+  assert.match(read('services/cuttingStock.js'), /require\('\.\/inventoryPlanningLength'\)/);
+  assert.doesNotMatch(read('services/cuttingStock.js'), /\b(?:UPDATE|INSERT INTO|DELETE FROM)\b/);
   assert.match(route, /router\.post\('\/inventory\/stocktakes\/preview'/);
   assert.doesNotMatch(route, /axios/);
   assert.doesNotMatch(route, /router\.(get|post|patch)\('\/suppliers/);

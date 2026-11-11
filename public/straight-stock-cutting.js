@@ -310,5 +310,67 @@
     };
   }
 
-  return { planCutting, bestFitDecreasing, exactPack };
+  function planInventoryCutting({sources=[],pieces=[],kerfMm=0,groupPolicies={},separateOrders=false,_sourcePreference=null}={}){
+    if(!_sourcePreference){
+      const variants=['shortest','longest'].map(preference=>planInventoryCutting({sources,pieces,kerfMm,groupPolicies,separateOrders,_sourcePreference:preference}));
+      variants.sort((a,b)=>b.pieceCount-a.pieceCount||b.totalCutLengthMm-a.totalCutLengthMm||a.totalWasteMm-b.totalWasteMm||a.bars.length-b.bars.length);
+      return variants[0];
+    }
+    const kerf=nonNegativeNumber(kerfMm),stock=sources.map(source=>({...source,remaining:Math.max(0,Math.floor(Number(source.count)||0))}));
+    if(stock.some(source=>!Number.isFinite(source.stockLengthMm)||source.stockLengthMm<=0||!Number.isSafeInteger(source.count)||source.count<0)||new Set(stock.map(source=>String(source.id))).size!==stock.length)throw new Error('רשימת מלאי המוטות אינה תקינה');
+    const policies={...groupPolicies};
+    for(const diameter of new Set(pieces.map(piece=>piece.diameter))){
+      const policy=policies[diameter];if(!policy||policy.allowMixedStockLengths!==false||policy.stockLengthsMm?.length===1)continue;
+      const subset=pieces.filter(piece=>piece.diameter===diameter),available=stock.filter(source=>Number(source.diameter)===Number(diameter)&&source.count>0);
+      const lengths=[...new Set(available.map(source=>source.stockLengthMm))].filter(length=>!policy.stockLengthsMm?.length||policy.stockLengthsMm.includes(length));
+      const variants=lengths.map(length=>({length,plan:planInventoryCutting({sources:available,pieces:subset,kerfMm:kerf,separateOrders,groupPolicies:{[diameter]:{stockLengthsMm:[length]}},_sourcePreference})}));
+      variants.sort((a,b)=>b.plan.pieceCount-a.plan.pieceCount||a.plan.totalWasteMm-b.plan.totalWasteMm||a.plan.totalStockLengthMm-b.plan.totalStockLengthMm);
+      if(variants.length)policies[diameter]={stockLengthsMm:[variants[0].length]};
+    }
+    const demand=[],rejected=[];
+    for(const piece of pieces){
+      const quantity=Number(piece.quantity),lengthMm=Number(piece.lengthMm);
+      if(!Number.isSafeInteger(quantity)||quantity<=0||!Number.isFinite(lengthMm)||lengthMm<=0)throw new Error('יש להזין אורכים חיוביים וכמויות שלמות לתוכנית');
+      if(demand.length+quantity>100000)throw new Error('התוכנית כוללת יותר מ־100,000 חלקים. יש לפצל את הבחירה לכמה תוכניות.');
+      for(let copy=1;copy<=quantity;copy++)demand.push({...piece,quantity:1,copy});
+    }
+    demand.sort((a,b)=>b.lengthMm-a.lengthMm||String(a.itemId).localeCompare(String(b.itemId))||a.copy-b.copy);
+    const groups=new Map(),pools=new Map();
+    function insert(pool,bin){let lo=0,hi=pool.length;while(lo<hi){const mid=(lo+hi)>>1;if(pool[mid].wasteMm<=bin.wasteMm)lo=mid+1;else hi=mid;}pool.splice(lo,0,bin);}
+    function fit(length,total,count){const endLoss=(count-1)*kerf,remainder=length-total-endLoss;if(Math.abs(remainder)<1e-7)return {kerfLossMm:endLoss,wasteMm:0};if(remainder+1e-7<kerf)return null;return {kerfLossMm:count*kerf,wasteMm:Math.max(0,length-total-count*kerf)};}
+    function groupFor(piece){
+      const key=piece.groupKey||`${piece.diameter}|${piece.material||'ribbed'}`;
+      if(!groups.has(key))groups.set(key,{key,diameter:piece.diameter,material:piece.material,materialLabel:piece.materialLabel||'',bins:[],exact:false});
+      return groups.get(key);
+    }
+    for(const piece of demand){
+      const group=groupFor(piece),policy=policies[piece.diameter]||{},poolKey=group.key+(separateOrders?'|order:'+piece.orderId:'');
+      if(!pools.has(poolKey))pools.set(poolKey,[]);const pool=pools.get(poolKey);
+      const allowed=source=>source.remaining>0&&Number(source.diameter)===Number(piece.diameter)&&(source.material||'ribbed')===(piece.material||'ribbed')&&source.stockLengthMm>=piece.lengthMm
+        &&(!piece.grade||piece.grade===source.grade)&&(!piece.standard||piece.standard===source.standard)
+        &&(!policy.stockLengthsMm?.length||policy.stockLengthsMm.includes(source.stockLengthMm))&&fit(source.stockLengthMm,piece.lengthMm,1);
+      let best=null;
+      let lo=0,hi=pool.length;while(lo<hi){const mid=(lo+hi)>>1;if(pool[mid].wasteMm+1e-7<piece.lengthMm)lo=mid+1;else hi=mid;}
+      for(let index=lo;index<pool.length;index++){const bin=pool[index];
+        if((piece.grade&&piece.grade!==bin.grade)||(piece.standard&&piece.standard!==bin.standard))continue;
+        const fitted=fit(bin.stockLengthMm,bin.cutLengthMm+piece.lengthMm,bin.pieces.length+1);
+        if(fitted){best={bin,index,...fitted};break;}
+      }
+      if(best){pool.splice(best.index,1);best.bin.pieces.push(piece);best.bin.cutLengthMm+=piece.lengthMm;best.bin.kerfLossMm=best.kerfLossMm;best.bin.usedMm=best.bin.cutLengthMm+best.kerfLossMm;best.bin.wasteMm=best.wasteMm;insert(pool,best.bin);continue;}
+      const source=stock.filter(allowed).sort((a,b)=>(_sourcePreference==='longest'?-1:1)*(a.stockLengthMm-b.stockLengthMm)||String(a.id).localeCompare(String(b.id)))[0];
+      if(!source){rejected.push({...piece,reason:'inventory-shortage',quantity:1});continue;}
+      source.remaining--;
+      const fitted=fit(source.stockLengthMm,piece.lengthMm,1),bin={index:group.bins.length+1,sourceId:source.id,sourceLot:source.lot_number||String(source.id),stockLengthMm:source.stockLengthMm,
+        grade:source.grade,standard:source.standard,pieces:[piece],cutLengthMm:piece.lengthMm,kerfLossMm:fitted.kerfLossMm,usedMm:piece.lengthMm+fitted.kerfLossMm,wasteMm:fitted.wasteMm};
+      group.bins.push(bin);insert(pool,bin);
+    }
+    const resultGroups=[...groups.values()].filter(group=>group.bins.length);
+    const bars=resultGroups.flatMap(group=>group.bins.map(bin=>({...bin,diameter:group.diameter,material:group.material,groupKey:group.key})));
+    const totalStockLengthMm=bars.reduce((s,b)=>s+b.stockLengthMm,0),totalCutLengthMm=bars.reduce((s,b)=>s+b.cutLengthMm,0),totalKerfLossMm=bars.reduce((s,b)=>s+b.kerfLossMm,0),totalWasteMm=bars.reduce((s,b)=>s+b.wasteMm,0);
+    const failures=new Map();for(const piece of rejected){const key=String(piece.itemId),old=failures.get(key);if(old)old.quantity++;else failures.set(key,{...piece});}
+    return {inventoryConstrained:true,exact:false,complete:!rejected.length,groups:resultGroups,bars,rejected:[...failures.values()],kerfMm:kerf,
+      pieceCount:demand.length-rejected.length,totalStockLengthMm,totalCutLengthMm,totalKerfLossMm,totalWasteMm,wastePercent:totalStockLengthMm?100*totalWasteMm/totalStockLengthMm:0,
+      sourceUsage:stock.map(source=>({...source,barsUsed:source.count-source.remaining}))};
+  }
+  return { planCutting, planInventoryCutting, bestFitDecreasing, exactPack };
 });

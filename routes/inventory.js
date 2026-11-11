@@ -13,6 +13,7 @@ const stocktakes = require('../services/inventoryStocktake');
 const mesh = require('../services/meshInventory');
 const { materialOnHandSql } = require('../services/materialBalance');
 const { consumeReservationsForProduction } = require('../services/inventoryReservation');
+const { cuttingStock } = require('../services/cuttingStock');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/inventory missing dependency: ${name}`);
@@ -92,6 +93,11 @@ module.exports = function createInventoryRouter(deps) {
 
   router.get('/inventory/summary', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req, res) => {
     res.json(db.prepare(`SELECT diameter,material_type,nominal_length_mm,SUM(stock_adjustment_kg) as total_adjustments,SUM(weight_received) as total_received,SUM(weight_used) as total_used,SUM(weight_scrapped) as total_scrapped,ROUND(SUM(${materialOnHandSql(db)}),2) as available,COUNT(*) as batches FROM raw_material WHERE active=1 AND COALESCE(verification_status,'approved')='approved' GROUP BY diameter,material_type,nominal_length_mm ORDER BY diameter,material_type,nominal_length_mm`).all());
+  });
+  router.get('/inventory/cutting-stock', requireAnyRole(['warehouse','office','manager','admin']), (req,res) => {
+    const raw=String(req.query.order_ids||''),parts=raw?raw.split(','):[];
+    if(parts.length>500||parts.some(value=>!/^\d+$/.test(value)||!Number.isSafeInteger(Number(value))||Number(value)<=0))return res.status(400).json({error:'יש לבחור מספרי הזמנות תקינים לתכנון החיתוך'});
+    res.json(cuttingStock(db,[...new Set(parts.map(Number))]));
   });
   router.get('/inventory/metrics', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), (req,res) => {
     res.json(require('../services/inventoryMetrics').inventoryMetrics(db));

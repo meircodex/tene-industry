@@ -4,6 +4,16 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    orderBatchActions: {
+      screen:'orders.html',owner:'Orders',source:{api:'/api/orders',fields:['id','order_num','customer_id','deleted_at','delivery_date','priority','total_weight','status','delivery_progress','general_notes','driver_notes']},
+      meaning:'Mailbox checkbox selection; numeric/date-aware asc/desc header sorting preserves selected IDs. Default partial-delivery ordering remains until explicit sorting. Same-customer IDs open the existing delivery preview; mixed-customer document icon has a red slash and explains only on click. Selection/navigation issue no documents.',
+      consumers:['orderBatchCount','orderBatchMaster','data-sort-key'],risk:'D0',
+    },
+    cuttingStockSources: {
+      screen:'orders.html',owner:'Inventory',source:{api:'/api/inventory/cutting-stock',fields:['captured_at','sources.id','sources.nominal_length_mm','sources.diameter','sources.grade','sources.standard_code','sources.physical_kg','sources.allocated_to_other_orders_kg','sources.available_kg','sources.calculated_bar_count','sources.unit_weight_kg']},
+      meaning:'Approved straight lots only. Inventory barEstimate derives whole bars from physical kg less other orders confirmed lot allocations. Missing lot length never becomes 6/12m. Source/finish choices are local planning inputs. Refreshed each calculation; no stock writes. Finite heuristic cutting retains order/item/lot identity and lists all unplaced quantities without promising a global optimum.',
+      consumers:['straightStockInventory','straightStockResults','straightStockSeparateOrders','cut-quantity-table','cut-bar-row'],risk:'D0',
+    },
     orderInlinePriority: {
       screen:'orders.html',owner:'Orders',source:{api:'/api/orders',fields:['priority','workspace_version','status','locked','deleted_at']},
       meaning:'Editable regular/urgent scheduling priority in each authorized open order row or mobile card. PATCH priority with expected_priority guards concurrent updates and does not move or consume inventory.',

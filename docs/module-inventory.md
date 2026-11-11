@@ -97,6 +97,15 @@ Current risks:
 
 ## Orders
 
+2026-11-11: Orders owns mailbox selection and local ascending/descending header
+sorting (`public/order-batch-actions.js`, `public/order-list-sorting.js`) and
+multi-order cutting orchestration (`public/order-cutting-planner.js`). Inventory
+owns the read-only lot projection `services/cuttingStock.js`; it reuses
+`services/inventoryPlanningLength.js` for recorded lengths and whole-bar estimates.
+The pure finite-stock engine is `public/straight-stock-cutting.js`. No order,
+stock, allocation or delivery document is written by planning. See
+`docs/multi-order-cutting-20261111.md` for boundaries and rollback.
+
 Purpose:
 
 - Internal order creation, import, approval, status, item/pallet structure,

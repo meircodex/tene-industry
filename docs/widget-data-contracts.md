@@ -1,5 +1,18 @@
 # Widget Data Contracts
 
+2026-11-11: `orderBatchActions` documents checkbox IDs and local header sorting.
+Natural order-number sorting, numeric weight sorting, chronological delivery
+dates, Hebrew customer/status/notes and regular-before-urgent ascending priority
+all preserve selected IDs and current filters. Missing values stay last in both
+directions; ties preserve the existing order. Actions/checkbox headers do not sort.
+Default outstanding-partial-delivery priority is unchanged until a header is clicked.
+
+`cuttingStockSources` documents the Inventory-owned finite lot snapshot, recorded
+length and calculated whole-bar counts. Shortage means unplaced in the selected
+heuristic plan, not a proven optimal shortage. Output retains order/item/lot
+identity; reusable tails and kerf loss are separate. No stock/production/delivery
+event is inferred from viewing or printing a plan.
+
 Inventory length separation (2026-11-11): `inventoryDailyRows` reads
 `groups.nominal_length_mm`, `available_stock_kg` and `estimated_bar_count` from
 the existing protected procurement plan. Straight stock, demand and incoming
