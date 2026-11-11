@@ -115,6 +115,8 @@ Inventory count and daily purchase planning contracts (2026-11-08):
 `/api/procurement/plan` is read-only planning; `/api/procurement/purchase-draft/export`
 is warehouse/office/manager/admin CSV export and does not create a purchase order or stock.
 See `inventory-accounting-20261108.md` for quantities, cutoff and replay contracts.
+  Straight-bar planning now includes nominal length and estimated physical bar
+  counts, with no cross-length coverage; see `inventory-length-separation-20261111.md`.
 
 | Route Family | Module | Expected Security | Current Concern |
 | --- | --- | --- | --- |

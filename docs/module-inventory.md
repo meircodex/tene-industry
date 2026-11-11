@@ -1,5 +1,10 @@
 # Module Inventory
 
+Straight-bar length planning (2026-11-11): Inventory owns the read-only
+`inventoryPlanning` projection and length identity helper. Steel/Rebar supplies
+canonical kg/m; Orders supplies lift shape snapshots. Inventory rows and
+editable procurement drafts preserve length. See inventory-length-separation-20261111.md.
+
 Product trait recognition (2026-11-10): Orders owns manual-entry resolution and
 recognition evidence in order snapshots; `modules/steel-rebar/shape-recognition.js`
 is the shared pure geometry dependency. Catalog persists explicit recognition

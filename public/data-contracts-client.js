@@ -77,8 +77,8 @@
     },
     inventoryDaily: {
       screen: 'inventory.html', owner: 'Inventory',
-      source: {api:'/api/procurement/plan',fields:['groups.physical_stock_kg','groups.backlog_kg','groups.incoming_kg','groups.recommended_purchase_kg','mesh_groups.physical_units','mesh_groups.required_units','mesh_groups.recommended_purchase_units']},
-      meaning:'Planning by diameter and supply form; kg values display rounded to whole kilograms without changing source precision; sheets remain separate whole units. Recommendations do not place purchase orders. Bar grade, standard and length require review.',
+      source: {api:'/api/procurement/plan',fields:['groups.nominal_length_mm','groups.estimated_bar_count','groups.physical_stock_kg','groups.available_stock_kg','groups.backlog_kg','groups.incoming_kg','groups.recommended_purchase_kg','mesh_groups.physical_units','mesh_groups.required_units','mesh_groups.recommended_purchase_units']},
+      meaning:'Planning by diameter and supply form, with straight bars separated by nominal length. Unknown length cannot cover demand. Estimated physical bar counts use canonical kg per metre × nominal length and round down; unknown length has no count. Whole kg display preserves source precision. Sheets stay separate units. Drafts retain the selected length and do not place purchase orders. Grade and standard require review.',
       consumers:['inventoryDailyRows'],risk:'D1',
     },
     inventoryPhysicalTotal: {

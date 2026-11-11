@@ -152,15 +152,16 @@ tr:hover td{background:rgba(0,0,0,0.015);}
         <details class="inventory-plan-options"><summary>אפשרויות תכנון</summary><div class="inventory-plan-fields"><div class="form-row"><label for="inventoryStockBasisSelect">בסיס החלטה להזמנה</label><select id="inventoryStockBasisSelect"><option value="available">מלאי פנוי — לאחר הזמנות</option><option value="physical">מלאי פיזי במחסן</option></select></div>
         <div class="form-row"><label for="inventoryThrough">תכנון עד</label><input id="inventoryThrough" type="date"></div>
         <div class="form-row"><label for="inventoryWaste">פחת לתכנון (%)</label><input id="inventoryWaste" type="number" min="0" max="100" step="0.1" value="0"></div>
-        <div class="form-row"><label for="inventorySafety">מלאי ביטחון (ק״ג לכל סוג וקוטר)</label><input id="inventorySafety" type="number" min="0" value="0"></div>
+        <div class="form-row"><label for="inventorySafety">מלאי ביטחון (ק״ג לכל סוג, קוטר ואורך)</label><input id="inventorySafety" type="number" min="0" value="0"></div>
         </div></details>
       </div>
       <div class="inventory-table-wrap"><table><thead><tr>
-        <th><button class="inventory-heading" data-inventory-sort="label">סוג ומפרט</button></th><th><button class="inventory-heading" data-inventory-sort="stock">במלאי</button></th>
+        <th><button class="inventory-heading" data-inventory-sort="label">סוג ומפרט</button></th><th><button class="inventory-heading" data-inventory-sort="lengthMm">אורך (מטר)</button></th><th><button class="inventory-heading" data-inventory-sort="stock">במלאי</button></th>
+        <th><button class="inventory-heading" data-inventory-sort="barCount">מוטות במלאי (משוער)</button></th>
         <th><button class="inventory-heading" data-inventory-sort="demand">נדרש להזמנות</button></th><th><button class="inventory-heading" data-inventory-sort="available">פנוי / חוסר</button></th>
         <th><button class="inventory-heading" data-inventory-sort="incoming">בדרך</button></th><th><button class="inventory-heading" data-inventory-sort="buy">המלצת הזמנה</button></th>
-      </tr></thead><tbody id="inventoryDailyRows"><tr><td colspan="6" class="inventory-message">טוען...</td></tr></tbody></table></div>
-      <div class="inventory-caption">לחיצה על כותרת ממיינת; לחיצה נוספת הופכת את הסדר. לחיצה על סוג ומפרט מסננת את הרשימה. רשתות ביחידות; ברזל בק״ג.</div>
+      </tr></thead><tbody id="inventoryDailyRows"><tr><td colspan="8" class="inventory-message">טוען...</td></tr></tbody></table></div>
+      <div class="inventory-caption">מספר המוטות משוער לפי משקל המלאי ÷ (אורך מוט × משקל למטר לפי הקוטר), בעיגול מטה. לחיצה על כותרת ממיינת; לחיצה נוספת הופכת את הסדר. לחיצה על סוג ומפרט מסננת את הרשימה. רשתות ביחידות; ברזל בק״ג.</div>
     </div>
   </div>
 
@@ -857,7 +858,7 @@ openInitialInventoryTab();
 </script>
 <script src="/data-contracts-client.js"></script>
 <script src="/purchase-units.js?v=20261110"></script>
-<script src="/inventory-workspace.js?v=20261110-purchase"></script>
+<script src="/inventory-workspace.js?v=20261111-length"></script>
 <script src="/inventory-counts.js?v=20261110"></script>
 </body>
 </html>

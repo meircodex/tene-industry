@@ -1,0 +1,777 @@
+<!doctype html><html dir="rtl" lang="he"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>הפרדת אורכי ליפטים — תצוגה מקדימה</title><style>
+:root{--steel:#f0f4f8;--steel-mid:#ffffff;--steel-light:#e8edf4;--steel-card:#ffffff;--iron:#d0dcea;--accent:#c9621a;--accent-light:#e07b39;--accent-dim:rgba(201,98,26,0.10);--success:#1a7a42;--success-dim:rgba(26,122,66,0.10);--danger:#b83227;--danger-dim:rgba(184,50,39,0.10);--warning:#a86b00;--warning-dim:rgba(168,107,0,0.10);--info:#1560a8;--info-dim:rgba(21,96,168,0.10);--text:#1a2533;--text-dim:#526070;--text-muted:#8fa0b0;--border:rgba(0,0,0,0.09);--border-bright:rgba(0,0,0,0.15);--radius:14px;--radius-sm:8px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);min-height:100vh;}
+.topnav{background:var(--steel-mid);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 8px rgba(0,0,0,0.08);}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),#f0954d);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.nav-links{display:flex;gap:2px;}
+.nav-link{padding:7px 13px;border-radius:7px;text-decoration:none;color:var(--text-dim);font-size:13px;font-weight:600;transition:all 0.2s;white-space:nowrap;}
+.nav-link:hover{background:rgba(0,0,0,0.04);color:var(--text);}
+.nav-link.active{background:var(--accent-dim);color:var(--accent);}
+.page{max-width:1300px;margin:0 auto;padding:24px 16px;}
+
+/* TABS */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:24px;}
+.tab-btn{padding:10px 20px;border:none;background:none;border-radius:var(--radius-sm) var(--radius-sm) 0 0;font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;color:var(--text-dim);cursor:pointer;transition:all 0.2s;border-bottom:2px solid transparent;margin-bottom:-2px;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--accent-dim);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* KPI ROW */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
+.kpi-card{background:var(--steel-mid);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;}
+.kpi-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+.kpi-val{font-size:26px;font-weight:900;color:var(--text);}
+.kpi-sub{font-size:12px;color:var(--text-dim);margin-top:2px;}
+
+/* TABLE */
+.card{background:var(--steel-mid);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px;}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.card-title{font-size:15px;font-weight:800;}
+table{width:100%;border-collapse:collapse;}
+th{padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.4px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(0,0,0,0.04);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(0,0,0,0.015);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.badge-ok{background:var(--success-dim);color:var(--success);}
+.badge-warn{background:var(--warning-dim);color:var(--warning);}
+.badge-danger{background:var(--danger-dim);color:var(--danger);}
+
+/* BUTTON */
+.btn{padding:8px 16px;border:none;border-radius:var(--radius-sm);font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent-light);}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-outline{background:transparent;border:1px solid var(--border-bright);color:var(--text-dim);}
+.btn-outline:hover{background:rgba(0,0,0,0.04);}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--steel-mid);border-radius:var(--radius);padding:28px;width:100%;max-width:680px;box-shadow:0 16px 50px rgba(0,0,0,0.25);max-height:92vh;overflow:auto;}
+.modal h2{font-size:18px;font-weight:900;margin-bottom:20px;}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:6px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:9px 12px;border:1px solid var(--border-bright);border-radius:var(--radius-sm);font-family:'Heebo',sans-serif;font-size:13px;background:var(--steel);color:var(--text);}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{outline:none;border-color:var(--accent);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+.bending-panel{display:none;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--steel-light);padding:14px;margin:6px 0 14px;}
+.bending-panel.active{display:block;}
+.bending-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.shape-preview{min-height:150px;background:#fff;border:1px dashed var(--border-bright);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.shape-status{font-size:12px;color:var(--text-dim);margin-top:8px;min-height:18px;}
+.shape-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+.material-shape{font-size:11px;color:var(--text-dim);margin-top:4px;}
+.receipt-workspace{display:grid;grid-template-columns:minmax(520px,1.15fr) minmax(440px,.85fr);gap:14px;align-items:start;}
+.receipt-source{min-height:620px;background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;display:flex;align-items:center;justify-content:center;position:sticky;top:12px;}
+.receipt-source iframe,.receipt-source img{width:100%;height:620px;border:0;object-fit:contain;background:#fff;}
+.receipt-card{border:1px solid var(--border);border-radius:var(--radius-sm);background:#fff;margin-bottom:12px;overflow:hidden;}
+.receipt-card-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+.receipt-body{padding:12px 14px;display:grid;gap:10px;}
+.receipt-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.receipt-fullscreen{position:fixed;inset:0;background:rgba(2,26,72,.62);z-index:700;display:none;padding:14px;backdrop-filter:blur(3px);}
+.receipt-fullscreen.open{display:flex;}
+.receipt-fullscreen-inner{background:#fff;border:1px solid var(--border);border-radius:12px;width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(2,26,72,.28);}
+.receipt-fullscreen-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8fafc;}
+.receipt-fullscreen-title{font-size:16px;font-weight:900;}
+.receipt-fullscreen-body{display:grid;grid-template-columns:minmax(620px,1.15fr) minmax(480px,.85fr);min-height:0;flex:1;}
+.receipt-fullscreen-source{background:#f7f9fc;border-left:1px solid var(--border);padding:14px;min-height:0;}
+.receipt-fullscreen-source iframe,.receipt-fullscreen-source img{width:100%;height:100%;border:1px solid var(--border);border-radius:10px;background:#fff;object-fit:contain;}
+.receipt-fullscreen-data{padding:14px;overflow:auto;}
+.receipt-fullscreen-data table{font-size:13px;}
+.muted{color:var(--text-dim);font-size:12px;}
+@media(max-width:980px){.receipt-workspace,.receipt-fullscreen-body{grid-template-columns:1fr}.receipt-source{position:static;min-height:420px}.receipt-source iframe,.receipt-source img{height:420px}.receipt-fullscreen-source{min-height:45vh;border-left:0;border-bottom:1px solid var(--border)}}
+@media(max-width:700px){.form-grid,.bending-grid{grid-template-columns:1fr}.modal{max-width:calc(100vw - 24px);padding:22px}}
+
+/* SEARCH */
+.search-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.search-row input,.search-row select{padding:8px 12px;border:1px solid var(--border-bright);border-radius:var(--radius-sm);font-family:'Heebo',sans-serif;font-size:13px;background:var(--steel);color:var(--text);}
+.search-row input{flex:1;min-width:200px;}
+/* ═══════════════════════════════════════════════════════
+   IronBend – Light Theme
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Variables ─────────────────────────────────────────── */
+:root {
+  --brand-primary: #021A48 !important;
+  --brand-primary-2: #062170 !important;
+  --brand-orange: #DF5000 !important;
+  --brand-orange-2: #F08A24 !important;
+  --brand-green: #40B900 !important;
+  --brand-sky: #A7ECFF !important;
+  --steel:        #f0f4f8 !important;
+  --steel-mid:    #ffffff !important;
+  --steel-card:   #ffffff !important;
+  --steel-light:  #e6edf5 !important;
+  --iron:         #d0dcea !important;
+  --accent:       var(--brand-orange) !important;
+  --accent-light: var(--brand-orange-2) !important;
+  --accent-dim:   rgba(223,80,0,0.10) !important;
+  --success:      #1a7a42 !important;
+  --success-dim:  rgba(26,122,66,0.10) !important;
+  --danger:       #b83227 !important;
+  --danger-dim:   rgba(184,50,39,0.10) !important;
+  --warning:      #a86b00 !important;
+  --warning-dim:  rgba(168,107,0,0.10) !important;
+  --info:         #1560a8 !important;
+  --info-dim:     rgba(21,96,168,0.10) !important;
+  --text:         #1a2533 !important;
+  --text-dim:     #526070 !important;
+  --text-muted:   #8fa0b0 !important;
+  --border:       rgba(0,0,0,0.09) !important;
+  --border-bright:rgba(0,0,0,0.16) !important;
+  --card:         rgba(0,0,0,0.02) !important;
+}
+
+/* ── Base ──────────────────────────────────────────────── */
+html { background: #f0f4f8 !important; }
+body { background: radial-gradient(circle at top right, rgba(167,236,255,0.20), transparent 360px), #f0f4f8 !important; color: #1a2533 !important; }
+
+/* ── Prevent bottom-nav layout shift ──────────────────── */
+/* nav.js injects #bottom-nav after page load — pre-reserve space so content doesn't jump */
+@media (max-width: 768px) {
+  body { padding-bottom: 64px !important; }
+}
+
+/* ── Topnav ────────────────────────────────────────────── */
+.topnav, nav.topnav {
+  background: #ffffff !important;
+  border-bottom: 1px solid rgba(2,26,72,0.10) !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.07) !important;
+}
+.nav-link { color: #526070 !important; }
+.nav-link:hover  { background: rgba(0,0,0,0.04) !important; color: #1a2533 !important; }
+.nav-link.active { background: rgba(201,98,26,0.10) !important; color: #c9621a !important; }
+
+#ib-topnav {
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%) !important;
+  border-bottom-color: rgba(2,26,72,0.12) !important;
+}
+#ib-logo {
+  color: var(--brand-primary) !important;
+}
+#ib-logo img, #ib-drawer-logo {
+  display: block;
+  object-fit: contain;
+}
+#ib-logo img {
+  width: 164px !important;
+  max-width: 164px;
+  max-height: 42px;
+  height: auto !important;
+}
+#ib-drawer-logo {
+  width: 176px !important;
+  max-width: 176px;
+  max-height: 54px;
+  height: auto;
+}
+.ib-link.ib-active, .ib-dl.ib-active, .ib-bn.ib-active {
+  color: var(--brand-orange) !important;
+}
+.ib-link.ib-active {
+  background: rgba(223,80,0,0.10) !important;
+  box-shadow: inset 0 -2px 0 var(--brand-orange) !important;
+}
+
+@media(max-width:768px) {
+  #ib-logo img {
+    width: 132px !important;
+    max-width: 132px;
+    max-height: 42px;
+  }
+}
+
+@media(min-width:1024px) {
+  #ib-topnav {
+    background: linear-gradient(180deg, #071c3b 0%, #021A48 58%, #00112f 100%) !important;
+    border-bottom: none !important;
+    border-left: 1px solid rgba(255,255,255,0.10) !important;
+    border-right: none !important;
+    box-shadow: -8px 0 32px rgba(2,26,72,0.20) !important;
+  }
+  #ib-logo {
+    color: #ffffff !important;
+  }
+  #ib-logo img {
+    width: 118px !important;
+    max-width: 118px;
+    max-height: 54px;
+  }
+  #ib-topnav .ib-link {
+    color: rgba(255,255,255,0.82) !important;
+  }
+  #ib-topnav .ib-link:hover {
+    background: rgba(255,255,255,0.10) !important;
+    color: #ffffff !important;
+  }
+  #ib-topnav .ib-link.ib-active {
+    background: linear-gradient(135deg, rgba(223,80,0,0.96), rgba(240,138,36,0.88)) !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 24px rgba(223,80,0,0.25) !important;
+  }
+}
+
+/* ── Day bar ───────────────────────────────────────────── */
+.day-bar {
+  background: linear-gradient(90deg,rgba(201,98,26,0.06),transparent 60%) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.07) !important;
+}
+.day-bar-sep { background: rgba(0,0,0,0.10) !important; }
+
+/* ── All cards ─────────────────────────────────────────── */
+.kpi-card, .machine-card, .table-card, .alerts-panel, .quick-stats,
+.pie-card, .company-card, .con-card, .card,
+[class*="-card"], [class*="card-"] {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04) !important;
+}
+.machine-card.running {
+  border-color: rgba(201,98,26,0.40) !important;
+  box-shadow: 0 0 0 2px rgba(201,98,26,0.25), 0 2px 10px rgba(0,0,0,0.07) !important;
+}
+.machine-card.online {
+  border-color: rgba(26,122,66,0.30) !important;
+  box-shadow: 0 0 0 2px rgba(26,122,66,0.18), 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+.machine-card.error {
+  border-color: rgba(184,50,39,0.40) !important;
+  box-shadow: 0 0 0 2px rgba(184,50,39,0.20), 0 2px 8px rgba(0,0,0,0.06) !important;
+}
+
+/* ── Machine internals ─────────────────────────────────── */
+.m-ring-bg { stroke: rgba(0,0,0,0.08) !important; }
+.m-ring-text { fill: #1a2533 !important; }
+.m-status-badge { background: rgba(0,0,0,0.05) !important; color: #526070 !important; }
+.m-status-badge.running { background: rgba(201,98,26,0.12) !important; color: #c9621a !important; }
+.m-status-badge.online  { background: rgba(26,122,66,0.12) !important; color: #1a7a42 !important; }
+.m-status-badge.error   { background: rgba(184,50,39,0.12) !important; color: #b83227 !important; }
+.m-job { background: #f5f8fb !important; border-color: rgba(0,0,0,0.07) !important; }
+.m-lastseen { color: #8fa0b0 !important; }
+.machine-stripe { opacity: 0.8 !important; }
+
+/* ── Tables ────────────────────────────────────────────── */
+table { background: transparent !important; }
+thead, th { background: #f5f8fb !important; color: #526070 !important; border-color: rgba(0,0,0,0.08) !important; }
+td { border-color: rgba(0,0,0,0.05) !important; color: #1a2533 !important; }
+tr:hover td { background: #f5f8fb !important; }
+.table-header { background: #ffffff !important; border-color: rgba(0,0,0,0.08) !important; }
+
+/* ── Status badges ─────────────────────────────────────── */
+.status-badge, .s-wait { background: rgba(0,0,0,0.06) !important; color: #526070 !important; }
+.s-prod  { background: rgba(201,98,26,0.12) !important;  color: #c9621a !important; }
+.s-done  { background: rgba(26,122,66,0.12) !important;  color: #1a7a42 !important; }
+.s-ship  { background: rgba(21,96,168,0.12) !important;  color: #1560a8 !important; }
+.s-pend  { background: rgba(168,107,0,0.12) !important;  color: #a86b00 !important; }
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn-sm, .go-btn, .alert-resolve {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.13) !important;
+  color: #526070 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+.btn-sm:hover, .go-btn:hover {
+  background: rgba(201,98,26,0.08) !important;
+  border-color: #c9621a !important;
+  color: #c9621a !important;
+}
+.btn-primary, .btn.btn-primary {
+  background: #c9621a !important;
+  color: #ffffff !important;
+  border-color: #c9621a !important;
+}
+.btn-primary:hover { background: #b05518 !important; }
+.btn-ghost { background: transparent !important; color: #526070 !important; }
+
+/* ── Alerts panel ──────────────────────────────────────── */
+.alerts-header { background: #f5f8fb !important; border-color: rgba(0,0,0,0.08) !important; }
+.alert-item { border-color: rgba(0,0,0,0.05) !important; }
+.alert-item:hover { background: #f5f8fb !important; }
+.no-alerts { color: #8fa0b0 !important; }
+
+/* ── Quick stats / sections ────────────────────────────── */
+.qs-row  { border-color: rgba(0,0,0,0.05) !important; }
+.ck      { border-color: rgba(0,0,0,0.06) !important; }
+.section-title { color: #8fa0b0 !important; }
+
+/* ── Holdings page ─────────────────────────────────────── */
+.holdings-hero {
+  background: linear-gradient(135deg,rgba(201,98,26,0.06),rgba(21,96,168,0.04)) !important;
+  border-color: rgba(0,0,0,0.07) !important;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05) !important;
+}
+.company-header  { background: #fafbfd !important; border-color: rgba(0,0,0,0.07) !important; }
+.company-footer  { background: #fafbfd !important; border-color: rgba(0,0,0,0.07) !important; }
+.company-kpis .ck { border-color: rgba(0,0,0,0.06) !important; }
+.company-card:hover { border-color: rgba(0,0,0,0.15) !important; }
+
+/* ── Modal ─────────────────────────────────────────────── */
+.modal-bg { background: rgba(20,40,60,0.45) !important; }
+.modal {
+  background: #ffffff !important;
+  border-color: rgba(0,0,0,0.10) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18) !important;
+}
+.form-group input, .form-group select, .form-group textarea,
+input[type=text], input[type=number], input[type=email], input[type=tel], select, textarea {
+  background: #f5f8fb !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #1a2533 !important;
+}
+
+/* ── Bottom nav (mobile) ───────────────────────────────── */
+#bottom-nav {
+  background: #ffffff !important;
+  border-top: 1px solid rgba(0,0,0,0.09) !important;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.08) !important;
+}
+.bnav-item { color: #8fa0b0 !important; }
+.bnav-item.active { color: #c9621a !important; }
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f0f4f8; }
+::-webkit-scrollbar-thumb { background: #c8d4de; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a8b8c8; }
+
+/* ── Report charts bg ──────────────────────────────────── */
+canvas { filter: none !important; }
+.chart-card, .report-card { background: #ffffff !important; border-color: rgba(0,0,0,0.08) !important; }
+
+/* ── KPI bar track ─────────────────────────────────────── */
+.kpi-bar { background: rgba(0,0,0,0.07) !important; }
+
+/* ── Misc text colors ──────────────────────────────────── */
+.empty-state { color: #8fa0b0 !important; }
+.overdue     { color: #b83227 !important; }
+.due-today   { color: #a86b00 !important; }
+.due-soon    { color: #c9621a !important; }
+
+/* ── Skeleton Loading (כרך ח) ──────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #e8edf4 25%, #f0f4f8 50%, #e8edf4 75%) !important;
+  background-size: 800px 100% !important;
+  animation: skeleton-shimmer 1.4s infinite linear !important;
+  border-radius: 6px !important;
+  color: transparent !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+.skeleton * { visibility: hidden !important; }
+.skeleton-text  { height: 14px; margin-bottom: 8px; border-radius: 4px; }
+.skeleton-title { height: 22px; margin-bottom: 12px; width: 60%; border-radius: 4px; }
+.skeleton-card  { height: 80px; border-radius: 12px; margin-bottom: 12px; }
+.skeleton-kpi   { height: 90px; border-radius: 12px; }
+.skeleton-row   { height: 44px; border-radius: 6px; margin-bottom: 6px; }
+.skeleton-circle{ border-radius: 50% !important; }
+
+/* ── Global Search Bar ─────────────────────────────────────
+   display:none כברירת מחדל — nav.js פותח/סוגר דרך inline style.
+   (היה display:flex וזה פתח את החלון אוטומטית בכל מסך — באג.) */
+#ib-search-bar {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.55); z-index: 999;
+  display: none; align-items: flex-start; justify-content: center;
+  padding-top: 80px; backdrop-filter: blur(4px);
+}
+#ib-search-box {
+  width: min(640px, 95vw);
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.32);
+  overflow: hidden;
+}
+#ib-search-input {
+  width: 100%; padding: 16px 20px; font-size: 17px;
+  font-family: 'Heebo', sans-serif; border: none; outline: none;
+  direction: rtl; background: transparent; color: #1a2533;
+  border-bottom: 1px solid rgba(0,0,0,0.09);
+}
+#ib-search-results { max-height: 400px; overflow-y: auto; }
+.ib-sr-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 18px; cursor: pointer; text-decoration: none;
+  color: #1a2533; border-bottom: 1px solid rgba(0,0,0,0.04);
+  transition: background .12s; font-family: 'Heebo', sans-serif;
+}
+.ib-sr-item:hover { background: rgba(201,98,26,0.07); }
+.ib-sr-icon { font-size: 18px; flex-shrink: 0; }
+.ib-sr-ref  { font-weight: 700; font-size: 14px; }
+.ib-sr-label{ font-size: 12px; color: #526070; margin-top: 1px; }
+.ib-sr-empty{ padding: 24px; text-align: center; color: #8fa0b0; font-family: 'Heebo',sans-serif; }
+
+/* ── TNA application shell inspired by the reference dashboards ── */
+:root {
+  --app-bg: #f3f6fa !important;
+  --app-panel: #ffffff !important;
+  --app-ink: #182636 !important;
+  --app-muted: #6b7a8b !important;
+  --app-line: #dbe4ee !important;
+  --app-blue: #021A48 !important;
+  --app-blue-2: #092b63 !important;
+  --app-orange: #DF5000 !important;
+  --app-shadow: 0 8px 24px rgba(2,26,72,0.07) !important;
+}
+
+body {
+  background:
+    radial-gradient(circle at top right, rgba(167,236,255,0.18), transparent 360px),
+    linear-gradient(180deg, #f8fafc 0%, var(--app-bg) 100%) !important;
+}
+
+.page, .content, main, .main {
+  width: min(1480px, calc(100vw - 28px)) !important;
+}
+
+@media(min-width:1024px) {
+  .page, .content, main, .main {
+    width: min(1480px, calc(100vw - 184px)) !important;
+  }
+}
+
+.page, .content {
+  margin-inline: auto !important;
+}
+
+.kpi-card, .machine-card, .table-card, .alerts-panel, .quick-stats,
+.pie-card, .company-card, .con-card, .card, .d-section, .hero-card,
+.orders-wrap, .machine-col, .modal, .panel, .box, .section, .chart-card,
+[class*="-card"], [class*="card-"] {
+  border: 1px solid var(--app-line) !important;
+  border-radius: 14px !important;
+  background: var(--app-panel) !important;
+  box-shadow: var(--app-shadow) !important;
+}
+
+.table-header, .alerts-header, .machine-col-header, .modal-header,
+.detail-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+  border-bottom: 1px solid var(--app-line) !important;
+}
+
+th, thead th {
+  background: #f7f9fc !important;
+  color: #526070 !important;
+  font-weight: 900 !important;
+}
+
+td {
+  color: var(--app-ink) !important;
+}
+
+input, select, textarea, .form-control, .search-box {
+  border-radius: 10px !important;
+  background: #fbfcfe !important;
+  border: 1px solid #d8e2ec !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8) !important;
+}
+
+input:focus, select:focus, textarea:focus, .form-control:focus, .search-box:focus {
+  border-color: var(--app-orange) !important;
+  box-shadow: 0 0 0 3px rgba(223,80,0,0.10) !important;
+  outline: none !important;
+}
+
+.btn, .btn-sm, .filter-btn, .status-btn, .machine-tab, .new-order-btn,
+button, a.print-btn, .submit-btn, .channel-btn, .priority-btn, .add-pallet-btn,
+.add-item-btn, .delete-btn, .tab-btn, .btn-new, .btn-save, .btn-cancel,
+.action-btn, .item-btn, .period-btn, .go-btn, .alert-resolve {
+  font-family: 'Heebo', sans-serif !important;
+}
+
+.btn, .btn-sm, .filter-btn, .status-btn, .machine-tab, .channel-btn,
+.priority-btn, .tab-btn, .btn-new, .btn-save, .btn-cancel, .item-btn,
+.period-btn, .go-btn, .alert-resolve {
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  font-weight: 800 !important;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease, color .14s ease !important;
+}
+
+.btn:hover, .btn-sm:hover, .filter-btn:hover, .status-btn:hover, .machine-tab:hover,
+.channel-btn:hover, .priority-btn:hover, .tab-btn:hover, .btn-new:hover, .btn-save:hover,
+.btn-cancel:hover, .item-btn:hover, .period-btn:hover, .go-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 20px rgba(2,26,72,0.10) !important;
+}
+
+.btn-primary, .new-order-btn, .print-btn, button[type=submit], .submit-btn,
+.btn-save, .btn-new, .add-pallet-btn, .add-item-btn, .action-btn.start,
+.action-btn.finish {
+  background: linear-gradient(135deg, var(--app-orange), #f08a24) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+
+.btn-outline, .btn-cancel, .filter-btn, .status-btn, .machine-tab, .channel-btn,
+.priority-btn, .period-btn, .go-btn, .action-btn.cancel {
+  background: #ffffff !important;
+  color: var(--app-muted) !important;
+  border: 1px solid var(--app-line) !important;
+}
+
+.filter-btn.active, .status-btn.cur, .machine-tab.active, .tab-btn.active,
+.channel-btn.active, .period-btn.active {
+  background: rgba(223,80,0,0.10) !important;
+  border-color: rgba(223,80,0,0.45) !important;
+  color: var(--app-orange) !important;
+  box-shadow: inset 0 -2px 0 var(--app-orange) !important;
+}
+
+.btn-success, .item-btn-start, .item-btn-done {
+  background: rgba(26,122,66,0.12) !important;
+  color: #1a7a42 !important;
+  border: 1px solid rgba(26,122,66,0.35) !important;
+}
+
+.btn-danger, .delete-btn, .item-btn-waste {
+  background: rgba(184,50,39,0.10) !important;
+  color: #b83227 !important;
+  border: 1px solid rgba(184,50,39,0.35) !important;
+}
+
+.btn-warning {
+  background: rgba(168,107,0,0.12) !important;
+  color: #a86b00 !important;
+  border: 1px solid rgba(168,107,0,0.35) !important;
+}
+
+.actions, .item-actions, .modal-footer, .modal-actions, .status-actions,
+.header-actions, .success-actions {
+  gap: 8px !important;
+}
+
+.section-title, .d-title, .page-title {
+  color: var(--app-ink) !important;
+  font-weight: 900 !important;
+}
+
+.badge, .status-badge, .item-status, .m-status-badge,
+.delivery-status, .item-priority-badge {
+  border-radius: 999px !important;
+  font-weight: 900 !important;
+}
+
+@media(min-width:1024px) {
+  #ib-topnav ~ .page,
+  body > .page:first-of-type {
+    margin-top: 0 !important;
+  }
+}
+
+/* Responsive foundation: shared layout rules for operational screens. */
+html {
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+}
+
+body {
+  min-width: 0 !important;
+  overflow-x: clip !important;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box !important;
+}
+
+img, svg, canvas, video, iframe {
+  max-width: 100% !important;
+}
+
+.page, .content, main, .main,
+.layout, .grid, .panel, .card, .table-card, .orders-wrap,
+.modal, .modal-body, .detail-panel, .detail-body, .d-section {
+  min-width: 0 !important;
+}
+
+.page, .content, main, .main {
+  max-width: min(1480px, calc(100vw - 28px)) !important;
+  padding-inline: clamp(10px, 1.4vw, 18px) !important;
+}
+
+@media (min-width: 1024px) {
+  .page, .content, main, .main {
+    max-width: min(1480px, calc(100vw - 184px)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page, .content, main, .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 10px !important;
+  }
+
+  .head, .page-header, .detail-header, .panel-head, .table-header,
+  .toolbar, .filters, .header-actions, .modal-actions, .status-actions,
+  .actions, .success-actions {
+    max-width: 100% !important;
+  }
+}
+
+/* Tables: keep dense desktop tables readable without breaking mobile width. */
+.table-scroll, .table-wrap, .orders-table-wrap, .flow-wrap,
+.ocr-items-sheet, .ocr-order-form,
+.table-card, .orders-wrap, .report-card, .costs-panel,
+div[style*="overflow-x:auto"], div[style*="overflow-x: auto"] {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-inline: contain !important;
+}
+
+table {
+  width: 100% !important;
+}
+
+.table-scroll table, .table-wrap table, .orders-table-wrap table,
+.ocr-items-table, .ocr-order-form-head, .ocr-order-row,
+.finance-table, .admin-table, .doc-table, .data-table {
+  min-width: max-content !important;
+}
+
+th, td {
+  overflow-wrap: anywhere !important;
+}
+
+@media (max-width: 768px) {
+  th, td {
+    padding-inline: 9px !important;
+  }
+
+  .btn, .btn-sm, .filter-btn, .status-btn, .machine-tab, .new-order-btn,
+  button, a.print-btn, .submit-btn, .channel-btn, .priority-btn,
+  .add-pallet-btn, .add-item-btn, .delete-btn, .tab-btn, .btn-new,
+  .btn-save, .btn-cancel, .action-btn, .item-btn, .period-btn, .go-btn,
+  .alert-resolve {
+    max-width: 100% !important;
+    white-space: normal !important;
+    line-height: 1.25 !important;
+  }
+}
+
+/* Small rebar shape cells: same reference style everywhere shapes appear in lists. */
+:root {
+  --shape-ink: #17365f !important;
+  --shape-line: #d8e1ea !important;
+  --shape-bg: #ffffff !important;
+  --shape-muted-bg: #f8fafc !important;
+}
+
+.ib-shape-cell, .ocr-table-shape, .ocr-shape-preview, .ocr-shape-large,
+.queue-shape, .item-visual, .item-detail-preview, .portal-shape-preview,
+.shape-preview, .shape-card-preview {
+  background: var(--shape-bg) !important;
+  border-color: var(--shape-line) !important;
+  color: var(--shape-ink) !important;
+  min-width: 0 !important;
+}
+
+.ib-shape-cell svg, .ocr-table-shape svg, .ocr-shape-preview svg,
+.ocr-shape-large svg, .queue-shape svg, .item-visual svg,
+.item-detail-preview svg, .portal-shape-preview svg, .shape-preview svg,
+.shape-card-preview svg {
+  display: block !important;
+  width: 100% !important;
+  max-width: 190px !important;
+  height: auto !important;
+  margin-inline: auto !important;
+}
+
+.ib-shape-cell svg :is(path, polyline, line),
+.ocr-table-shape svg :is(path, polyline, line),
+.ocr-shape-preview svg :is(path, polyline, line),
+.ocr-shape-large svg :is(path, polyline, line),
+.queue-shape svg :is(path, polyline, line),
+.item-visual svg :is(path, polyline, line),
+.item-detail-preview svg :is(path, polyline, line),
+.portal-shape-preview svg :is(path, polyline, line),
+.shape-preview svg :is(path, polyline, line),
+.shape-card-preview svg :is(path, polyline, line) {
+  stroke: var(--shape-ink) !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.ib-shape-cell svg text, .ocr-table-shape svg text,
+.ocr-shape-preview svg text, .ocr-shape-large svg text,
+.queue-shape svg text, .item-visual svg text,
+.item-detail-preview svg text, .portal-shape-preview svg text,
+.shape-preview svg text, .shape-card-preview svg text {
+  fill: var(--shape-ink) !important;
+  font-weight: 900 !important;
+}
+.inventory-toolbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--border)}
+.inventory-toolbar .form-row{margin:0}.inventory-toolbar input,.inventory-toolbar select{max-width:180px}
+.inventory-table-wrap{overflow-x:auto}.inventory-table-wrap table{min-width:740px}
+.inventory-heading,.inventory-link{border:0;background:none;color:inherit;font:inherit;cursor:pointer;text-align:right;padding:0}
+.inventory-heading{font-weight:700;white-space:nowrap}.inventory-heading:hover,.inventory-link:hover{color:var(--accent)}
+.inventory-heading:focus-visible,.inventory-link:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.inventory-shortage{color:var(--danger)}.inventory-message{padding:24px;text-align:center;color:var(--text-dim)}
+.inventory-modal{max-width:1120px}.inventory-modal table input,.inventory-modal table select{width:100%;min-width:80px;padding:8px;border:1px solid var(--border-bright);border-radius:var(--radius-sm);background:var(--steel);color:var(--text);font:inherit}
+.inventory-modal td:nth-child(3) input{min-width:220px}.inventory-modal td:nth-child(4) input{min-width:100px}
+.inventory-caption{padding:10px 20px;font-size:12px;color:var(--text-dim)}
+.inventory-form-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:16px}
+.inventory-count-input{width:110px;padding:8px;border:1px solid var(--border-bright);border-radius:var(--radius-sm);font:inherit}
+@media(max-width:650px){.inventory-toolbar{padding:12px;gap:8px}.inventory-toolbar .form-row{flex:1 1 120px}.inventory-toolbar input,.inventory-toolbar select{max-width:none}.inventory-modal{padding:16px}.card-header{flex-wrap:wrap}}
+
+.inventory-modal td:last-child{min-width:68px}.inventory-modal td:nth-child(5){min-width:65px;white-space:nowrap}.inventory-modal td:first-child{min-width:130px}.inventory-modal .btn{white-space:nowrap}
+
+.inventory-plan-options summary{cursor:pointer;color:var(--text-dim);font-size:12px;font-weight:700}.inventory-plan-options[open]{flex-basis:100%}.inventory-plan-fields{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.tabs{overflow-x:auto}.tab-btn{flex:0 0 auto}
+@media(max-width:650px){.kpi-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.kpi-card{padding:10px 6px}.kpi-val{font-size:20px}.kpi-label,.kpi-sub{font-size:10px}.inventory-plan-options{flex-basis:100%}}
+
+.inventory-modal td:nth-child(3) input{min-width:150px}.inventory-modal td:nth-child(4) input{min-width:75px;max-width:95px}.inventory-modal .material-shape{white-space:nowrap;font-size:11px;margin-top:6px}
+body{font-family:Arial,sans-serif}.page{max-width:1250px;margin:24px auto;padding:20px}.inventory-table-wrap table{min-width:850px}</style><body><div class="page">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('summary')">מלאי וחוסרים</button>
+    <button class="tab-btn" onclick="showTab('receipts')">הכנסת מלאי</button>
+    <button class="tab-btn" onclick="showTab('stocktake')">ספירת מלאי</button>
+    <button class="tab-btn" onclick="showTab('batches')">אצוות / מנות</button>
+    <button class="tab-btn" onclick="showTab('waste')">פחת וגרוטאות</button>
+  </div>
+
+  <!-- SUMMARY TAB -->
+  <div id="tab-summary" class="tab-panel active">
+    <div class="kpi-row" id="kpiRow" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div class="kpi-card"><div class="kpi-label">מלאי נוכחי</div><div class="kpi-val" id="kpiTotal">45,100</div><div class="kpi-sub">ק״ג לפי הספירה והעדכונים שאושרו, לפני שריונים</div></div>
+      <div class="kpi-card"><div class="kpi-label">קוטרים במלאי</div><div class="kpi-val" id="kpiDiam">8</div><div class="kpi-sub">סוגים</div></div>
+    </div>
+    <div class="card" id="inventoryStockBasis" style="padding:14px;line-height:1.6" role="status">תצוגה מקדימה — נתוני דוגמה לפי הספירה, ללא שינוי במערכת. מלאי נוכחי = המלאי בספירה + כניסות שאושרו − צריכות שנרשמו − גרוטאות שנרשמו.</div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">📦 מלאי, חוסרים והמלצת הזמנה</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" id="inventoryPurchase">הזמנת רכש</button>
+          <button class="btn btn-outline btn-sm" onclick="showTab('receipts')">הכנסת מלאי</button>
+        </div>
+      </div>
+      <div class="inventory-toolbar">
+        <div class="form-row"><label for="inventoryType">סוג חומר</label><select id="inventoryType"><option value="">כל הסוגים</option><option value="coil">גלילים</option><option value="straight" selected>ליפטים / מוטות ישרים</option><option value="mesh">רשתות</option><option value="bent">מכופף</option></select></div>
+        <div class="form-row"><label for="inventoryDiameter">קוטר</label><select id="inventoryDiameter"><option value="">כל הקטרים</option></select></div>
+        <label><input id="inventoryShortages" type="checkbox"> רק חוסרים</label>
+        <details class="inventory-plan-options"><summary>אפשרויות תכנון</summary><div class="inventory-plan-fields"><div class="form-row"><label for="inventoryStockBasisSelect">בסיס החלטה להזמנה</label><select id="inventoryStockBasisSelect"><option value="available">מלאי פנוי — לאחר הזמנות</option><option value="physical">מלאי פיזי במחסן</option></select></div>
+        <div class="form-row"><label for="inventoryThrough">תכנון עד</label><input id="inventoryThrough" type="date"></div>
+        <div class="form-row"><label for="inventoryWaste">פחת לתכנון (%)</label><input id="inventoryWaste" type="number" min="0" max="100" step="0.1" value="0"></div>
+        <div class="form-row"><label for="inventorySafety">מלאי ביטחון (ק״ג לכל סוג וקוטר)</label><input id="inventorySafety" type="number" min="0" value="0"></div>
+        </div></details>
+      </div>
+      <div class="inventory-table-wrap"><table><thead><tr>
+        <th><button class="inventory-heading" data-inventory-sort="label">סוג ומפרט</button></th><th><button class="inventory-heading">אורך (מטר) ↕</button></th><th><button class="inventory-heading" data-inventory-sort="stock">במלאי</button></th>
+        <th><button class="inventory-heading">מוטות במלאי (משוער) ↕</button></th><th><button class="inventory-heading" data-inventory-sort="demand">נדרש להזמנות</button></th><th><button class="inventory-heading" data-inventory-sort="available">פנוי / חוסר</button></th>
+        <th><button class="inventory-heading" data-inventory-sort="incoming">בדרך</button></th><th><button class="inventory-heading" data-inventory-sort="buy">המלצת הזמנה</button></th>
+      </tr></thead><tbody><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø8</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>6</strong></td><td>4,100 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 1,729</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 4,100 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø8</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>12</strong></td><td>4,100 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 864</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 4,100 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø10</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>6</strong></td><td>6,150 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 1,661</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 6,150 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø10</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>12</strong></td><td>2,050 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 276</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 2,050 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø12</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>6</strong></td><td>2,050 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 384</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 2,050 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø12</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>12</strong></td><td>0 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 0</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 0 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø14</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>6</strong></td><td>0 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 0</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 0 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø14</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>12</strong></td><td>8,200 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 564</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 8,200 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø16</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>6</strong></td><td>0 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 0</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 0 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr><tr><td><button class="inventory-link">ליפט / מוטות ישרים Ø16</button><div class="material-shape">יש לבדוק דרגה ותקן לפני הזמנה</div></td><td><strong>12</strong></td><td>3,075 ק״ג</td><td title="משקל המלאי חלקי משקל מוט באורך זה">≈ 162</td><td>0 ק״ג</td><td><span class="badge badge-ok">פנוי 3,075 ק״ג</span></td><td>0 ק״ג</td><td>אין צורך</td></tr></tbody></table></div>
+      <div class="inventory-caption">מספר המוטות משוער לפי משקל המלאי ÷ (אורך מוט × משקל למטר לפי הקוטר), בעיגול מטה. לחיצה על כותרת ממיינת; לחיצה נוספת הופכת את הסדר. לחיצה על סוג ומפרט מסננת את הרשימה. רשתות ביחידות; ברזל בק״ג.</div>
+    </div>
+  </div>
+
+</div></body></html>

@@ -1,5 +1,14 @@
 # Widget Data Contracts
 
+Inventory length separation (2026-11-11): `inventoryDailyRows` reads
+`groups.nominal_length_mm`, `available_stock_kg` and `estimated_bar_count` from
+the existing protected procurement plan. Straight stock, demand and incoming
+are grouped by diameter + form + length. Unknown lengths require review and
+cannot cover demand. Estimated bar counts divide physical kg by canonical
+kg/m × nominal length and round down, with no count for unknown length.
+The editable purchase draft retains the row length in a separate `length_m`
+field. See [contract](inventory-length-separation-20261111.md).
+
 Inline order priority: `orders.html` uses the existing order-list `priority`
 field for a regular/urgent select in each editable desktop row/mobile card.
 Only the protected priority/expected_priority PATCH changes it. It is a manual

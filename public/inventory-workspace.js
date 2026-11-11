@@ -35,15 +35,21 @@
   function visibleRows() {
     const type=$('inventoryType').value,diameter=$('inventoryDiameter').value;
     return state.rows.filter(row => (!type||row.type===type)&&(!diameter||row.diameter===Number(diameter))&&(!$('inventoryShortages').checked||row.buy>0))
-      .sort((a,b) => state.direction*(typeof a[state.sort]==='number' ? a[state.sort]-b[state.sort] : String(a[state.sort]).localeCompare(String(b[state.sort]),'he')));
+      .sort((a,b) => {
+        const numeric=['stock','demand','available','incoming','buy','lengthMm','barCount'].includes(state.sort);
+        const first=a[state.sort],second=b[state.sort];
+        const compared=numeric?(first==null?1:second==null?-1:first-second):String(first).localeCompare(String(second),'he',{numeric:true});
+        return state.direction*((first==null&&second==null?0:compared)||a.diameter-b.diameter||(a.lengthMm??Infinity)-(b.lengthMm??Infinity));
+      });
   }
   function render() {
     const rows=visibleRows();
     $('inventoryDailyRows').innerHTML=rows.map(row=>`<tr>
       <td><button class="inventory-link" data-filter-type="${row.type}" data-filter-diameter="${row.diameter}">${escape(row.label)}</button><div class="material-shape">${escape(row.specification)}</div></td>
-      <td>${number(row.stock)} ${row.unitLabel}</td><td>${number(row.demand)} ${row.unitLabel}</td>
+      <td>${row.type==='straight'?(row.lengthMm?escape(row.lengthMm/1000):'אורך לא צוין'):'—'}</td>
+      <td>${number(row.stock)} ${row.unitLabel}</td><td title="מספר מוטות משוער לפי משקל המלאי, אורך המוט ומשקל למטר לפי הקוטר; מעוגל מטה">${row.barCount==null?'—':`≈ ${number(row.barCount)}`}</td><td>${number(row.demand)} ${row.unitLabel}</td>
       <td><span class="badge ${row.available<0?'badge-danger':'badge-ok'}">${row.available<0?'חוסר':'פנוי'} ${number(Math.abs(row.available))} ${row.unitLabel}</span></td>
-      <td>${number(row.incoming)} ${row.unitLabel}</td><td>${row.buy>0?`<strong class="inventory-shortage">${number(row.buy)} ${row.unitLabel}</strong>`:'אין צורך'}</td></tr>`).join('') || '<tr><td colspan="6" class="inventory-message">אין פריטים בתצוגה זו.</td></tr>';
+      <td>${number(row.incoming)} ${row.unitLabel}</td><td>${row.buy>0?`<strong class="inventory-shortage">${number(row.buy)} ${row.unitLabel}</strong>`:'אין צורך'}</td></tr>`).join('') || '<tr><td colspan="8" class="inventory-message">אין פריטים בתצוגה זו.</td></tr>';
     document.querySelectorAll('[data-inventory-sort]').forEach(button=>{
       const active=button.dataset.inventorySort===state.sort;
       button.textContent=button.dataset.label+(active?(state.direction===1?' ↑':' ↓'):' ↕');
@@ -53,7 +59,7 @@
   }
   async function reload() {
     const revision=++loadRevision;
-    state.loaded=false;$('inventoryPurchase').disabled=true;$('inventoryDailyRows').innerHTML='<tr><td colspan="6" class="inventory-message">טוען מלאי וחוסרים...</td></tr>';
+    state.loaded=false;$('inventoryPurchase').disabled=true;$('inventoryDailyRows').innerHTML='<tr><td colspan="8" class="inventory-message">טוען מלאי וחוסרים...</td></tr>';
     try {
       const params=new URLSearchParams({waste_percent:$('inventoryWaste').value||'0',safety_stock_kg:$('inventorySafety').value||'0'});
       if($('inventoryThrough').value)params.set('through_date',$('inventoryThrough').value);
@@ -61,14 +67,14 @@
       const plan=await api('/api/procurement/plan?'+params);
       state.policy=plan.purchase_policy;
       if(revision!==loadRevision)return;
-      state.rows=plan.groups.map(row=>({type:row.material_type,diameter:row.diameter,label:`${labels[row.material_type]||row.material_type} Ø${row.diameter}`,stock:row.physical_stock_kg,demand:row.backlog_kg,available:row.physical_stock_kg-row.backlog_kg,incoming:row.incoming_kg,buy:row.recommended_purchase_kg,unitLabel:'ק״ג',specification:row.material_type==='straight'?'יש לבדוק אורך, דרגה ותקן לפני הזמנה':'יש לבדוק דרגה ותקן לפני הזמנה'}));
+      state.rows=plan.groups.map(row=>({type:row.material_type,diameter:row.diameter,lengthMm:row.nominal_length_mm??null,barCount:row.estimated_bar_count??null,label:`${labels[row.material_type]||row.material_type} Ø${row.diameter}`,stock:row.physical_stock_kg,demand:row.backlog_kg,available:row.available_stock_kg??(row.physical_stock_kg-row.backlog_kg),incoming:row.incoming_kg,buy:row.recommended_purchase_kg,unitLabel:'ק״ג',specification:row.requires_length_review?'יש להשלים אורך ולבדוק דרגה ותקן לפני הזמנה':'יש לבדוק דרגה ותקן לפני הזמנה'}));
       state.rows.push(...(plan.mesh_groups||[]).map(row=>({type:'mesh',diameter:row.specification.longitudinal_diameter_mm,label:`רשת Ø${row.specification.longitudinal_diameter_mm}/Ø${row.specification.transverse_diameter_mm}`,specification:meshDescription(row.specification),stock:row.physical_units,demand:row.required_units,available:row.available_units,incoming:row.incoming_units,buy:row.recommended_purchase_units,unitLabel:'יחידות',meshSpecification:row.specification})));
       const previous=$('inventoryDiameter').value;
       $('inventoryDiameter').innerHTML='<option value="">כל הקטרים</option>'+[...new Set(state.rows.map(row=>row.diameter))].sort((a,b)=>a-b).map(d=>`<option value="${d}">Ø${d}</option>`).join('');
       $('inventoryDiameter').value=previous;state.loaded=true;render();
     } catch(error) {
       if(revision!==loadRevision)return;
-      state.rows=[];$('inventoryDailyRows').innerHTML=`<tr><td colspan="6" class="inventory-message">${escape(window.IronBendMessages?.text(error.message) ?? error.message)} <button class="btn btn-outline btn-sm" id="inventoryRetry">נסה שוב</button></td></tr>`;
+      state.rows=[];$('inventoryDailyRows').innerHTML=`<tr><td colspan="8" class="inventory-message">${escape(window.IronBendMessages?.text(error.message) ?? error.message)} <button class="btn btn-outline btn-sm" id="inventoryRetry">נסה שוב</button></td></tr>`;
       $('inventoryRetry')?.addEventListener('click',reload);
     }
   }
@@ -77,7 +83,7 @@
   function purchaseType(){return $('purchaseMaterialType').value;}
   function draftLine(type,row={}){
     const weight=purchaseUnits.defaultUnitWeight(type);
-    return {material_type:type,diameter:row.diameter||'',specification:row.specification||'',length_m:'',purchase_unit:purchaseUnits.purchaseUnit(type).unit,unit_weight_kg:weight,shortage_kg:row.unitLabel==='ק״ג'?row.buy:null,quantity:row.buy?purchaseUnits.suggestedQuantity(type,row.buy,weight):1,notes:''};
+    return {material_type:type,diameter:row.diameter||'',specification:row.specification||'',length_m:type==='straight'&&row.lengthMm?row.lengthMm/1000:'',purchase_unit:purchaseUnits.purchaseUnit(type).unit,unit_weight_kg:weight,shortage_kg:row.unitLabel==='ק״ג'?row.buy:null,quantity:row.buy?purchaseUnits.suggestedQuantity(type,row.buy,weight):1,notes:''};
   }
   function buildPurchase(){
     const type=purchaseType(),diameter=$('inventoryDiameter').value;
@@ -157,7 +163,7 @@
   connect();
   window.InventoryWorkspace={reload,visibleRows,openModal,closeModal,api,escape,meshDescription};
   window.IronBendDataContracts?.applyDataContracts();
-  $('inventoryDailyRows').title='מלאי וחוסרים לפי סוג וקוטר; רשתות ביחידות וברזל בק״ג.';
+  $('inventoryDailyRows').title='מלאי וחוסרים לפי סוג וקוטר, וליפטים גם לפי אורך; מספר המוטות משוער לפי משקל. רשתות ביחידות וברזל בק״ג.';
   $('kpiTotal').title='יתרת ברזל מאושרת בק״ג, כולל התאמות ספירה ולפני שריונים. רשתות מוצגות בנפרד ביחידות.';
   reload();
 })();
