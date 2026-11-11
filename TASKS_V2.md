@@ -10,6 +10,7 @@
 - DB/API/events/screens: existing intake_log, authenticated analyze-image, new_intake and comparison workspace; no schema or UI changes.
 - Done: all numeric rows match source quantities, lengths and weights; unverified bends remain blocked for review; existing parser/auth tests pass.
 - Verified: 1,214 tests pass; live deploy fa2a97f; original sources staged once as intake IDs 33–39, with 31/35/25/21/21/21/23 rows (177 total). Browser values for diameter, quantity and cut length match all source rows. Closed-hoop callouts retain width, height and closure allowance separately. Final shape review and order approval remain pending; no production orders were created by this task.
+- Follow-up in progress: product owner clarified symmetric hoop closure allowance is shared by both ends (23 cm means 11.5 cm per end). Preserve six-segment geometry, display the rectangle rather than a U, and refresh the same seven drafts without duplicating them or approving production.
 
 לוח המשימות המרכזי לבנייה מחדש. אין לעבוד ממשימות בצ'אט בלבד.
 

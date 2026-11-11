@@ -61,11 +61,25 @@ test('closed hoop callouts preserve rectangle dimensions and separate printed cl
   assert.equal(parsed.metrics.usable_rows,1);
   assert.equal(item.shape_type,'stirrup');
   assert.equal(item.shape_name,'חישוק סגור');
-  assert.deepEqual(item.source_shape_parameters,{width_mm:1290,height_mm:340,closure_allowance_mm:300});
+  assert.deepEqual(item.source_shape_parameters,{width_mm:1290,height_mm:340,closure_allowance_mm:300,end_length_mm:150});
   assert.equal(item.total_length_mm,3560);
-  assert.deepEqual(item.segments,[]);
-  assert.ok(workflow.intakeApprovalErrors(parsed).some(error => error.field === 'shape_name'));
+  assert.deepEqual(item.segments.map(s=>s.length_mm),[150,340,1290,340,1290,150]);
+  assert.equal(item.segments.reduce((sum,s)=>sum+s.length_mm,0),3560);
   // A conflicting allowance must not silently become a hoop.
   input.tokens.find(w => w.text === '30').text='31';
   assert.equal(parseSteelDocument(input).items[0].shape_type,'unknown');
+});
+
+test('23 cm closure belongs to both symmetric ends, 11.5 cm per end', () => {
+  const input=source();
+  input.tokens=[word(1,545),word(1,282),word(8,258),word(27,226),word('1.35',160),word('36.5',121),word('0.395',88),word('14.4',58),
+    word(23,299,230),word(42,367,230),word(14,299,238),word(14,449,238),word(42,367,246)];
+  const parsed=parseSteelDocument(input),item=parsed.items[0];
+  assert.equal(parsed.metrics.usable_rows,1);
+  assert.equal(item.source_shape_parameters.closure_allowance_mm,230);
+  assert.equal(item.source_shape_parameters.end_length_mm,115);
+  assert.deepEqual(item.segments.map(s=>s.length_mm),[115,140,420,140,420,115]);
+  assert.equal(item.segments.reduce((sum,s)=>sum+s.length_mm,0),item.total_length_mm);
+  assert.equal(item.total_length_mm,1350);
+  assert.equal(item.quantity,27);
 });
