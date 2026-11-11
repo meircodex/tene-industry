@@ -2176,7 +2176,7 @@
 
 ### LIVE-MESH-20261111 — משקל רשתות והקצאת רשתות להזמנות
 
-- status: in_progress
+- status: done
 - owner: codex/mesh-order-stock-20261111
 - authorization: מאיר אישר ״תכניס חשוב תצוגה יפה״, 11.11.2026.
 - scope: חישוב Steel/Rebar משותף; חלון רשת קיים; Orders; שירות מלאי רשתות, קליטה ותצוגה; ציור במסמכי הזמנה.
