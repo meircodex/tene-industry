@@ -2196,7 +2196,7 @@
 
 ### LIVE-MESH-ENDS-20261112 — קצות רשת פתוחים
 
-- status: in_progress
+- status: done
 - owner: codex/mesh-spiked-preview-20261112
 - approval: מאיר אישר את תצוגת הקוצים ואמר ״כן״ לשילוב ולהעלאה.
 - scope: המחשת רשת בעורך ובציור הקנוני של פריט/מסמך; גרסאות assets.
