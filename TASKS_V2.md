@@ -2186,7 +2186,7 @@
 
 ### LIVE-MESH-UI-20261112 — הזנת רשת קומפקטית ומרווחים מאוחדים
 
-- status: in_progress
+- status: done
 - owner: codex/mesh-compact-preview-20261112
 - approval: מאיר אישר את התצוגה ואמר ״מצויין תעלה״, 12.11.2026.
 - scope: עורך הצורות המשותף בלבד, גרסאות assets במסכי הזמנה/לקוח ובדיקות ממוקדות.
