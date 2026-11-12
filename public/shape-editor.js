@@ -821,8 +821,10 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
   const innerTop = Math.min(width, edgeTop);
   const innerBottom = Math.max(innerTop, width - Math.min(width, edgeBottom));
   let counts;try{counts=canonicalSteelRebarShapes().calculateMesh(mesh).calculated;}catch{counts={transverseBarCount:Math.min(100,Math.ceil(length/transSpacing)),longitudinalBarCount:Math.min(100,Math.ceil(width/longSpacing))};}
-  const verticalPositions = Array.from({length:Math.min(2000,counts.transverseBarCount)},(_,i)=>Math.min(innerRight,innerLeft+i*transSpacing));
-  const horizontalPositions = Array.from({length:Math.min(2000,counts.longitudinalBarCount)},(_,i)=>Math.min(innerBottom,innerTop+i*longSpacing));
+  const xInset=Math.max(0,(innerRight-innerLeft-(counts.transverseBarCount-1)*transSpacing)/2);
+  const yInset=Math.max(0,(innerBottom-innerTop-(counts.longitudinalBarCount-1)*longSpacing)/2);
+  const verticalPositions = Array.from({length:Math.min(2000,counts.transverseBarCount)},(_,i)=>Math.min(innerRight,innerLeft+xInset+i*transSpacing));
+  const horizontalPositions = Array.from({length:Math.min(2000,counts.longitudinalBarCount)},(_,i)=>Math.min(innerBottom,innerTop+yInset+i*longSpacing));
   const verticals = verticalPositions.map(mm => {
     const x = x0 + mm * box.scale;
     return `<line class="mesh-longitudinal-bar" data-se-focus="mesh-longitudinal-bars mesh-longitudinal-diameter mesh-longitudinal-spacing" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="#111827" stroke-width="${Math.max(1,Math.min(2.2,transDia*0.1)).toFixed(1)}" stroke-linecap="round"/>`;
@@ -837,7 +839,7 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
       data-longitudinal="${longitudinalSpec}" data-transverse="${transverseSpec}"
       data-longitudinal-count="${horizontalPositions.length}" data-transverse-count="${verticalPositions.length}"
       data-edge-left="${edgeLeft}" data-edge-right="${edgeRight}" data-edge-top="${edgeTop}" data-edge-bottom="${edgeBottom}">
-    <rect data-se-focus="mesh-length mesh-width mesh-edge" x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${box.drawW.toFixed(1)}" height="${box.drawH.toFixed(1)}" fill="#fff" stroke="#d8dde5"/>
+    <rect data-se-focus="mesh-length mesh-width mesh-edge" x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${box.drawW.toFixed(1)}" height="${box.drawH.toFixed(1)}" fill="#fff" stroke="none"/>
     ${horizontals}${verticals}
     <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">אורך ${formatLengthCmFromMm(length)}</text>
     <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">רוחב ${formatLengthCmFromMm(width)}</text>
