@@ -205,10 +205,10 @@ test('core app smoke loads critical screens and authenticated APIs', async (t) =
   });
   assert.equal(approveNewDiameterReceipt.status, 200);
   const pendingNewDiameterBody = (await approveNewDiameterReceipt.json()).lines[0];
-  assert.equal(db.prepare('SELECT verification_status FROM raw_material WHERE id=?').get(pendingNewDiameterBody.created_raw_material_id).verification_status, 'pending_verification');
+  assert.equal(db.prepare('SELECT verification_status FROM raw_material WHERE id=?').get(pendingNewDiameterBody.created_raw_material_id).verification_status, 'approved');
   assert.equal(db.prepare('SELECT status FROM diameter_catalog WHERE diameter_key=?').get('5.5').status, 'pending_approval');
   const visibleBeforeApproval = await (await request('/api/inventory', { headers: authHeaders(admin) })).json();
-  assert.ok(!visibleBeforeApproval.some(row => row.id === pendingNewDiameterBody.created_raw_material_id));
+  assert.ok(visibleBeforeApproval.some(row => row.id === pendingNewDiameterBody.created_raw_material_id));
 
   const approvePendingDiameter = await request(`/api/inventory/${pendingNewDiameterBody.created_raw_material_id}/approve-verification`, {
     method: 'POST', headers: authHeaders(manager), body: JSON.stringify({}),
@@ -254,8 +254,19 @@ test('core app smoke loads critical screens and authenticated APIs', async (t) =
   assert.equal(approveSpecException.status, 200);
   const specExceptionBody = (await approveSpecException.json()).lines[0];
   const specExceptionLot = db.prepare('SELECT * FROM raw_material WHERE id=?').get(specExceptionBody.created_raw_material_id);
-  assert.equal(specExceptionLot.verification_status, 'pending_verification');
+  assert.equal(specExceptionLot.verification_status, 'approved');
+  assert.equal(specExceptionLot.catalog_item_id,null);
   assert.equal(specExceptionLot.spec_exception, 1);
+
+  // An old quarantined receipt is corrected in place by a manager, without new stock.
+  db.prepare("UPDATE raw_material SET verification_status='pending_verification' WHERE id=?").run(specExceptionLot.id);
+  const lotCountBeforeCorrection=db.prepare('SELECT COUNT(*) AS n FROM raw_material').get().n;
+  const warehouseCorrection=await request(`/api/inventory/${specExceptionLot.id}`,{method:'PATCH',headers:authHeaders(warehouse),body:JSON.stringify({diameter:10,material_type:'straight'})});
+  assert.equal(warehouseCorrection.status,200);assert.equal((await warehouseCorrection.json()).verification_status,'pending_verification');
+  const managerCorrection=await request(`/api/inventory/${specExceptionLot.id}`,{method:'PATCH',headers:authHeaders(manager),body:JSON.stringify({diameter:10,material_type:'straight'})});
+  assert.equal(managerCorrection.status,200);assert.equal((await managerCorrection.json()).verification_status,'approved');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM raw_material').get().n,lotCountBeforeCorrection);
+  assert.equal(db.prepare('SELECT weight_received FROM raw_material WHERE id=?').get(specExceptionLot.id).weight_received,20);
 
   const editedToNewDiameter = await request(`/api/inventory/${savedBent.id}`, {
     method: 'PATCH', headers: authHeaders(warehouse),
@@ -263,8 +274,8 @@ test('core app smoke loads critical screens and authenticated APIs', async (t) =
   });
   assert.equal(editedToNewDiameter.status, 200);
   const editedToNewDiameterBody = await editedToNewDiameter.json();
-  assert.equal(editedToNewDiameterBody.verification_status, 'pending_verification');
-  assert.equal(db.prepare('SELECT verification_status FROM raw_material WHERE id=?').get(savedBent.id).verification_status, 'pending_verification');
+  assert.equal(editedToNewDiameterBody.verification_status, 'approved');
+  assert.equal(db.prepare('SELECT verification_status FROM raw_material WHERE id=?').get(savedBent.id).verification_status, 'approved');
 
   db.prepare("INSERT OR IGNORE INTO diameter_catalog (diameter_key,diameter_display,status,source) VALUES ('12','Ø12','active','test')").run();
   const reviewPayload = {
@@ -310,7 +321,7 @@ test('core app smoke loads critical screens and authenticated APIs', async (t) =
   const approvedMaterial = db.prepare('SELECT * FROM raw_material WHERE id=?').get(approvedMaterialId);
   assert.equal(approvedMaterial.lot_number, 'HEAT-SMOKE');
   assert.equal(approvedMaterial.weight_received, 250);
-  assert.equal(approvedMaterial.verification_status, 'pending_verification');
+  assert.equal(approvedMaterial.verification_status, 'approved');
   approvedMaterialId = db.prepare("INSERT INTO raw_material (material_type,diameter,verification_status,weight_received,lot_number) VALUES ('coil',12,'approved',250,'HEAT-STOCK-SMOKE')").run().lastInsertRowid;
 
   const poCreate = await request('/api/purchase-orders', {

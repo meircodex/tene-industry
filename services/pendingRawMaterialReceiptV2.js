@@ -9,7 +9,7 @@ const fail = code => { throw new PendingReceiptError(code); };
 const kg = value => Number(Number(value || 0).toFixed(3));
 const stable = value => JSON.stringify(value);
 const fingerprint = value => crypto.createHash('sha256').update(stable(value)).digest('hex');
-const positive = (value, code) => { const n = Number(value); if (!Number.isFinite(n) || n <= 0) fail(code); return kg(n); };
+const positive = (value, code) => { const n = Number(value); if (!Number.isFinite(n) || n <= 0) fail(code); const rounded=kg(n); if(rounded<=0)fail(code); return rounded; };
 
 function normalizeLines(lines = []) {
   if (!Array.isArray(lines) || !lines.length) fail('receipt_lines_required');
@@ -17,12 +17,11 @@ function normalizeLines(lines = []) {
   return lines.map((row, index) => {
     const sourceLineRef = String(row.source_line_ref ?? row.sourceLineRef ?? index + 1);
     if (seen.has(sourceLineRef)) fail('duplicate_source_line_ref'); seen.add(sourceLineRef);
-    const materialType = String(row.material_type ?? row.materialType ?? 'coil');
+    const materialType = String(row.material_type ?? row.materialType ?? '');
     if (!MATERIAL_TYPES.has(materialType)) fail('invalid_material_type');
     const diameter = normalizeDiameter(row.diameter);
     if (!diameter) fail('invalid_diameter');
     const shape = bendingShapeColumns(row);
-    if (materialType === 'bent' && (!shape.name || !shape.segments)) fail('bending_shape_required');
     return { sourceLineRef, materialType, diameter, lotNumber: row.lot_number ?? row.lotNumber ?? row.heat_number ?? row.heatNumber ?? null,
       certificateNum: row.certificate_num ?? row.certificateNum ?? null, grade: row.grade ?? null,
       standardCode: row.standard_code ?? row.standardCode ?? null, nominalLengthMm: Number(row.nominal_length_mm ?? row.nominalLengthMm) || null,
@@ -113,8 +112,11 @@ function decideReceipt(db, input = {}, status) {
           if (actual == null || actual === '') exceptions.push(`catalog_${field}_missing`);
           else if (String(item[field]) !== String(actual)) exceptions.push(`catalog_${field}_mismatch`);
         }
-        const verification = exceptions.length ? 'pending_verification' : 'approved'; const snapshot = item ? { id:item.id,sku:item.sku,diameter_key:item.diameter_key,supply_form:item.supply_form,steel_grade:item.steel_grade,standard_code:item.standard_code,nominal_length_mm:item.nominal_length_mm } : null;
-        const lot = insert.run(line.material_type, line.diameter, item?.id || null, verification, receipt.supplier_id, line.lot_number, line.certificate_num, line.grade, line.standard_code, line.nominal_length_mm, exceptions.length ? 1 : 0, new Date().toISOString().slice(0,10), line.weight_received, line.purchase_price, line.warehouse_loc, line.bending_shape_name, line.bending_shape_segments, line.bending_shape_source, line.bending_shape_confidence, line.notes);
+        // Operational stock is determined by the validated type, diameter and weight.
+        // Optional catalog metadata never quarantines an otherwise valid receipt.
+        const matchedItem = exceptions.some(code=>code.startsWith('catalog_')) ? null : item;
+        const verification = 'approved'; const snapshot = matchedItem ? { id:matchedItem.id,sku:matchedItem.sku,diameter_key:matchedItem.diameter_key,supply_form:matchedItem.supply_form,steel_grade:matchedItem.steel_grade,standard_code:matchedItem.standard_code,nominal_length_mm:matchedItem.nominal_length_mm } : null;
+        const lot = insert.run(line.material_type, line.diameter, matchedItem?.id || null, verification, receipt.supplier_id, line.lot_number, line.certificate_num, line.grade, line.standard_code, line.nominal_length_mm, exceptions.length ? 1 : 0, new Date().toISOString().slice(0,10), line.weight_received, line.purchase_price, line.warehouse_loc, line.bending_shape_name, line.bending_shape_segments, line.bending_shape_source, line.bending_shape_confidence, line.notes);
         link.run(lot.lastInsertRowid, JSON.stringify(snapshot), JSON.stringify(exceptions), line.id);
       }
     }

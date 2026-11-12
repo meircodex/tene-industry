@@ -19,6 +19,8 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
 .nav-link.active{background:var(--accent-dim);color:var(--accent);}
 .page{max-width:1300px;margin:0 auto;padding:24px 16px;}
 
+input.batch-field-invalid,select.batch-field-invalid{border:2px solid var(--danger)!important;box-shadow:0 0 0 2px var(--danger-dim);}
+.batch-field-error{color:var(--danger);font-size:12px;line-height:1.6;margin-top:4px;}
 /* TABS */
 .tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);margin-bottom:24px;}
 .tab-btn{padding:10px 20px;border:none;background:none;border-radius:var(--radius-sm) var(--radius-sm) 0 0;font-family:'Heebo',sans-serif;font-weight:700;font-size:13px;color:var(--text-dim);cursor:pointer;transition:all 0.2s;border-bottom:2px solid transparent;margin-bottom:-2px;}
@@ -246,10 +248,11 @@ tr:hover td{background:rgba(0,0,0,0.015);}
         <datalist id="bDiameterSuggestions"></datalist>
         <small id="bDiameterHint" class="muted">אפשר להקליד קוטר ולנווט עם החיצים, Enter ו־Tab</small>
       </div>
-      <div class="form-row"><label>מק"ט חומר גלם</label><select id="bCatalogItem" onchange="applyCatalogItem()"><option value="">— ללא מק"ט —</option></select></div>
-      <div class="form-row"><label>סוג חומר</label>
-        <select id="bType" onchange="toggleBendingPanel()"><option value="coil">גלילים</option><option value="straight">ליפטים / מוטות ישרים</option><option value="bent">כיפוף (bent)</option></select>
+      <div class="form-row"><label>סוג פריט *</label>
+        <select id="bType" onchange="toggleBendingPanel()"><option value="">— בחר סוג פריט —</option><option value="coil">גלילים</option><option value="straight">ליפטים / מוטות ישרים</option><option value="bent">כיפוף (bent)</option></select>
       </div>
+      <div class="form-row"><label>משקל (ק"ג) *</label><input id="bWeight" type="number" step="1" min="0" placeholder="5000"></div>
+      <div class="form-row"><label>מק"ט חומר גלם</label><select id="bCatalogItem" onchange="applyCatalogItem()"><option value="">— ללא מק"ט —</option></select></div>
       <div class="form-row"><label>ספק</label>
         <select id="bSupplier"><option value="">— ללא ספק —</option></select>
       </div>
@@ -260,8 +263,7 @@ tr:hover td{background:rgba(0,0,0,0.015);}
       </div>
       <div class="form-row"><label>תקן / מפרט</label><input id="bStandard" type="text" placeholder="לדוגמה: 10219"></div>
       <div class="form-row"><label>אורך נומינלי (ס״מ)</label><input id="bNominalLength" type="number" step="0.1" min="0" placeholder="אופציונלי"></div>
-      <div class="form-row"><label>תאריך קבלה *</label><input id="bDate" type="date"></div>
-      <div class="form-row"><label>משקל (ק"ג) *</label><input id="bWeight" type="number" step="1" min="0" placeholder="5000"></div>
+      <div class="form-row"><label>תאריך קבלה</label><input id="bDate" type="date"></div>
       <div class="form-row"><label>מחיר לטון (₪)</label><input id="bPrice" type="number" step="1" min="0" placeholder="3800"></div>
       <div class="form-row"><label>מיקום מחסן</label><input id="bLoc" type="text" placeholder="מדף A3"></div>
     </div>
@@ -285,6 +287,7 @@ tr:hover td{background:rgba(0,0,0,0.015);}
       </div>
     </div>
     <div class="form-row"><label>הערות</label><textarea id="bNotes" rows="2"></textarea></div>
+    <p id="batchSaveMessage" role="status" class="batch-field-error"></p>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeBatchModal()">ביטול</button>
       <button class="btn btn-primary" onclick="saveBatch()">שמור קבלה</button>
@@ -736,6 +739,7 @@ async function loadWaste() {
 // ── BATCH MODAL ───────────────────────────────────────────────────
 let editingBatchId = null;
 function openAddBatch() {
+  clearBatchValidation();
   document.getElementById('bWeight').readOnly = false;
   editingBatchId = null;
   initBendingPresets();
@@ -762,9 +766,10 @@ function openAddBatch() {
   document.getElementById('modalBatch').classList.add('open');
 }
 
-function editBatch(id) {
-  const b = batches.find(x=>x.id===id);
+function editBatch(id, pendingLot) {
+  const b = pendingLot || batches.find(x=>x.id===id);
   if (!b) return;
+  clearBatchValidation();
   initBendingPresets();
   editingBatchId = id;
   document.getElementById('modalBatchTitle').textContent = 'עריכת אצווה';
@@ -796,11 +801,32 @@ function editBatch(id) {
 
 function closeBatchModal() { document.getElementById('modalBatch').classList.remove('open'); }
 
+function clearBatchValidation() {
+  document.querySelectorAll('#modalBatch .batch-field-invalid').forEach(field=>{field.classList.remove('batch-field-invalid');field.removeAttribute('aria-invalid');field.removeAttribute('aria-describedby');});
+  document.querySelectorAll('#modalBatch .batch-field-error').forEach(message=>message.textContent='');
+}
+function batchFieldError(id,message) {
+  const field=document.getElementById(id),errorId=id+'Error';
+  let error=document.getElementById(errorId);
+  if(!error){error=document.createElement('small');error.id=errorId;error.className='batch-field-error';field.insertAdjacentElement('afterend',error);}
+  error.textContent=message;field.classList.add('batch-field-invalid');field.setAttribute('aria-invalid','true');field.setAttribute('aria-describedby',errorId);
+}
+function validateBatchFields() {
+  clearBatchValidation();const errors=[];const diameter=normalizeBatchDiameter();
+  if(!diameter)errors.push(['bDiameter','יש להזין קוטר תקין.']);
+  if(!['coil','straight','bent'].includes(document.getElementById('bType').value))errors.push(['bType','יש לבחור סוג פריט.']);
+  const weight=Number(document.getElementById('bWeight').value);
+  if(!Number.isFinite(weight)||Number(weight.toFixed(3))<=0)errors.push(['bWeight','יש להזין משקל גדול מאפס בק״ג.']);
+  for(const [id,message]of errors)batchFieldError(id,message);
+  if(errors.length){document.getElementById(errors[0][0]).focus();return null;}
+  return diameter;
+}
+
 async function saveBatch() {
+  const diameter = validateBatchFields();
+  if (!diameter) return;
   const isBent = document.getElementById('bType').value === 'bent';
   const bendingSegments = parseBendingShapeSegments();
-  const diameter = normalizeBatchDiameter();
-  if (!diameter) return alert('קוטר לא תקין');
   const body = {
     material_type: document.getElementById('bType').value,
     diameter:      diameter.key,
@@ -830,20 +856,25 @@ async function saveBatch() {
   if (catalogDiameter?.status === 'inactive' && confirm(`${diameter.display} אינו פעיל. להפעיל אותו מחדש?`)) {
     body.reactivate_diameter = true;
   }
-  if (!body.diameter || !body.weight_received) return alert('קוטר ומשקל חובה');
-  if (isBent && (!body.bending_shape_name || !bendingSegments.length)) return alert('בחומר מסוג כיפוף חובה להזין שם וצלעות צורה');
   const url = editingBatchId ? `/api/inventory/${editingBatchId}` : '/api/inventory';
   const method = editingBatchId ? 'PATCH' : 'POST';
   const r = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
   const result = await r.json().catch(()=>({}));
-  if (!r.ok) return alert(result.user_message || result.error || 'שגיאה בשמירה');
+  if (!r.ok) { document.getElementById('batchSaveMessage').textContent = result.user_message || result.error || 'שגיאה בשמירה'; return; }
   if (result.verification_status === 'pending_verification') {
-    alert('הקבלה נשמרה כממתינה לאימות ואינה זמינה עדיין למלאי תפעולי');
+    document.getElementById('batchSaveMessage').textContent='החומר עדיין ממתין לאישור מנהל ואינו זמין למלאי. הפרטים נשמרו, אך נדרש אישור מנהל לשחרור הקבלה הקיימת.';
+    return;
   }
   closeBatchModal();
   loadSummary();
   loadBatches();
 }
+
+['bDiameter','bType','bWeight'].forEach(id=>{
+  const field=document.getElementById(id);
+  const clear=()=>{field.classList.remove('batch-field-invalid');field.removeAttribute('aria-invalid');field.removeAttribute('aria-describedby');const message=document.getElementById(id+'Error');if(message)message.textContent='';};
+  field.addEventListener('input',clear);field.addEventListener('change',clear);
+});
 
 // ── INIT ─────────────────────────────────────────────────────────
 // Dates for waste tab
@@ -860,6 +891,6 @@ openInitialInventoryTab();
 <script src="/purchase-units.js?v=20261110"></script>
 <script src="/inventory-workspace.js?v=20261111-mesh"></script>
 <script src="/steelRebarShapes.js?v=2-mesh"></script>
-<script src="/inventory-counts.js?v=20261111-mesh2"></script>
+<script src="/inventory-counts.js?v=20261112-verification"></script>
 </body>
 </html>

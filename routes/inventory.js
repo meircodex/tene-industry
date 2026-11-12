@@ -62,7 +62,7 @@ module.exports = function createInventoryRouter(deps) {
     }
     const catalogItem = db.prepare(`SELECT * FROM catalog_items
       WHERE id=? AND item_kind='raw_material' AND active=1`).get(catalogItemId);
-    if (!catalogItem) throw Object.assign(new Error('catalog_item_not_found'), { statusCode: 400 });
+    if (!catalogItem) return { catalogItem: null, specException: true };
     const comparisons = [
       ['diameter_key', diameter.key],
       ['supply_form', materialType],
@@ -74,7 +74,7 @@ module.exports = function createInventoryRouter(deps) {
       if (catalogItem[field] === null || catalogItem[field] === undefined || actual === null || actual === '') return false;
       return String(catalogItem[field]) !== String(actual);
     });
-    return { catalogItem, specException };
+    return { catalogItem: specException ? null : catalogItem, specException };
   }
 
 
@@ -350,19 +350,17 @@ module.exports = function createInventoryRouter(deps) {
       return res.status(409).json({error:'used_lot_specification_is_immutable'});
     }
 
-    const materialType = f.material_type && MATERIAL_TYPES.has(f.material_type) ? f.material_type : current.material_type;
+    if (f.material_type !== undefined && !MATERIAL_TYPES.has(f.material_type)) return res.status(400).json({error:'invalid_material_type'});
+    const materialType = f.material_type || current.material_type;
     const merged = { ...current, ...f, material_type: materialType };
     const shape = bendingShapeColumns(merged);
-    if (materialType === 'bent' && (!shape.name || !shape.segments)) {
-      return res.status(400).json({ error: 'צורת כיפוף חובה עבור חומר מסוג כיפוף' });
-    }
     try {
       const diameter = resolveDiameterCatalog(f.diameter_input ?? f.diameter ?? current.diameter, req, {
         approveNew: f.approve_new_diameter,
         reactivate: f.reactivate_diameter,
       });
       const { catalogItem, specException } = resolveCatalogItem(merged, materialType, diameter);
-      const verificationStatus = diameter.status === 'active' && !specException ? 'approved' : 'pending_verification';
+      const verificationStatus = current.verification_status === 'pending_verification' && !canApproveCatalog(req) ? 'pending_verification' : 'approved';
       db.prepare(`UPDATE raw_material SET
       material_type=?,
       diameter=?,
@@ -391,6 +389,8 @@ module.exports = function createInventoryRouter(deps) {
         f.received_date || null,
         f.purchase_price ?? null, f.warehouse_loc || null, shape.name, shape.segments, shape.source,
         shape.confidence, f.notes || null, f.active ?? null, req.params.id);
+      auditLog('raw_material',current.id,current.lot_number || String(current.id),'update','verification_status',current.verification_status,verificationStatus,'עדכון פרטי חומר; שדות מלאי מחייבים: קוטר, סוג ומשקל',req.auth?.sub || null,req.auth?.display_name || null);
+      wsBroadcast('inventory_changed',{raw_material_id:current.id});
       res.json({ success: true, diameter: diameter.display, verification_status: verificationStatus,
         catalog_action: diameter.catalogAction, spec_exception: specException });
     } catch (err) {

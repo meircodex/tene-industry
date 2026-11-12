@@ -1,9 +1,22 @@
 (function () {
   'use strict';
   const workspace=window.InventoryWorkspace,$=id=>document.getElementById(id),esc=workspace.escape;
-  let lots=[],sheets=[],pending=null;
+  let lots=[],sheets=[],pending=null,verificationLots=[];
   const fmt=value=>Number(value||0).toLocaleString('he-IL',{maximumFractionDigits:0});
   const uid=()=>crypto.randomUUID();
+  const canVerify=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role);
+  $('inventoryStockBasis').insertAdjacentHTML('afterend','<div id="inventoryVerificationNotice" class="card" role="status" hidden style="padding:14px;line-height:1.8"></div>');
+  function renderVerificationNotice(){
+    const box=$('inventoryVerificationNotice');box.hidden=!verificationLots.length;
+    if(!verificationLots.length){box.innerHTML='';return;}
+    box.innerHTML=`<strong>חומר שהתקבל וממתין לאימות: ${fmt(verificationLots.reduce((sum,row)=>sum+Number(row.weight_received),0))} ק״ג</strong><br>הקבלות אושרו, אך החומר עדיין אינו כלול במלאי הזמין. <button class="btn btn-outline btn-sm" id="inventoryReviewVerification">בדיקה בהכנסת מלאי</button>`;
+    $('inventoryReviewVerification').addEventListener('click',()=>showTab('receipts'));
+  }
+  function verificationCard(row){
+    const type={coil:'גלילים',straight:'ליפטים',bent:'מכופף',mesh:'רשתות'}[row.material_type]||row.material_type;
+    const length=row.nominal_length_mm?` · אורך ${row.nominal_length_mm/1000} מטר`:'';
+    return `<article class="receipt-card"><div class="receipt-body"><strong>${esc(type)} · קוטר ${esc(row.diameter)}${length} · ${fmt(row.weight_received)} ק״ג</strong><div><strong>הקבלה אושרה — החומר ממתין לאימות</strong></div><div class="muted">קבלה קודמת נשארה חסומה. יש לבדוק קוטר, סוג ומשקל ולעדכן את המנה הקיימת.</div><button class="btn btn-primary btn-sm" data-verify-lot="${row.id}">בדיקה ועדכון הקבלה</button></div></article>`;
+  }
   $('tab-batches').insertAdjacentHTML('afterend',`<div id="tab-stocktake" class="tab-panel"><div class="card"><div class="card-header"><span class="card-title">ספירת מלאי — יתרה בפועל</span><button class="btn btn-outline btn-sm" id="countReload">רענן אצוות</button></div>
     <div class="inventory-toolbar"><div class="form-row"><label for="countTime">מועד הספירה</label><input id="countTime" type="datetime-local" step="1"></div><div class="form-row"><label for="countReason">סיבת ההתאמה</label><input id="countReason" value="ספירת מלאי"></div></div>
     <p class="inventory-caption">מזינים את הכמות שנספרה, ולא את הכמות שהתקבלה בעבר. שורות ריקות לא משתנות; אפשר להזין אפס. אם היו תנועות מאז הספירה, יש לרשום את השינוי נטו ואת פירוט הבדיקה.</p>
@@ -81,13 +94,22 @@
   async function loadReceipts() {
     const box=$('receiptReviewList');box.textContent='טוען קבלות...';
     try {
-      const [raw,mesh,ocr]=await Promise.all([workspace.api('/api/inventory/pending-receipts?status=draft'),workspace.api('/api/inventory/mesh/receipts'),workspace.api('/api/inventory/receipt-reviews?status=pending_review')]);
+      const [raw,mesh,ocr,verification]=await Promise.all([workspace.api('/api/inventory/pending-receipts?status=draft'),workspace.api('/api/inventory/mesh/receipts'),workspace.api('/api/inventory/receipt-reviews?status=pending_review'),canVerify?workspace.api('/api/inventory/pending-verification'):Promise.resolve([])]);
+      verificationLots=verification;renderVerificationNotice();
       receiptReviews=ocr;
       box.innerHTML=raw.map(row=>`<article class="receipt-card"><div class="receipt-body"><strong>${esc(row.delivery_note_num||'קבלה ידנית')} · ${row.lines.length} שורות</strong>${row.lines.map(line=>`<div>Ø${esc(line.diameter)} · ${fmt(line.weight_received)} ק״ג</div>`).join('')}<button class="btn btn-primary btn-sm" data-approve-receipt="${row.id}" data-duplicate="${row.duplicate_warning?.suspected?'1':'0'}">אישור קבלה למלאי</button></div></article>`).join('')+mesh.map(row=>`<article class="receipt-card"><div class="receipt-body"><strong>רשתות · ${esc(row.delivery_note_num||'ללא תעודה')} · ${row.quantity_units} יחידות</strong><div>${esc(workspace.meshDescription(JSON.parse(row.specification_json)))}</div>${JSON.parse(row.specification_json).calculation?`<div>משקל תיאורטי: ${(JSON.parse(row.specification_json).calculation.weightKg*row.quantity_units).toFixed(2)} ק״ג</div>`:''}<button class="btn btn-primary btn-sm" data-approve-mesh="${row.id}">אישור רשתות למלאי</button></div></article>`).join('')+ocr.map(renderReceiptReview).join('')||'<div class="muted">אין קבלות ממתינות לאישור.</div>';
+      if(verificationLots.length)box.innerHTML=verificationLots.map(verificationCard).join('')+(raw.length||mesh.length||ocr.length?box.innerHTML:'');
       if(ocr[0])showReceiptSource(ocr[0].id);
     }catch(error){box.textContent=(window.IronBendMessages?.text(error.message) ?? error.message);}
   }
   $('receiptReviewList').addEventListener('click',async event=>{
+    const verify=event.target.closest('[data-verify-lot]');
+    if(verify){
+      const row=verificationLots.find(lot=>String(lot.id)===verify.dataset.verifyLot);if(!row||!canVerify)return;
+      editBatch(row.id,row);
+      validateBatchFields();
+      return;
+    }
     const button=event.target.closest('[data-approve-receipt],[data-approve-mesh]');if(!button)return;button.disabled=true;
     try{let duplicate=false;if(button.dataset.duplicate==='1'){if(!confirm('נמצאה קבלה דומה. בדקת שזו קבלה נוספת שצריך להוסיף למלאי?'))return;duplicate=true;}
       const mesh=button.dataset.approveMesh,id=mesh||button.dataset.approveReceipt;
@@ -100,5 +122,5 @@
   window.loadReceiptReviews=loadReceipts;
   window.InventoryCounts={load,loadReceipts};
   if(location.hash==='#stocktake')showTab('stocktake');
-  if(location.hash==='#receipts')loadReceipts();
+  loadReceipts();
 })();

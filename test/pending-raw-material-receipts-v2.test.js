@@ -4,8 +4,6 @@ const assert = require('node:assert/strict');
 const Database = require('better-sqlite3');
 const { ensureCoreSchema } = require('../db/coreSchema');
 const receipts = require('../services/pendingRawMaterialReceiptV2');
-const allocation = require('../services/materialAllocationPlanningV2');
-let allocationSequence = 1000;
 
 function db() { const value = new Database(':memory:'); value.pragma('foreign_keys=ON'); ensureCoreSchema(value); return value; }
 function line(overrides = {}) { return { source_line_ref: '1', material_type: 'coil', diameter: 12, lot_number: 'HEAT-1', certificate_num: 'CERT-1', grade: 'B500B', weight_received: 100, ...overrides }; }
@@ -19,46 +17,13 @@ function approveSpec(value, overrides = {}) {
   const receiptLine = value.prepare('SELECT * FROM pending_raw_material_receipt_lines_v2 WHERE receipt_id=?').get(draft.id); const lot = value.prepare('SELECT * FROM raw_material WHERE id=?').get(receiptLine.created_raw_material_id);
   return { receiptLine, lot };
 }
-function assertLotBlockedFromB2(value, lot) {
-  const id = allocationSequence++;
-  const before = value.prepare('SELECT verification_status,active,weight_received,weight_used,weight_scrapped FROM raw_material WHERE id=?').get(lot.id);
-  const beforeState = {
-    weight_received: before.weight_received,
-    weight_used: before.weight_used,
-    weight_scrapped: before.weight_scrapped,
-    active: before.active,
-    verification_status: before.verification_status
-  };
-  value.prepare('INSERT INTO orders (id,order_num,inventory_lifecycle_version) VALUES (?,?,2)').run(id, `B4-BLOCKED-${id}`);
-  value.prepare('INSERT INTO items (id,order_id,diameter,total_weight) VALUES (?,?,?,1)').run(id, id, lot.diameter);
-  value.prepare("INSERT INTO material_requirements_v2 (id,requirement_uid,order_id,item_id,lifecycle_version,diameter,material_type,required_kg,need_by_source,status,source,source_revision) VALUES (?,?,?,?,2,?,?,1,'unknown','open','manual',?)").run(id, `b4-blocked-${id}`, id, id, lot.diameter, lot.material_type, `b4-blocked-${id}`);
+function assertSpec(value, overrides, expected) {
+ const {receiptLine,lot}=approveSpec(value,overrides);
+ assert.equal(lot.verification_status,'approved');assert.equal(lot.catalog_item_id,null);
+ assert.equal(lot.weight_received,100);assert.equal(JSON.parse(receiptLine.spec_snapshot_json),null);
+ assert.ok(JSON.parse(receiptLine.spec_exceptions_json).includes(expected));value.close();
+}
 
-  assert.equal(beforeState.active, 1);
-  assert.equal(beforeState.verification_status, 'pending_verification');
-  assert.throws(() => allocation.confirmAllocationPlan(value, {
-    material_requirement_id: id,
-    idempotency_key: `blocked-${id}`,
-    lines: [{ raw_material_id: lot.id, allocated_kg: 1 }]
-  }), /invalid_allocation_lot/);
-  assert.equal(value.prepare('SELECT COUNT(*) AS n FROM allocation_plans_v2 WHERE material_requirement_id=?').get(id).n, 0);
-  assert.equal(value.prepare('SELECT COUNT(*) AS n FROM allocation_plan_lines_v2').get().n, 0);
-  const after = value.prepare('SELECT verification_status,active,weight_received,weight_used,weight_scrapped FROM raw_material WHERE id=?').get(lot.id);
-  assert.equal(after.weight_received, beforeState.weight_received);
-  assert.equal(after.weight_used, beforeState.weight_used);
-  assert.equal(after.weight_scrapped, beforeState.weight_scrapped);
-  assert.equal(after.active, beforeState.active);
-  assert.equal(after.verification_status, beforeState.verification_status);
-}
-function assertSpec(value, overrides, expected, status = 'pending_verification') {
-  const { receiptLine, lot } = approveSpec(value, overrides);
-  assert.equal(lot.verification_status, status);
-  assert.equal(lot.catalog_item_id > 0, true);
-  assert.equal(lot.spec_exception, status === 'approved' ? 0 : 1);
-  assert.ok(JSON.parse(receiptLine.spec_snapshot_json).sku);
-  assert.ok(JSON.parse(receiptLine.spec_exceptions_json).includes(expected));
-  if (status === 'pending_verification') assertLotBlockedFromB2(value, lot);
-  value.close();
-}
 test('draft receipt is separate from inventory and approval creates an approved lot', () => {
   const value = db(); value.prepare("INSERT INTO diameter_catalog (diameter_key,diameter_display,status) VALUES ('12','Ø12','active')").run();
   const catalogItemId = value.prepare("INSERT INTO catalog_items (sku,item_kind,name,supply_form,diameter_key,steel_grade) VALUES ('RB-12','raw_material','RB 12','coil','12','B500B')").run().lastInsertRowid;
@@ -67,7 +32,7 @@ test('draft receipt is separate from inventory and approval creates an approved 
   const approved = receipts.approveReceipt(value, { receipt_id: draft.id, idempotency_key: 'approve-1', decided_by: 1 });
   assert.equal(approved.status, 'approved'); const lot = value.prepare('SELECT * FROM raw_material').get(); assert.equal(lot.verification_status, 'approved'); assert.equal(lot.weight_used, 0); value.close();
 });
-test('unmanaged specification creates a pending-verification lot that B2 cannot allocate', () => {
+test('valid diameter type and weight enter usable stock without an optional catalog link', () => {
   const value = db();
   value.prepare("INSERT INTO diameter_catalog (diameter_key,diameter_display,status) VALUES ('12','Ø12','active')").run();
   const draft = receipts.createDraft(value, { source_type: 'ocr', source_ref: 'doc-1', idempotency_key: 'ocr-1', lines: [line()] });
@@ -76,13 +41,12 @@ test('unmanaged specification creates a pending-verification lot that B2 cannot 
   const lot = value.prepare('SELECT * FROM raw_material').get();
   assert.equal(approved.status, 'approved');
   assert.equal(value.prepare('SELECT COUNT(*) AS n FROM raw_material').get().n, 1);
-  assert.equal(lot.verification_status, 'pending_verification');
+  assert.equal(lot.verification_status, 'approved');
   assert.equal(lot.spec_exception, 1);
   assert.equal(lot.catalog_item_id, null);
   assert.equal(JSON.parse(receiptLine.spec_snapshot_json), null);
   const exceptions = JSON.parse(receiptLine.spec_exceptions_json);
   assert.deepEqual(exceptions, ['catalog_item_unidentified']);
-  assertLotBlockedFromB2(value, lot);
   value.close();
 });
 test('duplicate is a warning and requires explicit approval confirmation', () => {
@@ -114,9 +78,23 @@ test('decision idempotency binds the action and decision payload', () => {
   value.close();
 });
 test('full matching catalog specification is approved with a snapshot', () => { const value = db(); const { receiptLine, lot } = approveSpec(value); assert.equal(lot.verification_status, 'approved'); assert.deepEqual(JSON.parse(receiptLine.spec_exceptions_json), []); assert.equal(JSON.parse(receiptLine.spec_snapshot_json).sku, 'RB-12-FULL'); value.close(); });
-test('missing catalog standard is fail-closed', () => assertSpec(db(), { standard_code: null }, 'catalog_standard_code_missing'));
-test('missing catalog nominal length is fail-closed', () => assertSpec(db(), { nominal_length_mm: null }, 'catalog_nominal_length_mm_missing'));
-test('missing catalog grade is fail-closed', () => assertSpec(db(), { grade: null }, 'catalog_steel_grade_missing'));
-test('mismatched catalog grade is fail-closed', () => assertSpec(db(), { grade: 'B400' }, 'catalog_steel_grade_mismatch'));
-test('mismatched catalog supply form is fail-closed', () => assertSpec(db(), { material_type: 'straight' }, 'catalog_supply_form_mismatch'));
-test('mismatched catalog diameter is fail-closed', () => assertSpec(db(), { diameter: 14 }, 'catalog_diameter_key_mismatch'));
+test('missing catalog standard does not block stock', () => assertSpec(db(), { standard_code: null }, 'catalog_standard_code_missing'));
+test('missing catalog nominal length does not block stock', () => assertSpec(db(), { nominal_length_mm: null }, 'catalog_nominal_length_mm_missing'));
+test('missing catalog grade does not block stock', () => assertSpec(db(), { grade: null }, 'catalog_steel_grade_missing'));
+test('mismatched catalog grade does not block stock', () => assertSpec(db(), { grade: 'B400' }, 'catalog_steel_grade_mismatch'));
+test('mismatched catalog supply form does not block stock', () => assertSpec(db(), { material_type: 'straight' }, 'catalog_supply_form_mismatch'));
+test('mismatched catalog diameter does not block stock', () => assertSpec(db(), { diameter: 14 }, 'catalog_diameter_key_mismatch'));
+
+test('only required stock identity fields reject an incomplete intake before any receipt or lot is written',()=>{
+ for(const changes of [{diameter:null},{diameter:-12},{material_type:null},{material_type:''},{material_type:'invalid'},{weight_received:0},{weight_received:-1},{weight_received:Infinity},{weight_received:0.0001}]){
+  const value=db();assert.throws(()=>receipts.createDraft(value,{idempotency_key:'invalid-required',lines:[line(changes)]}),/invalid_diameter|invalid_material_type|invalid_weight_received/);
+  assert.equal(value.prepare('SELECT COUNT(*) AS n FROM pending_raw_material_receipts_v2').get().n,0);
+  assert.equal(value.prepare('SELECT COUNT(*) AS n FROM raw_material').get().n,0);value.close();
+ }
+});
+test('manual receipt with just type diameter and weight is usable and approval replay cannot duplicate stock',()=>{
+ const value=db();const draft=receipts.createDraft(value,{idempotency_key:'three-fields',lines:[{material_type:'coil',diameter:12,weight_received:60606}]});
+ receipts.approveReceipt(value,{receipt_id:draft.id,idempotency_key:'three-fields-approve'});
+ receipts.approveReceipt(value,{receipt_id:draft.id,idempotency_key:'three-fields-approve'});
+ const lots=value.prepare('SELECT * FROM raw_material').all();assert.equal(lots.length,1);assert.equal(lots[0].verification_status,'approved');assert.equal(lots[0].weight_received,60606);assert.equal(lots[0].catalog_item_id,null);value.close();
+});
