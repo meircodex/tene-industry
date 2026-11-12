@@ -479,7 +479,6 @@ test('shape editor includes pile cage 2D engineering views without 3D helper out
   assert.match(pileRenderBlock[0], /pile-zone-dimension/);
   assert.match(pileRenderBlock[0], /pile-pitch-label/);
   assert.match(pileRenderBlock[0], /pile-spiral-loop/);
-  assert.match(editor, /data-se-focus="mesh-longitudinal-spacing mesh-transverse-spacing"/);
   assert.doesNotMatch(pileRenderBlock[0], /data-view=\"3d\"/);
   assert.doesNotMatch(pileRenderBlock[0], /se-engineer-helper/);
 });
@@ -617,7 +616,7 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=2-mesh/);
-  assert.match(index, /shape-editor\.js\?v=92-mesh/);
+  assert.match(index, /shape-editor\.js\?v=93-mesh-compact/);
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

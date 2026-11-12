@@ -2182,3 +2182,13 @@
 - scope: חישוב Steel/Rebar משותף; חלון רשת קיים; Orders; שירות מלאי רשתות, קליטה ותצוגה; ציור במסמכי הזמנה.
 - input/output/DB/API/events/screens/DoD: docs/mesh-order-stock-20261111.md.
 - production data: אין הסבה או שינוי יזום של מלאי והזמנות קיימים.
+
+
+### LIVE-MESH-UI-20261112 — הזנת רשת קומפקטית ומרווחים מאוחדים
+
+- status: in_progress
+- owner: codex/mesh-compact-preview-20261112
+- approval: מאיר אישר את התצוגה ואמר ״מצויין תעלה״, 12.11.2026.
+- scope: עורך הצורות המשותף בלבד, גרסאות assets במסכי הזמנה/לקוח ובדיקות ממוקדות.
+- contract: docs/mesh-compact-editor-20261112.md.
+- DB/API/events: ללא שינוי; אין שינוי בחישוב רשתות, מלאי או מסמכים היסטוריים.

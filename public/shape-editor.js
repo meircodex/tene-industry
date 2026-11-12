@@ -833,10 +833,6 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
   }).join('');
   const longitudinalSpec = `Ø${longDia}@${formatLengthCmFromMm(longSpacing)}`;
   const transverseSpec = `Ø${transDia}@${formatLengthCmFromMm(transSpacing)}`;
-  const spacingHelperPath = `M ${(x1 - 61).toFixed(1)} ${(y1 + 18).toFixed(1)} H ${(x1 - 20).toFixed(1)}
-    M ${(x1 - 61).toFixed(1)} ${(y1 + 28).toFixed(1)} H ${(x1 - 20).toFixed(1)}
-    M ${(x1 - 50).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}
-    M ${(x1 - 34).toFixed(1)} ${(y1 + 13).toFixed(1)} V ${(y1 + 34).toFixed(1)}`;
   return `<g data-engine="MeshEngine" data-family="mesh" data-length="${length}" data-width="${width}"
       data-longitudinal="${longitudinalSpec}" data-transverse="${transverseSpec}"
       data-longitudinal-count="${horizontalPositions.length}" data-transverse-count="${verticalPositions.length}"
@@ -845,12 +841,6 @@ MeshEngine.render = function(mesh, w = 300, h = 260) {
     ${horizontals}${verticals}
     <text data-se-focus="mesh-length" x="${((x0 + x1) / 2).toFixed(1)}" y="${(y0 - 10).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">אורך ${formatLengthCmFromMm(length)}</text>
     <text data-se-focus="mesh-width" x="${(x0 - 10).toFixed(1)}" y="${((y0 + y1) / 2).toFixed(1)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#1a2533" transform="rotate(-90 ${(x0 - 10).toFixed(1)} ${((y0 + y1) / 2).toFixed(1)})">רוחב ${formatLengthCmFromMm(width)}</text>
-    <g class="se-engineer-helper" data-se-focus="mesh-longitudinal-spacing mesh-transverse-spacing">
-      <rect class="se-helper-panel" x="${(x1 - 72).toFixed(1)}" y="${(y1 + 8).toFixed(1)}" width="64" height="34" rx="4"/>
-      <path d="${spacingHelperPath}" stroke="#475569" stroke-width="1.5" fill="none"/>
-      <text x="${(x1 - 40).toFixed(1)}" y="${(y1 + 53).toFixed(1)}" text-anchor="middle" font-size="8">פרט מרווח</text>
-    </g>
-    <text data-se-focus="mesh-longitudinal-diameter mesh-longitudinal-spacing mesh-transverse-diameter mesh-transverse-spacing" x="${(x1 + 8).toFixed(1)}" y="${(y1 + 16).toFixed(1)}" font-size="10" font-family="Heebo,Arial" font-weight="800" fill="#526070">${longitudinalSpec} / ${transverseSpec}</text>
   </g>`;
 };
 
@@ -3560,23 +3550,54 @@ class ShapeEditorModal {
 #seModal #seRecognitionDetails button{min-height:28px;margin:3px;padding:3px 6px;font-family:inherit;font-size:11px;cursor:pointer;border:1px solid #c5cbd4;border-radius:5px;background:#fff;color:#243047;}
 #seModal #seRecognitionDetails select{width:100%;min-height:28px;padding:3px;font-family:inherit;font-size:12px;background:#fff;color:#243047;}
 @media(max-height:760px){#seModal #seBillingDetails{max-height:36vh;}}
-/* Mesh uses the established editor shell with larger, compact paired fields. */
+/* Compact mesh editor: common fields, longitudinal and transverse groups. */
+#seModal.se-mesh-editor>.ib-window-back-row{display:none!important}
+#seModal.se-mesh-editor .se-element-name-row,
+#seModal.se-mesh-editor .se-catalog-entry,
+#seModal.se-mesh-editor #seBillingDetails,
+#seModal.se-mesh-editor #seRecognitionDetails{display:none!important}
 #seModal.se-mesh-editor .se-family-editor-table tr{display:block!important}
-#seModal.se-mesh-editor .se-family-editor-table td{display:block!important;padding:12px!important}
-#seModal.se-mesh-editor .se-mesh-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 10px}
-#seModal.se-mesh-editor .se-mesh-grid label{display:grid;gap:7px;font-size:13px;line-height:1.45;font-weight:700;color:#526070}
-#seModal.se-mesh-editor .se-mesh-grid .se-input{width:100%;min-width:0;height:46px;font-size:23px!important;font-weight:800;text-align:center;padding:5px;border:1px solid #c5cbd4;border-radius:8px;background:white}
-#seModal.se-mesh-editor .se-mesh-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 10px;border-top:1px solid #c5cbd4;margin-top:20px;padding-top:20px}
-#seModal.se-mesh-editor .se-mesh-results div{display:grid;gap:7px}
+#seModal.se-mesh-editor .se-family-editor-table td{display:block!important;padding:10px!important}
+#seModal.se-mesh-editor .se-mesh-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#seModal.se-mesh-editor .se-mesh-grid label{display:grid;gap:5px;font-size:13px;line-height:1.4;font-weight:700;color:#526070}
+#seModal.se-mesh-editor .se-mesh-grid .se-input{width:100%;min-width:0;height:42px;min-height:42px;font-size:23px!important;font-weight:800;text-align:center;padding:5px;border:1px solid #c5cbd4;border-radius:8px;background:#fff}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child{gap:8px 10px}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field{padding:3px 7px;border-radius:9px;font-weight:800;box-shadow:inset 0 0 0 1px var(--mesh-field-border)}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field:nth-child(-n+2){background:#edf8f0;color:#25713c;--mesh-field-border:#c4e6cf}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field:nth-child(3),
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field:nth-child(5){background:#edf4ff;color:#2356a5;--mesh-field-border:#c6d9fa}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field:nth-child(4),
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field:nth-child(6){background:#fff3e9;color:#a94f16;--mesh-field-border:#f4d4bb}
+#seModal.se-mesh-editor #seTableBody>tr>td>.se-mesh-grid:first-child>.se-mesh-field>.se-input{border-color:var(--mesh-field-border);color:inherit;background:#fff}
+#seModal.se-mesh-editor .se-mesh-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-top:1px solid #c5cbd4;margin-top:12px;padding-top:12px}
+#seModal.se-mesh-editor .se-mesh-results div{display:grid;gap:4px}
 #seModal.se-mesh-editor .se-mesh-results span{font-size:12px;color:#526070}
 #seModal.se-mesh-editor .se-mesh-results strong{font-size:24px;color:#1a2332}
-#seModal.se-mesh-editor .se-mesh-results p{grid-column:1/-1;font-size:12px;line-height:1.6;margin:0;color:#6b7280}
-#seModal.se-mesh-editor .se-mesh-advanced{font-size:12px;line-height:1.7;margin-top:18px;color:#526070}
+#seModal.se-mesh-editor .se-mesh-results p{grid-column:1/-1;font-size:12px;line-height:1.5;margin:0;color:#6b7280}
+#seModal.se-mesh-editor .se-mesh-advanced{font-size:12px;line-height:1.7;margin-top:10px;color:#526070}
 #seModal.se-mesh-editor .se-mesh-advanced summary{cursor:pointer;font-weight:700;margin-bottom:12px}
 #seModal.se-mesh-editor .se-mesh-confirm{display:flex;gap:8px;align-items:center;margin:12px 0}
 #seModal.se-mesh-editor .se-mesh-confirm input{width:18px;height:18px;min-width:18px}
-#seModal.se-mesh-editor .se-bottom-summary .se-summary-item:not(:has(#seTotalWeight)){display:none!important}
-#seModal.se-mesh-editor .se-bottom-summary:before{content:'משקל תיאורטי לרשת';font-size:13px;color:#526070}
+#seModal.se-mesh-editor .se-bottom-summary{display:none!important}
+#seModal.se-mesh-editor .se-svg-wrap{position:relative}
+#seModal.se-mesh-editor #seShapeSvg{width:calc(100% - 220px)!important;position:absolute;left:5px;top:0}
+#seModal.se-mesh-editor #seShapeSvg text[data-se-focus="mesh-length"]{fill:#2356a5}
+#seModal.se-mesh-editor #seShapeSvg text[data-se-focus="mesh-width"]{fill:#a94f16}
+#seModal.se-mesh-editor .mesh-spacing-guide{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:190px;direction:rtl}
+#seModal.se-mesh-editor .mesh-gap-card{padding:12px;background:#f7f9fc;border:1px solid #d8dde5;border-radius:8px;text-align:center}
+#seModal.se-mesh-editor .mesh-gap-card h3{margin:0 0 12px;font-size:15px;font-weight:800;color:#243047}
+#seModal.se-mesh-editor .mesh-gap-card svg{display:block;width:100%;height:165px;min-height:0;max-height:none;margin:0 0 12px}
+#seModal.se-mesh-editor .mesh-gap-label{font-size:13px;font-weight:800;line-height:1.6;padding:5px 0}
+#seModal.se-mesh-editor .mesh-gap-long{color:#2356a5}
+#seModal.se-mesh-editor .mesh-gap-trans{color:#b85b17}
+@media(max-width:980px){
+ #seModal.se-mesh-editor #seShapeSvg{width:calc(100% - 156px)!important}
+ #seModal.se-mesh-editor .mesh-spacing-guide{width:146px;right:5px}
+ #seModal.se-mesh-editor .mesh-gap-card{padding:7px}
+ #seModal.se-mesh-editor .mesh-gap-card h3{font-size:12px}
+ #seModal.se-mesh-editor .mesh-gap-card svg{height:120px}
+ #seModal.se-mesh-editor .mesh-gap-label{font-size:11px}
+}
 </style>
 <div id="seModal">
   <!-- ── Header ── -->
@@ -6068,7 +6089,8 @@ class ShapeEditorModal {
   // who has already moved to a code, side or quantity field.
   _focusFirstSideSoon() {
     const focus = () => {
-      const target = (this._el && this._el.querySelector('#seElementName'))
+      const target = (this.current?.family === 'mesh' && this._el?.querySelector('[data-mesh-field="longitudinalDiameter"]'))
+        || (this._el && this._el.querySelector('#seElementName'))
         || (this._el && this._el.querySelector('#seTableBody .se-input[data-side]'));
       if (target && document.activeElement !== target) {
         target.focus();
@@ -6430,12 +6452,33 @@ class ShapeEditorModal {
     }
   }
 
+  _renderMeshSpacingGuide() {
+  const wrap=document.getElementById('seSvgWrap');if(!wrap)return;
+  let guide=wrap.querySelector('.mesh-spacing-guide');
+  if(this.current?.family!=='mesh'){if(guide)guide.remove();return;}
+  if(!guide){guide=document.createElement('aside');guide.className='mesh-spacing-guide';guide.setAttribute('aria-label','הסבר משולב למרווחי הרשת');wrap.append(guide);}
+  const value=v=>Number.isFinite(Number(v))?(Number(v)/10).toLocaleString('he-IL',{maximumFractionDigits:2}):'—';
+  const long=value(this.current.longitudinalSpacing),trans=value(this.current.transverseSpacing);
+  guide.innerHTML=`<section class="mesh-gap-card"><h3>מרווח בין המוטות</h3>
+   <svg viewBox="0 0 190 175" aria-label="ציור משולב: מוטות האורך בכחול ומוטות הרוחב בכתום">
+   <g fill="none" stroke="#2356a5" stroke-width="3" stroke-linecap="round"><path d="M48 35H172M48 100H172"/></g>
+   <g fill="none" stroke="#b85b17" stroke-width="3" stroke-linecap="round"><path d="M80 15V125M140 15V125"/></g>
+   <g fill="none" stroke="#2356a5" stroke-width="1.5"><path d="M23 35H38M23 100H38M30 37V98M26 43L30 36L34 43M26 92L30 99L34 92"/></g>
+   <text x="14" y="68" text-anchor="middle" transform="rotate(-90 14 68)" font-size="14" font-weight="800" font-family="Heebo,Arial" fill="#2356a5">${long} ס״מ</text>
+   <g fill="none" stroke="#b85b17" stroke-width="1.5"><path d="M80 131V150M140 131V150M82 142H138M88 138L81 142L88 146M132 138L139 142L132 146"/></g>
+   <text x="110" y="167" text-anchor="middle" font-size="14" font-weight="800" font-family="Heebo,Arial" fill="#b85b17">${trans} ס״מ</text></svg>
+   <div class="mesh-gap-label mesh-gap-long">מוטות האורך · ${long} ס״מ</div>
+   <div class="mesh-gap-label mesh-gap-trans">מוטות הרוחב · ${trans} ס״מ</div>
+   </section>`;
+  }
+
   _renderPreviewNow() {
     if (!this.current) return;
     this._renderRecognition();
     const { sides, angles } = this.current;
     const svg = document.getElementById('seShapeSvg');
     if (!svg) return;
+    this._renderMeshSpacingGuide();
     this._refreshPileComponentGallery();
     svg.onclick = null;
     const is3D = window._seViewMode !== '2d';

@@ -1,0 +1,11 @@
+# הזנת רשת קומפקטית — 12.11.2026
+
+מאיר אישר את תצוגת mesh-unified-guide-20261112 ואמר ״מצויין תעלה״.
+
+Owner: Steel/Rebar, shared shape editor presentation. Inputs are the existing mesh fields in mm internally (metres/cm displayed). Output remains the same shape snapshot and order quantity. No DB, routes, auth, calculation, inventory, pricing or historical data changes.
+
+The mesh editor hides its element-name/catalogue/commercial/recognition panels from the normal view; values and policies remain in the existing contract. The order-row element name remains editable. Six primary inputs stay in paired rows. Green groups diameter/quantity, blue length/longitudinal spacing, orange width/transverse spacing. The original main mesh drawing remains, with one combined side guide whose numeric labels update from the same mesh data. The old tiny helper and cramped bottom specification are removed instead of retained as hidden SVG markup. Duplicate footer mass is removed; calculated results remain in the input panel. Mesh focus starts at the visible diameter field. The duplicate shared back-row is hidden only in mesh mode; the existing editor back/close controls remain, matching the approved preview and returning 46px to the input panel. Other shape families keep their normal panels and preview.
+
+Validation: focused shape geometry, order editor and mesh stock regression checks; syntax check; real editor at 690px height with default advanced details closed; update spacing and quantity, confirm and reopen, switch between mesh and bars. Live verification uses only an uncommitted editor preview and makes no inventory/order writes. Asset references are updated for factory and customer editors. Rollback is code-only; no data migration required.
+
+Validation observed before release: 123 focused checks passed, npm test passed all 1,244 checks. In the real factory order editor at a 690px viewport the input panel has clientHeight=514 and scrollHeight=514. Three colored groups, hidden catalogue, one combined guide, spacing updates (10→20 cm), item confirmation (3 sheets, 355.56 kg), reopen and return to bars were verified. The bar catalogue returns and the mesh guide is removed on family change.
