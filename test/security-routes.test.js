@@ -817,11 +817,12 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
       item_id: item.id,
       diameter: 12,
       material_type: 'coil',
-      reserved_kg: 6.76,
+      reserved_kg: 6.749,
       status: 'active',
     });
     assert.equal(created.inventoryReservations.inserted, 1);
-    assert.equal(created.inventoryReservations.reservedKg, 6.76);
+    assert.equal(created.inventoryReservations.reservedKg, 6.749);
+    assert.equal(reservation.reserved_kg, Number(item.total_weight.toFixed(3)));
   });
 
   await t.test('order item delete releases existing inventory reservation', async () => {

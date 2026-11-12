@@ -125,7 +125,13 @@ function decideReceipt(db, input = {}, status) {
     return getReceipt(db,id);
   }); return tx.immediate();
 }
-function approveReceipt(db, input) { return decideReceipt(db,input,'approved'); }
+function approveReceipt(db, input) {
+  return db.transaction(()=>{
+    const receipt=decideReceipt(db,input,'approved');
+    require('./inventoryItemCompletion').retryCurrentPending(db,{actor_id:input.decided_by});
+    return receipt;
+  }).immediate();
+}
 function rejectReceipt(db, input) { return decideReceipt(db,input,'rejected'); }
 function cancelDraft(db, input = {}) { return decideReceipt(db,{...input, idempotency_key: input.idempotency_key ?? input.idempotencyKey ?? `cancel:${input.receipt_id ?? input.receiptId}`},'cancelled'); }
 function listReceipts(db, { status = 'draft' } = {}) { return db.prepare('SELECT id FROM pending_raw_material_receipts_v2 WHERE status=? ORDER BY id DESC').all(status).map(row => getReceipt(db,row.id)); }

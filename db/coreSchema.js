@@ -2000,6 +2000,7 @@ function ensureCoreSchema(db) {
   ensureBugReportSchema(db);
   ensureOrderWorkspaceSchema(db);
   require('./orderOperationsSchema').ensureOperationSchema(db);
+  require('./inventoryWeightSchema').ensureInventoryWeightSchema(db);
 }
 
 module.exports = {

@@ -14,6 +14,8 @@ function buildInventoryMetrics(db) {
   const result={generated_at:new Date().toISOString(),stocked_lots:stocked.length,stocked_diameters:new Set(stocked.map(l=>Number(l.diameter))).size,baseline,
     recorded_net_kg:null,verified_consumption_kg:null,status:'no_baseline',issues:[],gaps,historical_used_counter_kg:historicalUsed};
   if(!baseline)return result;
+  gaps.historical_weight_review_items=db.prepare("SELECT 1 FROM sqlite_master WHERE name='inventory_weight_review_items'").get()?db.prepare('SELECT COUNT(*) n FROM inventory_weight_review_items').get().n:0;
+  if(gaps.historical_weight_review_items)result.issues.push('historical_weight_review_required');
   const since=baseline.created_at;
   const legacy=db.prepare('SELECT * FROM raw_material_usage WHERE julianday(used_at)>=julianday(?)').all(since);
   const events=db.prepare(`SELECT e.event_type,e.approved_at,l.raw_material_id,l.consumed_kg FROM material_consumption_events_v2 e JOIN material_consumption_event_lines_v2 l ON l.consumption_event_id=e.id WHERE julianday(e.approved_at)>=julianday(?)`).all(since);

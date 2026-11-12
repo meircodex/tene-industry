@@ -1739,7 +1739,9 @@ test('buildShapeDataContractV2 returns bars envelope without shape-owned quantit
   assert.equal(contract.source, 'shape-editor');
   assert.deepEqual(contract.data, { sides: [350, 1200, 350], angles: [90, 90], diameter: 12 });
   assert.equal(contract.calculated.totalLengthMm, 1900);
-  assert.equal(contract.calculated.totalWeightKg, contract.calculated.weightKg);
+  assert.equal(contract.calculated.unitWeightKg, contract.calculated.weightKg);
+  assert.equal(contract.calculated.weightBasis, 'unit');
+  assert.equal(contract.calculated.totalWeightKg, undefined);
   assert.equal(contract.calculated.bendCount, 2);
   assert.equal(contract.validation.valid, true);
   assert.equal(contract.machineOutput.generic.family, 'bars');

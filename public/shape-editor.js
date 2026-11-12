@@ -1762,9 +1762,8 @@ function buildLiftShapeContract(shape) {
   // All the packages go on the scale together, so the weighed number is the
   // total for the whole line. The package count is there to be counted, never
   // to multiply the weighing.
-  // The contract carries a single weight and mirrors it into totalWeightKg,
-  // because quantity belongs to the order item. That mirroring is exactly
-  // what marks this number as a whole-line total rather than a per-unit one.
+  // Explicit line basis is written by normalizeCalculatedPayload; equality
+  // of two numeric fields is never used as proof of their meaning.
   const weightKg = Number(data.weighedKg.toFixed(3));
   const calculated = { totalLengthMm: data.barLength, weightKg, weighedKg: weightKg };
   return {
@@ -1822,18 +1821,21 @@ function cleanShapePayload(value, depth = 0) {
   }, {});
 }
 
-function normalizeCalculatedPayload(calculated = {}) {
+function normalizeCalculatedPayload(calculated = {}, family = 'bars') {
   const payload = cleanShapePayload(calculated || {});
   if (Object.prototype.hasOwnProperty.call(payload, 'totalLengthMm')) {
     payload.totalLengthMm = roundShapeMetric(payload.totalLengthMm);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'weightKg')) {
     payload.weightKg = payload.calculationVersion==='mesh-count-v2'?Number(payload.weightKg):roundShapeMetric(payload.weightKg);
-    if (payload.calculationVersion !== 'mesh-count-v2') payload.totalWeightKg = payload.weightKg;
+    if (family === 'lifts') payload.totalWeightKg = payload.weightKg;
+    else { payload.unitWeightKg = payload.weightKg; delete payload.totalWeightKg; }
   } else if (Object.prototype.hasOwnProperty.call(payload, 'totalWeightKg')) {
     payload.totalWeightKg = roundShapeMetric(payload.totalWeightKg);
     payload.weightKg = payload.totalWeightKg;
   }
+  payload.weightBasis = family === 'lifts' ? 'line' : 'unit';
+  payload.weightCalculationVersion = 'item-weight-v3';
   return payload;
 }
 
@@ -1885,7 +1887,7 @@ function buildShapeDataContractV2(shape) {
   const approvedAt = new Date().toISOString();
   const displayName = String(safeShape.displayName || safeShape.presetName || safeShape.shapeName || safeShape.name || '');
   const data = cleanShapePayload(familyPayload.data || {});
-  const calculated = normalizeCalculatedPayload(familyPayload.calculated || {});
+  const calculated = normalizeCalculatedPayload(familyPayload.calculated || {}, family);
   const generic = normalizeGenericMachineOutput(familyPayload.generic || {}, calculated, family, shapeType);
   const validation = normalizeShapeValidation(familyPayload, calculated, approvedAt);
   const machineOutput = {

@@ -46,10 +46,10 @@
   }
   function render() {
     const rows=visibleRows();
-    $('inventoryDailyRows').innerHTML=rows.map(row=>`<tr>
-      <td><button class="inventory-link" data-filter-type="${row.type}" data-filter-diameter="${row.diameter}">${escape(row.label)}</button><div class="material-shape">${escape(row.specification)}</div>${row.type==='mesh'?`<div class="material-shape">${row.theoreticalWeight!=null?`תיאורטי לרשת: ${row.theoreticalWeight.toFixed(2)} ק״ג · במלאי: ${(row.theoreticalWeight*row.stock).toFixed(2)} ק״ג`:'משקל היסטורי — נדרשת בדיקת מפרט'}</div>`:''}</td>
+    $('inventoryDailyRows').innerHTML=rows.map(row=>`<tr ${row.type!=='mesh'?`data-demand-row="${state.rows.indexOf(row)}" style="cursor:pointer"`:""}>
+      <td><button class="inventory-link" ${row.type==='mesh'?`data-filter-type="${row.type}" data-filter-diameter="${row.diameter}"`:`data-demand-open="${state.rows.indexOf(row)}" aria-expanded="false"`}>${escape(row.label)}</button><div class="material-shape">${escape(row.specification)}</div>${row.type==='mesh'?`<div class="material-shape">${row.theoreticalWeight!=null?`תיאורטי לרשת: ${row.theoreticalWeight.toFixed(2)} ק״ג · במלאי: ${(row.theoreticalWeight*row.stock).toFixed(2)} ק״ג`:'משקל היסטורי — נדרשת בדיקת מפרט'}</div>`:''}</td>
       <td>${row.type==='straight'?(row.lengthMm?escape(row.lengthMm/1000):'אורך לא צוין'):'—'}</td>
-      <td>${number(row.stock)} ${row.unitLabel}</td><td title="מספר מוטות משוער לפי משקל המלאי, אורך המוט ומשקל למטר לפי הקוטר; מעוגל מטה">${row.barCount==null?'—':`≈ ${number(row.barCount)}`}</td><td>${number(row.demand)} ${row.unitLabel}</td>
+      <td>${number(row.stock)} ${row.unitLabel}</td><td title="מספר מוטות משוער לפי משקל המלאי, אורך המוט ומשקל למטר לפי הקוטר; מעוגל מטה">${row.barCount==null?'—':`≈ ${number(row.barCount)}`}</td><td>${number(row.demand)} ${row.unitLabel}${row.reviewKg>0?`<div class="inventory-review">מתוכם ${number(row.reviewKg)} ק״ג צריכת עבר לבדיקה</div>`:""}</td>
       <td><span class="badge ${row.available<0?'badge-danger':'badge-ok'}">${row.available<0?'חוסר':'פנוי'} ${number(Math.abs(row.available))} ${row.unitLabel}</span></td>
       <td>${number(row.incoming)} ${row.unitLabel}</td><td>${row.buy>0?`<strong class="inventory-shortage">${number(row.buy)} ${row.unitLabel}</strong>`:'אין צורך'}</td></tr>`).join('') || '<tr><td colspan="8" class="inventory-message">אין פריטים בתצוגה זו.</td></tr>';
     document.querySelectorAll('[data-inventory-sort]').forEach(button=>{
@@ -59,6 +59,30 @@
     });
     $('inventoryPurchase').disabled=!state.loaded;
   }
+  async function showDemand(index,offset=0) {
+    const row=state.rows[index],tr=$('inventoryDailyRows').querySelector(`[data-demand-row="${index}"]`);
+    if(!row||!tr)return;
+    const next=tr.nextElementSibling;if(next?.classList.contains('inventory-demand-detail'))next.remove();
+    const detail=document.createElement('tr');detail.className='inventory-demand-detail';
+    detail.innerHTML='<td colspan="8">טוען את ההזמנות והפריטים...</td>';tr.after(detail);
+    tr.querySelector('button')?.setAttribute('aria-expanded','true');
+    try {
+      const params=new URLSearchParams(state.planParams||'');
+      params.set('include_details','true');params.set('diameter',row.diameter);params.set('material_type',row.type);
+      params.set('nominal_length_mm',row.lengthMm??'');params.set('detail_limit','25');params.set('detail_offset',offset);
+      const plan=await api('/api/procurement/plan?'+params),group=plan.groups[0],data=group?.demand_details;
+      if(!detail.isConnected)return;
+      if(!data)throw new Error('לא ניתן לטעון פירוט לפריט זה');
+      detail.innerHTML=`<td colspan="8"><div class="inventory-demand-box"><strong>${escape(row.label)}${row.lengthMm?` · ${row.lengthMm/1000} מטר`:''} — פירוט דרישה: ${number(group.backlog_kg)} ק״ג</strong>
+        <p>מלאי פיזי: ${number(group.physical_stock_kg)} ק״ג. צריכות עבר המסומנות לבדיקה טרם שינו את היתרה הרשומה.</p>
+        <div class="table-wrap"><table><thead><tr><th>הזמנה / לקוח</th><th>פריט</th><th>צורה ומידות</th><th>כמות</th><th>דרישה שנותרה</th><th>מצב</th><th></th></tr></thead><tbody>${data.items.map(item=>`<tr>
+          <td><strong>${escape(item.order_num)}</strong><div>${escape(item.customer_name)}</div></td><td>${escape(item.item_number)}</td>
+          <td><div class="inventory-demand-shape">${item.shape_svg}</div><div>${escape(item.shape_name)}${item.length_mm?` · אורך פריסה ${number(item.length_mm/10)} ס״מ`:''}</div></td>
+          <td>${number(item.quantity)} יח׳</td><td><strong>${number(item.remaining_kg)} ק״ג</strong>${item.recorded_consumption_kg>0?`<div>נרשם שנצרך: ${number(item.recorded_consumption_kg)} ק״ג</div>`:''}</td>
+          <td class="${item.requires_review?'inventory-review':''}">${escape(item.status)}</td><td><a class="btn btn-outline btn-sm" href="/orders.html?id=${Number(item.order_id)}#item-row-${Number(item.item_id)}">פתח הזמנה</a></td></tr>`).join('')||'<tr><td colspan="7">אין דרישה פתוחה בשורה זו.</td></tr>'}</tbody></table></div>
+        <div class="inventory-demand-pages">${offset>0?`<button class="btn btn-outline btn-sm" data-row="${index}" data-demand-page="${Math.max(0,offset-25)}">הקודם</button>`:''}<span>${data.total?`${offset+1}–${Math.min(offset+25,data.total)} מתוך ${data.total}`:'0 פריטים'}</span>${offset+25<data.total?`<button class="btn btn-outline btn-sm" data-row="${index}" data-demand-page="${offset+25}">הבא</button>`:''}</div></div></td>`;
+    }catch(error){if(detail.isConnected)detail.innerHTML=`<td colspan="8">${escape(error.message)} <button class="btn btn-outline btn-sm" data-row="${index}" data-demand-page="${offset}">נסה שוב</button></td>`;}
+  }
   async function reload() {
     const revision=++loadRevision;
     state.loaded=false;$('inventoryPurchase').disabled=true;$('inventoryDailyRows').innerHTML='<tr><td colspan="8" class="inventory-message">טוען מלאי וחוסרים...</td></tr>';
@@ -67,9 +91,10 @@
       if($('inventoryThrough').value)params.set('through_date',$('inventoryThrough').value);
       params.set('stock_basis',$('inventoryStockBasisSelect').value);
       const plan=await api('/api/procurement/plan?'+params);
+      state.planParams=params.toString();
       state.policy=plan.purchase_policy;
       if(revision!==loadRevision)return;
-      state.rows=plan.groups.map(row=>({type:row.material_type,diameter:row.diameter,lengthMm:row.nominal_length_mm??null,barCount:row.estimated_bar_count??null,label:`${labels[row.material_type]||row.material_type} Ø${row.diameter}`,stock:row.physical_stock_kg,demand:row.backlog_kg,available:row.available_stock_kg??(row.physical_stock_kg-row.backlog_kg),incoming:row.incoming_kg,buy:row.recommended_purchase_kg,unitLabel:'ק״ג',specification:row.requires_length_review?'יש להשלים אורך ולבדוק דרגה ותקן לפני הזמנה':'יש לבדוק דרגה ותקן לפני הזמנה'}));
+      state.rows=plan.groups.map(row=>({type:row.material_type,diameter:row.diameter,lengthMm:row.nominal_length_mm??null,barCount:row.estimated_bar_count??null,label:`${labels[row.material_type]||row.material_type} Ø${row.diameter}`,stock:row.physical_stock_kg,reviewKg:row.completed_review_kg||0,demand:row.backlog_kg,available:row.available_stock_kg??(row.physical_stock_kg-row.backlog_kg),incoming:row.incoming_kg,buy:row.recommended_purchase_kg,unitLabel:'ק״ג',specification:row.requires_length_review?'יש להשלים אורך ולבדוק דרגה ותקן לפני הזמנה':'יש לבדוק דרגה ותקן לפני הזמנה'}));
       state.rows.push(...(plan.mesh_groups||[]).map(row=>({type:'mesh',diameter:row.specification.longitudinal_diameter_mm,label:`רשת Ø${row.specification.longitudinal_diameter_mm}`,specification:meshDescription(row.specification),stock:row.physical_units,demand:row.required_units,available:row.available_units,incoming:row.incoming_units,buy:row.recommended_purchase_units,unitLabel:'יחידות',meshSpecification:row.specification,theoreticalWeight:row.specification.calculation?.weightKg})));
       const previous=$('inventoryDiameter').value;
       $('inventoryDiameter').innerHTML='<option value="">כל הקטרים</option>'+[...new Set(state.rows.map(row=>row.diameter))].sort((a,b)=>a-b).map(d=>`<option value="${d}">Ø${d}</option>`).join('');
@@ -142,7 +167,14 @@
   document.querySelectorAll('[data-inventory-sort]').forEach(button=>{button.dataset.label=button.textContent;button.addEventListener('click',()=>{const field=button.dataset.inventorySort;state.direction=state.sort===field?-state.direction:1;state.sort=field;render();});});
   ['inventoryType','inventoryDiameter','inventoryShortages'].forEach(id=>$(id).addEventListener('change',render));
   ['inventoryThrough','inventoryWaste','inventorySafety','inventoryStockBasisSelect'].forEach(id=>$(id).addEventListener('change',reload));
-  $('inventoryDailyRows').addEventListener('click',event=>{const button=event.target.closest('[data-filter-type]');if(button){$('inventoryType').value=button.dataset.filterType;$('inventoryDiameter').value=button.dataset.filterDiameter;render();}});
+  $('inventoryDailyRows').addEventListener('click',event=>{
+    const page=event.target.closest('[data-demand-page]');
+    if(page){showDemand(Number(page.dataset.row),Number(page.dataset.demandPage));return;}
+    if(event.target.closest('.inventory-demand-detail'))return;
+    const tr=event.target.closest('[data-demand-row]');
+    if(tr){const id=Number(tr.dataset.demandRow),detail=tr.nextElementSibling;if(detail?.classList.contains('inventory-demand-detail')){detail.remove();tr.querySelector('button')?.setAttribute('aria-expanded','false');}else showDemand(id,0);return;}
+    const button=event.target.closest('[data-filter-type]');if(button){$('inventoryType').value=button.dataset.filterType;$('inventoryDiameter').value=button.dataset.filterDiameter;render();}
+  });
   $('inventoryPurchase').addEventListener('click',openPurchase);
   $('purchaseMaterialType').addEventListener('change',buildPurchase);
   $('purchaseAddRow').addEventListener('click',()=>{state.draft.push(draftLine(purchaseType()));renderDraft();});

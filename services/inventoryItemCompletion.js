@@ -63,7 +63,7 @@ function movement(db,item,lines,{key,reason,actorId}){
   return true;
 }
 function pending(db,item,reason,details={}){
-  const label={insufficient_stock:'אין מספיק חומר מתאים',missing_reservation:'חסר שיוך חומר לפריט',length_requires_review:'יש לבדוק את אורך הליפט',unreconciled_usage:'יש לבדוק צריכת חומר שכבר נרשמה',completion_time_missing:'חסר מועד השלמת ייצור'}[reason]||'נתוני הפריט דורשים בדיקה';
+  const label={historical_weight_review_required:'צריכת עבר דורשת אימות לפני שינוי המלאי',insufficient_stock:'אין מספיק חומר מתאים',missing_reservation:'חסר שיוך חומר לפריט',length_requires_review:'יש לבדוק את אורך הליפט',unreconciled_usage:'יש לבדוק צריכת חומר שכבר נרשמה',completion_time_missing:'חסר מועד השלמת ייצור'}[reason]||'נתוני הפריט דורשים בדיקה';
   const message=`צריכת מלאי ממתינה: הזמנה ${item.owner_order_id}, פריט ${item.id}: ${label}`;
   if(!db.prepare("SELECT 1 FROM alerts WHERE type='inventory_consumption_pending' AND order_id=? AND message=? AND resolved=0").get(item.owner_order_id,message))db.prepare("INSERT INTO alerts(type,level,message,order_id) VALUES('inventory_consumption_pending','warning',?,?)").run(message,item.owner_order_id);
   return {consumed:0,pending:{item_id:item.id,reason,...details}};
@@ -73,9 +73,11 @@ function consumeItem(db,{item_id,actual_weight_kg,reason='השלמת ייצור 
     const item=itemRecord(db,item_id),blocked=eligibility(db,item);
     if(blocked)return blocked==='completion_time_missing'?pending(db,item,blocked):{consumed:0,reason:blocked};
     if(Number(item.inventory_lifecycle_version)===2)return {consumed:0,reason:'v2_requires_approved_consumption_report'};
+    if(db.prepare('SELECT 1 FROM inventory_weight_review_items WHERE item_id=?').get(item.id))return pending(db,item,'historical_weight_review_required');
     const reservation=db.prepare("SELECT * FROM inventory_reservations WHERE item_id=? AND order_id=? AND status IN ('active','consumed') ORDER BY id DESC LIMIT 1").get(item.id,item.owner_order_id);
     if(!reservation)return pending(db,item,'missing_reservation');
-    const amount=kg(actual_weight_kg??reservation.pending_actual_kg??item.actual_weight_kg??itemShapeMetrics(item).totalWeightKg??reservation.reserved_kg);
+    if(actual_weight_kg==null&&reservation.pending_weight_source!=='actual'&&itemShapeMetrics(item).requiresWeightReview)return pending(db,item,'weight_basis_requires_review');
+    const amount=kg(actual_weight_kg??(reservation.pending_weight_source==='actual'?reservation.pending_actual_kg:null)??itemShapeMetrics(item).totalWeightKg??reservation.reserved_kg);
     if(!Number.isFinite(amount)||amount<0)throw Error('invalid_actual_weight');
     const metrics=itemShapeMetrics(item),shape=parseJsonObject(item.shape_snapshot_json);
     const identity={diameter:Number(reservation.diameter),material_type:reservation.material_type,length_mm:reservation.material_type==='straight'?Number(metrics.totalLengthMm):null,preferred_raw_material_id:reservation.preferred_raw_material_id||null};
@@ -111,13 +113,13 @@ function consumeItem(db,{item_id,actual_weight_kg,reason='השלמת ייצור 
       if(remaining>0)throw Object.assign(Error('insufficient_stock'),{pendingReason:'insufficient_stock',missing_kg:remaining});
       movement(db,item,allocations,{key,reason,actorId:actor_id});
       db.prepare(`INSERT INTO inventory_item_completion_state(item_id,order_id,consumed_kg,identity_json,allocations_json,revision) VALUES(?,?,?,?,?,?) ON CONFLICT(item_id) DO UPDATE SET consumed_kg=excluded.consumed_kg,identity_json=excluded.identity_json,allocations_json=excluded.allocations_json,revision=excluded.revision`).run(item.id,item.owner_order_id,amount,identityJson,JSON.stringify(allocations),revision);
-      db.prepare("UPDATE inventory_reservations SET status='consumed',reserved_kg=?,pending_actual_kg=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(amount,reservation.id);
+      db.prepare("UPDATE inventory_reservations SET status='consumed',reserved_kg=?,pending_actual_kg=NULL,pending_weight_source=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(amount,reservation.id);
       db.prepare("UPDATE alerts SET resolved=1 WHERE type='inventory_consumption_pending' AND order_id=? AND message LIKE ?").run(item.owner_order_id,`צריכת מלאי ממתינה: הזמנה ${item.owner_order_id}, פריט ${item.id}:%`);
       return {consumed:1,consumed_kg:kg(amount-(previous?.consumed_kg||0)),allocations};
     });
     try{return save();}catch(error){
       if(!error.pendingReason||strict)throw error;
-      db.prepare('UPDATE inventory_reservations SET pending_actual_kg=? WHERE id=?').run(amount,reservation.id);
+      db.prepare('UPDATE inventory_reservations SET pending_actual_kg=?,pending_weight_source=? WHERE id=?').run(amount,actual_weight_kg!=null||reservation.pending_weight_source==='actual'?'actual':'calculated',reservation.id);
       return pending(db,item,error.pendingReason,error.missing_kg?{missing_kg:error.missing_kg}:{});
     }
   }).immediate();
@@ -145,4 +147,13 @@ function exemptHistoricalItems(db,{item_ids,reason}){
   let exempted=0;for(const id of new Set(item_ids))exempted+=insert.run(id,rule.stocktake_id).changes;
   return {exempted};
 }
-module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction,exemptHistoricalItems,consumptionOverride,authorizeConsumptionOverrides};
+function retryCurrentPending(db,{actor_id}={}){
+  if(!policy(db))return {consumed:0,pending:[]};
+  const rows=db.prepare(`SELECT DISTINCT r.item_id FROM inventory_reservations r
+    WHERE r.pending_actual_kg IS NOT NULL AND r.pending_weight_source IN ('actual','calculated')
+    AND NOT EXISTS(SELECT 1 FROM inventory_weight_review_items v WHERE v.item_id=r.item_id) ORDER BY r.id LIMIT 100`).all();
+  const result={consumed:0,pending:[]};
+  for(const row of rows){const outcome=consumeItem(db,{item_id:row.item_id,actor_id,reason:'השלמת צריכה ממתינה לאחר אישור קבלת חומר'});result.consumed+=outcome.consumed;if(outcome.pending)result.pending.push(outcome.pending);}
+  return result;
+}
+module.exports={policy,activatePolicy,eligibility,itemRecord,consumeItem,state,returnErroneousProduction,exemptHistoricalItems,consumptionOverride,authorizeConsumptionOverrides,retryCurrentPending};

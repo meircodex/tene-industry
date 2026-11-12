@@ -61,3 +61,25 @@ test('without a snapshot, weight_per_unit x quantity wins, then total_weight', (
   const fromTotal = itemShapeMetrics({ quantity: 4, total_weight: 11.5 });
   assert.equal(fromTotal.totalWeightKg, 11.5);
 });
+
+test('explicit unit weight disambiguates the editor mirror; saved precision is retained', () => {
+  const item={quantity:45,weight_per_unit:13.2145,total_weight:594.6525,
+    shape_snapshot_json:snapshotWith({weightKg:13.215,unitWeightKg:13.215,totalWeightKg:13.215,totalLengthMm:5350})};
+  assert.equal(itemShapeMetrics(item).totalWeightKg,594.6525);
+  assert.equal(itemShapeMetrics({...item,weight_per_unit:undefined,total_weight:undefined}).totalWeightKg,13.215*45);
+  assert.equal(itemShapeMetrics({...item,quantity:0}).totalWeightKg,0);
+  assert.equal(itemShapeMetrics({...item,quantity:46}).totalWeightKg,13.2145*46);
+});
+
+test('weighed lift weight belongs to the whole line and actual measurement has priority', () => {
+  const shape=JSON.parse(snapshotWith({weightKg:2050,totalWeightKg:2050,weighedKg:2050}));shape.family='lifts';
+  const item={quantity:3,shapeSnapshot:shape};
+  assert.equal(itemShapeMetrics(item).totalWeightKg,2050);
+  assert.equal(itemShapeMetrics({...item,actual_weight_kg:2010}).totalWeightKg,2010);
+});
+
+test('new explicit unit/line basis does not depend on equality of legacy fields', () => {
+  assert.equal(itemShapeMetrics({quantity:5,shape_snapshot_json:snapshotWith({weightKg:20,totalWeightKg:20,weightBasis:'unit'})}).totalWeightKg,100);
+  assert.equal(itemShapeMetrics({quantity:5,shape_snapshot_json:snapshotWith({weightKg:20,totalWeightKg:20,weightBasis:'line'})}).totalWeightKg,20);
+  assert.equal(itemShapeMetrics({quantity:5,shape_snapshot_json:snapshotWith({weightKg:20,totalWeightKg:20})}).requiresWeightReview,true);
+});

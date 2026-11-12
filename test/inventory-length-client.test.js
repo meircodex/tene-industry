@@ -19,7 +19,7 @@ test('inventory displays both length rows and estimated counts, and draft carrie
  await window.InventoryWorkspace.reload();
  const table=node('inventoryDailyRows').innerHTML;
  assert.match(table,/<td>6<\/td>/);assert.match(table,/<td>12<\/td>/);assert.match(table,/≈ 384/);assert.match(table,/≈ 0/);
- assert.equal((table.match(/<tr>/g)||[]).length,2);assert.equal((table.match(/<td(?:\s|>)/g)||[]).length,16);
+ assert.equal((table.match(/<tr(?:\s|>)/g)||[]).length,2);assert.equal((table.match(/<td(?:\s|>)/g)||[]).length,16);
  await node('inventoryPurchase').handlers.click();
  const draft=node('purchaseDraftRows').innerHTML;
  const lines=[...draft.matchAll(/<tr data-draft-index="\d+">([\s\S]*?)<\/tr>/g)].map(m=>m[1]);

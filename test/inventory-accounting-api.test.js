@@ -27,5 +27,9 @@ test('count approval, stock immutability and purchase export enforce roles and p
     assert.equal((await request('/procurement/purchase-draft/export','POST','production',exportBody)).status,403);
     const result=await request('/procurement/purchase-draft/export','POST','manager',exportBody);assert.equal(result.status,200);assert.match(result.headers.get('content-type'),/text\/csv/);assert.match(await result.text(),/1234/);
     assert.equal((await request('/procurement/plan','GET','warehouse')).status,200);assert.ok(events.some(([name])=>name==='inventory_changed'));
+    assert.equal((await request('/procurement/plan?include_details=true','GET')).status,401);
+    assert.equal((await request('/procurement/plan?include_details=true','GET','production')).status,403);
+    assert.equal((await request('/procurement/plan?include_details=true&detail_limit=101','GET','warehouse')).status,400);
+    assert.equal((await request('/procurement/plan?include_details=true&detail_offset=-1','GET','warehouse')).status,400);
   }finally{await new Promise(resolve=>server.close(resolve));db.close();}
 });

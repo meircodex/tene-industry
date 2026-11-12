@@ -100,12 +100,9 @@ function effectiveItemWeight(item, pileBreakdown = null) {
     return { weightKg: pileBreakdown.totalWeightKg, source: 'canonical_pile_cage' };
   }
 
-  const storedTotal = positive(item.total_weight ?? item.totalWeight);
-  if (storedTotal > 0) return { weightKg: round(storedTotal), source: 'theoretical_saved' };
-
   const metrics = itemShapeMetrics(item);
   const snapshotTotal = positive(metrics.totalWeightKg);
-  if (snapshotTotal > 0) return { weightKg: round(snapshotTotal), source: 'theoretical_snapshot' };
+  if (snapshotTotal > 0) return { weightKg: round(snapshotTotal), source: metrics.weightSource.startsWith('saved_') ? 'theoretical_saved' : 'theoretical_snapshot' };
 
   const unit = positive(item.weight_per_unit ?? item.weightPerUnit ?? metrics.unitWeightKg);
   if (unit > 0) return { weightKg: round(unit * itemQuantity(item)), source: 'theoretical_unit' };

@@ -102,7 +102,9 @@ function projectMaterialCoverageV2(db) {
     group.approved_inventory.active_v2_allocated_remaining_kg += remaining;
     if (line.requirement_status === 'cancelled') group.anomalies.push(anomaly('cancelled_requirement_has_active_allocation', 'warning', { allocation_plan_line_id: line.id }));
   }
-  const legacy = db.prepare("SELECT * FROM inventory_reservations WHERE status='active' ORDER BY id").all();
+  const legacy = require('./inventoryItemCompletion').policy(db)
+    ? require('./inventoryDemand').inventoryDemand(db).map(row=>({...row,reserved_kg:row.remaining_kg}))
+    : db.prepare("SELECT * FROM inventory_reservations WHERE status='active' ORDER BY id").all();
   for (const row of legacy) {
     if (!validIdentity(row)) { global.push(anomaly('legacy_reservation_unclassified', 'warning', { inventory_reservation_id: row.id })); continue; }
     add(row.diameter, row.material_type).legacy_reservations.active_reserved_kg += kg(row.reserved_kg);

@@ -139,7 +139,8 @@
   }
 
   function itemQuantity(item = {}) {
-    return Math.max(1, Number(item.quantity ?? item.qty ?? item.production_qty ?? 1) || 1);
+    const quantity = Number(item.quantity ?? item.qty ?? item.production_qty ?? 1);
+    return Number.isFinite(quantity) && quantity >= 0 ? quantity : 0;
   }
 
   function itemShapeMetrics(item = {}) {
@@ -151,18 +152,39 @@
       ?? item.shape_contract
       ?? item.shape_snapshot_json
       ?? null;
+    const shape = parseJsonObject(snapshot);
     const metrics = shapeSnapshotMetrics(snapshot) || {};
     const quantity = itemQuantity(item);
     const totalLengthMm = metrics.totalLengthMm ?? positiveNumberOrNull(item.totalLengthMm ?? item.total_length_mm ?? item.length_mm ?? item.length);
-    const snapUnit = metrics.weightKg ?? null;
+    const calculated = shape?.calculated || {};
+    const snapUnit = positiveNumberOrNull(calculated.unitWeightKg) ?? metrics.weightKg ?? null;
     const snapTotal = metrics.totalWeightKg ?? null;
-    if(parseJsonObject(snapshot)?.family==='mesh'&&snapUnit!==null)return {totalLengthMm,unitWeightKg:snapUnit,totalWeightKg:Number((snapUnit*quantity).toFixed(3)),quantity};
     const dbUnit = positiveNumberOrNull(item.weightPerUnit ?? item.weight_per_unit);
+    const dbTotal = positiveNumberOrNull(item.totalWeight ?? item.total_weight);
+    const actual = positiveNumberOrNull(item.actual_weight_kg ?? item.actualWeightKg);
+    const result = (unit, total, source, requiresReview = false) => ({totalLengthMm,unitWeightKg:unit,totalWeightKg:quantity === 0 ? 0 : total,quantity,weightSource:source,requiresWeightReview:requiresReview});
+    if (actual !== null) return result(quantity ? actual / quantity : null, actual, 'actual');
+    // A weighed lift package is a line weight, regardless of package count.
+    const measuredLine = positiveNumberOrNull(calculated.weighedKg ?? shape?.data?.weighedKg);
+    if (isShapeDataContractV2(shape) && shape.family === 'lifts' && measuredLine !== null) return result(quantity ? measuredLine / quantity : null, measuredLine, 'measured_line');
+    if (calculated.weightBasis === 'line') {
+      const total = snapTotal ?? metrics.weightKg ?? dbTotal;
+      return result(quantity && total !== null ? total / quantity : null, total, 'snapshot_line');
+    }
+    // Saved high precision unit/total pairs are authoritative over rounded
+    // editor mirrors. In particular, 45 x 13.2145 is 594.6525, not 13.215.
+    if (dbUnit !== null && dbTotal !== null && Math.abs(dbUnit * quantity - dbTotal) <= 0.001) return result(dbUnit, dbTotal, 'saved_unit_total');
+    if (shape?.family === 'mesh' || calculated.weightBasis === 'unit' || positiveNumberOrNull(calculated.unitWeightKg) !== null) {
+      const unit = dbUnit ?? snapUnit;
+      if (unit !== null) return result(unit, unit * quantity, 'explicit_unit');
+    }
+    if (dbUnit !== null && snapUnit === null) return result(dbUnit, dbUnit * quantity, 'saved_unit_total');
+    if (dbTotal !== null && (snapUnit === null || (snapTotal !== null && Math.abs(snapUnit-snapTotal)<0.0005))) return result(dbUnit ?? (quantity ? dbTotal / quantity : null), dbTotal, 'saved_total');
     let unitWeightKg = snapUnit ?? dbUnit ?? (snapTotal !== null ? snapTotal / quantity : null);
     let totalWeightKg;
     if (snapUnit !== null && snapTotal !== null && quantity > 1 && Math.abs(snapUnit - snapTotal) < 0.0005) {
-      // Some editor snapshots mirror the same number into both fields; the
-      // value is a total — never multiply it by quantity again.
+      // Legacy mirrors without an explicit basis cannot be disambiguated.
+      // Preserve their total and surface the ambiguity instead of guessing.
       totalWeightKg = snapTotal;
       unitWeightKg = dbUnit ?? snapTotal / quantity;
     } else if (snapUnit !== null) {
@@ -172,9 +194,9 @@
     } else if (dbUnit !== null) {
       totalWeightKg = dbUnit * quantity;
     } else {
-      totalWeightKg = positiveNumberOrNull(item.totalWeight ?? item.total_weight);
+      totalWeightKg = dbTotal;
     }
-    return { totalLengthMm, unitWeightKg, totalWeightKg, quantity };
+    return result(unitWeightKg, totalWeightKg, 'legacy_snapshot', snapUnit !== null && snapTotal !== null && quantity > 1 && Math.abs(snapUnit - snapTotal) < 0.0005);
   }
 
   return {

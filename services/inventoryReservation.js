@@ -117,6 +117,9 @@ function calculateReservedKg(db, {
 } = {}) {
   const safeReservationTable = safeIdentifier(reservationTable);
   if (!tableExists(db, safeReservationTable)) return 0;
+  if (safeReservationTable === 'inventory_reservations' && activeStatuses.length===1 && activeStatuses[0]==='active' && tableExists(db,'inventory_weight_rollout') && require('./inventoryItemCompletion').policy(db)) {
+    return roundKg(require('./inventoryDemand').inventoryDemand(db).filter(row=>row.diameter===Number(diameter)&&row.material_type===material_type).reduce((sum,row)=>sum+row.remaining_kg,0));
+  }
 
   const columns = tableColumns(db, safeReservationTable);
   if (!columns.has('diameter')) return 0;
