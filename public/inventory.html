@@ -866,7 +866,8 @@ async function saveBatch() {
     return;
   }
   closeBatchModal();
-  loadSummary();
+  await window.InventoryCounts?.loadReceipts();
+  await loadSummary();
   loadBatches();
 }
 
