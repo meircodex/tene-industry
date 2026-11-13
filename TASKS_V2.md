@@ -6,7 +6,7 @@
 
 ### מעבר אוטומטי מאישור ומסריקה וצבעי רשימת הזמנות (13.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - module: Orders lifecycle / Production scan / orders presentation
 - input: אישור פנימי קיים, סריקת כרטיס מקור תקין והחלטת שער הייצור בשרת.
@@ -16,6 +16,8 @@
 - screens: אדום לפני אישור, צהוב בתור לפני ייצור, מילוי ירוק של אחוז הייצור בשלבים הבאים; גם במובייל. המחשה נפרדת לפני שינוי תצוגה.
 - scope: services/orderProductionStatus.js, routes/production.js, public/worker-visual.html, public/order-workspace.js, public/orders-workspace.css, public/orders.html, בדיקות ותיעוד.
 - Definition of Done: בדיקות אישור/סריקה/חזרות/חסימת לא מאושר/ללא צריכת מלאי בתחילה, ידני, צבעים ואירוע רענון; full tests ופריסה מאומתת.
+- verification: npm test 1,264/1,264; ממשק בדיקה מלא: סריקה של QA-104 התחילה ייצור עם receipt 2 וההזמנה בייצור; אישור QA-101 במסך הרשימה העביר מאדום לצהוב ולתור ייצור. סנכרון על עותק גיבוי שינה רק הזמנה 124, פריטים/מלאי זהים, הרצה חוזרת ללא שינוי.
+- deployment: 3ac2ed9 / dep-dbrh0fs9v7es73cisdc0 live; health OK, נכסי workflow HTTP 200, ללא שגיאות app חדשות. GET חי לכרטיס 1766 אימת order_status בייצור אחרי הסנכרון, status הושלם ו־can_start_production false.
 
 
 ### התקדמות ייצור בשורות ההזמנות והבהרת אורך יחידה (13.11.2026)
