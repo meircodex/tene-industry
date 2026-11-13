@@ -21,4 +21,7 @@ body[data-page=orders] .page{max-width:none;padding:12px 14px 28px}body[data-pag
 /* One background on the whole row keeps the production fill continuous across cells. */
 .orders-table .order-row[data-production-percent],.m-card[data-production-percent]{background:linear-gradient(to left,#dcefe1 0 var(--production-progress),#fff var(--production-progress) 100%)}
 .orders-table .order-row[data-production-percent]>td{background:transparent}
+/* The global theme paints every *-card* descendant white with !important. */
+body[data-page=orders] .m-card[data-production-percent]{background:linear-gradient(to left,#dcefe1 0 var(--production-progress),#fff var(--production-progress) 100%)!important}
+body[data-page=orders] .m-card[data-production-percent] [class*="m-card-"]{background:transparent!important}
 .order-production-percent{display:inline-block;margin-top:5px;padding:2px 8px;border-radius:6px;background:#ffffffb8;color:#275d3a;font-size:14px;font-weight:800;white-space:nowrap}
