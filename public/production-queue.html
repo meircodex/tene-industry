@@ -40,14 +40,6 @@
   .page-title { font-size: 22px; font-weight: 800; }
   .header-actions { display: flex; gap: 8px; margin-right: auto; flex-wrap: wrap; }
 
-  /* MACHINE FILTER TABS */
-  .machine-tabs { max-width: 1440px; margin: 0 auto; display: flex; gap: 8px; padding: 0 24px 16px; flex-wrap: wrap; }
-  .machine-tab { padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
-                 background: var(--card); color: var(--muted); cursor: pointer; font-size: 14px;
-                 font-family: 'Heebo', sans-serif; transition: all .2s; }
-  .machine-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(224,123,57,.1); }
-  .machine-tab:hover:not(.active) { border-color: var(--muted); color: var(--text); }
-
   /* SHIFT BAR */
   .shift-bar { background: var(--card); border-block: 1px solid var(--border);
                padding: 14px 24px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
@@ -174,8 +166,12 @@
     .machines-grid { grid-template-columns: 1fr; }
     .page-header { padding: 16px; }
     .content { padding: 0 12px 48px; }
-    .machine-tabs { padding: 0 12px 12px; }
   }
+.queue-filters{display:grid;grid-template-columns:repeat(3,minmax(140px,1fr));gap:12px;padding:16px;margin-bottom:18px;background:#fff;border:1px solid var(--border);border-radius:12px}
+.queue-filters label{display:grid;gap:5px;font-size:14px;font-weight:700}.queue-filters select{width:100%;min-height:42px;border:1px solid #bbcbdc;border-radius:8px;padding:7px;font:inherit;background:#fff;color:var(--text)}
+.queue-filter-footer{grid-column:1/-1;display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}
+.queue-stock{padding:3px 8px;border-radius:6px;font-size:12px;font-weight:800;background:#edf1f5;color:#526779}.queue-stock-available{background:#e0f2e6;color:#23673d}.queue-stock-shortage{background:#fbe5e4;color:#9c302c}.queue-stock-allocation{background:#fff1c9;color:#805b10}
+@media(max-width:640px){.queue-filters{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:10px}.queue-filter-footer{align-items:flex-start;flex-direction:column}.machines-grid{grid-template-columns:minmax(0,1fr)}}
 </style>
 <script src="/auth-client.js"></script>
 <script src="/display-units.js"></script>
@@ -222,11 +218,6 @@
   <button class="btn btn-warning" onclick="openStopModal()">⏸ דיווח עצירה</button>
 </div>
 
-<!-- MACHINE TABS -->
-<div class="machine-tabs" id="machine-tabs">
-  <button class="machine-tab active" data-machine="all" onclick="filterMachine('all',this)">🏭 כל המכונות</button>
-</div>
-
 <!-- HEADER -->
 <div class="page-header">
   <div>
@@ -241,6 +232,15 @@
 
 <!-- CONTENT -->
 <div class="content">
+  <section class="queue-filters" aria-label="סינון כרטיסיות ייצור">
+    <label>קוטר<select id="queueFilterDiameter" onchange="applyQueueFilters()"><option value="">כל הקטרים</option></select></label>
+    <label>לקוח<select id="queueFilterCustomer" onchange="applyQueueFilters()"><option value="">כל הלקוחות</option></select></label>
+    <label>הזמנה<select id="queueFilterOrder" onchange="applyQueueFilters()"><option value="">כל ההזמנות</option></select></label>
+    <label>מכונה<select id="queueFilterMachine" onchange="applyQueueFilters()"><option value="">כל המכונות</option></select></label>
+    <label>מצב ייצור<select id="queueFilterStatus" onchange="applyQueueFilters()"><option value="">הכול</option><option value="ממתין">ממתינות להתחלה</option><option value="בייצור">בייצור</option></select></label>
+    <label>זמינות במלאי<select id="queueFilterStock" onchange="applyQueueFilters()"><option value="">כל המצבים</option><option value="available">יש מלאי</option><option value="shortage">חסר מלאי</option><option value="allocation">דורש הקצאה</option><option value="unknown">לא אומת</option></select></label>
+    <div class="queue-filter-footer"><span id="queueFilterSummary" aria-live="polite">טוען כרטיסיות…</span><button class="btn btn-outline" type="button" onclick="clearQueueFilters()">נקה סינון</button></div>
+  </section>
   <div class="machines-grid" id="machines-grid">
     <div class="empty-state">טוען...</div>
   </div>
@@ -340,6 +340,7 @@
   </div>
 </div>
 
+<script src="/production-queue-filters.js?v=1"></script>
 <script>
 const API = '';
 let queueData = { items: [], grouped: {} };
@@ -348,7 +349,6 @@ let users = [];
 let stopReasons = [];
 let currentShift = null;
 let selectedReason = null;
-let currentMachineFilter = 'all';
 let currentWasteItemId = null;
 let queueRequestSequence = 0;
 let queueRefreshTimer = null;
@@ -370,29 +370,20 @@ function jsArg(value) {
 
 // ── INIT ──────────────────────────────────────────────────────────
 async function init() {
-  await Promise.all([loadMachines(), loadUsers(), loadStopReasons()]);
-  populateStopMachines();
-  populateShiftMachines();
-  populateShiftOperators();
   loadQueue();
   loadTonsToday();
   connectQueueUpdates();
+  await Promise.allSettled([loadMachines(), loadUsers(), loadStopReasons()]);
+  populateStopMachines();
+  populateShiftMachines();
+  populateShiftOperators();
   setInterval(() => { loadQueue(); loadTonsToday(); }, 30000);
 }
 
 async function loadMachines() {
   const data = await fetch(`${API}/api/machines`).then(r=>r.json());
   machines = Array.isArray(data) ? data : (data.machines || []);
-  const tabs = document.getElementById('machine-tabs');
-  tabs.innerHTML = `<button class="machine-tab active" data-machine="all" onclick="filterMachine('all',this)">🏭 כל המכונות</button>`;
-  machines.forEach(m => {
-    const btn = document.createElement('button');
-    btn.className = 'machine-tab';
-    btn.dataset.machine = m.name;
-    btn.onclick = () => filterMachine(m.name, btn);
-    btn.textContent = `מכונה ${m.label || m.name}`;
-    tabs.appendChild(btn);
-  });
+  renderQueueFilterOptions();
 }
 
 async function loadUsers() {
@@ -403,7 +394,8 @@ async function loadUsers() {
 }
 
 async function loadStopReasons() {
-  stopReasons = await fetch(`${API}/api/downtime-reasons`).then(r=>r.json());
+  const data = await fetch(`${API}/api/downtime-reasons`).then(r=>r.json());
+  stopReasons = Array.isArray(data) ? data : [];
   const pills = document.getElementById('reason-pills');
   pills.innerHTML = '';
   stopReasons.forEach(r => {
@@ -424,9 +416,7 @@ function selectReason(code, el) {
 
 async function loadQueue() {
   const sequence = ++queueRequestSequence;
-  const url = currentMachineFilter === 'all'
-    ? `${API}/api/production-queue`
-    : `${API}/api/production-queue?machine=${encodeURIComponent(currentMachineFilter)}`;
+  const url = `${API}/api/production-queue?include_stock=1`;
   try {
     const response = await fetch(url, { cache:'no-store' });
     if (!response.ok) throw new Error('queue_unavailable');
@@ -434,6 +424,7 @@ async function loadQueue() {
     if (!Array.isArray(data.items) || !data.grouped || typeof data.grouped !== 'object') throw new Error('invalid_queue');
     if (sequence !== queueRequestSequence) return;
     queueData = data;
+    renderQueueFilterOptions();
     renderQueue();
   } catch {
     if (sequence !== queueRequestSequence) return;
@@ -449,7 +440,7 @@ function connectQueueUpdates() {
     queueSocket = new WebSocket(window.IronBendAuth?.webSocketUrl?.('/') || `${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
     queueSocket.onopen = scheduleQueueRefresh;
     queueSocket.onmessage = event => { try {
-      if (['new_order','order_status','order_updated','order_deleted','order_review','item_status','item_progress','order_cancellation_disposition','delivery_confirm'].includes(JSON.parse(event.data).type)) scheduleQueueRefresh();
+      if (['new_order','order_status','order_updated','order_deleted','order_review','item_status','item_progress','order_cancellation_disposition','delivery_confirm','inventory_changed'].includes(JSON.parse(event.data).type)) scheduleQueueRefresh();
     } catch {} };
     queueSocket.onclose = () => setTimeout(connectQueueUpdates,2000);
   } catch { /* The existing 30-second refresh remains available. */ }
@@ -467,22 +458,36 @@ async function loadTonsToday() {
 }
 
 // ── FILTER ────────────────────────────────────────────────────────
-function filterMachine(machine, btn) {
-  currentMachineFilter = machine;
-  document.querySelectorAll('.machine-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  loadQueue();
+function queueSelection(){return Object.fromEntries(['diameter','customer','order','machine','status','stock'].map(key=>[key,document.getElementById('queueFilter'+key[0].toUpperCase()+key.slice(1)).value]));}
+function applyQueueFilters(){renderQueue();}
+function clearQueueFilters(){for(const key of ['Diameter','Customer','Order','Machine','Status','Stock'])document.getElementById('queueFilter'+key).value='';renderQueue();}
+function queueOptions(id,entries,allLabel){
+  const select=document.getElementById(id),previous=select.value,previousLabel=select.selectedOptions[0]?.textContent;
+  const unique=new Map(entries.filter(([key])=>key!==null&&key!==undefined).map(([key,label])=>[String(key),label]));
+  if(previous&&!unique.has(previous))unique.set(previous,previousLabel||previous);
+  select.innerHTML=`<option value="">${allLabel}</option>`+[...unique].sort((a,b)=>a[1].localeCompare(b[1],'he',{numeric:true})).map(([key,label])=>`<option value="${escHtml(key)}">${escHtml(label)}</option>`).join('');select.value=previous;
+}
+function renderQueueFilterOptions(){
+  const items=queueData.items||[];
+  queueOptions('queueFilterDiameter',items.filter(i=>Number(i.diameter)>0).map(i=>[i.diameter,'Ø'+i.diameter]),'כל הקטרים');
+  const names=new Map();for(const i of items){const name=i.customer_name||'ללא לקוח';if(!names.has(name))names.set(name,new Set());names.get(name).add(IronBendQueueFilters.customerKey(i));}
+  queueOptions('queueFilterCustomer',items.map(i=>[IronBendQueueFilters.customerKey(i),(i.customer_name||'ללא לקוח')+(names.get(i.customer_name||'ללא לקוח').size>1&&i.customer_id?' · מס׳ '+i.customer_id:'')]),'כל הלקוחות');
+  queueOptions('queueFilterOrder',items.map(i=>[i.order_id,i.order_num||String(i.order_id)]),'כל ההזמנות');
+  queueOptions('queueFilterMachine',[...machines.map(m=>[m.name,'מכונה '+(m.label||m.name)]),...items.map(i=>[i.machine||'__unassigned',i.machine||'לא משויך למכונה'])],'כל המכונות');
 }
 
 // ── RENDER QUEUE ─────────────────────────────────────────────────
 function renderQueue() {
   const grid = document.getElementById('machines-grid');
-  const grouped = queueData.grouped || {};
+  const filtered=IronBendQueueFilters.filter(queueData.items||[],queueSelection());
+  const grouped={};for(const item of filtered){const key=item.machine||'לא שויך';(grouped[key]||=([])).push(item);}
+  const remaining=filtered.reduce((sum,item)=>sum+Math.max(0,Number(item.quantity||0)-Number(item.produced_qty||0)),0);
+  document.getElementById('queueFilterSummary').textContent=`מוצגות ${filtered.length} מתוך ${(queueData.items||[]).length} כרטיסיות · ${remaining.toLocaleString('he-IL')} יח׳ נותרו לייצור`;
   const keys = Object.keys(grouped);
   document.getElementById('shift-pieces').textContent = (queueData.items || []).length;
 
   if (keys.length === 0) {
-    grid.innerHTML = `<div class="empty-state">✅ אין פריטים ממתינים לייצור</div>`;
+    grid.innerHTML = `<div class="empty-state">אין כרטיסיות התואמות למסננים שנבחרו</div>`;
     return;
   }
 
@@ -545,6 +550,7 @@ function renderQueueItem(item) {
           <span class="item-status-badge">${escHtml(item.status)}</span>
         </div>
         <div class="item-details">
+          ${item.stock_state?`<span class="queue-stock queue-stock-${escHtml(item.stock_state.code)}" title="${escHtml(item.stock_state.reason)}">${escHtml(item.stock_state.label)}</span>`:''}
           <span class="item-detail"><strong>קוטר</strong> ⌀${escHtml(item.diameter)}</span>
           <span class="item-detail"><strong>כמות</strong> ${item.produced_qty||0}/${item.quantity}</span>
           <span class="item-detail"><strong>משקל</strong> ${Math.round(item.weight||0)} ק"ג</span>

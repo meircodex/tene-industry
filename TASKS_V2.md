@@ -16,6 +16,7 @@
 - screens: אותן תצוגות; התראת סריקות קיימות ואישור, טעינה מפורשת במקום אפס. המחשה לפני שילוב.
 - scope: orderStatusCorrection, orderProductionStatus, routes orders/production, dashboard.js/html, orders.html, worker-visual.html, services/dashboardQueue.js, בדיקות ותיעוד.
 - Definition of Done: בדיקות HTTP להרשאות/אישור/רעננות/שימור דיווחים וסריקה חוזרת; deferred fetch/error/singleflight; השוואת גודל תור, full tests, פריסה ו־health.
+- תוספת מאיר: תור ייצור מסונן במשולב לפי קוטר, לקוח, הזמנה, מכונה, מצב ייצור וזמינות חומר. אותם כרטיסים וציורים, ללא מסך חדש. Inventory owns stock projection, consumes canonical inventoryPlanning contributor/identity and active allocation accounting; unknown identities/review remain unverified. Read-only include_stock=1 on existing queue API; no reservation/stock writes. public/production-queue.html, public/production-queue-filters.js, services/productionQueueStock.js, inventoryPlanning internal queue data, tests/docs.
 
 
 ### מעבר אוטומטי מאישור ומסריקה וצבעי רשימת הזמנות (13.11.2026)

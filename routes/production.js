@@ -847,6 +847,7 @@ module.exports = function createProductionRouter(deps) {
   router.get('/production-queue', requireAnyRole(['production', 'kiosk', 'office', 'manager', 'admin']), (req, res) => {
     res.set('Cache-Control', 'no-store');
     if(req.query.view && !['full','dashboard'].includes(req.query.view))return res.status(400).json({error:'invalid_queue_view'});
+    if(req.query.include_stock && !['0','1'].includes(req.query.include_stock))return res.status(400).json({error:'invalid_stock_view'});
     const { machine } = req.query;
     let q = `
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
@@ -870,6 +871,10 @@ module.exports = function createProductionRouter(deps) {
     q += ' ORDER BY i.machine, priority_score DESC, o.delivery_date ASC, i.diameter ASC';
     const items = db.prepare(q).all(...params);
     if(req.query.view==='dashboard')return res.json({items:require('../services/dashboardQueue').dashboardQueue(items),grouped:{}});
+    if(req.query.include_stock==='1'){
+      const states=require('../services/productionQueueStock').productionQueueStock(db,items);
+      for(const item of items)item.stock_state=states.get(Number(item.id));
+    }
     items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); item.order_status = statusContracts.normalizeOrderStatus(item.order_status); });
 
     // Group by machine
@@ -914,7 +919,7 @@ module.exports.manifest = {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'read', production: 'edit', kiosk: 'edit' },
   },
-  consumes: [{ event: 'new_order' }, { event: 'order_status' }, { event: 'order_updated' }, { event: 'order_deleted' }, { table: 'orders' }, { table: 'items' }, { table: 'machines' }],
+  consumes: [{ event: 'new_order' }, { event: 'order_status' }, { event: 'order_updated' }, { event: 'order_deleted' }, { table: 'orders' }, { table: 'items' }, { table: 'machines' }, { table: 'raw_material' }, { table: 'inventory_reservations' }, { table: 'allocation_plan_lines_v2' }, { table: 'inventory_mesh_stock' }],
   produces: [
     { event: 'order_status' },
     { event: 'inventory_changed' },

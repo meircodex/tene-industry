@@ -237,6 +237,12 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
     assert.deepEqual(compact.items.map(i=>i.id),full.items.map(i=>i.id));
     for(const item of compact.items){assert.equal(item.weight,full.items.find(i=>i.id===item.id).weight);assert.equal(item.shape_svg,undefined);assert.equal(item.shape_snapshot_json,undefined);}
     assert.equal((await request('/production-queue?view=bad')).status,400);
+    const before=db.prepare('SELECT * FROM raw_material_usage ORDER BY id').all();
+    const withStock=await(await request('/production-queue?include_stock=1')).json();
+    assert.deepEqual(withStock.items.map(i=>i.id),full.items.map(i=>i.id));
+    for(const row of withStock.items)assert.ok(['available','shortage','allocation','unknown'].includes(row.stock_state.code));
+    assert.deepEqual(db.prepare('SELECT * FROM raw_material_usage ORDER BY id').all(),before);
+    assert.equal((await request('/production-queue?include_stock=bad')).status,400);
   });
   await t.test('order rollback returns all advanced items together and permits real production after a certificate', async () => {
     const f = await fixture({ count: 2 });

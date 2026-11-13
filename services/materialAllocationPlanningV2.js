@@ -224,4 +224,4 @@ function planHasConsumedLines(db, planId) {
     WHERE l.allocation_plan_id=? GROUP BY l.id HAVING SUM(CASE WHEN e.event_type='consumption' THEN c.consumed_kg ELSE -c.consumed_kg END)>0 LIMIT 1`).get(planId);
 }
 
-module.exports = { activeAllocatedForLot, MaterialAllocationPlanningError, suggestFifoLots, confirmAllocationPlan, reconcileAllocationPlan, releaseAllocationPlan, getAllocationPlan };
+module.exports = { consumedForAllocationLine, activeAllocatedForLot, MaterialAllocationPlanningError, suggestFifoLots, confirmAllocationPlan, reconcileAllocationPlan, releaseAllocationPlan, getAllocationPlan };
