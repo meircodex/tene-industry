@@ -133,6 +133,36 @@ test('opening a QR waits for a persisted matching scan receipt before confirming
   assert.equal(f.run('state.originalCard.html'), originalCard.html);
 });
 
+test('a confirmed eligible scan starts production through the existing save endpoint and confirms its receipt', async () => {
+  const f=fixture(async (url,options)=>options.method==='PATCH'
+    ? response({ok:true,item:{...f.item,status:'בייצור'},receipt:receipt('status_changed')})
+    : response({items:[f.item],scan_receipt:receipt('opened'),original_card:originalCard}));
+  f.item.can_start_production=true;
+  await f.context.load();
+  assert.equal(f.requests.length,2);
+  assert.equal(f.requests[1].url,'/api/worker-card/42/status');
+  const payload=JSON.parse(f.requests[1].options.body);
+  assert.equal(payload.card,token);assert.equal(payload.expected_status,'ממתין');assert.equal(payload.status,'בייצור');
+  assert.match(payload.request_id,/^[a-zA-Z0-9_-]{16,100}$/);
+  assert.equal(f.run('state.items[0].status'),'בייצור');
+  assertReceiptVisible(f);assert.match(f.feedback().textContent,/התחיל אוטומטית/);
+});
+
+test('a scan never starts an unapproved, stopped or already advanced card', async () => {
+  for(const candidate of [{status:'ממתין',can_start_production:false},{status:'בייצור',can_start_production:true},{status:'הושלם',can_start_production:true},{status:'בוטל',can_start_production:false}]){
+    const f=fixture(async()=>response({items:[{...f.item,...candidate}],scan_receipt:receipt('opened'),original_card:originalCard}));
+    await f.context.load();assert.equal(f.requests.length,1);assert.equal(f.run('state.items[0].status'),candidate.status);
+  }
+});
+
+test('an unconfirmed automatic start cannot display production success', async () => {
+  const f=fixture(async (_url,options)=>options.method==='PATCH'
+    ? response({ok:true,item:{...f.item,status:'בייצור'}})
+    : response({items:[f.item],scan_receipt:receipt('opened'),original_card:originalCard}));
+  f.item.can_start_production=true;
+  await f.context.load();assert.equal(f.feedback().dataset.state,'unknown');assert.equal(f.item.status,'ממתין');
+});
+
 for (const missingOriginal of [undefined, { ...originalCard, item_id: 99 }, { ...originalCard, html: '' }]) {
   test('an acknowledged camera scan cannot start production without the matching original work card: ' + JSON.stringify(missingOriginal), async () => {
     const f = fixture(async () => response({ items: [f.item], scan_receipt: receipt('opened'), original_card: missingOriginal }));

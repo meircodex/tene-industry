@@ -2,6 +2,7 @@ const router = require('express').Router();
 const createProductionMachinesRouter = require('./productionMachines');
 const productionCards = require('../services/productionCards');
 const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
+const { markOrderProductionStarted } = require('../services/orderProductionStatus');
 const { consumeReservationsForProduction, calculateMaterialStockPosition, normalizeMaterialType } = require('../services/inventoryReservation');
 const { expandProductionCardsForOrder } = require('../services/productionCardPrintPage');
 const { itemStatusCorrectionPreview, cancelUnshippedCertificatesForCorrection, reopenOrderAfterItemCorrection, isBackwardItemStatus, isPreviouslyReopenedItem } = require('../services/itemStatusCorrection');
@@ -115,7 +116,7 @@ module.exports = function createProductionRouter(deps) {
     const item = db.prepare(`
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
-             i.actual_weight_kg, i.weight_deviation_pct,
+             i.actual_weight_kg, i.weight_deviation_pct, i.cancelled_at, i.production_stopped_at,
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
              i.total_length_mm, i.note, i.qc_status,
              p.order_id, p.pallet_num,
@@ -130,9 +131,12 @@ module.exports = function createProductionRouter(deps) {
     if (item) {
       item.shape_svg = productionCards.itemShapeSvg(item);
       item.order_status = statusContracts.normalizeOrderStatus(item.order_status);
+      item.can_start_production = isProductionGateOpen(item);
       // Lifecycle fields are needed by server guards, not the public QR DTO.
       delete item.order_payment_status;
       delete item.order_deleted_at;
+      delete item.cancelled_at;
+      delete item.production_stopped_at;
     }
     return item;
   }
@@ -157,27 +161,19 @@ module.exports = function createProductionRouter(deps) {
     return item;
   }
 
-  function setOrderStatusIfChanged(orderId, nextStatus) {
-    const order = db.prepare('SELECT id,order_num,status FROM orders WHERE id=?').get(orderId);
-    if (!order) return null;
-    if (statusContracts.normalizeOrderStatus(order.status) === nextStatus) return null;
-    db.prepare('UPDATE orders SET status=? WHERE id=?').run(nextStatus, order.id);
-    wsBroadcast('order_status', { id: order.id, status: nextStatus, orderNum: order.order_num });
-    return nextStatus;
-  }
-
-  function syncOrderStatusAfterItemStatus(item, nextItemStatus) {
+  function syncOrderStatusAfterItemStatus(item, nextItemStatus, req) {
     if (!item?.order_id) return null;
-    const orderStatus = statusContracts.normalizeOrderStatus(item.order_status);
-    if (nextItemStatus === ITEM_STATUS.IN_PRODUCTION && (
-      orderStatus === ORDER_STATUS.PRODUCTION_QUEUE
-    )) {
-      return setOrderStatusIfChanged(item.order_id, ORDER_STATUS.IN_PRODUCTION);
+    const completed = [ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(nextItemStatus);
+    let started = null;
+    if (nextItemStatus === ITEM_STATUS.IN_PRODUCTION || completed) {
+      started = markOrderProductionStarted(db, item.order_id, { userId: req?.userId || req?.auth?.sub,
+        userName: req?.auth?.display_name || req?.qrAccess?.actor_name });
+      if (started) wsBroadcast('order_status', started);
     }
-    if ([ITEM_STATUS.DONE, ITEM_STATUS.LOADED, ITEM_STATUS.SENT, ITEM_STATUS.DELIVERED].includes(nextItemStatus)) {
+    if (completed) {
       checkOrderComplete(item.order_id, wsBroadcast);
     }
-    return null;
+    return started ? db.prepare('SELECT status FROM orders WHERE id=?').get(item.order_id)?.status : null;
   }
 
   function consumeProductionReservations(item, actualWeightKg) {
@@ -448,7 +444,7 @@ module.exports = function createProductionRouter(deps) {
     const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status, correction: backwards });
     const orderStatus = backwards || previouslyReopened
       ? reopenOrderAfterItemCorrection(db, item, status, { reason: correctionReason, userId: req.userId, userName: req.auth?.display_name || req.qrAccess?.actor_name })
-      : syncOrderStatusAfterItemStatus(item, status);
+      : syncOrderStatusAfterItemStatus(item, status, req);
     if (orderStatus && (backwards || previouslyReopened)) wsBroadcast('order_status', { id: item.order_id, status: orderStatus, orderNum: item.order_num });
     const consumedReservations = status === ITEM_STATUS.DONE && !backwards ? consumeProductionReservations(item) : { consumed: 0 };
     wsBroadcast('item_status', { id: Number(req.params.id), status });
@@ -526,7 +522,7 @@ module.exports = function createProductionRouter(deps) {
         JOIN orders o ON p.order_id=o.id
         WHERE i.id=?
       `).get(req.params.id);
-      syncOrderStatusAfterItemStatus(savedItem, nextItemStatus);
+      syncOrderStatusAfterItemStatus(savedItem, nextItemStatus, req);
       if (nextItemStatus === ITEM_STATUS.DONE) consumeProductionReservations(savedItem, actual_weight_kg);
       wsBroadcast('item_status', { id: Number(req.params.id), status: nextItemStatus });
     }
@@ -596,9 +592,7 @@ module.exports = function createProductionRouter(deps) {
     db.prepare('UPDATE machines SET current_item_id=?,current_order_num=?,counter=0 WHERE id=?')
       .run(itemIdNum, orderNum, machineIdNum);
 
-    // Auto-update order status to 'בייצור'
-    db.prepare("UPDATE orders SET status='בייצור' WHERE id=? AND status IN ('בתור ייצור','ממתינה לאישור')")
-      .run(item.order_id);
+    syncOrderStatusAfterItemStatus(item, ITEM_STATUS.IN_PRODUCTION, req);
 
     // Send params to machine via Modbus
     const segments = productionCards.shapeSegmentsFromItem(item);
@@ -708,7 +702,7 @@ module.exports = function createProductionRouter(deps) {
       if (backwards || previouslyReopened) orderStatus = reopenOrderAfterItemCorrection(db, item, status, {
         reason: correctionReason, userId: req.auth?.sub, userName: req.auth?.display_name });
     })(); } catch (error) { return res.status(error.status || 409).json({ error: error.message }); }
-    if (!backwards && !previouslyReopened) orderStatus = syncOrderStatusAfterItemStatus(item, status);
+    if (!backwards && !previouslyReopened) orderStatus = syncOrderStatusAfterItemStatus(item, status, req);
     if (orderStatus || cancelledCertificates.length) wsBroadcast('order_status', { id: item.order_id,
       status: db.prepare('SELECT status FROM orders WHERE id=?').get(item.order_id).status, orderNum: item.order_num });
     for (const cancellation of cancelledCertificates) {
@@ -833,7 +827,7 @@ module.exports = function createProductionRouter(deps) {
       JOIN orders o ON p.order_id=o.id
       WHERE i.id=?
     `).get(req.params.id) : null;
-    const orderStatus = savedItem ? syncOrderStatusAfterItemStatus(savedItem, nextItemStatus) : null;
+    const orderStatus = savedItem ? syncOrderStatusAfterItemStatus(savedItem, nextItemStatus, req) : null;
     const consumedReservations = savedItem && nextItemStatus === ITEM_STATUS.DONE
       ? consumeProductionReservations(savedItem, actual_weight_kg)
       : { consumed: 0 };
@@ -914,6 +908,7 @@ module.exports.manifest = {
   },
   consumes: [{ event: 'new_order' }, { event: 'order_status' }, { event: 'order_updated' }, { event: 'order_deleted' }, { table: 'orders' }, { table: 'items' }, { table: 'machines' }],
   produces: [
+    { event: 'order_status' },
     { event: 'inventory_changed' },
     { event: 'machine_assign' },
     { event: 'end_of_day' },

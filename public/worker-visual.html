@@ -201,13 +201,20 @@
       try{
         const source=ENTRY_PARAMS.get('source')==='phone_camera'?'phone_camera':'in_app_scan';
         const data=await workerRequest(`/api/worker-card?card=${encodeURIComponent(parsed.token)}&source=${source}&original=1`);
-        const item=Array.isArray(data.items)?data.items.find(row=>Number(row.id)===Number(parsed.itemId)):null;
+        let item=Array.isArray(data.items)?data.items.find(row=>Number(row.id)===Number(parsed.itemId)):null;
         if(!item||!validReceipt(data.scan_receipt,item.id,'opened'))throw Object.assign(new Error('לא התקבל אישור שהסריקה נרשמה. נסה שוב.'),{uncertain:true});
         if(SCAN_ENTRY&&(!data.original_card||Number(data.original_card.item_id)!==Number(item.id)||typeof data.original_card.html!=='string'||!data.original_card.html.trim()))throw Object.assign(new Error(`הסריקה נרשמה במערכת. ${receiptText(data.scan_receipt)} כרטיס המקור אינו זמין. יש לבדוק את הקוד ולנסות שוב לפני תחילת ייצור.`),{explicit:true});
+        let startReceipt=null;
+        if(item.status===ITEM_STATUS.WAITING&&item.can_start_production===true){
+          const started=await workerRequest(`/api/worker-card/${item.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({card:parsed.token,status:ITEM_STATUS.IN_PRODUCTION,expected_status:ITEM_STATUS.WAITING,request_id:workerRequestId()})});
+          if(!started.ok||!validReceipt(started.receipt,item.id,'status_changed')||started.item?.status!==ITEM_STATUS.IN_PRODUCTION)throw Object.assign(new Error('לא התקבל אישור תחילת ייצור. בדוק ונסה שוב.'),{uncertain:true});
+          item=started.item;startReceipt=started.receipt;
+        }
         if(SCAN_ENTRY){state.items=[item];state.originalCard=data.original_card;}
         else {const index=state.items.findIndex(row=>Number(row.id)===Number(item.id));if(index<0)state.items.push(item);else state.items[index]=item;}
         focusScannedCard(parsed);
-        showOperation(`סריקת כרטיס ${item.order_num||''} / ${item.id} נקלטה במערכת. ${receiptText(data.scan_receipt)}`,'success');
+        showOperation(startReceipt?`הייצור בכרטיס ${item.order_num||''} / ${item.id} התחיל אוטומטית. ${receiptText(startReceipt)}`:`סריקת כרטיס ${item.order_num||''} / ${item.id} נקלטה במערכת. ${receiptText(data.scan_receipt)}`,'success');
       }catch(error){showOperation(error.explicit?error.message:'לא התקבל אישור קליטה מהמערכת. בדוק את החיבור ונסה שוב.',error.explicit?'failed':'unknown',()=>loadScannedCard(parsed));}
       finally{pendingLoad=false;}
     }

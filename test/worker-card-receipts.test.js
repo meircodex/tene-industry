@@ -96,6 +96,27 @@ test('public worker cards confirm only persisted scans and atomic, retry-safe sa
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  await t.test('scan eligibility follows approval and starting updates Orders once without consuming inventory', async () => {
+    const card=seedCard('AUTO-START',ORDER_STATUS.PENDING_APPROVAL);
+    const read=async()=>await (await request(`/api/worker-card?card=${encodeURIComponent(card.card)}`)).json();
+    assert.equal((await read()).items[0].can_start_production,false);
+    const denied=await patch(card,{status:ITEM_STATUS.IN_PRODUCTION,expected_status:ITEM_STATUS.WAITING},'/status');
+    assert.equal(denied.status,409);
+    db.prepare('UPDATE orders SET status=? WHERE id=?').run(ORDER_STATUS.PRODUCTION_QUEUE,card.orderId);
+    assert.equal((await read()).items[0].can_start_production,true);
+    const before=db.prepare('SELECT COUNT(*) n FROM raw_material_usage').get().n;
+    const payload={status:ITEM_STATUS.IN_PRODUCTION,expected_status:ITEM_STATUS.WAITING,request_id:'automatic-scan-start-request'};
+    const started=await patch(card,payload,'/status');
+    assert.equal(started.status,200,JSON.stringify(started.body));
+    assert.equal(started.body.item.order_status,ORDER_STATUS.IN_PRODUCTION);
+    assert.equal(started.body.item.status,ITEM_STATUS.IN_PRODUCTION);
+    assert.equal(db.prepare('SELECT workspace_version FROM orders WHERE id=?').get(card.orderId).workspace_version,2);
+    assert.equal(outputCount(card),0);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM raw_material_usage').get().n,before);
+    assert.equal((await patch(card,payload,'/status')).status,200);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM audit_log WHERE entity_type='order' AND entity_id=? AND action='production_started_automatically'").get(card.orderId).n,1);
+  });
+
   await t.test('an unauthenticated scan returns an uncached persisted opened receipt', async () => {
     const card = seedCard('OPEN');
     const response = await request(`/api/worker-card?card=${encodeURIComponent(card.card)}`);

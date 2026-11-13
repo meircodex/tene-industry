@@ -15,13 +15,13 @@
 <script src="/auth-client.js"></script>
 <script src="/display-units.js?v=4"></script>
 <script src="/status-contracts-client.js"></script>
-<script src="/order-workspace.js?v=20261113-progress"></script>
+<script src="/order-workspace.js?v=20261113-workflow"></script>
 <script src="/order-item-filters.js?v=1"></script>
 <script src="/order-batch-actions.js?v=1"></script>
 <script src="/order-list-sorting.js?v=1"></script>
 <script src="/straight-stock-inventory.js?v=1"></script>
 <script src="/order-cutting-planner.js?v=1"></script>
-<link rel="stylesheet" href="/orders-workspace.css?v=20261113-progress2">
+<link rel="stylesheet" href="/orders-workspace.css?v=20261113-workflow">
 <script src="/safe-dom.js" defer></script>
 <script src="/nav.js" defer></script>
 <script src="/shape-renderer.js?v=6" defer></script>
@@ -950,7 +950,8 @@ function setTableHead(labels) {
 
 function orderProgressAttributes(order) {
   const progress=window.IronBendOrderWorkspace.productionProgress(order);
-  return progress?`data-production-percent="${progress.percent}" style="--production-progress:${progress.percent}%"`:'';
+  const tone=window.IronBendOrderWorkspace.rowTone(order);
+  return `data-order-phase="${tone}" ${progress?`data-production-percent="${progress.percent}" style="--production-progress:${progress.percent}%"`:''}`;
 }
 
 function orderProgressBadge(order) {
