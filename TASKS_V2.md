@@ -4,6 +4,18 @@
 
 ## סטטוסים
 
+### התקדמות ייצור בשורות ההזמנות והבהרת אורך יחידה (13.11.2026)
+
+- status: in_progress
+- owner: codex
+- module: reports / orders presentation
+- scope: public/dashboard.js, public/dashboard.html, public/order-workspace.js, public/orders.html, public/orders-workspace.css ובדיקות ותיעוד.
+- input: total_length_mm מה־API הקיים — אורך פריסה של יחידה אחת; הכמות נפרדת.
+- output: „אורך ליחידה” במקום „אורך כולל” ברשימת כרטיסי הייצור ובפירוט; ערך חסר אינו מוצג כאורך אפס.
+- DB/API/events: ללא שינוי. המרת מ״מ לס״מ נשארת באותה פונקציה; אין שינוי במשקל או בחישוב מלאי.
+- screens: מילוי ירוק בהיר רציף מימין לשמאל על כל שורת הזמנה ואחוז ייצור; גם במובייל. מקור הנתון delivery_progress.stage_counts.produced / total_item_count הקיים, ללא חישוב ייצור נוסף. בוטל/מחוק/חסר נתונים ללא אחוז מטעה. תצוגה מקדימה הוצגה לפני שילוב.
+- Definition of Done: אימות 862 יח׳ באורך 4,600 מ״מ מול הגיבוי (460 ס״מ ליחידה), בדיקות תצוגה קיימות, אימות הכיתוב בדפדפן ופריסה.
+
 ### תיקון מערכתי — מקור משקל ודרישה אחיד (12.11.2026)
 
 - status: done

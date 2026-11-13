@@ -7,6 +7,14 @@ const {ensureOrderWorkspaceSchema}=require('../db/orderWorkspaceSchema');
 const {ensureAuthSchema}=require('../auth-core');
 const {createOrderWorkspaceService,bucketCondition}=require('../services/orderWorkspace');
 const ui=require('../public/order-workspace');
+test('production percentage uses server completion counts and never reports completion early',()=>{
+ const progress=(produced,total)=>({status:'בייצור',delivery_progress:{total_item_count:total,stage_counts:{produced}}});
+ assert.deepEqual(ui.productionProgress(progress(26,31)),{total:31,completed:26,percent:84});
+ assert.equal(ui.productionProgress(progress(0,31)).percent,0);
+ assert.equal(ui.productionProgress(progress(31,31)).percent,100);
+ assert.equal(ui.productionProgress(progress(999,1000)).percent,99);
+ for(const order of [{status:'הושלם – ממתין לאיסוף'},progress(0,0),progress(4,3),progress(-1,3),progress(null,3),{...progress(2,3),status:'בוטלה'},{...progress(2,3),deleted_at:'2026-11-13'}])assert.equal(ui.productionProgress(order),null);
+});
 const actor={id:1,name:'מנהל',role:'admin'};
 function fixture(t){const db=new Database(':memory:');db.pragma('foreign_keys=ON');ensureCoreSchema(db);ensureAuthSchema(db);db.prepare('INSERT INTO users(id,username,display_name,role,pin_hash,active) VALUES(1,?,?,?,?,1)').run('test-admin','Test Admin','admin',bcrypt.hashSync('1234',4));t.after(()=>db.close());return{db,s:createOrderWorkspaceService({db})};}
 function order(db,num,status='ממתינה לאישור'){return Number(db.prepare('INSERT INTO orders(order_num,status,total_weight,delivery_date) VALUES(?,?,123.4,?)').run(num,status,'2026-10-15').lastInsertRowid);}

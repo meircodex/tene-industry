@@ -14,5 +14,12 @@
     return order.status==='אספקה חלקית'||Number(progress?.shipped_unit_count)>0||Number(progress?.shipped_item_count)>0||Number(progress?.partially_shipped_item_count)>0;
   }
   function sortActiveOrders(orders){return [...orders].sort((a,b)=>Number(hasPartialDeliveryRemainder(b))-Number(hasPartialDeliveryRemainder(a)));}
-  return{bucket,rowTone,deliveryDate,notes,primaryStatus,deliverySummary,hasPartialDeliveryRemainder,sortActiveOrders,delivered,cancelled};
+  function productionProgress(order){
+    if(order.deleted_at||cancelled.includes(order.status))return null;
+    const total=order.delivery_progress?.total_item_count,completed=order.delivery_progress?.stage_counts?.produced;
+    if(!Number.isInteger(total)||total<=0||!Number.isInteger(completed)||completed<0||completed>total)return null;
+    const percent=completed===total?100:Math.min(99,Math.round(completed/total*100));
+    return{total,completed,percent};
+  }
+  return{bucket,rowTone,deliveryDate,notes,primaryStatus,deliverySummary,hasPartialDeliveryRemainder,sortActiveOrders,productionProgress,delivered,cancelled};
 });
