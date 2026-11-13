@@ -6,7 +6,7 @@
 
 ### החזרה לתור לפי סריקות והאצת טעינת הדשבורד (13.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Orders lifecycle / Production scan / dashboard presentation
 - input/output: העברה ידנית מבייצור לתור משמרת כרטיסים וכמויות; סריקות קודמות מחייבות התראה ואישור תואם fingerprint. סריקה חדשה מחזירה לבייצור גם אם הכרטיס כבר בייצור. סנכרון בעלייה מכבד החזרה ידנית.
@@ -17,6 +17,8 @@
 - scope: orderStatusCorrection, orderProductionStatus, routes orders/production, dashboard.js/html, orders.html, worker-visual.html, services/dashboardQueue.js, בדיקות ותיעוד.
 - Definition of Done: בדיקות HTTP להרשאות/אישור/רעננות/שימור דיווחים וסריקה חוזרת; deferred fetch/error/singleflight; השוואת גודל תור, full tests, פריסה ו־health.
 - תוספת מאיר: תור ייצור מסונן במשולב לפי קוטר, לקוח, הזמנה, מכונה, מצב ייצור וזמינות חומר. אותם כרטיסים וציורים, ללא מסך חדש. Inventory owns stock projection, consumes canonical inventoryPlanning contributor/identity and active allocation accounting; unknown identities/review remain unverified. Read-only include_stock=1 on existing queue API; no reservation/stock writes. public/production-queue.html, public/production-queue-filters.js, services/productionQueueStock.js, inventoryPlanning internal queue data, tests/docs.
+- verification: npm test 1,272/1,272; focused final checks 150/150. בדפדפן: אישור התראת סריקה, החזרה לתור בלי שינוי פריט, סריקה חוזרת וחזרה לבייצור. כל 6 המסננים צמצמו נתוני בדיקה 13→1; ניקוי החזיר 13. באתר החי: 114 כרטיסיות, 86 עם מלאי/16 דורשות הקצאה/11 חסרות/1 לא מאומתת בזמן הבדיקה; שילוב ממתינות+יש מלאי הציג 85. Dashboard pending=1 ותור=114, ללא רינדור שגיאת התחברות כאפסים.
+- deployment: 4cbea24 / dep-dbrhgpd6e07s73bnvkp0 live; health OK, HTML/JS חדשים HTTP 200, ללא שגיאות app חדשות. טעינה ושדות אומתו במערכת החיה. ללא כתיבה למלאי מהסינון.
 
 
 ### מעבר אוטומטי מאישור ומסריקה וצבעי רשימת הזמנות (13.11.2026)
