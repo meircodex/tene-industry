@@ -2,6 +2,7 @@
 
 const { ORDER_STATUS, normalizeOrderStatus } = require('../status-contracts');
 const workspace = require('../public/order-workspace');
+const { bucketCondition } = require('./orderWorkspace');
 
 // Orders owns the order transition; Production supplies the accepted work event.
 function markOrderProductionStarted(db, orderId, actor = {}) {
@@ -17,4 +18,15 @@ function markOrderProductionStarted(db, orderId, actor = {}) {
   })();
 }
 
-module.exports = { markOrderProductionStarted };
+function reconcileQueuedProduction(db) {
+  return db.transaction(() => {
+    const orders = db.prepare(`SELECT o.id,o.status FROM orders o WHERE ${bucketCondition('active')}
+      AND EXISTS(SELECT 1 FROM items i JOIN pallets p ON p.id=i.pallet_id WHERE p.order_id=o.id
+        AND i.cancelled_at IS NULL AND i.status NOT IN ('בוטל','בוטלה')
+        AND (i.status IN ('בייצור','הושלם','הועמס','נשלח','סופק') OR i.produced_qty>0))`).all();
+    return orders.filter(order => normalizeOrderStatus(order.status) === ORDER_STATUS.PRODUCTION_QUEUE)
+      .map(order => markOrderProductionStarted(db, order.id, { userName: 'סנכרון סטטוס לפי כרטיסי ייצור' })).filter(Boolean);
+  })();
+}
+
+module.exports = { markOrderProductionStarted, reconcileQueuedProduction };

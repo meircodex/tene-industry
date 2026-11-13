@@ -11,7 +11,7 @@
 - module: Orders lifecycle / Production scan / orders presentation
 - input: אישור פנימי קיים, סריקת כרטיס מקור תקין והחלטת שער הייצור בשרת.
 - output: אישור פנימי מוביל לתור ייצור (המסלול הקיים); סריקה מפעילה PATCH ייצור קיים עם אישור שמירה; הזמנה עוברת לבייצור. ידני נשאר.
-- DB: ללא migration או עדכון היסטורי גורף; עדכונים רק בעקבות פעולה מאושרת. Orders owns order status דרך service; Production owns item status/receipt.
+- DB: ללא migration. בנוסף לאירועים חדשים, סנכרון בעלייה מתקן רק הזמנות פעילות בתור עם ראיות ייצור שמורות; audit ו־version, ללא שינוי פריטים, אישורים או מלאי. Orders owns order status דרך service; Production owns item status/receipt.
 - API/events: worker-card GET נשאר קריאה מתועדת; PATCH קיים לסטטוס, auth/token/expected_status/idempotency/transaction; order_status וגם item_status משודרים.
 - screens: אדום לפני אישור, צהוב בתור לפני ייצור, מילוי ירוק של אחוז הייצור בשלבים הבאים; גם במובייל. המחשה נפרדת לפני שינוי תצוגה.
 - scope: services/orderProductionStatus.js, routes/production.js, public/worker-visual.html, public/order-workspace.js, public/orders-workspace.css, public/orders.html, בדיקות ותיעוד.

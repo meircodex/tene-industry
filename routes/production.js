@@ -2,7 +2,7 @@ const router = require('express').Router();
 const createProductionMachinesRouter = require('./productionMachines');
 const productionCards = require('../services/productionCards');
 const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
-const { markOrderProductionStarted } = require('../services/orderProductionStatus');
+const { markOrderProductionStarted, reconcileQueuedProduction } = require('../services/orderProductionStatus');
 const { consumeReservationsForProduction, calculateMaterialStockPosition, normalizeMaterialType } = require('../services/inventoryReservation');
 const { expandProductionCardsForOrder } = require('../services/productionCardPrintPage');
 const { itemStatusCorrectionPreview, cancelUnshippedCertificatesForCorrection, reopenOrderAfterItemCorrection, isBackwardItemStatus, isPreviouslyReopenedItem } = require('../services/itemStatusCorrection');
@@ -34,6 +34,12 @@ module.exports = function createProductionRouter(deps) {
   const productionActuals = required('productionActuals', deps.productionActuals);
   const workerCardActivity = required('workerCardActivity', deps.workerCardActivity);
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
+  // Repair only active queued orders with persisted production evidence. No item,
+  // inventory or approval changes are made by this Orders-owned reconciliation.
+  for (const started of reconcileQueuedProduction(db)) {
+    wsBroadcast('order_status', started);
+    checkOrderComplete(started.id, wsBroadcast);
+  }
 
   const productionWritableItemStatuses = new Set([
     ITEM_STATUS.WAITING,
