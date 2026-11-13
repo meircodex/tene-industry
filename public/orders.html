@@ -1132,11 +1132,14 @@ async function setStatus(id, status, expectedStatus) {
   const preview = await previewResponse.json();
   if (!previewResponse.ok) throw new Error(preview.user_message || preview.error || 'לא ניתן לבדוק את שינוי הסטטוס');
   let correction = null;
-  if (preview.requires_correction) {
+  if (preview.queue_transfer) {
+    const warning=preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'} בהזמנה. דיווחי הייצור והכמויות יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.\n\n`:'';
+    if(!confirm(`${warning}להעביר את ההזמנה לתור ייצור?`))return false;
+  } else if (preview.requires_correction) {
     const affectedText = preview.affected_items.length === 1 ? 'פריט אחד יוחזר' : `${preview.affected_items.length} פריטים יוחזרו`;
     const loadingInfo = preview.cancelled_loading_session_ids.length ? ' ההעמסה הפעילה תבוטל ותיפתח מחדש בהמשך; הסריקות נשמרות בהיסטוריה.' : '';
     correction = await requestCorrectionReason({ title: `החזרת ההזמנה ל״${status}״`,
-      info: `${affectedText} ל״${preview.target_item_status || status}״ יחד עם ההזמנה. הכמויות שיוצרו נשמרות.${loadingInfo}`,
+      info: `${preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'}. סריקה נוספת תחזיר את ההזמנה לבייצור. `:''}${affectedText} ל״${preview.target_item_status || status}״ יחד עם ההזמנה. הכמויות שיוצרו נשמרות.${loadingInfo}`,
       defaultReason: 'תיקון סטטוס שנבחר בטעות', itemCorrection: preview });
     if (!correction) return false;
   } else if (!confirm(`לשנות את סטטוס ההזמנה ל״${status}״?${status === ORDER_STATUS.DELIVERED_CONFIRMED ? ' ההזמנה תעבור ללשונית הזמנות שסופקו.' : ''}`)) return false;
@@ -1144,7 +1147,7 @@ async function setStatus(id, status, expectedStatus) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, expected_status: expectedStatus ?? preview.current_status,
-      correction_fingerprint: preview.fingerprint, correction_reason: correction?.reason, correction_mode: correction?.mode })
+      queue_scan_acknowledged: Boolean(preview.scan_warning), correction_fingerprint: preview.fingerprint, correction_reason: correction?.reason, correction_mode: correction?.mode })
   });
   const result = await response.json().catch(() => ({}));
   if (response.status === 401 || response.status === 403) {

@@ -27,7 +27,7 @@ const { rateLimit } = require('express-rate-limit');
 const { createOrderQuoteService } = require('../services/orderQuotes');
 const { createOrderCancellationService, OrderCancellationError } = require('../services/orderCancellation');
 const { createHistoricalProductionReconciliationService } = require('../services/historicalProductionReconciliation');
-const { orderStatusCorrectionPreview, applyOrderStatusCorrection } = require('../services/orderStatusCorrection');
+const { orderStatusCorrectionPreview, applyOrderStatusCorrection, assertQueueTransfer } = require('../services/orderStatusCorrection');
 
 function required(name, value) {
   if (!value) throw new Error(`routes/orders missing dependency: ${name}`);
@@ -1080,6 +1080,7 @@ module.exports = function createOrdersRouter(deps) {
     let correction = null, requiresCorrection = false;
     try { db.transaction(() => {
       const preview = orderStatusCorrectionPreview(db, order.id, requestedStatus);
+      assertQueueTransfer(preview,req.body);
       requiresCorrection = preview.requires_correction;
       if (requiresCorrection) {
         correction = applyOrderStatusCorrection(db, preview, { fingerprint: req.body.correction_fingerprint,
@@ -1091,7 +1092,7 @@ module.exports = function createOrdersRouter(deps) {
       db.prepare(
         'UPDATE orders SET status=?, workspace_version=workspace_version+1, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
       ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
-      auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, req.body.correction_reason || null, req.userId || userId || null, req.auth?.display_name || userName || null);
+      auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, preview.queue_transfer ? `העברה ידנית לתור; דיווחי הכרטיסים נשמרו${preview.scan_warning ? '; התראת סריקות אושרה' : ''}` : req.body.correction_reason || null, req.userId || userId || null, req.auth?.display_name || userName || null);
       if (transition.isApproval) {
         auditLog('order', order.id, order.order_num, 'manager_approval', 'approved_by', null, req.userId || userId || null, null, req.userId || userId || null, req.auth?.display_name || userName || null);
       }

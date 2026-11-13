@@ -577,7 +577,7 @@ test('dashboard production queue uses production queue API source', () => {
 
   assert.match(dashboard, /\/api\/production-queue/);
   assert.doesNotMatch(dashboard, /renderProdQueue\(dashData\.recentOrders\)/);
-  assert.match(dashboard, /renderProdQueue\(productionQueue\.items \|\| \[\]\)/);
+  assert.match(dashboard, /renderProdQueue\(productionQueueItems\)/);
 });
 
 test('dashboard metric drilldowns use the server source and permit card-level traceability', () => {

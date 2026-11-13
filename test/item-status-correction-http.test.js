@@ -208,6 +208,36 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
     status: p.target_status, expected_status: p.current_status, correction_fingerprint: p.fingerprint,
     correction_reason: 'תיקון הזמנה שנבחרה בטעות', correction_mode: mode,
   }, role);
+  await t.test('returning an order to queue warns for scans, preserves work and resumes on the next accepted scan',async()=>{
+    const f=await fixture({certificate:false});
+    db.prepare("UPDATE items SET status='בייצור',produced_qty=2,completed_at=NULL WHERE id=?").run(f.item);
+    let p=await orderPreview(f,'בתור ייצור');
+    assert.equal(p.queue_transfer,true);assert.equal(p.requires_correction,false);assert.equal(p.scan_warning,null);
+    assert.equal((await orderPatch(f,p)).status,200);
+    assert.equal(readItem(f).status,'בייצור');assert.equal(readItem(f).produced_qty,2);
+    require('../services/orderProductionStatus').reconcileQueuedProduction(db);
+    assert.equal(orderStatus(f),'בתור ייצור','restart reconciliation respects the explicit manual queue decision');
+    const phone=async()=>request(`/worker-card/${f.item}/status`,'PATCH',{card:String(f.item),status:'בייצור',expected_status:'בייצור'});
+    assert.equal((await phone()).status,200);assert.equal(orderStatus(f),'בייצור');
+    await request(`/worker-card?card=${f.item}`);
+    p=await orderPreview(f,'בתור ייצור');assert.equal(p.scan_warning.scanned_item_count,1);
+    assert.equal((await orderPatch(f,p)).status,409,'API cannot bypass scan acknowledgment');
+    const body={status:'בתור ייצור',expected_status:'בייצור',correction_fingerprint:p.fingerprint,queue_scan_acknowledged:true};
+    await request(`/worker-card?card=${f.item}`);
+    assert.equal((await request(`/orders/${f.order}/status`,'PATCH',body)).status,409,'a new scan invalidates the preview');
+    p=await orderPreview(f,'בתור ייצור');body.correction_fingerprint=p.fingerprint;
+    const before=readItem(f);assert.equal((await request(`/orders/${f.order}/status`,'PATCH',body)).status,200);
+    assert.deepEqual(readItem(f),before);assert.equal(orderStatus(f),'בתור ייצור');
+    assert.equal((await phone()).status,200);assert.equal(orderStatus(f),'בייצור');
+    assert.deepEqual(readItem(f),before);
+  });
+
+  await t.test('dashboard queue view preserves the queue source and omits heavy geometry',async()=>{
+    const full=await(await request('/production-queue')).json(),compact=await(await request('/production-queue?view=dashboard')).json();
+    assert.deepEqual(compact.items.map(i=>i.id),full.items.map(i=>i.id));
+    for(const item of compact.items){assert.equal(item.weight,full.items.find(i=>i.id===item.id).weight);assert.equal(item.shape_svg,undefined);assert.equal(item.shape_snapshot_json,undefined);}
+    assert.equal((await request('/production-queue?view=bad')).status,400);
+  });
   await t.test('order rollback returns all advanced items together and permits real production after a certificate', async () => {
     const f = await fixture({ count: 2 });
     db.prepare("UPDATE orders SET status='סופק – אושר' WHERE id=?").run(f.order);

@@ -155,6 +155,16 @@ test('a scan never starts an unapproved, stopped or already advanced card', asyn
   }
 });
 
+test('a new scan resumes a manually queued order even when its card is already in production',async()=>{
+  const f=fixture(async (_url,options)=>options.method==='PATCH'
+    ? response({ok:true,item:{...f.item,order_status:'בייצור'},receipt:receipt('status_changed')})
+    : response({items:[f.item],scan_receipt:receipt('opened'),original_card:originalCard}));
+  Object.assign(f.item,{status:'בייצור',order_status:'בתור ייצור',can_start_production:true});
+  await f.context.load();assert.equal(f.requests.length,2);
+  assert.equal(JSON.parse(f.requests[1].options.body).expected_status,'בייצור');
+  assert.equal(f.run('state.items[0].order_status'),'בייצור');
+});
+
 test('an unconfirmed automatic start cannot display production success', async () => {
   const f=fixture(async (_url,options)=>options.method==='PATCH'
     ? response({ok:true,item:{...f.item,status:'בייצור'}})

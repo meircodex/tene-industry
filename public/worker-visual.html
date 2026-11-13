@@ -205,9 +205,9 @@
         if(!item||!validReceipt(data.scan_receipt,item.id,'opened'))throw Object.assign(new Error('לא התקבל אישור שהסריקה נרשמה. נסה שוב.'),{uncertain:true});
         if(SCAN_ENTRY&&(!data.original_card||Number(data.original_card.item_id)!==Number(item.id)||typeof data.original_card.html!=='string'||!data.original_card.html.trim()))throw Object.assign(new Error(`הסריקה נרשמה במערכת. ${receiptText(data.scan_receipt)} כרטיס המקור אינו זמין. יש לבדוק את הקוד ולנסות שוב לפני תחילת ייצור.`),{explicit:true});
         let startReceipt=null;
-        if(item.status===ITEM_STATUS.WAITING&&item.can_start_production===true){
+        if(item.can_start_production===true&&(item.status===ITEM_STATUS.WAITING||(item.status===ITEM_STATUS.IN_PRODUCTION&&item.order_status==='בתור ייצור'))){
           const started=await workerRequest(`/api/worker-card/${item.id}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({card:parsed.token,status:ITEM_STATUS.IN_PRODUCTION,expected_status:ITEM_STATUS.WAITING,request_id:workerRequestId()})});
+            body:JSON.stringify({card:parsed.token,status:ITEM_STATUS.IN_PRODUCTION,expected_status:item.status,request_id:workerRequestId()})});
           if(!started.ok||!validReceipt(started.receipt,item.id,'status_changed')||started.item?.status!==ITEM_STATUS.IN_PRODUCTION)throw Object.assign(new Error('לא התקבל אישור תחילת ייצור. בדוק ונסה שוב.'),{uncertain:true});
           item=started.item;startReceipt=started.receipt;
         }
@@ -286,9 +286,10 @@
       try{
         const check=await fetch(`/api/orders/${orderId}/status-correction-preview?status=${encodeURIComponent(next)}`),preview=await check.json();
         if(!check.ok)throw Error(preview.user_message || preview.error||'לא ניתן לבדוק את שינוי הסטטוס');
+        const scanWarning=preview.scan_warning?` שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'}. דיווחי הייצור והכמויות יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.`:'';
         const effect=preview.requires_correction?` ${preview.affected_items.length} פריטים יוחזרו לשלב ${preview.target_item_status||next}. הכמויות ותעודות המשלוח נשמרות.${preview.cancelled_loading_session_ids.length?' ההעמסה הפעילה תבוטל ותישמר בהיסטוריה.':''}`:'';
-        if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״?${effect}`)){select.value=order.order_status;select.disabled=false;return;}
-        const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status,correction_fingerprint:preview.fingerprint,correction_reason:'תיקון סטטוס מתחנת עבודה',correction_mode:'keep_documents'})});
+        if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״?${scanWarning}${effect}`)){select.value=order.order_status;select.disabled=false;return;}
+        const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status,queue_scan_acknowledged:Boolean(preview.scan_warning),correction_fingerprint:preview.fingerprint,correction_reason:'תיקון סטטוס מתחנת עבודה',correction_mode:'keep_documents'})});
         const result=await r.json().catch(()=>({}));if(!r.ok)throw Error(result.message||result.user_message || result.error||'עדכון סטטוס ההזמנה נכשל');await load();
       }catch(error){alert(error.message);select.value=order.order_status;select.disabled=false;}
     }

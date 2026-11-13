@@ -16,6 +16,13 @@ const RANK = { [O.PENDING_APPROVAL]: -1, [O.CUSTOMER_PENDING_APPROVAL]: -1,
   [O.SENT]: 4, [O.DELIVERY_PROBLEM]: 4, [O.DELIVERED_CONFIRMED]: 5 };
 function fail(message, status = 409) { throw Object.assign(new Error(message), { status }); }
 
+function scanHistory(db,orderId) {
+  return db.prepare(`SELECT COUNT(DISTINCT item_id) AS scanned_item_count,COUNT(*) AS scan_count,MAX(scanned_at) AS last_scan_at FROM (
+    SELECT item_id,datetime(occurred_at) scanned_at FROM worker_card_activity WHERE order_id=? AND action='opened'
+    UNION ALL SELECT sl.item_id,datetime(sl.scanned_at) FROM scan_log sl JOIN items i ON i.id=sl.item_id JOIN pallets p ON p.id=i.pallet_id
+      WHERE p.order_id=? AND sl.action='start')`).get(orderId,orderId);
+}
+
 function orderStatusCorrectionPreview(db, orderId, status) {
   const order = db.prepare('SELECT * FROM orders WHERE id=?').get(orderId);
   if (!order) fail('הזמנה לא נמצאה', 404);
@@ -44,9 +51,13 @@ function orderStatusCorrectionPreview(db, orderId, status) {
       return { id: note.id, note_num: note.note_num, can_cancel: true, affected_items: preview.items };
     } catch (error) { return { id: note.id, note_num: note.note_num, can_cancel: false, blocked_reason: error.message, affected_items: [] }; }
   });
+  const returningToQueue = from === O.IN_PRODUCTION && target === O.PRODUCTION_QUEUE;
+  const queueTransfer = returningToQueue && sessions.length === 0 && items.every(item=>item.cancelled_at || item.status===I.CANCELLED || [I.WAITING,I.IN_PRODUCTION].includes(item.status));
+  const scan = returningToQueue ? scanHistory(db,order.id) : null;
   const result = { order_id: order.id, current_status: from, target_status: target,
-    requires_correction: RANK[target] < RANK[from] || affected.length > 0 || cancelLoading.length > 0,
-    affected_items: affected, target_item_status: targetItem || null,
+    queue_transfer: queueTransfer, scan_warning: scan && scan.scanned_item_count>0 ? scan : null,
+    requires_correction: !queueTransfer && (RANK[target] < RANK[from] || affected.length > 0 || cancelLoading.length > 0),
+    affected_items: queueTransfer ? [] : affected, target_item_status: queueTransfer ? null : targetItem || null,
     cancelled_loading_session_ids: cancelLoading.map(session => session.id),
     documented_qty: progress.shipped_unit_count, certificates,
     can_cancel_certificates: RANK[target] <= RANK[O.LOADING] && !progress.history_needs_review && certificates.length > 0 && certificates.every(note => note.can_cancel),
@@ -85,4 +96,10 @@ function applyOrderStatusCorrection(db, preview, { fingerprint, reason, mode = '
     cancelled_loading_session_ids: fresh.cancelled_loading_session_ids };
 }
 
-module.exports = { orderStatusCorrectionPreview, applyOrderStatusCorrection };
+function assertQueueTransfer(preview,body) {
+  if(!preview.queue_transfer&&!preview.scan_warning)return;
+  if(body.correction_fingerprint!==preview.fingerprint)fail('ההזמנה או הסריקות השתנו; יש לבדוק מחדש את ההעברה לתור');
+  if(preview.scan_warning&&body.queue_scan_acknowledged!==true)fail('כבר נסרקו כרטיסים בהזמנה. יש לאשר את ההתראה לפני החזרה לתור ייצור');
+}
+
+module.exports = { orderStatusCorrectionPreview, applyOrderStatusCorrection, assertQueueTransfer };

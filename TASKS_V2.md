@@ -4,6 +4,20 @@
 
 ## סטטוסים
 
+### החזרה לתור לפי סריקות והאצת טעינת הדשבורד (13.11.2026)
+
+- status: in_progress
+- owner: codex
+- modules: Orders lifecycle / Production scan / dashboard presentation
+- input/output: העברה ידנית מבייצור לתור משמרת כרטיסים וכמויות; סריקות קודמות מחייבות התראה ואישור תואם fingerprint. סריקה חדשה מחזירה לבייצור גם אם הכרטיס כבר בייצור. סנכרון בעלייה מכבד החזרה ידנית.
+- DB: ללא schema; audit של העברה ידנית ונתוני סריקה קיימים. אין שינוי מלאי/כמויות.
+- API/events: status-correction-preview וה־PATCH הקיימים; view=dashboard מצמצם תור ייצור ללא ציורים/geometry; auth והרשאות נשמרים, order_status קיים.
+- performance: מדדי דשבורד נטענים בנפרד משאר המקורות, single flight; אין רינדור אפסים מתשובת שגיאה. החלפת inventory/forecast שאינו קיים ב־procurement/plan הקיים; ללא מנגנון חישוב נוסף.
+- screens: אותן תצוגות; התראת סריקות קיימות ואישור, טעינה מפורשת במקום אפס. המחשה לפני שילוב.
+- scope: orderStatusCorrection, orderProductionStatus, routes orders/production, dashboard.js/html, orders.html, worker-visual.html, services/dashboardQueue.js, בדיקות ותיעוד.
+- Definition of Done: בדיקות HTTP להרשאות/אישור/רעננות/שימור דיווחים וסריקה חוזרת; deferred fetch/error/singleflight; השוואת גודל תור, full tests, פריסה ו־health.
+
+
 ### מעבר אוטומטי מאישור ומסריקה וצבעי רשימת הזמנות (13.11.2026)
 
 - status: done

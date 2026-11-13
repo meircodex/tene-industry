@@ -1,6 +1,8 @@
 const WS_URL = () => window.IronBendAuth?.webSocketUrl?.('/') || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
 const TODAY = new Date().toISOString().slice(0, 10);
 let ws, dashData = null, alertsData = [], inventoryForecast = [], productionQueueItems = [], todayDeliveries = [], shiftSummary = null, _wsDelay = 1000;
+let dashboardError = null;
+let dashboardLoadPromise = null, forecastLoadPromise = null, queueLoaded = false, deliveriesLoaded = false, forecastLoaded = false, forecastFailed = false;
 let dashboardDrilldownData = null, dashboardDrilldownRequest = 0, dashboardDrilldownTrigger = null;
 
 function applyDataContractBadges() {
@@ -75,38 +77,40 @@ function connectWS() {
   } catch {}
 }
 
-async function fetchDashboard() {
+async function dashboardJSON(url) {
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   try {
-    const [dashboardRes, queueRes, ordersRes, forecastRes, alertsRes, shiftRes] = await Promise.all([
-      fetch('/api/dashboard'),
-      fetch('/api/production-queue'),
-      fetch('/api/orders?date=' + encodeURIComponent(TODAY)),
-      fetch('/api/inventory/forecast').catch(() => null),
-      fetch('/api/alerts').catch(() => null),
-      fetch('/api/kpi/shift-summary').catch(() => null)
-    ]);
-    dashData = await dashboardRes.json();
-    const productionQueue = await queueRes.json().catch(() => ({ items: [] }));
-    const ordersToday = await ordersRes.json().catch(() => []);
-    productionQueueItems = productionQueue.items || [];
-    todayDeliveries = Array.isArray(ordersToday) ? ordersToday : [];
-    inventoryForecast = forecastRes && forecastRes.ok ? await forecastRes.json().catch(() => []) : [];
-    alertsData = alertsRes && alertsRes.ok ? await alertsRes.json().catch(() => []) : [];
-    shiftSummary = shiftRes && shiftRes.ok ? await shiftRes.json().catch(() => null) : null;
-
-    renderKPIs(dashData);
-    renderDailyProductionPlan();
-    renderActionCenter();
-    renderTodayDeliveries();
-    renderProdQueue(productionQueue.items || []);
-    renderStockShortages();
-    renderProductionCardsSummary();
-    renderMachinesCompact(dashData.machines || []);
-    renderWasteByMachine(dashData.wasteByMachine || []);
-    applyDataContractBadges();
-  } catch (err) {
-    console.warn('dashboard load failed', err);
-  }
+    const response=await fetch(url,{signal:controller.signal});
+    if(!response.ok)throw Object.assign(new Error('dashboard_request_failed'),{status:response.status});
+    return await response.json();
+  } finally {clearTimeout(timer);}
+}
+function renderLoadedDashboard() {
+  if(dashData){renderKPIs(dashData);renderMachinesCompact(dashData.machines||[]);renderWasteByMachine(dashData.wasteByMachine||[]);renderDailyProductionPlan();}
+  if(deliveriesLoaded)renderTodayDeliveries();
+  if(queueLoaded){renderProdQueue(productionQueueItems);renderProductionCardsSummary();}
+  renderStockShortages();
+  if(dashData&&deliveriesLoaded&&queueLoaded)renderActionCenter();
+  applyDataContractBadges();
+  if(dashboardError)dashboardLoadError(dashboardError);
+}
+function dashboardLoadError(error) {
+  dashboardError=error;
+  setText('overallStatusBadge',error.status===401?'נדרשת התחברות מחדש':'לא ניתן לעדכן נתונים');
+  if(!dashData)setText('productionPlanSubtitle','הנתונים עדיין לא נטענו. יש לרענן או להתחבר מחדש.');
+}
+function fetchDashboard() {
+  if(dashboardLoadPromise)return dashboardLoadPromise;
+  const tasks=[
+    dashboardJSON('/api/dashboard').then(data=>{if(!data||data.offline||typeof data.pending!=='number'||!Array.isArray(data.machines))throw Error('invalid_dashboard');dashboardError=null;dashData=data;renderLoadedDashboard();}).catch(dashboardLoadError),
+    dashboardJSON('/api/production-queue?view=dashboard').then(data=>{if(!Array.isArray(data.items))throw Error('invalid_queue');productionQueueItems=data.items;queueLoaded=true;renderLoadedDashboard();}).catch(()=>{if(!queueLoaded)document.getElementById('prodQueueBody').textContent='תור הייצור לא נטען. נסה לרענן.';}),
+    dashboardJSON('/api/orders?date='+encodeURIComponent(TODAY)).then(data=>{if(!Array.isArray(data))throw Error('invalid_orders');todayDeliveries=data;deliveriesLoaded=true;renderLoadedDashboard();}).catch(()=>{if(!deliveriesLoaded)setText('todayDeliveriesSub','נתוני האספקות לא נטענו');}),
+    dashboardJSON('/api/alerts').then(data=>{alertsData=Array.isArray(data)?data:[];renderLoadedDashboard();}).catch(()=>{}),
+    dashboardJSON('/api/kpi/shift-summary').then(data=>{shiftSummary=data;renderLoadedDashboard();}).catch(()=>{})
+  ];
+  if(!forecastLoaded)fetchInventoryForecast();
+  dashboardLoadPromise=Promise.allSettled(tasks).finally(()=>{dashboardLoadPromise=null;});
+  return dashboardLoadPromise;
 }
 
 function renderKPIs(d) {
@@ -114,9 +118,9 @@ function renderKPIs(d) {
   const producedTonsToday = Number(d.producedTonsToday || (producedWeightToday / 1000) || 0);
   const completedItemsToday = Number(d.itemsDone ?? d.completedToday ?? 0);
   const deliveryWeight = todayDeliveries.reduce((sum, o) => sum + Number(o.total_weight || o.billing_weight || 0), 0);
-  const shortageCount = relevantShortages().length;
+  const shortageCount = new Set(relevantShortages().map(row=>row.diameter)).size;
 
-  document.getElementById('kpiOrdersToday').textContent = todayDeliveries.length || 0;
+  document.getElementById('kpiOrdersToday').textContent = deliveriesLoaded ? todayDeliveries.length : '—';
   document.getElementById('kpiWeightToday').textContent = producedWeightToday.toFixed(0) + ' ק"ג יוצרו';
   document.getElementById('kpiInProd').textContent = d.inProduction ?? 0;
   document.getElementById('kpiItemsProd').textContent = (d.itemsInProduction || 0) + ' פריטים';
@@ -128,9 +132,9 @@ function renderKPIs(d) {
   document.getElementById('kpiTonsToday').textContent = formatTons(producedTonsToday) + ' ט';
   document.getElementById('qsWeight').textContent = producedWeightToday.toFixed(0) + ' ק"ג';
 
-  setText('todayDeliveryWeight', deliveryWeight > 0 ? formatKg(deliveryWeight) + ' לצאת' : 'אין צפי משקל');
-  setText('stockShortageKpi', shortageCount);
-  setText('deliveriesTodayKpi', todayDeliveries.length || 0);
+  setText('todayDeliveryWeight', !deliveriesLoaded ? 'טוען אספקות…' : deliveryWeight > 0 ? formatKg(deliveryWeight) + ' לצאת' : 'אין צפי משקל');
+  setText('stockShortageKpi', forecastLoaded ? shortageCount : '—');
+  setText('deliveriesTodayKpi', deliveriesLoaded ? todayDeliveries.length : '—');
   setText('deliveriesTodaySub', deliveryWeight > 0 ? formatTons(deliveryWeight / 1000) + ' טון' : 'הזמנות');
 }
 
@@ -159,6 +163,7 @@ function calculateProductionPace(actualKg, targetKg) {
   return { status: 'ok', badge: 'בקצב', text: 'הביצוע תואם את קצב המשמרת' };
 }
 function renderDailyProductionPlan() {
+  if(!deliveriesLoaded){setText('productionActualTons',formatTons(Number(dashData?.producedWeightToday||0)/1000));setText('productionPlanSubtitle','טוען אספקות…');return;}
   const actualKg = Number(dashData?.producedWeightToday || 0);
   const ref = productionReference();
   const pct = ref.kg > 0 ? Math.min(160, (actualKg / ref.kg) * 100) : 0;
@@ -187,10 +192,11 @@ function relevantShortages() {
   return (inventoryForecast || [])
     .filter(row => row.alert && row.alert !== 'ok')
     .filter(row => !queueDiameters.size || queueDiameters.has(String(row.diameter || '').trim()))
-    .slice(0, 6);
+    ;
 }
 function renderActionCenter() {
   const actions = [];
+  if(!forecastLoaded)actions.push({level:'warning',title:forecastFailed?'נתוני המלאי לא נטענו':'נתוני המלאי עדיין נטענים',sub:'מצב החוסרים יוצג לאחר קבלת הנתונים.',href:'/inventory.html'});
   const portalAwaitingCustomerApproval = Number(dashData?.portalAwaitingCustomerApproval || 0);
   const pending = Number(dashData?.pending || 0), urgent = Number(dashData?.urgentOpen || 0);
   const todayNotReady = todayDeliveries.filter(o => !String(o.status || '').includes('סופק') && !String(o.status || '').includes('הושלם'));
@@ -226,8 +232,9 @@ function renderProdQueue(items) {
 function renderStockShortages() {
   const shortages = relevantShortages();
   const host = document.getElementById('stockShortagesPanel');
+  if (!forecastLoaded) {host.textContent=forecastFailed?'נתוני המלאי לא נטענו. נסה לרענן.':'טוען נתוני מלאי…';return;}
   if (!shortages.length) { host.innerHTML = '<div class="muted-state">אין חוסרי מלאי רלוונטיים כרגע.</div>'; return; }
-  host.innerHTML = `<div class="compact-list">${shortages.map(row => { const diameter = Number(row.diameter); const canDrill = Number.isFinite(diameter) && diameter > 0; return `<div class="compact-row"><span>Ø${escHtml(row.diameter)} · ${row.alert === 'critical' ? 'חוסר קריטי' : 'אזהרה'} ${canDrill ? `<button class="inline-detail-btn" type="button" data-dashboard-drilldown="shortage" data-dashboard-diameter="${diameter}">כרטיסים</button>` : ''}</span><strong>${formatKg(row.on_hand_kg || 0)}</strong></div>`; }).join('')}</div><a class="action-link" href="/procurement.html" style="margin-top:12px">פתח רכש/מלאי</a>`;
+  host.innerHTML = `<div class="compact-list">${shortages.slice(0,6).map(row => { const diameter = Number(row.diameter); const canDrill = Number.isFinite(diameter) && diameter > 0; return `<div class="compact-row"><span>${row.material_type==='straight'?'ליפט':row.material_type==='coil'?'גליל':'ברזל'} Ø${escHtml(row.diameter)}${row.nominal_length_mm?' · '+escHtml(row.nominal_length_mm/1000)+' מ׳':''} · ${row.alert === 'critical' ? 'חוסר קריטי' : 'אזהרה'} ${canDrill ? `<button class="inline-detail-btn" type="button" data-dashboard-drilldown="shortage" data-dashboard-diameter="${diameter}">כרטיסים</button>` : ''}</span><strong>חסר ${formatKg(row.shortage_kg || 0)}</strong></div>`; }).join('')}</div><a class="action-link" href="/procurement.html" style="margin-top:12px">פתח רכש/מלאי</a>`;
 }
 function renderProductionCardsSummary() {
   const waiting = productionQueueItems.filter(item => String(item.status || '').includes('ממתין')).length;
@@ -256,8 +263,14 @@ function renderWasteByMachine(wasteByMachine) {
 async function fetchTonsToday() {
   try { const d = await fetch('/api/kpi/tons-today').then(r => r.json()); if (d && Number.isFinite(Number(d.tons))) document.getElementById('kpiTonsToday').textContent = formatTons(d.tons) + ' ט'; } catch {}
 }
-async function fetchInventoryForecast() {
-  try { inventoryForecast = await fetch('/api/inventory/forecast').then(r => r.json()); renderStockShortages(); renderActionCenter(); } catch {}
+function fetchInventoryForecast() {
+  if(forecastLoadPromise)return forecastLoadPromise;
+  forecastLoadPromise=dashboardJSON('/api/procurement/plan').then(data=>{
+    if(!Array.isArray(data.groups))throw Error('invalid_inventory_plan');
+    inventoryForecast=data.groups.map(row=>({...row,on_hand_kg:row.physical_stock_kg,shortage_kg:row.recommended_purchase_kg,alert:row.recommended_purchase_kg>0?'critical':'ok'}));
+    forecastLoaded=true;forecastFailed=false;renderLoadedDashboard();
+  }).catch(()=>{forecastFailed=true;renderLoadedDashboard();}).finally(()=>{forecastLoadPromise=null;});
+  return forecastLoadPromise;
 }
 
 function drillSummaryCells(summary = {}) {

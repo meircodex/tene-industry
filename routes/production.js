@@ -846,6 +846,7 @@ module.exports = function createProductionRouter(deps) {
   // Returns pending items grouped and sorted by machine, diameter priority
   router.get('/production-queue', requireAnyRole(['production', 'kiosk', 'office', 'manager', 'admin']), (req, res) => {
     res.set('Cache-Control', 'no-store');
+    if(req.query.view && !['full','dashboard'].includes(req.query.view))return res.status(400).json({error:'invalid_queue_view'});
     const { machine } = req.query;
     let q = `
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
@@ -868,6 +869,7 @@ module.exports = function createProductionRouter(deps) {
     if (machine) { q += ' AND i.machine=?'; params.push(machine); }
     q += ' ORDER BY i.machine, priority_score DESC, o.delivery_date ASC, i.diameter ASC';
     const items = db.prepare(q).all(...params);
+    if(req.query.view==='dashboard')return res.json({items:require('../services/dashboardQueue').dashboardQueue(items),grouped:{}});
     items.forEach(item => { item.shape_svg = productionCards.itemShapeSvg(item); item.order_status = statusContracts.normalizeOrderStatus(item.order_status); });
 
     // Group by machine

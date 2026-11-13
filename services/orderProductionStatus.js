@@ -25,6 +25,10 @@ function reconcileQueuedProduction(db) {
         AND i.cancelled_at IS NULL AND i.status NOT IN ('בוטל','בוטלה')
         AND (i.status IN ('בייצור','הושלם','הועמס','נשלח','סופק') OR i.produced_qty>0))`).all();
     return orders.filter(order => normalizeOrderStatus(order.status) === ORDER_STATUS.PRODUCTION_QUEUE)
+      .filter(order => {
+        const manual=db.prepare("SELECT old_value,new_value FROM audit_log WHERE entity_type='order' AND entity_id=? AND action='status_change' ORDER BY rowid DESC LIMIT 1").get(order.id);
+        return !(manual && normalizeOrderStatus(manual.old_value)===ORDER_STATUS.IN_PRODUCTION && normalizeOrderStatus(manual.new_value)===ORDER_STATUS.PRODUCTION_QUEUE);
+      })
       .map(order => markOrderProductionStarted(db, order.id, { userName: 'סנכרון סטטוס לפי כרטיסי ייצור' })).filter(Boolean);
   })();
 }
