@@ -6,7 +6,7 @@
 
 ### התקדמות ייצור בשורות ההזמנות והבהרת אורך יחידה (13.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - module: reports / orders presentation
 - scope: public/dashboard.js, public/dashboard.html, public/order-workspace.js, public/orders.html, public/orders-workspace.css ובדיקות ותיעוד.
@@ -15,6 +15,8 @@
 - DB/events: ללא שינוי. API הדשבורד שומר מקור משקל: שקילה חסרה אינה אפס, אלא חזרה למשקל התאורטי הקיים. היקף נוסף: routes/reports.js ובדיקת HTTP/auth/governance. אין שינוי בתנועות מלאי או במשקלים שמורים.
 - screens: מילוי ירוק בהיר רציף מימין לשמאל על כל שורת הזמנה ואחוז ייצור; גם במובייל. מקור הנתון delivery_progress.stage_counts.produced / total_item_count הקיים, ללא חישוב ייצור נוסף. בוטל/מחוק/חסר נתונים ללא אחוז מטעה. תצוגה מקדימה הוצגה לפני שילוב.
 - Definition of Done: אימות 862 יח׳ באורך 4,600 מ״מ מול הגיבוי (460 ס״מ ליחידה), בדיקות תצוגה קיימות, אימות הכיתוב בדפדפן ופריסה.
+- verification: npm test — 1,259/1,259; focused HTTP/auth — 141/141. מילוי שולחן עבודה אומת ב־computed style; במובייל צילום חי של הזמנה 126 ב־72%. כיתוב אורך ליחידה אומת בכרטיס 124. תיקון NULL שקילה אומת ב־HTTP test; ניסיון אימות הכרטיס לאחר הפריסה האחרונה דרש התחברות מחדש.
+- deployment: 272f5b4 / dep-dbrgh4k9v7es73chg5og live; health OK, נכסים מעודכנים HTTP 200, ללא שגיאות runtime חדשות. ללא כתיבה לנתוני מלאי.
 
 ### תיקון מערכתי — מקור משקל ודרישה אחיד (12.11.2026)
 
