@@ -1547,6 +1547,14 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal(cardDrilldown.entries[0].quantity, 3);
     assert.equal(cardDrilldown.entries[0].total_length_mm, 1000);
     assert.match(cardDrilldown.entries[0].order_url, new RegExp(`orders\\.html\\?id=${orderId}`));
+    // Missing weighing evidence must not turn into a measured zero via Number(null).
+    db.prepare('UPDATE items SET actual_weight_kg=NULL WHERE id=?').run(reportItemId);
+    const unweighedCard = await (await request(`/api/dashboard/drilldown?metric=card&item_id=${reportItemId}`, { headers: authHeaders(production) })).json();
+    assert.equal(unweighedCard.entries[0].display_weight_kg, 2.664);
+    assert.equal(unweighedCard.entries[0].weight_source, 'theoretical');
+    const unweighedCompleted = await (await request('/api/dashboard/drilldown?metric=done_today', { headers: authHeaders(production) })).json();
+    assert.equal(unweighedCompleted.entries.find(entry => entry.item_id === Number(reportItemId)).display_weight_kg, 2.664);
+    db.prepare('UPDATE items SET actual_weight_kg=2.664 WHERE id=?').run(reportItemId);
     assert.equal((await request('/api/dashboard/drilldown?metric=not-a-metric', { headers: authHeaders(production) })).status, 400);
 
     const dashboardContracts = Object.values(dataContracts.WIDGET_CONTRACTS)

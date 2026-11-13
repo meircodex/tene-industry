@@ -277,7 +277,7 @@ function cardDrillHtml(card, { detail = false } = {}) {
   const quantity = Number.isFinite(Number(card.quantity)) ? `כמות ${dashboardNumber(card.quantity, 2)}` : 'כמות לא זמינה';
   const produced = Number(card.produced_quantity || 0);
   const production = produced > 0 ? `יוצר ${dashboardNumber(produced, 2)}` : (card.status || 'ללא מצב');
-  const weight = Number.isFinite(Number(card.display_weight_kg)) ? formatDrillKg(card.display_weight_kg) : 'ללא משקל זמין';
+  const weight = card.display_weight_kg != null && Number.isFinite(Number(card.display_weight_kg)) ? formatDrillKg(card.display_weight_kg) : 'ללא משקל זמין';
   const source = drillWeightSourceLabel(card.weight_source);
   const length = Number.isFinite(Number(card.total_length_mm)) && Number(card.total_length_mm) > 0 ? `אורך ליחידה ${IronBendDisplayUnits.formatLengthCmFromMm(card.total_length_mm)}` : 'אורך לא זמין';
   const order = card.order_num ? `הזמנה ${card.order_num}` : 'ללא הזמנה';
@@ -293,7 +293,7 @@ function cardDrillHtml(card, { detail = false } = {}) {
 function orderDrillHtml(order) {
   const title = `הזמנה ${order.order_num || `#${order.order_id}`}`;
   const customer = order.customer_name || 'לקוח לא מזוהה';
-  const weight = Number.isFinite(Number(order.display_weight_kg)) ? formatDrillKg(order.display_weight_kg) : 'ללא משקל זמין';
+  const weight = order.display_weight_kg != null && Number.isFinite(Number(order.display_weight_kg)) ? formatDrillKg(order.display_weight_kg) : 'ללא משקל זמין';
   return `<button class="drill-entry" type="button" data-dashboard-drill-entry="${Number(order.order_id)}"><span class="drill-entry-main"><span class="drill-entry-title">${escHtml(title)} <span class="status-badge ${statusBadgeClass(order.status)}">${escHtml(order.status || '—')}</span></span><span class="drill-entry-sub">${escHtml(customer)}${order.delivery_date ? ` · אספקה ${escHtml(order.delivery_date)}` : ''}</span><span class="drill-entry-meta"><span class="drill-data-pill">${escHtml(weight)}</span>${order.priority ? `<span class="drill-data-pill">${escHtml(order.priority)}</span>` : ''}</span></span><span class="drill-entry-arrow" aria-hidden="true">‹</span></button>`;
 }
 

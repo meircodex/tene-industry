@@ -414,11 +414,12 @@ module.exports = function createReportsRouter(deps) {
     const metrics = itemReportMetrics(item);
     const theoreticalWeightKg = Number(metrics.totalWeightKg);
     const hasTheoreticalWeight = Number.isFinite(theoreticalWeightKg) && theoreticalWeightKg > 0;
-    const outputKg = outputEvidence && Number.isFinite(Number(outputEvidence.weight_kg))
+    const outputKg = outputEvidence && outputEvidence.weight_kg != null && Number.isFinite(Number(outputEvidence.weight_kg))
       ? roundMetric(outputEvidence.weight_kg)
       : null;
     const actualWeightKg = Number(item.actual_weight_kg);
-    const fallbackWeightKg = Number.isFinite(actualWeightKg) && actualWeightKg >= 0
+    const hasActualWeight = item.actual_weight_kg != null && String(item.actual_weight_kg).trim() !== '' && Number.isFinite(actualWeightKg) && actualWeightKg >= 0;
+    const fallbackWeightKg = hasActualWeight
       ? roundMetric(actualWeightKg)
       : hasTheoreticalWeight ? roundMetric(theoreticalWeightKg) : null;
     return {
@@ -436,7 +437,7 @@ module.exports = function createReportsRouter(deps) {
       total_length_mm: Number.isFinite(Number(metrics.totalLengthMm)) && Number(metrics.totalLengthMm) > 0 ? roundMetric(metrics.totalLengthMm) : null,
       theoretical_weight_kg: hasTheoreticalWeight ? roundMetric(theoreticalWeightKg) : null,
       display_weight_kg: outputKg ?? fallbackWeightKg,
-      weight_source: outputEvidence?.source || (Number.isFinite(actualWeightKg) && actualWeightKg >= 0 ? 'current_item_actual' : hasTheoreticalWeight ? 'theoretical' : null),
+      weight_source: outputKg != null ? outputEvidence.source : (hasActualWeight ? 'current_item_actual' : hasTheoreticalWeight ? 'theoretical' : null),
       actual_waste: Number.isFinite(Number(item.actual_waste)) ? roundMetric(item.actual_waste) : null,
       machine: item.machine || null,
       completed_at: item.completed_at || null,
