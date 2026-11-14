@@ -6,7 +6,7 @@
 
 ### תור ייצור בעמודות קוטר ומרשם המכונות המאושר (13.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Production machine registry / queue presentation
 - input: מאיר אישר ביטול הרשומות הישנות ושמונה שמות: MEP, 7, 6, תלת מימד, 5, 3, 1, 5 ישן.
@@ -16,6 +16,7 @@
 - screens: אותה שפה עיצובית, עמודות צפופות יותר, מסננים בשורה במחשב ופרטי כרטיס בהרחבה; המחשה לפני שילוב.
 - scope: production-queue HTML/CSS/filters, machineRegistry service/schema/data, routes production/productionMachines, modbus, בדיקות ותיעוד.
 - Definition of Done: בדיקות מרשם חד־פעמי/היסטוריה/פרוטוקול חסר/הסתרת ישנות, עמודות קוטר ומכונות ריקות/מסננים; full tests, QA חזותי ופריסה מאומתת.
+- verified: 14.11.2026 — npm test: 1281 passed; עותק מסד אמיתי: items/raw_material/raw_material_usage/delivery_notes נשארו ללא שינוי לאחר עדכון המרשם. Render a8a9a5a / dep-dbs90qec6qcc738h9pg0 live; health 200; נצפו 114/114 כרטיסיות בשבע עמודות קוטר ושמונה טורי מכונות ועוד לא משויך.
 
 
 ### החזרה לתור לפי סריקות והאצת טעינת הדשבורד (13.11.2026)
