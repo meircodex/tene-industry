@@ -16,10 +16,23 @@ module.exports = function createProductionMachinesRouter(deps) {
   const MACHINE_STATES = required('MACHINE_STATES', deps.MACHINE_STATES);
   const STATE_TRANSITIONS = required('STATE_TRANSITIONS', deps.STATE_TRANSITIONS);
   const checkOrderComplete = required('checkOrderComplete', deps.checkOrderComplete);
+  const registry=require('../services/machineRegistry');
+  registry.ensureMachineRegistry(db);
+  // Tenant data explicitly approved by the product owner. Tests exercise this
+  // migration directly, while keeping their independent machine fixtures.
+  if(process.env.NODE_ENV!=='test'){
+    const applied=registry.applyMachineCatalog(db,require('../db/approvedMachineCatalog.json'));
+    if(applied.changed)wsBroadcast('machine_registry_changed',applied);
+  }
+  router.use('/machines/:id',requireAnyRole(['production','kiosk','maintenance','office','manager','admin']),(req,res,next)=>{
+    if(req.params.id==='oee')return next();
+    if(!db.prepare('SELECT id FROM machines WHERE id=? AND retired_at IS NULL').get(req.params.id))return res.status(404).json({error:'המכונה אינה פעילה במערכת'});
+    next();
+  });
 
   // ── MACHINES ──────────────────────────────────────────────────────
   router.get('/machines', requireAnyRole(['production', 'kiosk', 'maintenance', 'office', 'manager', 'admin']), (req, res) => {
-    const machines = db.prepare('SELECT * FROM machines ORDER BY id').all();
+    const machines = db.prepare('SELECT * FROM machines WHERE retired_at IS NULL ORDER BY id').all();
     const live = modbus.getAllState();
     const merged = machines.map(m => {
       const ls = live.find(l => l.id === m.id);
@@ -77,6 +90,8 @@ module.exports = function createProductionMachinesRouter(deps) {
       .run(itemId, item.order_num, req.params.id);
     db.prepare('UPDATE items SET status=?,started_at=?,machine_id=? WHERE id=?')
       .run('בייצור', new Date().toISOString(), req.params.id, itemId);
+    const started=require('../services/orderProductionStatus').markOrderProductionStarted(db,item.order_id,{userId:req.userId||req.auth?.sub,userName:req.auth?.display_name});
+    if(started)wsBroadcast('order_status',started);
     wsBroadcast('machine_assign', { machineId: Number(req.params.id), itemId, orderNum: item.order_num });
     res.json({ success: true });
   });
@@ -236,6 +251,8 @@ module.exports.manifest = {
   },
   consumes: [{ table: 'machines' }, { table: 'items' }],
   produces: [
+    { event: 'machine_registry_changed' },
+    { event: 'order_status' },
     { event: 'inventory_changed' },
     { event: 'machine_assign' },
     { event: 'machine_complete' },

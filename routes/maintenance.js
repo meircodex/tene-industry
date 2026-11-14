@@ -81,7 +81,7 @@ module.exports = function createMaintenanceRouter(deps) {
       open:        db.prepare("SELECT COUNT(*) as c FROM maintenance_logs WHERE status!='\u05e1\u05d2\u05d5\u05e8\u05d4'").get().c,
       breakdowns:  db.prepare("SELECT COUNT(*) as c FROM maintenance_logs WHERE log_type='breakdown'").get().c,
       avgDowntime: db.prepare('SELECT ROUND(AVG(downtime_min),0) as avg FROM maintenance_logs WHERE downtime_min>0').get().avg||0,
-      activeProductionLoad: attachMachineLoad(db.prepare('SELECT id,label,name FROM machines').all(), loadMap),
+      activeProductionLoad: attachMachineLoad(db.prepare('SELECT id,label,name FROM machines WHERE retired_at IS NULL').all(), loadMap),
       byMachine:   attachMachineLoad(byMachine, loadMap),
     });
   });

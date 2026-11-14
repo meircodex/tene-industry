@@ -172,6 +172,13 @@
 .queue-filter-footer{grid-column:1/-1;display:flex;gap:12px;align-items:center;justify-content:space-between;font-size:14px;color:var(--muted)}
 .queue-stock{padding:3px 8px;border-radius:6px;font-size:12px;font-weight:800;background:#edf1f5;color:#526779}.queue-stock-available{background:#e0f2e6;color:#23673d}.queue-stock-shortage{background:#fbe5e4;color:#9c302c}.queue-stock-allocation{background:#fff1c9;color:#805b10}
 @media(max-width:640px){.queue-filters{grid-template-columns:repeat(2,minmax(0,1fr));padding:12px;gap:10px}.queue-filter-footer{align-items:flex-start;flex-direction:column}.machines-grid{grid-template-columns:minmax(0,1fr)}}
+/* Compact board: one column per diameter or registered machine. */
+.content,.page-header{max-width:none}.shift-bar{padding:7px 16px;gap:8px}.shift-info{gap:8px}.shift-stat{min-width:95px;padding:4px 8px}.shift-stat .value{font-size:16px}.shift-stat .label{font-size:10px}.page-header{padding:12px 20px}.queue-filters{grid-template-columns:repeat(6,minmax(100px,1fr));gap:8px;padding:10px;margin-bottom:12px}
+.queue-view-controls{grid-column:1/-1;display:flex;gap:14px;align-items:center}.queue-view-controls label{display:flex;align-items:center;gap:7px}.queue-view-controls select{width:auto;min-width:105px;min-height:34px}.queue-view-controls span{font-size:13px;color:var(--muted)}
+.queue-filter-footer{font-size:13px}.queue-filter-footer .btn{padding:5px 10px}.queue-board{overflow-x:auto;padding-bottom:12px}.machines-grid{grid-template-columns:repeat(var(--queue-columns,1),minmax(150px,1fr));gap:8px;align-items:start}.machines-grid:not(.compact){grid-template-columns:repeat(var(--queue-columns,1),minmax(390px,1fr))}
+.machine-col{min-width:0;border-radius:10px}.machine-col-header{padding:10px;display:flex;flex-wrap:wrap;gap:5px;background:#fff4e7!important}.machine-col-title{font-size:19px;font-weight:800}.machine-col-count{flex-basis:100%;font-size:12px}.queue-list{max-height:none;overflow:visible;padding:7px;gap:7px}.queue-list .empty-state{padding:16px 5px;font-size:12px}
+.compact .queue-item{grid-template-columns:minmax(0,1fr);padding:7px;gap:4px;border-radius:8px}.compact .queue-shape{height:50px;min-height:50px;border-radius:6px}.compact .queue-shape svg{width:100%;height:100%;max-height:50px}.compact .queue-info{gap:3px}.compact .item-top{flex-wrap:wrap;gap:3px}.compact .item-order{font-size:12px}.compact .item-customer,.compact .badge-normal{display:none}.compact .item-status-badge{font-size:10px;margin:0}.compact .item-details{display:flex;flex-wrap:wrap;gap:3px}.compact .item-detail{display:none;padding:3px;font-size:11px;border-radius:5px}.compact .queue-diameter,.compact .queue-quantity{display:block}.compact .queue-stock{font-size:11px;padding:2px 5px}.compact .queue-item.expanded .item-detail,.compact .queue-item.expanded .item-customer{display:block}.compact .queue-item.expanded .queue-shape{height:116px;min-height:116px}.compact .queue-item.expanded .queue-shape svg{max-height:none}.compact .item-actions{gap:4px}.compact .item-btn{font-size:11px;padding:5px}
+@media(max-width:900px){.queue-filters{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:640px){.queue-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.queue-view-controls{flex-wrap:wrap}.machines-grid{grid-template-columns:repeat(var(--queue-columns,1),minmax(190px,1fr))}}
 </style>
 <script src="/auth-client.js"></script>
 <script src="/display-units.js"></script>
@@ -239,11 +246,12 @@
     <label>מכונה<select id="queueFilterMachine" onchange="applyQueueFilters()"><option value="">כל המכונות</option></select></label>
     <label>מצב ייצור<select id="queueFilterStatus" onchange="applyQueueFilters()"><option value="">הכול</option><option value="ממתין">ממתינות להתחלה</option><option value="בייצור">בייצור</option></select></label>
     <label>זמינות במלאי<select id="queueFilterStock" onchange="applyQueueFilters()"><option value="">כל המצבים</option><option value="available">יש מלאי</option><option value="shortage">חסר מלאי</option><option value="allocation">דורש הקצאה</option><option value="unknown">לא אומת</option></select></label>
+    <div class="queue-view-controls"><label>תור לפי<select id="queueGroupBy" onchange="renderQueue()"><option value="diameter">קוטר</option><option value="machine">מכונה</option></select></label><label>תצוגה<select id="queueDensity" onchange="renderQueue()"><option value="compact">מרוכזת</option><option value="detail">מפורטת</option></select></label><span id="queueMachineCount"></span></div>
     <div class="queue-filter-footer"><span id="queueFilterSummary" aria-live="polite">טוען כרטיסיות…</span><button class="btn btn-outline" type="button" onclick="clearQueueFilters()">נקה סינון</button></div>
   </section>
-  <div class="machines-grid" id="machines-grid">
+  <div class="queue-board"><div class="machines-grid compact" id="machines-grid">
     <div class="empty-state">טוען...</div>
-  </div>
+  </div></div>
 </div>
 
 <!-- START SHIFT MODAL -->
@@ -340,7 +348,7 @@
   </div>
 </div>
 
-<script src="/production-queue-filters.js?v=1"></script>
+<script src="/production-queue-filters.js?v=2"></script>
 <script>
 const API = '';
 let queueData = { items: [], grouped: {} };
@@ -383,7 +391,7 @@ async function init() {
 async function loadMachines() {
   const data = await fetch(`${API}/api/machines`).then(r=>r.json());
   machines = Array.isArray(data) ? data : (data.machines || []);
-  renderQueueFilterOptions();
+  renderQueueFilterOptions();renderQueue();
 }
 
 async function loadUsers() {
@@ -440,7 +448,7 @@ function connectQueueUpdates() {
     queueSocket = new WebSocket(window.IronBendAuth?.webSocketUrl?.('/') || `${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
     queueSocket.onopen = scheduleQueueRefresh;
     queueSocket.onmessage = event => { try {
-      if (['new_order','order_status','order_updated','order_deleted','order_review','item_status','item_progress','order_cancellation_disposition','delivery_confirm','inventory_changed'].includes(JSON.parse(event.data).type)) scheduleQueueRefresh();
+      const type=JSON.parse(event.data).type;if(type==='machine_registry_changed')loadMachines();if (['new_order','order_status','order_updated','order_deleted','order_review','item_status','item_progress','order_cancellation_disposition','delivery_confirm','inventory_changed','machine_registry_changed','machine_assign'].includes(type)) scheduleQueueRefresh();
     } catch {} };
     queueSocket.onclose = () => setTimeout(connectQueueUpdates,2000);
   } catch { /* The existing 30-second refresh remains available. */ }
@@ -480,49 +488,23 @@ function renderQueueFilterOptions(){
 function renderQueue() {
   const grid = document.getElementById('machines-grid');
   const filtered=IronBendQueueFilters.filter(queueData.items||[],queueSelection());
-  const grouped={};for(const item of filtered){const key=item.machine||'לא שויך';(grouped[key]||=([])).push(item);}
+  const selection=queueSelection(),mode=document.getElementById('queueGroupBy').value;
+  const groups=IronBendQueueFilters.groups(filtered,{mode,machines,allItems:queueData.items||[],diameter:selection.diameter,machine:selection.machine});
   const remaining=filtered.reduce((sum,item)=>sum+Math.max(0,Number(item.quantity||0)-Number(item.produced_qty||0)),0);
   document.getElementById('queueFilterSummary').textContent=`מוצגות ${filtered.length} מתוך ${(queueData.items||[]).length} כרטיסיות · ${remaining.toLocaleString('he-IL')} יח׳ נותרו לייצור`;
-  const keys = Object.keys(grouped);
-  document.getElementById('shift-pieces').textContent = (queueData.items || []).length;
-
-  if (keys.length === 0) {
-    grid.innerHTML = `<div class="empty-state">אין כרטיסיות התואמות למסננים שנבחרו</div>`;
-    return;
-  }
-
-  grid.innerHTML = '';
-  keys.forEach(machineKey => {
-    const items = grouped[machineKey];
-    const machineInfo = machines.find(m => m.name === machineKey);
-    const col = createMachineColumn(machineKey, machineInfo, items);
-    grid.appendChild(col);
-  });
+  document.getElementById('queueMachineCount').textContent=`${machines.length} מכונות מוגדרות`;
+  document.getElementById('shift-pieces').textContent=(queueData.items||[]).length;
+  grid.classList.toggle('compact',document.getElementById('queueDensity').value==='compact');
+  grid.style.setProperty('--queue-columns',Math.max(1,groups.length));
+  grid.innerHTML='';
+  if(!groups.length){grid.innerHTML='<div class="empty-state">אין כרטיסיות התואמות למסננים שנבחרו</div>';return;}
+  for(const group of groups)grid.appendChild(createQueueColumn(group));
 }
 
-function createMachineColumn(machineName, machineInfo, items) {
-  const col = document.createElement('div');
-  col.className = 'machine-col';
-
-  const isConnected = machineInfo && machineInfo.status === 'מחובר';
-  const dotClass = isConnected ? 'dot-green' : machineInfo ? 'dot-gray' : 'dot-gray';
-  const activeItems = items.filter(i => i.status === ITEM_STATUS.IN_PRODUCTION);
-
-  col.innerHTML = `
-    <div class="machine-col-header">
-      <div class="machine-badge">${machineInfo ? (machineInfo.label || machineName) : machineName[0]}</div>
-      <div>
-        <div class="machine-col-title">${machineName}</div>
-        <div class="machine-col-count">${items.length} פריטים | ${activeItems.length} פעיל</div>
-      </div>
-      <div class="machine-status-dot ${dotClass}"></div>
-      <button class="stop-btn-small" onclick="openStopForMachine('${machineName}')">⏸ עצירה</button>
-    </div>
-    <div class="queue-list" id="list-${machineName.replace(/\s/g,'_')}">
-      ${items.map(item => renderQueueItem(item)).join('')}
-      ${items.length === 0 ? '<div class="empty-state">אין פריטים</div>' : ''}
-    </div>
-  `;
+function createQueueColumn(group){
+  const {items,machine}=group,col=document.createElement('section');col.className='machine-col';col.dataset.queueGroup=group.key;
+  const active=items.filter(i=>i.status===ITEM_STATUS.IN_PRODUCTION).length;
+  col.innerHTML=`<header class="machine-col-header"><div class="machine-col-title">${escHtml(group.label)}</div><div class="machine-col-count">${items.length} כרטיסיות · ${active} בייצור</div>${machine?`<button class="stop-btn-small" onclick="openStopForMachine(${escHtml(jsArg(machine.name))})">⏸ עצירה</button>`:''}</header><div class="queue-list">${items.map(renderQueueItem).join('')}${items.length?'':'<div class="empty-state">אין כרטיסיות במסננים אלו</div>'}</div>`;
   return col;
 }
 
@@ -551,11 +533,12 @@ function renderQueueItem(item) {
         </div>
         <div class="item-details">
           ${item.stock_state?`<span class="queue-stock queue-stock-${escHtml(item.stock_state.code)}" title="${escHtml(item.stock_state.reason)}">${escHtml(item.stock_state.label)}</span>`:''}
-          <span class="item-detail"><strong>קוטר</strong> ⌀${escHtml(item.diameter)}</span>
-          <span class="item-detail"><strong>כמות</strong> ${item.produced_qty||0}/${item.quantity}</span>
+          <span class="item-detail queue-diameter"><strong>קוטר</strong> ⌀${escHtml(item.diameter)}</span>
+          <span class="item-detail queue-quantity"><strong>כמות</strong> ${item.produced_qty||0}/${item.quantity}</span>
           <span class="item-detail"><strong>משקל</strong> ${Math.round(item.weight||0)} ק"ג</span>
           ${totalLength ? `<span class="item-detail"><strong>אורך</strong> ${IronBendDisplayUnits.formatLengthCmFromMm(totalLength)}</span>` : ''}
           ${item.shape_name ? `<span class="item-detail"><strong>צורה</strong> ${escHtml(shapeLabel(item.shape_name))}</span>` : ''}
+          ${item.previous_machine?`<span class="item-detail">זקוק לשיוך · שיוך קודם ${escHtml(item.previous_machine)}</span>`:''}
           ${dims ? `<span class="item-detail"><strong>מידות</strong> ${escHtml(dims)}</span>` : ''}
           ${item.delivery_date ? `<span class="item-detail"><strong>אספקה</strong> ${escHtml(item.delivery_date)}</span>` : ''}
         </div>
@@ -616,7 +599,7 @@ function shapeLabel(shapeName) {
 function toggleItemActions(itemId) {
   const el = document.getElementById(`actions-${itemId}`);
   if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  const expanded=el.style.display==='none';el.style.display=expanded?'flex':'none';el.closest('.queue-item')?.classList.toggle('expanded',expanded);
 }
 
 // ── ITEM ACTIONS ─────────────────────────────────────────────────

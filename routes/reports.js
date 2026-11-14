@@ -646,7 +646,7 @@ module.exports = function createReportsRouter(deps) {
       wasteAvgPct:      wasteData.totalQty > 0 ? ((wasteData.totalWaste / wasteData.totalQty) * 100).toFixed(1) : '0',
       wasteByMachine,
       recentOrders:     db.prepare(`SELECT o.*,c.name as customer_name FROM orders o LEFT JOIN customers c ON o.customer_id=c.id ORDER BY o.created_at DESC LIMIT 10`).all(),
-      machines:         db.prepare('SELECT * FROM machines ORDER BY id').all(),
+      machines:         db.prepare('SELECT * FROM machines WHERE retired_at IS NULL ORDER BY id').all(),
     });
   });
 

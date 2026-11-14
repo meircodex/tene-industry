@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {filter,customerKey}=require('../public/production-queue-filters');
+const {groups}=require('../public/production-queue-filters');
 const {classifyStock}=require('../services/productionQueueStock');
 const rows=[
   {id:1,diameter:12,customer_id:1,customer_name:'לקוח',order_id:10,machine:'A',status:'ממתין',stock_state:{code:'available'}},
@@ -24,4 +25,12 @@ test('stock availability respects total commitments, confirmed own coverage and 
   assert.equal(classifyStock({need:40,physical:100,total:150,allocated:40}).code,'available');
   assert.equal(classifyStock({need:40,physical:30,total:150,allocated:40}).code,'shortage');
   for(const extra of [{review:true},{conflict:true},{physical:NaN}])assert.equal(classifyStock({need:40,physical:100,total:90,...extra}).code,'unknown');
+});
+test('diameter columns retain every diameter and machine columns include idle registered machines',()=>{
+  const columns=groups([rows[0]],{allItems:rows,mode:'diameter'});
+  assert.deepEqual(columns.map(g=>g.label),['Ø12','Ø16']);assert.equal(columns[1].items.length,0);
+  const machines=[{id:1,name:'7',label:'7'},{id:2,name:'MEP',label:'MEP'}];
+  const machineColumns=groups([{...rows[0],machine:'7'},rows[2]],{mode:'machine',machines});
+  assert.deepEqual(machineColumns.map(g=>g.label),['7','MEP','לא שויך']);assert.equal(machineColumns[1].items.length,0);
+  assert.equal(groups(rows,{mode:'diameter',diameter:'16'}).length,1);
 });

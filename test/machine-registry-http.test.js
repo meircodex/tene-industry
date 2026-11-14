@@ -1,0 +1,24 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),os=require('os'),path=require('path');
+const folder=fs.mkdtempSync(path.join(os.tmpdir(),'tene-registry-http-'));process.env.NODE_ENV='test';process.env.JWT_SECRET='registry-local-http-test';process.env.BCRYPT_ROUNDS='4';process.env.DB_PATH=path.join(folder,'test.db');process.env.BACKUP_DIR=path.join(folder,'backups');
+const {server,db,closeServer}=require('../server'),{hashPin}=require('../auth-core'),{applyMachineCatalog}=require('../services/machineRegistry'),catalog=require('../db/approvedMachineCatalog.json');
+test('retired machines cannot be selected or controlled; current assignment filters use the active registry id',async t=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>closeServer(r));db.close();assert.ok(path.resolve(folder).startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(folder,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active,password_changed_at)VALUES(?,?,?,?,1,?)').run('registry-admin','QA','admin',hashPin('1234',4),new Date().toISOString());
+ const auth=await(await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'registry-admin',pin:'1234'})})).json();
+ const request=(url,method='GET',body)=>fetch(base+'/api'+url,{method,headers:{Authorization:'Bearer '+auth.access_token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+ const old=db.prepare('SELECT id FROM machines ORDER BY id LIMIT 1').get().id;
+ const order=db.prepare("INSERT INTO orders(order_num,status)VALUES('REGISTRY-QA','בתור ייצור')").run().lastInsertRowid,pallet=db.prepare('INSERT INTO pallets(order_id,pallet_num)VALUES(?,1)').run(order).lastInsertRowid;
+ const item=db.prepare("INSERT INTO items(pallet_id,order_id,shape_name,diameter,quantity,production_qty,total_length_mm,total_weight,segments,status,machine,machine_id)VALUES(?,?,'straight',12,10,10,1000,8.88,'[]','ממתין','A',?)").run(pallet,order,old).lastInsertRowid;
+ applyMachineCatalog(db,catalog);
+ assert.equal((await fetch(base+'/api/machines')).status,401);
+ const machines=await(await request('/machines')).json();assert.deepEqual(machines.map(m=>m.name),catalog.names);
+ assert.deepEqual((await(await request('/dashboard')).json()).machines.map(m=>m.name),catalog.names);
+ assert.equal((await(await request('/machines/oee')).json()).length,8);
+ assert.equal((await request(`/machines/${old}/assign`,'POST',{itemId:Number(item)})).status,404);
+ const queue=await(await request('/production-queue')).json();assert.equal(queue.items.find(i=>i.id===Number(item)).machine,null);assert.equal(queue.items.find(i=>i.id===Number(item)).previous_machine,'A');
+ assert.equal((await request(`/machines/${machines[0].id}/assign`,'POST',{itemId:Number(item)})).status,200);
+ const selected=await(await request('/production-queue?machine=MEP')).json();assert.ok(selected.items.some(i=>i.id===Number(item)&&i.machine==='MEP'));
+ assert.equal(db.prepare('SELECT status FROM orders WHERE id=?').get(order).status,'בייצור');assert.equal(db.prepare('SELECT quantity FROM items WHERE id=?').get(item).quantity,10);
+});

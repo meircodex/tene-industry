@@ -50,22 +50,22 @@ class ModbusService {
   _getConfigs() {
     if (!this.db) return MACHINES_CONFIG;
     try {
-      const rows = this.db.prepare('SELECT * FROM machines ORDER BY id').all();
+      const rows = this.db.prepare('SELECT * FROM machines WHERE retired_at IS NULL ORDER BY id').all();
       return rows.map(row => ({
         id:         row.id,
         label:      row.label || String(row.id),
         name:       row.name,
         type:       'xinje',
         mode:       row.conn_mode || 'tcp',
-        host:       row.tcp_host  || `192.168.1.${100 + row.id}`,
+        host:       row.tcp_host  || null,
         port:       row.tcp_port  || 502,
-        serialPort: row.rtu_port  || `COM${2 + row.id}`,
+        serialPort: row.rtu_port  || null,
         baudRate:   row.baud_rate || 9600,
         parity:     row.parity    || 'none',
         stopBits:   row.stop_bits || 1,
         unitId:     row.slave_id  || row.id,
       }));
-    } catch { return MACHINES_CONFIG; }
+    } catch { return []; }
   }
 
   // ── Reconnect a single machine after config change ────────────────
@@ -92,6 +92,7 @@ class ModbusService {
   }
 
   async connectMachine(cfg) {
+    if(!cfg||!['tcp','rtu'].includes(cfg.mode)||(cfg.mode==='tcp'&&!cfg.host)||(cfg.mode==='rtu'&&!cfg.serialPort))return;
     const client = new ModbusRTU();
     try {
       if (cfg.mode === 'tcp') {
@@ -171,6 +172,7 @@ class ModbusService {
       itemId,
       orderId,
     });
+    if(this.db&&!this._getConfigs().some(m=>m.id===Number(machineId)&&['tcp','rtu'].includes(m.mode)))throw new Error('המכונה לא הוגדרה לחיבור');
     const cfg    = MACHINES_CONFIG.find(m => m.id === machineId);
     const client = this.clients[machineId];
 
@@ -230,7 +232,7 @@ class ModbusService {
     console.log('[Modbus] סקירה הופסקה');
   }
 
-  getAllState() { return Object.values(this.state); }
+  getAllState() { return this._getConfigs().map(m=>({counter:0,statusCode:-1,errorCode:0,lastSeen:null,...this.state[m.id],id:m.id,name:m.name,label:m.label,connected:this.state[m.id]?.connected||false,status:this.state[m.id]?.status||'לא מחובר'})); }
   getState(id)  { return this.state[id]; }
 }
 

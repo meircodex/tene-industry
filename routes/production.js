@@ -120,7 +120,7 @@ module.exports = function createProductionRouter(deps) {
 
   function selectWorkerCardById(itemId) {
     const item = db.prepare(`
-      SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
+      SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter, i.machine_id,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
              i.actual_weight_kg, i.weight_deviation_pct, i.cancelled_at, i.production_stopped_at,
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
@@ -556,7 +556,7 @@ module.exports = function createProductionRouter(deps) {
 
     if (isNaN(itemIdNum)) return res.status(400).json({ error: 'QR לא תקין' });
 
-    const machine = db.prepare('SELECT * FROM machines WHERE id=?').get(machineIdNum);
+    const machine = db.prepare('SELECT * FROM machines WHERE id=? AND retired_at IS NULL').get(machineIdNum);
     if (!machine) return res.status(404).json({ error: 'מכונה לא נמצאה' });
 
     const item = db.prepare(`
@@ -850,7 +850,7 @@ module.exports = function createProductionRouter(deps) {
     if(req.query.include_stock && !['0','1'].includes(req.query.include_stock))return res.status(400).json({error:'invalid_stock_view'});
     const { machine } = req.query;
     let q = `
-      SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter,
+      SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter, i.machine_id,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
              i.actual_weight_kg, i.weight_deviation_pct,
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
@@ -867,9 +867,15 @@ module.exports = function createProductionRouter(deps) {
       WHERE ${productionQueueCondition({ visual: req.query.visual === '1' })}
     `;
     const params = [];
-    if (machine) { q += ' AND i.machine=?'; params.push(machine); }
     q += ' ORDER BY i.machine, priority_score DESC, o.delivery_date ASC, i.diameter ASC';
-    const items = db.prepare(q).all(...params);
+    let items = db.prepare(q).all(...params);
+    const activeMachines=db.prepare('SELECT id,name,label FROM machines WHERE retired_at IS NULL').all();
+    for(const item of items){
+      const assigned=require('../services/machineRegistry').queueMachine(item,activeMachines);
+      if(item.machine&&!assigned)item.previous_machine=item.machine;
+      item.machine=assigned;
+    }
+    if(machine){const canonical=require('../services/machineRegistry').queueMachine({machine},activeMachines)||machine;items=items.filter(i=>i.machine===canonical);}
     if(req.query.view==='dashboard')return res.json({items:require('../services/dashboardQueue').dashboardQueue(items),grouped:{}});
     if(req.query.include_stock==='1'){
       const states=require('../services/productionQueueStock').productionQueueStock(db,items);

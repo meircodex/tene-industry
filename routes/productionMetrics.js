@@ -40,7 +40,7 @@ module.exports = function createProductionMetricsRouter(deps) {
     const today = selectedDay(req, res);
     if (!today) return;
     const actualByMachine = new Map(productionActuals.getDailyProductionActuals(db, today).machines.map(row => [row.machine, row]));
-    const machines = db.prepare('SELECT * FROM machines').all();
+    const machines = db.prepare('SELECT * FROM machines WHERE retired_at IS NULL').all();
     const result = machines.map(m => {
       // Availability: 1 - downtime / shift_hours (assume 8h shift = 480 min)
       const stopMins = db.prepare(
