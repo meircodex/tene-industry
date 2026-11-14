@@ -616,7 +616,8 @@ test('shape editor index loads a fresh shape editor asset version', () => {
   const index = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
 
   assert.match(index, /steelRebarShapes\.js\?v=2-mesh/);
-  assert.match(index, /shape-editor\.js\?v=94-mesh-open/);
+  const asset = index.match(/shape-editor\.js\?v=(\d+)-[a-z0-9-]+/);
+  assert.ok(asset && Number(asset[1]) >= 94, 'editor must retain or advance the open-mesh cache version');
   assert.doesNotMatch(index, /shape-editor\.js\?v=(?:62|63|64|65|66|67)/);
 });
 

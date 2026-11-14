@@ -3779,6 +3779,7 @@ class ShapeEditorModal {
       </div>
       <div class="se-foot-actions">
         <button class="se-cancel-btn" id="seCancel">ביטול</button>
+        <button class="se-save-shape-btn" id="seManufacturingIntent" type="button">כוונת ביצוע</button>
         <button class="se-save-shape-btn" id="seSaveShapeBtn" style="display:none">שמור צורה</button>
         <button class="se-ok-btn" id="seOk">אשר צורה</button>
       </div>
@@ -4024,6 +4025,7 @@ class ShapeEditorModal {
     if(edit) edit.style.display = this._canManageCatalogue && activeEntry && this._shapeMode === 'template' ? '' : 'none';
     const save = document.getElementById('seSaveShapeBtn');
     if(save) save.style.display = this._canManageCatalogue && this._shapeMode==='authoring' ? '' : 'none';
+    const intent=document.getElementById('seManufacturingIntent');if(intent)intent.hidden=normalizeShapeFamily(this.current)!=='bars';
     const nameRow=document.getElementById('seCatalogNameRow'),name=document.getElementById('seCatalogName');
     if(nameRow)nameRow.style.display=this._canManageCatalogue&&this._shapeMode==='authoring'?'':'none';
     if(name&&document.activeElement!==name)name.value=this.current?.presetName||'';
@@ -4187,6 +4189,15 @@ class ShapeEditorModal {
     document.getElementById('seOk').onclick            = () => this._confirm();
     document.getElementById('seAddSide').onclick       = () => this._addSide();
     document.getElementById('seSaveShapeBtn').onclick  = () => this._showSaveBar();
+    document.getElementById('seManufacturingIntent').onclick=async()=>{
+      try{
+        if(!window.IronBendManufacturingIntent){
+          window._manufacturingIntentLoad ||= new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='/shape-manufacturing-intent.js?v=1.1';script.onload=resolve;script.onerror=()=>{window._manufacturingIntentLoad=null;reject(Error('רכיב כוונת הביצוע אינו זמין'));};document.head.append(script);});
+          await window._manufacturingIntentLoad;
+        }
+        await window.IronBendManufacturingIntent.open(this);
+      }catch(error){this._showToast(error.message);}
+    };
     document.getElementById('seBackBtn').onclick = () => this._goBack();
     // Phone taps synthesize extra mouse events right after the tap; they can
     // land on the backdrop while the modal is still sliding in and close the
