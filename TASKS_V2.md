@@ -2281,3 +2281,16 @@
 - scope: המחשת רשת בעורך ובציור הקנוני של פריט/מסמך; גרסאות assets.
 - DB/API/calculation: ללא שינוי; מספר המוטות, המשקל והמפרט השמור נשמרים.
 - DoD: בדיקות ממוקדות וכלליות, אימות קצוות פתוחים באתר החי; docs/mesh-open-ends-20261112.md.
+
+
+### ENG-STATION-BRIDGE-20261113 — כוונת ביצוע וחיבור תחנות מכונה
+
+- status: in_progress
+- owner: codex/station-bridge-web-20261113
+- authorization: מאיר ביקש לבצע מיד את אפיון התחנה ואת תוספת הנדסת הצורה, עם מינימום הסברים בחזית.
+- module: Machine Integration; עורך Steel/Rebar מציג כוונה נפרדת בלבד.
+- scope: routes/machineStation.js, services/machineIntegration/stationInbox.js, contracts/machine-station/v1, חוזה חתימה גנרי, רכיב כוונת ביצוע נפרד וטעינתו, חיבורי מודולים בלבד בשרת, בדיקות ותלות AJV.
+- input: צורה מלאה בגרסה, כוונת ביצוע, מכונה מוגדרת ודיווחי תחנה חתומים.
+- output: כוונה בגרסה לפי גאומטריה ומכונה; קליטת דיווחים עמידה עם שיוך וכפילות; מסך קומפקטי לכל כיפוף.
+- DB/API/events/screens/logic: docs/machine-station-bridge.md. אין כתיבת PLC ואין שינוי מקור, הזמנה או תוצאת איכות סמכותית.
+- definition_of_done: בדיקות חוזה, הרשאות, governance, שמירה ופתיחה בדפדפן, רגרסיה מלאה, פריסה ואימות הנכסים באתר.

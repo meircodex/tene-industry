@@ -62,6 +62,7 @@ const createProductionMachinesRouter = require('./routes/productionMachines');
 const createProductionMetricsRouter = require('./routes/productionMetrics');
 const createProductionShiftsRouter = require('./routes/productionShifts');
 const createQualityRouter = require('./routes/quality');
+const createMachineStationRouter = require('./routes/machineStation');
 const createMaintenanceRouter = require('./routes/maintenance');
 const createCustomersRouter = require('./routes/customers');
 const createAuthRouter = require('./routes/auth');
@@ -330,7 +331,7 @@ const allRouteFactories = [
   createProductionMachinesRouter, createProductionCardsRouter, createWarehouseRouter,
   createInventoryRouter, createProcurementRouter, createProcurementRecommendationsRouter, createFleetRouter, createQualityRouter,
   createMaterialAllocationPlanningRouter,
-  createMaintenanceRouter, createReportsRouter, createFinanceRouter, createFinanceInvoicesRouter,
+  createMaintenanceRouter, createReportsRouter, createFinanceRouter, createFinanceInvoicesRouter, createMachineStationRouter,
   createFinanceCostsRouter, createFinanceLedgerRouter, createFinanceCreditRouter,
   createCompaniesRouter, createAdminRouter, createLogisticsRouter, createPortalRouter,
   createPortalAdminRouter, createAlertsRouter, createAiRouter, createBvbsRouter,
@@ -412,6 +413,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/productionMetrics.js', factory: createProductionMetricsRouter },
     { file: 'routes/productionShifts.js', factory: createProductionShiftsRouter },
     { file: 'routes/quality.js', factory: createQualityRouter },
+    { file: 'routes/machineStation.js', factory: createMachineStationRouter },
     { file: 'routes/reports.js', factory: createReportsRouter },
     { file: 'routes/search.js', factory: createSearchRouter },
     { file: 'routes/warehouse.js', factory: createWarehouseRouter },
@@ -656,6 +658,8 @@ app.use('/api', requireModule('production'), createProductionMetricsRouter({
   statusContracts,
   productionActuals,
 }));
+
+app.use('/api', requireModule('production'), createMachineStationRouter({db,requireAnyRole,auditLog,wsBroadcast}));
 
 app.use('/api', requireModule('production'), createProductionShiftsRouter({
   db,

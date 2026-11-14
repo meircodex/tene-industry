@@ -1,0 +1,408 @@
+{
+  "$id": "tene.station.prepare/1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "card",
+    "shapeSnapshot",
+    "manufacturingIntent",
+    "profileRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.1"
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "revision",
+        "quantityUnits",
+        "strandsPerCycle"
+      ],
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
+        },
+        "quantityUnits": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "strandsPerCycle": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      }
+    },
+    "shapeSnapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "shapeId",
+        "shapeVersion",
+        "family",
+        "data"
+      ],
+      "properties": {
+        "shapeId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
+        },
+        "shapeVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": [
+            "sides",
+            "angles",
+            "diameter"
+          ],
+          "properties": {
+            "sides": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1000,
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "angles": {
+              "type": "array",
+              "maxItems": 999,
+              "items": {
+                "type": "number"
+              }
+            },
+            "diameter": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "radiusMm": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "radiusReference": {
+              "enum": [
+                "inner",
+                "centerline",
+                "outer",
+                null
+              ]
+            },
+            "is3d": {
+              "enum": [
+                false,
+                true,
+                0,
+                1
+              ]
+            },
+            "azAngles": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "elAngles": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "manufacturingIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision"
+      ],
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dimensionReference": {
+          "enum": [
+            "outside",
+            "inside",
+            "centerline",
+            "feed_reference",
+            null
+          ]
+        },
+        "startSegmentIndex": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "reverseOrder": {
+          "type": "boolean"
+        },
+        "bends": {
+          "type": "array",
+          "maxItems": 999,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bendIndex"
+            ],
+            "properties": {
+              "bendIndex": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "approach": {
+                "enum": [
+                  "AUTO",
+                  "ABOVE",
+                  "BELOW"
+                ]
+              },
+              "plate": {
+                "enum": [
+                  "AUTO",
+                  "REQUIRE",
+                  "PROHIBIT"
+                ]
+              },
+              "radiusMm": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "radiusReference": {
+                "enum": [
+                  "inner",
+                  "centerline",
+                  "outer",
+                  null
+                ]
+              },
+              "toolId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "choiceSource": {
+                "enum": [
+                  "editor",
+                  "imported",
+                  "approved_memory"
+                ]
+              }
+            }
+          }
+        },
+        "compensation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source"
+          ],
+          "properties": {
+            "source": {
+              "enum": [
+                "PROFILE",
+                "APPROVED_MEMORY",
+                "MANUAL"
+              ]
+            },
+            "memoryRef": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  ]
+                },
+                "revision": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  ]
+                }
+              }
+            },
+            "reason": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "lengthAdjustments": {
+              "type": "array",
+              "maxItems": 1000,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "segmentIndex",
+                  "deltaMm"
+                ],
+                "properties": {
+                  "segmentIndex": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "deltaMm": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "angleAdjustments": {
+              "type": "array",
+              "maxItems": 999,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bendIndex",
+                  "deltaDeg"
+                ],
+                "properties": {
+                  "bendIndex": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "deltaDeg": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            {
+              "type": "integer",
+              "minimum": 1
+            }
+          ]
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 200
+    }
+  }
+}
