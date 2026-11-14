@@ -17,3 +17,7 @@ The shape editor opens an isolated compact manufacturing-intent dialog. Each ben
 Saved intent has status `requested_not_machine_qualified`. AUTO requires verified station rules; manual choice does not override capabilities or physical interlocks. Saving intent never starts a machine or writes a recipe. Job/transfer/measurement messages are reported evidence, not permission to mutate another module's records.
 
 Validation: shared contract/service tests, route authorization/governance, full main-application tests and an actual browser save/reopen test against the central router with synthetic data. Local station distribution and physical qualification are tracked separately from this web release.
+
+## Verified release — 14 November 2026
+
+PR #16 merged as `3c76ed4`; live deploy `dep-dbs90qec6qcc738h9pg0` serves descendant `a8a9a5a`. All 1,277 tests in the web-only checkout passed. Nine browser save/reopen checks passed with synthetic data. Live checks passed for health, the editor cache version, button availability, exact tested module contents and anonymous-access rejection. No production manufacturing-intent or machine-control writes were performed for verification.
