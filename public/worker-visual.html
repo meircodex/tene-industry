@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>דשבורד איסוף כרטיסים – IronBend</title>
+  <link rel="stylesheet" href="/worker-machine-feedback.css?v=20261115">
   <style>
     :root{--navy:#0b4262;--blue:#0c567a;--teal:#17766d;--ink:#072e49;--line:#c8dce6;--bg:#edf5f7;--soft:#f8fcfd;--wait:#b56c14;--done:#467c3b;--loaded:#625194}
     *{box-sizing:border-box}html{min-width:0}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif;direction:rtl;min-width:0;overflow-x:hidden}
@@ -112,11 +113,12 @@
   <script src="/auth-client.js"></script>
   <script src="/display-units.js"></script>
   <script src="/status-contracts-client.js"></script>
+  <script src="/worker-machine-feedback.js?v=20261115"></script>
   <script>
     const state={items:[],selected:null,focusItemId:null,scanToken:null,originalCard:null};
     const ENTRY_PARAMS=new URLSearchParams(location.search);
     const SCAN_ENTRY=ENTRY_PARAMS.get('scan')==='1'||ENTRY_PARAMS.has('card')||ENTRY_PARAMS.has('item');
-    let pendingWrite=null;
+    let pendingWrite=null,preparingMachineFeedback=false;
     let pendingLoad=false;
     let unresolvedWrite=false;
     document.body.classList.toggle('scan-entry',SCAN_ENTRY);
@@ -214,6 +216,7 @@
         if(SCAN_ENTRY){state.items=[item];state.originalCard=data.original_card;}
         else {const index=state.items.findIndex(row=>Number(row.id)===Number(item.id));if(index<0)state.items.push(item);else state.items[index]=item;}
         focusScannedCard(parsed);
+        try{Promise.resolve(window.IronBendMachineFeedback?.onCardOpened({item,card:parsed.token,receipt:data.scan_receipt})).catch(()=>{});}catch{}
         showOperation(startReceipt?`הייצור בכרטיס ${item.order_num||''} / ${item.id} התחיל אוטומטית. ${receiptText(startReceipt)}`:`סריקת כרטיס ${item.order_num||''} / ${item.id} נקלטה במערכת. ${receiptText(data.scan_receipt)}`,'success');
       }catch(error){showOperation(error.explicit?error.message:'לא התקבל אישור קליטה מהמערכת. בדוק את החיבור ונסה שוב.',error.explicit?'failed':'unknown',()=>loadScannedCard(parsed));}
       finally{pendingLoad=false;}
@@ -386,12 +389,20 @@
       await saveProductionFields(id,event);
     }
     async function setStatus(id,key){
-      if(pendingWrite||pendingLoad)return;
+      if(pendingWrite||pendingLoad||preparingMachineFeedback)return;
       if(!apiStatus[key])return;
       const item=state.items.find(row=>row.id===id);
+      let machineFeedback=null;
+      if(key==='done'&&publicWorkerCardToken()){
+        preparingMachineFeedback=true;
+        try{machineFeedback=await window.IronBendMachineFeedback?.beforeComplete({itemId:id,card:publicWorkerCardToken()});}catch{}
+        finally{preparingMachineFeedback=false;}
+        if(machineFeedback?.cancelled)return;
+      }
       const payload={status:apiStatus[key],expected_status:item?.status,correction_reason:'תיקון סטטוס בסריקת כרטיס'};
       if(SCAN_ENTRY||state.scanToken){payload.card=publicWorkerCardToken();payload.request_id=workerRequestId();}
-      return runWorkerWrite({id,payload,url:workerCardApi(id,'/status'),suffix:'/status',action:'status_changed',preserveDraft:readWorkerDraft(id),success:`הסטטוס בכרטיס ${id} עודכן ל־${statusText[key]}.`,apply(data){const item=state.items.find(item=>item.id===id);if(item){if(data.item)Object.assign(item,data.item);else item.status=payload.status;}}});
+      const scanCard=publicWorkerCardToken();
+      return runWorkerWrite({id,payload,url:workerCardApi(id,'/status'),suffix:'/status',action:'status_changed',preserveDraft:readWorkerDraft(id),success:`הסטטוס בכרטיס ${id} עודכן ל־${statusText[key]}.`,apply(data){const item=state.items.find(item=>item.id===id);if(item){if(data.item)Object.assign(item,data.item);else item.status=payload.status;}if(key==='done'){try{window.IronBendMachineFeedback?.afterComplete({context:machineFeedback,receipt:data.receipt,itemId:id,card:scanCard});}catch{}}}});
     }
     function selectOrder(id){if(pendingWrite||pendingLoad)return;state.selected=id;state.focusItemId=null;state.scanToken=null;render();document.querySelector('.panel').classList.add('mobile-hidden');document.querySelector('.stage').classList.remove('mobile-hidden')}
     async function load(){

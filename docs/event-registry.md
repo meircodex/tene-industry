@@ -1,5 +1,10 @@
 # Event Registry
 
+`worker_machine_request` signals the durable relay using source/request IDs.
+Local `run.recipe_confirmed` preserves source/card/run/snapshot attestation after
+the original Production `status_changed` DONE receipt. Feedback does not create
+another completion or stock event. Operator approval is not machine qualification.
+
 Production queue consumers (2026-11-11) refetch after `order_updated` and
 `order_deleted`, as well as the existing order/item lifecycle events. Closing,
 paying, trashing or restoring an order therefore changes queue membership through

@@ -46,7 +46,7 @@ Status values:
 | `machine.html` | Production | partial | internal production | Machine assignment/state. Needs state contract. |
 | `kiosk.html` | Production | partial | shop-floor auth TBD | Does not load shared nav in inventory check; needs auth decision. |
 | `worker.html` | Production | partial | shop-floor auth TBD | Very small wrapper/entry point. |
-| `worker-visual.html` | Production | partial | shop-floor auth TBD | Visual worker flow; needs auth and shared status model. |
+| `worker-visual.html` | Production | active | existing production QR/card scope | Original scan and completion; optional Machine Integration parameter mirror and same-action recipe confirmation. No new worker screen. |
 
 ## Inventory, Procurement, Delivery
 

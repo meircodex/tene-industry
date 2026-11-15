@@ -63,6 +63,7 @@ const createProductionMetricsRouter = require('./routes/productionMetrics');
 const createProductionShiftsRouter = require('./routes/productionShifts');
 const createQualityRouter = require('./routes/quality');
 const createMachineStationRouter = require('./routes/machineStation');
+const createWorkerMachineFeedbackRouter = require('./routes/workerMachineFeedback');
 const createMaintenanceRouter = require('./routes/maintenance');
 const createCustomersRouter = require('./routes/customers');
 const createAuthRouter = require('./routes/auth');
@@ -331,7 +332,7 @@ const allRouteFactories = [
   createProductionMachinesRouter, createProductionCardsRouter, createWarehouseRouter,
   createInventoryRouter, createProcurementRouter, createProcurementRecommendationsRouter, createFleetRouter, createQualityRouter,
   createMaterialAllocationPlanningRouter,
-  createMaintenanceRouter, createReportsRouter, createFinanceRouter, createFinanceInvoicesRouter, createMachineStationRouter,
+  createMaintenanceRouter, createReportsRouter, createFinanceRouter, createFinanceInvoicesRouter, createMachineStationRouter, createWorkerMachineFeedbackRouter,
   createFinanceCostsRouter, createFinanceLedgerRouter, createFinanceCreditRouter,
   createCompaniesRouter, createAdminRouter, createLogisticsRouter, createPortalRouter,
   createPortalAdminRouter, createAlertsRouter, createAiRouter, createBvbsRouter,
@@ -416,6 +417,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/quality.js', factory: createQualityRouter },
     { file: 'routes/qualityWeighings.js', factory: require('./routes/qualityWeighings') },
     { file: 'routes/machineStation.js', factory: createMachineStationRouter },
+    { file: 'routes/workerMachineFeedback.js', factory: createWorkerMachineFeedbackRouter },
     { file: 'routes/reports.js', factory: createReportsRouter },
     { file: 'routes/search.js', factory: createSearchRouter },
     { file: 'routes/warehouse.js', factory: createWarehouseRouter },

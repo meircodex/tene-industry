@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const createProductionMachinesRouter = require('./productionMachines');
+const createWorkerMachineFeedbackRouter = require('./workerMachineFeedback');
 const productionCards = require('../services/productionCards');
 const { buildWorkerOriginalCard } = require('../services/workerOriginalCard');
 const { markOrderProductionStarted, reconcileQueuedProduction } = require('../services/orderProductionStatus');
@@ -389,6 +390,7 @@ module.exports = function createProductionRouter(deps) {
     res.json({ success: true });
   });
 
+  router.use('/machine-feedback', createWorkerMachineFeedbackRouter({db,requireQrPermission,authorizeCard:authorizePublicWorkerCard,parseCard:parseWorkerCardToken,wsBroadcast}));
   router.use(createProductionMachinesRouter({
     db,
     requireAnyRole,

@@ -1,5 +1,11 @@
 # API Route Permission Map
 
+Worker feedback uses `requireQrPermission('production')` plus existing item/card
+authorization. Activity-free snapshot additionally requires a bound station
+credential. Station relay/current routes require production/maintenance/manager/
+admin and exact source credentials. Actor/card/request and source hashes prevent
+cross-card or cross-station results. Test: `test/worker-machine-feedback.test.js`.
+
 `GET /api/operations/editor-drafts`, `PUT .../:id`, `POST .../:id/close`
 (2026-11-11): office/manager/admin existing JWT only. Production, warehouse,
 portal and unauthenticated clients cannot read/write these shared editor

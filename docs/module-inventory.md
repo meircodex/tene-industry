@@ -664,3 +664,12 @@ module-governance foundation:
 
 
 Production owns `services/itemStatusCorrection.js` and `/api/items/:id/status-correction-preview`, orchestrating the existing Orders certificate cancellation service without modifying document snapshots.
+
+## Machine Integration Edge: worker feedback (2026-11-15)
+
+Primary owner: Machine Integration Edge. Production retains worker status and
+quantity ownership. `routes/workerMachineFeedback.js` is a child of Production;
+`services/machineIntegration/workerFeedback.js` owns `mi_worker_requests`,
+`mi_station_presence`, `mi_station_current` and the registered-station relay.
+The existing worker page embeds optional feedback assets. No new screen is added.
+See [interfaces and rollback](worker-machine-feedback.md).

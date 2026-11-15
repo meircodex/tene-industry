@@ -4,6 +4,12 @@
   root.IronBendDataContracts = api;
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   const WIDGET_CONTRACTS = Object.freeze({
+    workerMachineFeedback: {
+      screen:'worker-visual.html',owner:'Machine Integration Edge',
+      source:{api:'/api/machine-feedback/requests',fields:['sourceId','card','runId','observedAtUtc','live','complete','expected','rows','special','changes','proposal','approvalSaved']},
+      meaning:'Optional read-only controller mirror inside the existing worker card. Only registered station/card/run data are shown, with freshness and research-mapping limitations. The existing Production DONE receipt must succeed before an optional operator-attested recipe snapshot is saved locally. Offline or unavailable feedback never changes production status/counts or blocks the original workflow. Manual HMI corrections remain authoritative observations, not verified physical dimensions or automatic machine qualification. No PLC writes.',
+      consumers:['workerMachineFeedback','mif-source','mif-approve'],risk:'D2',
+    },
     productionQueue: {
       screen:'production-queue.html',owner:'Production',source:{api:'/api/production-queue',fields:['items','grouped','order_status','order_payment_status','order_deleted_at','status','cancelled_at','production_stopped_at']},
       meaning:'Queue membership consumes the canonical Orders active-workspace condition and released production status. Paid/closed, trashed, cancelled and delivered orders are excluded in both normal and visual modes. Cancelled/stopped items are excluded. Visual mode retains finished/loading items only for still-open orders. The header counts queued item rows, not pieces completed during a shift. Order/item lifecycle events refetch the queue; failed fetches clear stale actions and out-of-order responses are discarded. All consumers use the same endpoint and production-start guard.',

@@ -1,5 +1,12 @@
 # Entity Registry
 
+Machine Integration Edge owns additive `mi_worker_requests` (actor/card-scoped
+requests and immutable replies), `mi_station_presence` (heartbeat) and
+`mi_station_current` (one latest mirror per source). Existing machine directory
+and Production DONE receipts are consumed read-only. Full observations and
+operator-attested recipe snapshots remain in the local recorder. These tables
+never own item status, production counts, stock or physical product quality.
+
 `direct_order_drafts` (Orders, 2026-11-11) also stores complete shape-editor UI
 snapshots under source `new-order-editor-v2`. `external_id` is the client draft
 ID, `version` guards concurrent writes, and `submitted`/`deleted` retain payload

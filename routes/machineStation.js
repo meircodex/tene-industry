@@ -1,11 +1,26 @@
 'use strict';
 const express=require('express');
 const {StationInbox}=require('../services/machineIntegration/stationInbox');
+const {WorkerFeedback}=require('../services/machineIntegration/workerFeedback');
 function required(name,value){if(!value)throw Error('routes/machineStation missing dependency: '+name);return value;}
 function principal(req){const id=req.auth?.sub??req.user?.id;return id==null?null:{id,displayName:req.auth?.display_name||req.user?.name||''};}
 module.exports=function createMachineStationRouter(deps){
  const db=required('db',deps.db),requireAnyRole=required('requireAnyRole',deps.requireAnyRole),auditLog=required('auditLog',deps.auditLog),wsBroadcast=required('wsBroadcast',deps.wsBroadcast);
  const router=express.Router(),service=new StationInbox({db});
+ const workerFeedback=new WorkerFeedback({db,inbox:service});
+ router.post('/machine-integration/station-current',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+  try{res.json(workerFeedback.publish(req.query.sourceId,req.headers['x-station-credential'],req.body));}
+  catch(error){res.status(error.status||400).json({error:error.message});}
+ });
+ router.get('/machine-integration/station-requests',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+  try{res.set('Cache-Control','no-store');res.json(workerFeedback.pending(req.query.sourceId,req.headers['x-station-credential'],{limit:Number(req.query.limit||10),offset:Number(req.query.offset||0)}));}
+  catch(error){res.status(error.status||400).json({error:error.message});}
+ });
+ router.post('/machine-integration/station-requests/result',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+  try{const result=workerFeedback.respond(req.query.sourceId,req.headers['x-station-credential'],req.body);
+   wsBroadcast('worker_machine_result',{sourceId:req.query.sourceId,requestId:result.id});res.json(result);}
+  catch(error){res.status(error.status||400).json({error:error.message});}
+ });
  router.post('/machine-integration/stations/register',requireAnyRole(['manager','admin']),(req,res)=>{
   try{const actor=principal(req),result=service.register(actor,req.body||{});
    auditLog('machine_station',result.sourceId,result.sourceId,'register','machine_id',null,result.machineId,'רישום תחנת מכונה',actor.id,actor.displayName);

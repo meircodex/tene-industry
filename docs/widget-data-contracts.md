@@ -1,5 +1,13 @@
 # Widget Data Contracts
 
+`workerMachineFeedback` (2026-11-15, Machine Integration Edge) is an optional
+section in the existing `worker-visual.html`. Its registered source/card/run
+values, freshness, expected geometry and actual controller rows come from
+`/api/machine-feedback/requests`; values are not substituted from the card.
+Unknown/stale data are marked. Original completion receipts precede optional
+local recipe approval. No device writes or physical-accuracy claims. D2 additive
+tables; no change to production ownership or mandatory worker input.
+
 `productionQueue` (2026-11-11, Production) uses `/api/production-queue` for every
 machine/visual consumer. Membership requires an open Orders workspace record and
 the applicable released production status, with stopped/cancelled items excluded.

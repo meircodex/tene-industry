@@ -2,7 +2,7 @@
 const {hashEvent,canonicalizeEvent}=require('../../machine-monitor/v1');
 function fail(code,status=422){throw Object.assign(Error(code),{status});}
 function string(value,max=200){return typeof value==='string'&&value.length>0&&value.length<=max&&!/[\x00-\x1f]/.test(value);}
-const allowed={MachineIntegration:/^(job\.prepared|transfer\.(prepared|transferring|readback_pending|verified|failed|outcome_unknown)|recipe\.changed)$/,
+const allowed={MachineIntegration:/^(job\.prepared|transfer\.(prepared|transferring|readback_pending|readback_verified|acceptance_pending|verified|failed|outcome_unknown)|run\.(queued|observing|transferring|active|attention|completed|cancelled|feedback|recipe_confirmed)|recipe\.changed)$/,
  Quality:/^(measurement\.saved|quality\.policy_changed|recipe_memory\.(candidate|approved|withdrawn))$/};
 function validateSyncBatch(request){
  if(request?.schemaVersion!=='1.1'||!Array.isArray(request.messages)||!request.messages.length||request.messages.length>100)fail('INVALID_STATION_BATCH');

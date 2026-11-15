@@ -5,6 +5,14 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('worker machine feedback is additive, QR-scoped, and does not own the existing status mutation',()=>{
+  const route=fs.readFileSync(path.join(root,'routes/workerMachineFeedback.js'),'utf8');
+  const production=fs.readFileSync(path.join(root,'routes/production.js'),'utf8');
+  assert.match(route,/requireQrPermission\('production'\)/);assert.match(route,/authorizeCard/);
+  assert.match(production,/router\.use\('\/machine-feedback', createWorkerMachineFeedbackRouter/);
+  assert.doesNotMatch(route,/UPDATE items|writeParams|modbus\.|PLC_START/);
+});
+
 test('production eligibility consumes the Orders workspace lifecycle contract', () => {
   const policy = fs.readFileSync(path.join(root, 'services/productionEligibility.js'), 'utf8');
   assert.match(policy, /require\('\.\/orderWorkspace'\)/);

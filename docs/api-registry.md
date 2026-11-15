@@ -1,5 +1,15 @@
 # API Registry
 
+## Existing worker machine feedback (2026-11-15)
+
+Machine Integration Edge owns GET `/api/machine-feedback/stations`, POST
+`/requests`, GET `/requests/:id`, GET `/snapshot` inside Production's router.
+Existing production QR/card scope applies; snapshot additionally requires source
+credentials and creates no extra scan activity. Station GET
+`/api/machine-integration/station-requests`, POST `/station-requests/result` and
+`/station-current` retain role and source guards. No arbitrary device commands.
+See [interface contract](worker-machine-feedback.md).
+
 Production queue lifecycle fix (2026-11-11): GET `/api/production-queue`, including
 visual/machine filters, consumes the canonical Orders active bucket before
 checking released production/item status. Paid, trashed, cancelled and delivered
