@@ -28,7 +28,8 @@ function saveAccount(db,authService,profileId,body,actor){
 }
 function identify(db,req){
  const account=accountForUser(db,req.auth?.sub);
- if(!account||!account.profile_active||!account.user_active)fail(403,'worker_portal_disabled');
+ if(!account)fail(403,'worker_portal_account_required');
+ if(!account.profile_active||!account.user_active)fail(403,'worker_portal_disabled');
  req.portalWorker=publicAccount(account);req.userId=String(account.user_id);
  req.auth={...req.auth,display_name:account.worker_name};
  // A shared device's former enrollment must never override the logged-in worker.

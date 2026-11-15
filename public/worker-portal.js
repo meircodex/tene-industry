@@ -17,6 +17,7 @@
   if(code==='invalid_worker_credentials')return 'loginError';
   if(code==='worker_login_locked'||status===423||status===429)return 'locked';
   if(code==='worker_portal_disabled')return 'disabled';
+  if(code==='worker_portal_account_required')return 'loginRequired';
   if(code==='invalid_worker_card_token'||code==='invalid_card_split'||code==='specific_component_card_required')return 'invalidCode';
   if(code==='not_found')return 'notFound';
   if(code==='worker_status_changed'||code==='worker_portal_invalid_transition'||code==='worker_request_conflict')return 'changed';

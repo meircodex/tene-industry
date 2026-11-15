@@ -31,6 +31,7 @@ test('personal worker portal reuses production with account identity, scoped per
  assert.equal(login.body.user.portal_only,true);assert.equal(login.body.user.language,'th');
  const bob=(await call('/api/auth/worker-login',null,{username:'portal-bob',password:'portal-Test-123!'})).body.access_token;
  assert.equal((await call('/api/worker-portal/me')).status,401);
+ assert.equal((await call('/api/worker-portal/me',admin)).body.error,'worker_portal_account_required');
  assert.equal((await call('/api/worker-portal/me',alice)).body.worker.worker_name,'Alice Worker');
  for(const url of ['/api/orders','/api/users','/api/machines','/api/reports/production-timing','/api/worker-card?card=1'])assert.equal((await call(url,alice)).status,403,url);
  const id=seedItem(),card=String(id);
