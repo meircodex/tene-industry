@@ -403,6 +403,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       lunch_minutes: deductions.lunchMinutes,
       documented_stop_minutes: deductions.documentedStopMinutes,
       net_minutes: round(netMinutes, 3),
+      net_minutes_exact: netMinutes,
       cut_length_mm: round(cutLengthMm, 3),
       total_bends: bends,
       meters_per_min: netMinutes > 0 ? round(cutLengthMm / 1000 / netMinutes, 4) : null,
@@ -532,7 +533,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
 
     if (item.included_in_statistics) {
       current.measured_cards += 1;
-      current.net_minutes += item.net_minutes;
+      current.net_minutes += item.net_minutes_exact ?? item.net_minutes;
       current.gross_minutes = (current.gross_minutes || 0) + item.gross_minutes;
       current.outside_work_minutes = (current.outside_work_minutes || 0) + item.outside_work_minutes;
       current.measured_cut_length_mm += item.cut_length_mm;
@@ -553,7 +554,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     current.measured_cards += 1;
     current.timed_weight_kg = (current.timed_weight_kg || 0) + item.weight_kg;
     current.timed_cut_length_mm = (current.timed_cut_length_mm || 0) + item.cut_length_mm;
-    current.net_minutes += item.net_minutes;
+    current.net_minutes += item.net_minutes_exact ?? item.net_minutes;
     current.gross_minutes = (current.gross_minutes || 0) + item.gross_minutes;
     current.outside_work_minutes = (current.outside_work_minutes || 0) + item.outside_work_minutes;
     current.lunch_minutes += item.lunch_minutes;
@@ -581,7 +582,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     order.measured_cards += 1;
     order.timed_weight_kg = (order.timed_weight_kg || 0) + item.weight_kg;
     order.timed_cut_length_mm = (order.timed_cut_length_mm || 0) + item.cut_length_mm;
-    order.net_minutes += item.net_minutes;
+    order.net_minutes += item.net_minutes_exact ?? item.net_minutes;
     order.gross_minutes = (order.gross_minutes || 0) + item.gross_minutes;
     order.outside_work_minutes = (order.outside_work_minutes || 0) + item.outside_work_minutes;
     order.lunch_minutes += item.lunch_minutes;
@@ -658,7 +659,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
 
   const recipeSummaries = [...recipes.values()].map(list => {
     const first = list[0];
-    const netMinutes = list.reduce((sum, item) => sum + item.net_minutes, 0);
+    const netMinutes = list.reduce((sum, item) => sum + (item.net_minutes_exact ?? item.net_minutes), 0);
     const cutLengthMm = list.reduce((sum, item) => sum + item.cut_length_mm, 0);
     const weightKg = list.reduce((sum, item) => sum + item.weight_kg, 0);
     const bends = list.reduce((sum, item) => sum + item.total_bends, 0);

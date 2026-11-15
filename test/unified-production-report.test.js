@@ -25,3 +25,9 @@ test('drilling into a shape matches exactly, without including similarly named s
  const result=unifiedProductionReport(copy,parseFilters({drill_field:'shape_name',drill_value:'צורה 3'}));
  assert.ok(result.rows.every(r=>r.shape_name==='צורה 3'));assert.equal(result.total,3);
 });
+
+test('pace uses the canonical unrounded duration, so a single trusted card agrees with its summary',()=>{
+ const exact=191/60,cardRow=card(1,3.183,90045,{net_minutes_exact:exact,meters_per_min:90045/1000/exact});
+ const result=unifiedProductionReport({cards:[cardRow],activity:{cards:[activity(1,'2026-11-15')]}},parseFilters());
+ assert.equal(result.summary.meters_per_min,cardRow.meters_per_min);
+});

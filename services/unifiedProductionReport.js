@@ -18,7 +18,7 @@ function summary(rows){
   result.started_cards+=Number(Boolean(r.started));result.ended_cards+=Number(Boolean(r.ended));
   if(r.reported_complete){result.reported_cards++;result.units+=Number(r.reported_quantity)||0;result.weight_kg+=Number(r.reported_weight_kg)||0;result[r.weight_source==='measured'?'measured_kg':'theoretical_kg']+=Number(r.reported_weight_kg)||0;}
   if(r.confirmed_same_day)result.confirmed_units+=Number(r.reported_quantity)||0;
-  if(r.reported_complete&&r.card?.included_in_statistics){result.reliable_cards++;result.net_minutes+=Number(r.card.net_minutes)||0;result.timed_length_mm+=Number(r.card.cut_length_mm)||0;result.timed_weight_kg+=Number(r.card.weight_kg)||0;}
+  if(r.reported_complete&&r.card?.included_in_statistics){result.reliable_cards++;result.net_minutes+=Number(r.card.net_minutes_exact??r.card.net_minutes)||0;result.timed_length_mm+=Number(r.card.cut_length_mm)||0;result.timed_weight_kg+=Number(r.card.weight_kg)||0;}
  }
  result.meters_per_min=result.net_minutes>0?result.timed_length_mm/1000/result.net_minutes:null;
  result.kg_per_min=result.net_minutes>0?result.timed_weight_kg/result.net_minutes:null;
