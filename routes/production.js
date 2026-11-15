@@ -34,6 +34,7 @@ module.exports = function createProductionRouter(deps) {
   const productionActuals = required('productionActuals', deps.productionActuals);
   const workerCardActivity = required('workerCardActivity', deps.workerCardActivity);
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
+  router.use(require('./productionTimingReviews')({db,requireAnyRole,wsBroadcast}));
   // Repair only active queued orders with persisted production evidence. No item,
   // inventory or approval changes are made by this Orders-owned reconciliation.
   for (const started of reconcileQueuedProduction(db)) {

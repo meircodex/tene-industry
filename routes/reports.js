@@ -906,6 +906,6 @@ module.exports.manifest = {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'read', finance: 'read', quality: 'read', maintenance: 'read' },
   },
-  consumes: [{ table: 'orders' }, { table: 'items' }, { table: 'invoices' }],
+  consumes: [{ table: 'orders' }, { table: 'items' }, { table: 'invoices' }, { table: 'production_timing_reviews' }, { table: 'inventory_reservations' }, { table: 'raw_material_usage' }, { table: 'raw_material' }],
   produces: [],
 };

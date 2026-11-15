@@ -4,6 +4,7 @@
 // production item timestamps and the canonical shape snapshot stored on each
 // item; this service never changes an order, a card, or an item state.
 
+const crypto = require('node:crypto');
 const FACTORY_TIME_ZONE = 'Asia/Jerusalem';
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const WORK_START_MINUTE = 7 * 60;
@@ -324,7 +325,7 @@ function scannedInterval(item, completedAt, index) {
   const preciseStart=asDate(item.started_at);
   if(start && preciseStart && Math.abs(preciseStart-start)<1000) start=preciseStart;
   if(end && Math.abs(completedAt-end)<1000) end=completedAt;
-  return {start,end:end||completedAt,source};
+  return {start,end:end||completedAt,source,endSource:end?'scan':'item_timestamp'};
 }
 
 function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
@@ -342,14 +343,17 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     ORDER BY datetime(i.completed_at), i.id
   `).all();
 
-  const items = [];
+  const approvedOutsidePeriod=new Set(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='production_timing_reviews'").get()
+    ? db.prepare("SELECT item_id FROM production_timing_reviews WHERE decision='include'").all().map(r=>r.item_id):[]);
+  const allItems = [];
   for (const item of rows) {
     const recordedCompletion = asDate(item.completed_at);
     if (!recordedCompletion) continue;
     const scan = scannedInterval(item,recordedCompletion,scans);
     const completedAt = scan.end;
     const productionDay = israelDay(completedAt);
-    if (!productionDay || productionDay < fromDate || productionDay > toDate) continue;
+    if (!productionDay) continue;
+    if((productionDay<fromDate||productionDay>toDate)&&!approvedOutsidePeriod.has(item.id)) continue;
     const startedAt = scan.start;
     const profile = shapeProfile(item);
     const machineId = resolveMachineId(item, stopData.machines);
@@ -363,7 +367,9 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       machine_id: machineId,
       machine,
       production_day: productionDay,
+      geometry_revision: crypto.createHash('sha256').update(JSON.stringify([item.shape_snapshot_json||null,item.segments||null])).digest('hex'),
       timing_source: scan.source,
+      timing_end_source: scan.endSource,
       recorded_started_at: item.started_at || null,
       recorded_completed_at: item.completed_at,
       started_at: startedAt ? startedAt.toISOString() : null,
@@ -374,11 +380,11 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       ...profile,
     };
     if (!startedAt) {
-      items.push({ ...base, measurement_status: 'missing_start', measurement_reason: item.started_at ? 'יש זמן התחלה אך אין תיעוד סריקת התחלה' : 'לא נרשמה סריקת התחלת ייצור', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
+      allItems.push({ ...base, measurement_status: 'missing_start', measurement_reason: item.started_at ? 'יש זמן התחלה אך אין תיעוד סריקת התחלה' : 'לא נרשמה סריקת התחלת ייצור', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
       continue;
     }
-    if (completedAt <= startedAt) {
-      items.push({ ...base, measurement_status: 'invalid_range', measurement_reason: 'סיום קודם להתחלה', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
+    if (completedAt <= startedAt || completedAt-startedAt > 370*86400000) {
+      allItems.push({ ...base, measurement_status: 'invalid_range', measurement_reason: completedAt<=startedAt?'סיום קודם להתחלה':'משך מדידה ארוך משנה דורש בירור', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
       continue;
     }
     const stops = machineId ? (stopData.byMachineId.get(machineId) || []) : [];
@@ -387,7 +393,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     const netMinutes = Math.max(0, grossMinutes - deductions.deductedMinutes);
     const cutLengthMm = profile.unitCutLengthMm * quantity;
     const bends = profile.bendCount * quantity;
-    items.push({
+    allItems.push({
       ...base,
       measurement_status: netMinutes > 0 ? 'measured' : 'zero_net_time',
       measurement_reason: netMinutes > 0 ? null : 'אין זמן ייצור נטו לאחר ניכויים',
@@ -404,7 +410,10 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     });
   }
 
-  const measured = items.filter(item => item.measurement_status === 'measured');
+  const reliability=require('./productionTimingReliability');
+  reliability.classify(db,allItems);
+  const items=allItems.filter(item=>item.production_day>=fromDate&&item.production_day<=toDate);
+  const measured = items.filter(item => item.included_in_statistics);
   const recipes = new Map();
   for (const item of measured) {
     const key = `${item.machine}|${item.fingerprint}`;
@@ -427,17 +436,18 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
 
   const transitions = [];
   const byMachine = new Map();
-  for (const item of measured) {
+  for (const item of items) {
     if (!item.machine_id) continue;
     if (!byMachine.has(item.machine_id)) byMachine.set(item.machine_id, []);
     byMachine.get(item.machine_id).push(item);
   }
   for (const [machineId, machineItems] of byMachine.entries()) {
-    const ordered = [...machineItems].sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.item_id - b.item_id);
+    const ordered = [...machineItems].sort((a, b) => Date.parse(a.started_at||a.completed_at) - Date.parse(b.started_at||b.completed_at) || a.item_id - b.item_id);
     const stops = stopData.byMachineId.get(machineId) || [];
     for (let index = 1; index < ordered.length; index += 1) {
       const previous = ordered[index - 1];
       const current = ordered[index];
+      if(!previous.included_in_statistics||!current.included_in_statistics) continue;
       const start = asDate(previous.completed_at);
       const end = asDate(current.started_at);
       if (!start || !end) continue;
@@ -519,7 +529,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     if (cardCutLength === null) current.missing_cut_length_cards += 1;
     else current.cut_length_mm += cardCutLength;
 
-    if (item.measurement_status === 'measured') {
+    if (item.included_in_statistics) {
       current.measured_cards += 1;
       current.net_minutes += item.net_minutes;
       current.gross_minutes = (current.gross_minutes || 0) + item.gross_minutes;
@@ -580,7 +590,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     order.profiles.add(`${item.shapeName} · Ø${item.diameterMm} מ״מ`);
     orderSummaries.set(orderKey, order);
   }
-  for (const item of items.filter(item => item.measurement_status !== 'measured')) {
+  for (const item of items.filter(item => !item.included_in_statistics)) {
     const key = item.machine;
     const current = machineSummaries.get(key) || {
       machine: key, measured_cards: 0, unmeasured_cards: 0, net_minutes: 0, lunch_minutes: 0,
@@ -711,7 +721,11 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     recipes: recipeSummaries,
     daily_diameters,
     transitions: transitions.sort((a, b) => b.transition_minutes - a.transition_minutes || b.item_id - a.item_id),
+    reliability_policy: reliability.POLICY,
     data_quality: {
+      reliable_cards:items.filter(c=>c.reliability_status==='reliable').length,
+      review_cards:items.filter(c=>c.reliability_status==='review').length,
+      unreliable_cards:items.filter(c=>c.reliability_status==='unreliable').length,
       completed_cards: items.length,
       measured_cards: measured.length,
       unmeasured_cards: items.length - measured.length,

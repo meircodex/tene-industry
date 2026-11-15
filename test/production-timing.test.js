@@ -46,6 +46,12 @@ function seedItem(db, values = {}) {
   if(values.started_at) db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(?,'start',?)").run(values.id,values.started_at);
 }
 
+function approveTiming(db,id,day) {
+ const service=require('../services/productionTimingReliability');service.ensureReviews(db);
+ const card=reportProductionTiming(db,{fromDate:day,toDate:day}).cards.find(c=>c.item_id===id);
+ service.saveReview(db,{itemId:id,day,measurementKey:card.measurement_key,decision:'include',reason:'fixture verified scan interval',expectedReviewRevision:card.review_revision});
+}
+
 test('production timing deducts only the actual lunch overlap and avoids double-deducting documented stops', () => {
   const start = new Date('2026-08-13T08:50:00.000Z'); // 11:50 in Israel
   const end = new Date('2026-08-13T10:00:00.000Z');   // 13:00 in Israel
@@ -94,6 +100,7 @@ test('production timing reports net time, cut metres, rates and coil loading wit
       (1,'COIL_LOAD','2026-08-13T09:40:00.000Z','2026-08-13T09:55:00.000Z',15)
     `).run();
 
+    approveTiming(db,1,'2026-08-13');approveTiming(db,2,'2026-08-13');
     const report = reportProductionTiming(db, { fromDate: '2026-08-13', toDate: '2026-08-13' });
     const card1 = report.cards.find(card => card.item_id === 1);
     assert.equal(card1.measurement_status, 'measured');
@@ -187,6 +194,7 @@ test('missing weighing uses theoretical mass and untimed completed work stays in
   seedBase(db);
   seedItem(db,{id:1,started_at:'2026-11-15T06:00:00Z',completed_at:'2026-11-15T07:00:00Z',total_weight:120});
   seedItem(db,{id:2,completed_at:'2026-11-15T08:00:00Z',total_weight:240});
+  approveTiming(db,1,'2026-11-15');
   const report=reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
   assert.equal(report.cards.find(x=>x.item_id===1).weight_source,'theoretical');
   assert.equal(report.cards.find(x=>x.item_id===1).weight_kg,120);
@@ -252,5 +260,29 @@ test('manual starts do not establish scan timing, and late duplicate completion 
   const card=report().cards[0];
   assert.equal(card.started_at,'2026-11-15T06:00:00.000Z');assert.equal(card.completed_at,'2026-11-15T07:00:00.000Z');
   assert.equal(card.net_minutes,60);assert.equal(card.timing_source,'scan_log');assert.equal(card.recorded_completed_at,'2026-11-15T09:00:00Z');
+ }finally{db.close();}
+});
+
+test('trusted baselines are independent of the report date filter and excluded time never changes production totals',()=>{
+ const db=createDb();try{
+  seedBase(db);
+  for(let id=1;id<=7;id++){
+   const day=id<=5?'2026-11-12':'2026-11-15',minute=id<=5?(id-1)*3:id===6?0:3;
+   const stamp=(m,seconds=0)=>`${day}T06:${String(m).padStart(2,'0')}:${String(seconds).padStart(2,'0')}Z`;
+   const start=stamp(minute),end=id===7?stamp(minute,2):stamp(minute+2);
+   seedItem(db,{id,started_at:start,completed_at:end});
+   db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(?,'complete',?)").run(id,end);
+   db.prepare("INSERT INTO inventory_reservations(order_id,item_id,diameter,material_type,reserved_kg)VALUES(1,?,12,'coil',10)").run(id);
+  }
+  for(let id=1;id<=5;id++)approveTiming(db,id,'2026-11-12');
+  const selected=reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
+  const wide=reportProductionTiming(db,{fromDate:'2026-11-12',toDate:'2026-11-15'});
+  assert.equal(selected.cards.find(c=>c.item_id===6).reliability_status,'reliable');
+  assert.equal(selected.cards.find(c=>c.item_id===6).measurement_key,wide.cards.find(c=>c.item_id===6).measurement_key);
+  assert.equal(selected.cards.find(c=>c.item_id===7).reliability_status,'review');
+  assert.equal(selected.machines[0].weight_kg,20);assert.equal(selected.machines[0].net_minutes,2);assert.equal(selected.machines[0].kg_per_min,5);
+  assert.equal(selected.daily_diameters[0].weight_kg,20);assert.equal(selected.daily_diameters[0].timed_weight_kg,10);
+  db.prepare('UPDATE items SET quantity=11 WHERE id=1').run();
+  assert.equal(reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'}).cards.find(c=>c.item_id===6).reliability_status,'review');
  }finally{db.close();}
 });

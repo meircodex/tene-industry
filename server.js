@@ -410,6 +410,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/production.js', factory: createProductionRouter },
     { file: 'routes/productionCards.js', factory: createProductionCardsRouter },
     { file: 'routes/productionMachines.js', factory: createProductionMachinesRouter },
+    { file: 'routes/productionTimingReviews.js', factory: require('./routes/productionTimingReviews') },
     { file: 'routes/productionMetrics.js', factory: createProductionMetricsRouter },
     { file: 'routes/productionShifts.js', factory: createProductionShiftsRouter },
     { file: 'routes/quality.js', factory: createQualityRouter },

@@ -211,7 +211,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
     <div class="timing-note">הכרטיסים נבחרים לפי תאריך הסיום. הכמות והמשקל כוללים את כל הכרטיסים שהושלמו. הזמן והקצב מחושבים רק לכרטיסים עם התחלה וסיום תקינים; חסרים מסומנים בנפרד.</div>
     <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);">
       <table class="data-table">
-        <thead><tr><th>הזמנה</th><th>צורות וקטרים</th><th>כרטיסים מדודים</th><th>חסרי מדידה</th><th>זמן נטו</th><th>אורך חיתוך</th><th>משקל כולל</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th></tr></thead>
+        <thead><tr><th>הזמנה</th><th>צורות וקטרים</th><th>נכללו בקצב</th><th>הוחרגו מהקצב</th><th>זמן שנכלל בקצב</th><th>אורך חיתוך</th><th>משקל כולל</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th></tr></thead>
         <tbody id="timingOrderTable"></tbody>
       </table>
     </div>
@@ -222,7 +222,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
     <div class="timing-note">המשקל כולל כרטיסים שהושלמו גם אם חסר להם זמן התחלה; קצב מחושב רק מכרטיסים עם זמן נטו מדוד. לחיצה על „פתח כרטיסים” מסננת את הפירוט למטה.</div>
     <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);">
       <table class="data-table">
-        <thead><tr><th>יום</th><th>קוטר</th><th>כרטיסים</th><th>יחידות</th><th>אורך חיתוך</th><th>משקל</th><th>זמן נטו</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th><th>טעינת גליל</th><th></th></tr></thead>
+        <thead><tr><th>יום</th><th>קוטר</th><th>כרטיסים</th><th>יחידות</th><th>אורך חיתוך</th><th>משקל</th><th>זמן שנכלל בקצב</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th><th>טעינת גליל</th><th></th></tr></thead>
         <tbody id="dailyDiameterTable"></tbody>
       </table>
     </div>
@@ -233,7 +233,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
     <div class="timing-note">ההשוואה כוללת צורה, קוטר, אורכי צלעות וכיפופים. צפי מוצג רק לאחר לפחות 5 כרטיסים זהים.</div>
     <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);">
       <table class="data-table">
-        <thead><tr><th>מכונה</th><th>צורה</th><th>קוטר</th><th>אורך יח׳</th><th>כיפופים</th><th>כרטיסים</th><th>זמן נטו</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th><th>כיפ׳/דק׳</th><th>צפי יח׳</th></tr></thead>
+        <thead><tr><th>מכונה</th><th>צורה</th><th>קוטר</th><th>אורך יח׳</th><th>כיפופים</th><th>כרטיסים</th><th>זמן שנכלל בקצב</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th><th>כיפ׳/דק׳</th><th>צפי יח׳</th></tr></thead>
         <tbody id="timingRecipeTable"></tbody>
       </table>
     </div>
@@ -252,10 +252,12 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
 
   <div>
     <div class="section-title">🧾 פירוט זמני כרטיסים <span class="timing-filter" id="timingCardFilter" hidden></span><button class="btn-export timing-filter" id="clearTimingCardFilter" type="button" onclick="clearTimingCardFilter()" hidden>נקה סינון</button></div>
-    <div class="timing-note">כרטיס ללא התחלה או סיום תקינים אינו נכנס למדדי המהירות, כדי שלא ייווצר נתון מומצא.</div>
+    <div class="timing-note">הקצב מחושב רק ממדידות אמינות. כמות ומשקל של כל הכרטיסים נשארים בסיכומי התפוקה. רישום קצר או חריג דורש בדיקת מנהל.</div>
+    <details class="timing-note"><summary>איך נקבעת אמינות המדידה?</summary>מדידה שאושרה במפורש על ידי מנהל נכללת בסטטיסטיקה. בגלילים ניתן גם אישור אוטומטי כשהקצב מעל מטר לדקה ובטווח של עד פי 3 מחציון לפחות 5 כרטיסים דומים שאושרו, עם סריקות התחלה וסיום. ליפטים וסוג חומר לא מאומת דורשים בדיקת מנהל. רישום התחלה וסיום בתוך 5 שניות מסומן לבדיקה כחשד לדיווח בדיעבד. מנהל יכול לאשר גם קצב חריג או איטי אם בדק שהזמנים נרשמו בזמן העבודה. זמן חסר או לא תקין אינו ניתן לאישור כזמן מדוד.</details>
+    <div class="filter-bar"><label for="timingReliabilityFilter">אמינות המדידה</label><select id="timingReliabilityFilter" onchange="renderTimingCards(timingData?.cards||[])"><option value="">כל המדידות</option><option value="reliable">אמינות</option><option value="review">דורשות בדיקה</option><option value="unreliable">לא אמינות</option></select><span id="timingReviewMessage" role="status"></span></div>
     <div style="overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);">
       <table class="data-table">
-        <thead><tr><th>הזמנה</th><th>מכונה</th><th>צורה</th><th>קוטר</th><th>כמות</th><th>התחלה</th><th>סיום</th><th>זמן נטו</th><th>מ׳/דק׳</th><th>ק״ג/דק׳</th><th>מצב</th></tr></thead>
+        <thead><tr><th>הזמנה</th><th>מכונה</th><th>כרטיס / צורה</th><th>סוג וקוטר</th><th>כמות</th><th>התחלה</th><th>סיום</th><th>זמן שנרשם</th><th>מ׳/דק׳ שנרשם</th><th>ק״ג/דק׳ שנרשם</th><th>אמינות וסטטיסטיקה</th></tr></thead>
         <tbody id="timingCardTable"></tbody>
       </table>
     </div>
@@ -437,7 +439,7 @@ async function loadProductionTiming(from, to) {
     data=await response.json();
     if(!Array.isArray(data.cards)) throw Error('invalid_timing_data');
   } catch(error) { state.textContent='נתוני הזמן לא נטענו. יש לנסות שוב; הנתונים הקודמים, אם מוצגים, לא עודכנו.'; return; }
-  state.textContent=`${num(data.data_quality?.measured_cards)} כרטיסים עם זמן מדוד · ${num(data.data_quality?.unmeasured_cards)} ללא מדידה תקינה. משקל תאורטי מוצג כשאין שקילה בפועל. זמן התחלה ידני ללא תיעוד סריקה אינו נחשב למדידת זמן.`;
+  state.textContent=`${num(data.data_quality?.reliable_cards)} מדידות אמינות · ${num(data.data_quality?.review_cards)} דורשות בדיקה · ${num(data.data_quality?.unreliable_cards)} לא אמינות. רק מדידות אמינות נכללות בקצב. תפוקת כל הכרטיסים נשארת בסיכום.`;
   timingData = data;
   timingCardFilter = null;
   renderTimingMachines(data.machines || []);
@@ -542,7 +544,7 @@ function renderMachineEfficiency(eff) {
       <div class="machine-stat">פריטים הושלמו: <strong>${num(m.completed_items)}</strong></div>
       <div class="machine-stat">יחידות יוצרו: <strong>${num(m.total_units)}</strong></div>
       <div class="machine-stat">סה"כ משקל: <strong>${(num(m.total_weight_kg) / 1000).toFixed(2)} טון</strong></div>
-      <div class="machine-stat">זמן ממוצע לכרטיס: <strong>${timed?.avg_card_minutes == null ? 'אין מדידה מספקת' : formatMinutes(timed.avg_card_minutes)}</strong></div>
+      <div class="machine-stat">זמן ממוצע לכרטיס: <strong>${timed?.avg_card_minutes == null ? 'אין מדידה מאושרת' : formatMinutes(timed.avg_card_minutes)}</strong></div>
       <div class="waste-bar-wrap">
         <div class="machine-stat">פחת: <strong style="color:${wCls}">${w}%</strong></div>
         <div class="waste-bar-bg"><div class="waste-bar-fill" style="width:${Math.min(w * 10, 100)}%;background:${wCls}"></div></div>
@@ -569,7 +571,7 @@ function formatRate(value, digits = 2) {
 }
 
 function measuredTime(row) {
-  return num(row.measured_cards ?? row.sample_count) ? formatMinutes(row.net_minutes) : 'אין זמן מדוד';
+  return num(row.measured_cards ?? row.sample_count) ? formatMinutes(row.net_minutes) : 'לא נכלל בחישוב הקצב';
 }
 function timingBreakdown(row) {
   if(row.net_minutes == null) return 'אין זמן מדוד';
@@ -580,7 +582,7 @@ function renderTimingMachines(machines) {
   document.getElementById('timingMachineGrid').innerHTML = machines.length ? machines.map(machine => `
     <div class="machine-card">
       <div class="machine-label">${escH(machine.machine || 'לא שויכה')}</div>
-      <div class="machine-stat">כרטיסים מדודים: <strong>${num(machine.measured_cards)}</strong></div>
+      <div class="machine-stat">כרטיסים שנכללו בקצב: <strong>${num(machine.measured_cards)}</strong></div>
       <div class="machine-stat">זמן נטו: <strong>${measuredTime(machine)}</strong></div>
       <div class="machine-stat">קצב: <strong>${formatRate(machine.meters_per_min)} מ׳/דק׳</strong></div>
       <div class="machine-stat">קצב לפי משקל: <strong>${formatRate(machine.kg_per_min)} ק״ג/דק׳</strong></div>
@@ -590,7 +592,7 @@ function renderTimingMachines(machines) {
       <div class="machine-stat">משקל כל הכרטיסים: <strong>${formatRate(machine.weight_kg)} ק״ג</strong></div>
       <div class="machine-stat">מתוכו תאורטי: <strong>${formatRate(machine.estimated_weight_kg)} ק״ג</strong></div>
       ${num(machine.measured_cards) ? timingBreakdown(machine) : ''}
-      <div class="machine-stat">לא מדודים: <strong>${num(machine.unmeasured_cards)}</strong></div>
+      <div class="machine-stat">מחוץ לסטטיסטיקה: <strong>${num(machine.unmeasured_cards)}</strong></div>
     </div>`).join('') : '<div style="color:var(--text-dim);font-size:13px">אין עדיין כרטיסים עם זמני התחלה וסיום מלאים בתקופה שנבחרה.</div>';
 }
 
@@ -609,15 +611,15 @@ function timingChartOptions(yTitle, extra = {}) {
 }
 
 function renderTimingCharts(data) {
-  const machines = Array.isArray(data?.machines) ? data.machines : [];
-  const orders = (Array.isArray(data?.orders) ? data.orders : []).slice(0, 12);
+  const machines = (Array.isArray(data?.machines) ? data.machines : []).filter(row=>num(row.measured_cards)>0);
+  const orders = (Array.isArray(data?.orders) ? data.orders : []).filter(row=>num(row.measured_cards)>0).slice(0,12);
   const recipes = (Array.isArray(data?.recipes) ? data.recipes : [])
     .slice().sort((a, b) => num(b.net_minutes) - num(a.net_minutes)).slice(0, 12);
   const transitions = (Array.isArray(data?.transitions) ? data.transitions : [])
     .filter(row => row.gap_status === 'measured')
     .slice().sort((a, b) => num(b.gross_gap_minutes) - num(a.gross_gap_minutes)).slice(0, 12);
   const cards = (Array.isArray(data?.cards) ? data.cards : [])
-    .filter(row => row.measurement_status === 'measured').slice(0, 24);
+    .filter(row => row.included_in_statistics).slice(0, 24);
   const dailyDiameters = Array.isArray(data?.daily_diameters) ? data.daily_diameters : [];
 
   makeChart('timingPaceChart', 'bar', {
@@ -728,7 +730,7 @@ function renderDailyDiameters(rows) {
   document.getElementById('dailyDiameterTable').innerHTML = dailyDiameterRows.map((row, index) => `
     <tr>
       <td>${escH(row.date || '—')}</td><td><strong>${dailyDiameterLabel(row)}</strong></td>
-      <td>${num(row.completed_cards)} <span style="color:var(--text-muted)">(${num(row.measured_cards)} מדודים)</span></td>
+      <td>${num(row.completed_cards)} <span style="color:var(--text-muted)">(${num(row.measured_cards)} נכללו בקצב)</span></td>
       <td>${num(row.quantity)}</td>
       <td>${num(row.cut_length_mm) ? IronBendDisplayUnits.formatLengthCmFromMm(row.cut_length_mm) : row.missing_cut_length_cards ? 'חסר נתון אורך' : '—'}</td>
       <td>${formatRate(row.weight_kg)} ק״ג <span style="color:var(--text-muted)">(${dailyWeightSourceLabel(row)})</span></td>
@@ -766,6 +768,7 @@ function renderTimingTransitions(transitions) {
 }
 
 function timingStatus(card) {
+  if(card.reliability_status) return {label:card.reliability_status==='reliable'?'אמינה':card.reliability_status==='review'?'דורשת בדיקה':'לא אמינה',cls:card.reliability_status==='reliable'?'normal':card.reliability_status==='review'?'watch':'slow'};
   if (card.measurement_status !== 'measured') return { label: escH(card.measurement_reason || 'לא נמדד'), cls: 'missing' };
   if (card.speed_status === 'slow') return { label: 'איטי מול מתכון', cls: 'slow' };
   if (card.speed_status === 'watch') return { label: 'לבדיקה', cls: 'watch' };
@@ -777,7 +780,7 @@ function formatTimingDate(value) {
   if (!value) return '—';
   const raw=String(value);
   const date = new Date(/(?:Z|[+-]\d\d:\d\d)$/i.test(raw)?raw:raw.replace(' ','T')+'Z');
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Jerusalem' });
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Jerusalem' });
 }
 
 function setTimingCardFilter(day, diameterMm) {
@@ -793,11 +796,13 @@ function clearTimingCardFilter() {
 
 function renderTimingCards(sourceCards) {
   const allCards = Array.isArray(sourceCards) ? sourceCards : [];
-  const cards = timingCardFilter ? allCards.filter(card => {
+  let cards = timingCardFilter ? allCards.filter(card => {
     if (card.production_day !== timingCardFilter.day) return false;
     const diameter = Number.isFinite(Number(card.diameterMm)) && Number(card.diameterMm) > 0 ? Number(card.diameterMm) : null;
     return diameter === timingCardFilter.diameter_mm;
   }) : allCards;
+  const reliabilityFilter=document.getElementById('timingReliabilityFilter')?.value;
+  if(reliabilityFilter) cards=cards.filter(c=>c.reliability_status===reliabilityFilter);
   const filter = document.getElementById('timingCardFilter');
   const clearButton = document.getElementById('clearTimingCardFilter');
   if (timingCardFilter) {
@@ -811,17 +816,36 @@ function renderTimingCards(sourceCards) {
   }
   document.getElementById('timingCardTable').innerHTML = cards.map(card => {
     const status = timingStatus(card);
-    return `<tr>
+    return `<tr style="${card.included_in_statistics?'':'background:#fffaf2'}">
       <td>${escH(card.order_num || '—')}</td><td>${escH(card.machine || 'לא שויכה')}</td><td>${escH(card.shapeName || '—')}<br><small>כרטיס #${num(card.item_id)}</small></td>
-      <td>Ø${num(card.diameterMm) || '—'} מ״מ</td><td>${num(card.quantity)}</td><td>${formatTimingDate(card.started_at)}</td>
+      <td>${card.material_type==='coil'?'גליל':card.material_type==='straight'?'ליפט':'סוג לא מאומת'}<br>Ø${num(card.diameterMm) || '—'} מ״מ</td><td>${num(card.quantity)}</td><td>${formatTimingDate(card.started_at)}</td>
       <td>${formatTimingDate(card.completed_at)}</td><td>${card.net_minutes == null ? 'אין זמן מדוד' : formatMinutes(card.net_minutes)}${card.net_minutes == null ? '' : timingBreakdown(card)}</td>
       <td>${card.meters_per_min == null ? '—' : `${formatRate(card.meters_per_min)} מ׳/דק׳`}</td>
       <td>${card.kg_per_min == null ? '—' : `${formatRate(card.kg_per_min)} ק״ג/דק׳`}</td>
-      <td><span class="timing-status ${status.cls}">${status.label}</span></td>
+      <td style="min-width:230px"><span class="timing-status ${status.cls}">${status.label}</span><div>${card.included_in_statistics?'נכללת בסטטיסטיקה':'מחוץ לסטטיסטיקה'}</div><small>${(card.reliability_reasons||[]).map(escH).join('<br>')}</small>${renderTimingReview(card)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:20px">אין כרטיסים שהושלמו בתקופה שנבחרה.</td></tr>';
 }
 
+function renderTimingReview(card) {
+  if(!['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)) return '';
+  return `<details style="margin-top:8px"><summary>בדיקת מנהל</summary><form data-timing-review="${num(card.item_id)}">
+    <label>החלטה<select name="decision" required><option value="" disabled ${!card.timing_review?'selected':''}>בחר החלטה</option><option value="include" ${card.measurement_status!=='measured'||!num(card.net_minutes)?'disabled':''} ${card.timing_review?.decision==='include'?'selected':''}>אישור המדידה כאמינה</option><option value="exclude" ${card.timing_review?.decision==='exclude'?'selected':''}>סימון כלא אמינה</option></select></label>
+    <label>סיבת הבדיקה<textarea name="reason" minlength="3" maxlength="500" required placeholder="לדוגמה: תחילת הייצור נסרקה רק לאחר סיום העבודה">${escH(card.timing_review?.reason||'')}</textarea></label>
+    <button type="submit" class="btn-export">שמור החלטה</button><small>${card.timing_review?escH(card.timing_review.reviewer_name||'מנהל')+' · '+formatTimingDate(card.timing_review.reviewed_at):'ההחלטה נשמרת עם המשתמש והסיבה; זמני המקור אינם משתנים.'}</small>
+  </form></details>`;
+}
+document.addEventListener('submit',async event=>{
+ const form=event.target.closest('[data-timing-review]');if(!form)return;event.preventDefault();
+ const card=timingData?.cards?.find(c=>c.item_id===Number(form.dataset.timingReview));if(!card)return;
+ const message=document.getElementById('timingReviewMessage'),button=form.querySelector('button');button.disabled=true;message.textContent='שומר החלטה…';
+ try{
+  const response=await fetch(`/api/production-timing/${card.item_id}/review`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({production_day:card.production_day,measurement_key:card.measurement_key,expected_review_revision:card.review_revision,decision:form.elements.decision.value,reason:form.elements.reason.value})});
+  const result=await response.json();if(!response.ok)throw Error(result.error||'שמירת הבדיקה נכשלה');
+  const previousFilter=timingCardFilter;
+  await loadProductionTiming(document.getElementById('fromDate').value,document.getElementById('toDate').value);timingCardFilter=previousFilter;renderTimingCards(timingData?.cards||[]);message.textContent='ההחלטה נשמרה והסטטיסטיקה עודכנה.';
+ }catch(error){message.textContent=error.message;}finally{button.disabled=false;}
+});
 function renderWasteTable(waste) {
   waste = Array.isArray(waste) ? waste : [];
   document.getElementById('wasteTable').innerHTML = waste.map(w => {
