@@ -43,6 +43,7 @@ function seedItem(db, values = {}) {
     started_at: values.started_at || null,
     completed_at: values.completed_at,
   });
+  if(values.started_at) db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(?,'start',?)").run(values.id,values.started_at);
 }
 
 test('production timing deducts only the actual lunch overlap and avoids double-deducting documented stops', () => {
@@ -229,13 +230,27 @@ test('Friday is closed without production scans, opens 07–14 with scan evidenc
 test('opening a Friday card is not production evidence; an explicit scanned start is, without rewriting history',()=>{
  const db=createDb();try{
   seedBase(db);seedItem(db,{id:1,started_at:'2026-11-12T15:00:00Z',completed_at:'2026-11-15T06:00:00Z'});
-  db.exec('CREATE TABLE worker_card_activity(action TEXT,details_json TEXT,occurred_at TEXT)');
+  db.exec('CREATE TABLE worker_card_activity(id INTEGER PRIMARY KEY,item_id INTEGER,action TEXT,details_json TEXT,occurred_at TEXT)');
   const report=()=>reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
-  db.prepare("INSERT INTO worker_card_activity VALUES('opened','{}','2026-11-13 06:00:00')").run();
+  db.prepare("INSERT INTO worker_card_activity(item_id,action,details_json,occurred_at) VALUES(1,'opened','{}','2026-11-13 06:00:00')").run();
   assert.equal(report().cards[0].net_minutes,120);
-  db.prepare("INSERT INTO worker_card_activity VALUES('status_changed',?,'2026-11-13 06:01:00')").run(JSON.stringify({to_status:'בייצור',correction:false}));
+  db.prepare("INSERT INTO worker_card_activity(item_id,action,details_json,occurred_at) VALUES(999,'status_changed',?,'2026-11-13 06:01:00')").run(JSON.stringify({to_status:'בייצור',correction:false}));
   const before=db.prepare('SELECT * FROM items').all();
   assert.equal(report().cards[0].net_minutes,495);
   assert.deepEqual(db.prepare('SELECT * FROM items').all(),before);
+ }finally{db.close();}
+});
+
+test('manual starts do not establish scan timing, and late duplicate completion does not extend a scanned cycle',()=>{
+ const db=createDb();try{
+  seedBase(db);seedItem(db,{id:1,started_at:'2026-11-15T05:00:00Z',completed_at:'2026-11-15T09:00:00Z'});
+  db.exec('DELETE FROM scan_log');
+  const report=()=>reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
+  assert.equal(report().cards[0].measurement_status,'missing_start');
+  assert.equal(report().cards[0].net_minutes,null);
+  db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(1,'start','2026-11-15T06:00:00Z'),(1,'complete','2026-11-15T07:00:00Z'),(1,'complete','2026-11-15T09:00:00Z')").run();
+  const card=report().cards[0];
+  assert.equal(card.started_at,'2026-11-15T06:00:00.000Z');assert.equal(card.completed_at,'2026-11-15T07:00:00.000Z');
+  assert.equal(card.net_minutes,60);assert.equal(card.timing_source,'scan_log');assert.equal(card.recorded_completed_at,'2026-11-15T09:00:00Z');
  }finally{db.close();}
 });

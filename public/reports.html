@@ -168,7 +168,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
   <!-- Production timing: read-only projection from card/item timestamps. -->
   <div>
     <div class="section-title">⏱️ זמן וקצב ייצור</div>
-    <div class="timing-note">זמן נטו = התחלה עד סיום בתוך שעות העבודה: א׳–ה׳ משעה 07:00 עד 18:00. שישי עד 14:00 רק כשיש סריקת ייצור באותו יום; שבת לא נספרת. מנוכים צהריים 12:00–12:45 ועצירות מתועדות.</div>
+    <div class="timing-note">זמן נטו = סריקת התחלת ייצור עד סיום בתוך שעות העבודה: א׳–ה׳ משעה 07:00 עד 18:00. שישי עד 14:00 רק כשיש סריקת ייצור באותו יום; שבת לא נספרת. מנוכים צהריים 12:00–12:45 ועצירות מתועדות.</div>
     <div class="timing-note" id="timingLoadState" role="status"></div>
     <div class="machine-grid" id="timingMachineGrid"></div>
   </div>
@@ -437,7 +437,7 @@ async function loadProductionTiming(from, to) {
     data=await response.json();
     if(!Array.isArray(data.cards)) throw Error('invalid_timing_data');
   } catch(error) { state.textContent='נתוני הזמן לא נטענו. יש לנסות שוב; הנתונים הקודמים, אם מוצגים, לא עודכנו.'; return; }
-  state.textContent=`${num(data.data_quality?.measured_cards)} כרטיסים עם זמן מדוד · ${num(data.data_quality?.unmeasured_cards)} ללא מדידה תקינה. משקל תאורטי מוצג כשאין שקילה בפועל.`;
+  state.textContent=`${num(data.data_quality?.measured_cards)} כרטיסים עם זמן מדוד · ${num(data.data_quality?.unmeasured_cards)} ללא מדידה תקינה. משקל תאורטי מוצג כשאין שקילה בפועל. זמן התחלה ידני ללא תיעוד סריקה אינו נחשב למדידת זמן.`;
   timingData = data;
   timingCardFilter = null;
   renderTimingMachines(data.machines || []);
@@ -554,7 +554,8 @@ function renderMachineEfficiency(eff) {
 function formatMinutes(value) {
   const minutes = num(value, 0);
   if (!minutes) return '0 דק׳';
-  if (minutes < 60) return `${minutes.toFixed(minutes % 1 ? 1 : 0)} דק׳`;
+  if (minutes < 1) return minutes*60 < 1 ? 'פחות משנייה' : `${Math.round(minutes*60)} שנ׳`;
+  if (Math.round(minutes * 10) < 600) return `${minutes.toFixed(minutes % 1 ? 1 : 0)} דק׳`;
   const roundedMinutes = Math.round(minutes);
   const hours = Math.floor(roundedMinutes / 60);
   const rest = roundedMinutes % 60;

@@ -290,23 +290,48 @@ function median(values = []) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function fridayDatesWithProductionScans(db) {
-  const dates = new Set();
-  const add = raw => { const day = israelDay(raw); if(day && new Date(day+'T12:00:00Z').getUTCDay()===5) dates.add(day); };
-  for(const row of db.prepare("SELECT scanned_at FROM scan_log WHERE action IN ('start','complete','close_prev')").all()) add(row.scanned_at);
+function productionScanIndex(db) {
+  const byItem = new Map(), fridayDates = new Set();
+  const add = (itemId,raw,kind,source) => {
+    const at=asDate(raw); if(!at) return;
+    const day=israelDay(at);
+    if(kind!=='reset' && new Date(day+'T12:00:00Z').getUTCDay()===5) fridayDates.add(day);
+    if(!byItem.has(Number(itemId))) byItem.set(Number(itemId),[]);
+    byItem.get(Number(itemId)).push({at,kind,source});
+  };
+  for(const row of db.prepare("SELECT item_id,action,scanned_at FROM scan_log WHERE action IN ('start','complete','close_prev') ORDER BY id").all())
+    add(row.item_id,row.scanned_at,row.action==='start'?'start':'end','scan_log');
   if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='worker_card_activity'").get()) {
-    for(const row of db.prepare("SELECT occurred_at,details_json FROM worker_card_activity WHERE action='status_changed'").all()) {
+    for(const row of db.prepare("SELECT item_id,occurred_at,details_json FROM worker_card_activity WHERE action IN ('status_changed','updated') ORDER BY id").all()) {
       const details = parseJson(row.details_json,{}) || {};
-      if(!details.correction && ['בייצור','הושלם'].includes(details.to_status)) add(row.occurred_at);
+      const kind=details.from_status===details.to_status?null:details.to_status==='ממתין'?'reset':details.to_status==='בייצור'?'start':details.to_status==='הושלם'&&!details.correction?'end':null;
+      if(kind) add(row.item_id,row.occurred_at,kind,'worker_card_activity');
     }
   }
-  return [...dates].sort();
+  for(const events of byItem.values()) events.sort((a,b)=>a.at-b.at);
+  return {byItem,fridayWorkDates:[...fridayDates].sort()};
+}
+function scannedInterval(item, completedAt, index) {
+  let start=null,end=null,source=null;
+  for(const event of index.byItem.get(Number(item.id))||[]) {
+    if(event.at.getTime()>completedAt.getTime()+1000) break;
+    if(event.kind==='reset') { start=null;end=null;source=null; }
+    if(event.kind==='start' && (!start || end)) { start=event.at;end=null;source=event.source; }
+    if(event.kind==='end' && start && !end) end=event.at;
+  }
+  // Retain timestamp millisecond precision only when it agrees with the scan;
+  // repeated completion reports must not extend a finished manufacturing cycle.
+  const preciseStart=asDate(item.started_at);
+  if(start && preciseStart && Math.abs(preciseStart-start)<1000) start=preciseStart;
+  if(end && Math.abs(completedAt-end)<1000) end=completedAt;
+  return {start,end:end||completedAt,source};
 }
 
 function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
   if (!validDay(fromDate) || !validDay(toDate) || fromDate > toDate) throw new Error('invalid production date range');
   const stopData = stopIndex(db);
-  const fridayWorkDates = fridayDatesWithProductionScans(db);
+  const scans = productionScanIndex(db);
+  const {fridayWorkDates} = scans;
   const rows = db.prepare(`
     SELECT i.*, COALESCE(i.order_id, p.order_id) AS report_order_id,
            o.order_num AS report_order_num
@@ -319,11 +344,13 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
 
   const items = [];
   for (const item of rows) {
-    const completedAt = asDate(item.completed_at);
-    if (!completedAt) continue;
+    const recordedCompletion = asDate(item.completed_at);
+    if (!recordedCompletion) continue;
+    const scan = scannedInterval(item,recordedCompletion,scans);
+    const completedAt = scan.end;
     const productionDay = israelDay(completedAt);
     if (!productionDay || productionDay < fromDate || productionDay > toDate) continue;
-    const startedAt = asDate(item.started_at);
+    const startedAt = scan.start;
     const profile = shapeProfile(item);
     const machineId = resolveMachineId(item, stopData.machines);
     const machine = machineDisplayName(item, stopData.names);
@@ -336,6 +363,9 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       machine_id: machineId,
       machine,
       production_day: productionDay,
+      timing_source: scan.source,
+      recorded_started_at: item.started_at || null,
+      recorded_completed_at: item.completed_at,
       started_at: startedAt ? startedAt.toISOString() : null,
       completed_at: completedAt.toISOString(),
       quantity,
@@ -344,7 +374,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       ...profile,
     };
     if (!startedAt) {
-      items.push({ ...base, measurement_status: 'missing_start', measurement_reason: 'לא נרשמה התחלת ייצור', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
+      items.push({ ...base, measurement_status: 'missing_start', measurement_reason: item.started_at ? 'יש זמן התחלה אך אין תיעוד סריקת התחלה' : 'לא נרשמה סריקת התחלת ייצור', gross_minutes: null, net_minutes: null, cut_length_mm: null, meters_per_min: null, kg_per_min: null, bends_per_min: null });
       continue;
     }
     if (completedAt <= startedAt) {

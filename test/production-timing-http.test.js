@@ -9,6 +9,7 @@ test('timing API keeps absent weighing distinct from zero and OEE never fabricat
  const request=url=>fetch(base+'/api'+url,{headers:{Authorization:'Bearer '+auth.access_token}});
  const order=db.prepare("INSERT INTO orders(order_num,status)VALUES('TIME-QA','הושלם')").run().lastInsertRowid,pallet=db.prepare('INSERT INTO pallets(order_id,pallet_num)VALUES(?,1)').run(order).lastInsertRowid;
  db.prepare("INSERT INTO items(pallet_id,order_id,shape_name,diameter,quantity,total_length_mm,total_weight,segments,status,machine,started_at,completed_at)VALUES(?,?,'straight',12,10,1000,120,'[]','הושלם','A','2026-11-15T06:00:00Z','2026-11-15T07:00:00Z')").run(pallet,order);
+ db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)SELECT id,'start',started_at FROM items WHERE order_id=?").run(order);
  const before=db.prepare('SELECT * FROM items').all();
  const endpoint='/reports/production-timing?from=2026-11-15&to=2026-11-15';
  assert.equal((await fetch(base+'/api'+endpoint)).status,401);
