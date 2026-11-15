@@ -30,6 +30,9 @@ test('offline service worker never replays stale authorization or scan receipts'
     '/api/worker-card/968',
     '/api/qr-access/mode',
     '/api/qr-access/scan',
+    '/api/worker-portal/me',
+    '/api/worker-portal/card?card=968',
+    '/api/worker-portal/history',
   ]) {
     const stale = new Response(JSON.stringify({
       allowed: true, mode: 'open', items: [{ id: 968 }],

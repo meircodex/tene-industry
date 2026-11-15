@@ -30,6 +30,12 @@ module.exports = function createAuthRouter(deps) {
   const authService = required('authService', deps.authService);
   const authLoginLimiter = required('authLoginLimiter', deps.authLoginLimiter);
 
+  router.post('/auth/worker-login', authLoginLimiter, (req,res)=>{
+    const result=authService.authenticateWorker(req.body||{},{ipAddress:req.ip,userAgent:req.headers['user-agent']});
+    if(!result.ok)return res.status(result.status).json({error:result.error});
+    res.append('Set-Cookie',refreshCookie(result.refreshToken));res.json({access_token:result.accessToken,user:result.user});
+  });
+
   router.post('/auth/login', authLoginLimiter, (req, res) => {
     const result = authService.authenticate(req.body, {
       ipAddress: req.ip,
@@ -56,7 +62,8 @@ module.exports = function createAuthRouter(deps) {
       res.setHeader('Set-Cookie', 'refresh_token=; HttpOnly; SameSite=Strict; Path=/api/auth; Max-Age=0');
       return res.status(401).json({ error: 'Logout requires an active session' });
     }
-    authService.logout(refreshToken);
+    if(req.auth?.portal_only)authService.revokePortalSessions(req.auth.sub);
+    else authService.logout(refreshToken);
     res.setHeader('Set-Cookie', 'refresh_token=; HttpOnly; SameSite=Strict; Path=/api/auth; Max-Age=0');
     res.json({ success: true });
   });

@@ -7,6 +7,8 @@ and Production DONE receipts are consumed read-only. Full observations and
 operator-attested recipe snapshots remain in the local recorder. These tables
 never own item status, production counts, stock or physical product quality.
 
+Worker portal (2026-11-15): `worker_portal_accounts` links an existing worker_qr_profile to one portal-only users row and allowed status actions. Auth owns credential hash/version/language fields; existing identities and historical activity remain intact. See `docs/worker-portal-20261115.md`.
+
 `direct_order_drafts` (Orders, 2026-11-11) also stores complete shape-editor UI
 snapshots under source `new-order-editor-v2`. `external_id` is the client draft
 ID, `version` guards concurrent writes, and `submitted`/`deleted` retain payload

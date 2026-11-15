@@ -35,6 +35,8 @@ module.exports = function createProductionRouter(deps) {
   const productionActuals = required('productionActuals', deps.productionActuals);
   const workerCardActivity = required('workerCardActivity', deps.workerCardActivity);
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
+  const portal=require('../services/workerPortalAccounts');portal.ensureSchema(db);
+  const authService=required('authService',deps.authService);
   router.use(require('./productionTimingReviews')({db,requireAnyRole,wsBroadcast}));
   // Repair only active queued orders with persisted production evidence. No item,
   // inventory or approval changes are made by this Orders-owned reconciliation.
@@ -205,7 +207,7 @@ module.exports = function createProductionRouter(deps) {
       try {
         response = db.transaction(() => handler(req, res))();
       } catch (error) {
-        if ([400, 409].includes(error.status)) return res.status(error.status).json({ error: error.message });
+        if ([400,403,404,409].includes(error.status)) return res.status(error.status).json({ error: error.message });
         console.error('[Worker card save]', error.message);
         return res.status(500).json({ error: 'worker_card_save_failed' });
       } finally {
@@ -402,7 +404,7 @@ module.exports = function createProductionRouter(deps) {
     checkOrderComplete,
   }));
 
-  router.get('/worker-card', requireQrPermission('production'), (req, res) => {
+  const openWorkerCard=(req, res) => {
     res.set('Cache-Control', 'no-store');
     const parsed = parseWorkerCardToken(req.query.card);
     if (!parsed?.itemId) return res.status(400).json({ error: 'invalid_worker_card_token' });
@@ -418,15 +420,22 @@ module.exports = function createProductionRouter(deps) {
       console.error('[Worker card open]',error.message);
       res.status(500).json({error:'worker_card_open_failed'});
     }
-  });
+  };
 
-  router.patch('/worker-card/:id/status', requireQrPermission('production'), workerCardWrite((req, res) => {
+  const updateWorkerCardStatus=workerCardWrite((req, res) => {
     const status = req.body?.status;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
     const item = authorizePublicWorkerCard(req, res, req.params.id);
     if (!item) return;
     const replay = workerCardActivity.replay(req, item.id, 'status_changed');
     if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
+    if(req.portalWorker){
+      portal.statusAllowed(db,req);
+      if(item.status===status){
+        const receipt=workerCardActivity.record(req,item,'status_changed',{from_status:status,to_status:status,correction:false,unchanged:true});
+        const response={ok:true,unchanged:true,receipt,item:selectWorkerCardById(item.id)};workerCardActivity.rememberResponse(req,item.id,'status_changed',response);return response;
+      }
+    }
     if (![ITEM_STATUS.WAITING, ITEM_STATUS.IN_PRODUCTION, ITEM_STATUS.DONE, ITEM_STATUS.LOADED].includes(status)) {
       return res.status(400).json({ error: 'worker_loading_status_only' });
     }
@@ -460,7 +469,10 @@ module.exports = function createProductionRouter(deps) {
     const response = { ok: true, order_status: orderStatus, consumedReservations, receipt, item: selectWorkerCardById(item.id) };
     workerCardActivity.rememberResponse(req, item.id, 'status_changed', response);
     return response;
-  }));
+  });
+  router.get('/worker-card',requireQrPermission('production'),openWorkerCard);
+  router.patch('/worker-card/:id/status',requireQrPermission('production'),updateWorkerCardStatus);
+  router.use(require('./workerPortal')({db,requireAnyRole,authService,openCard:openWorkerCard,updateStatus:updateWorkerCardStatus}));
 
   router.patch('/worker-card/:id', requireQrPermission('production'), workerCardWrite((req, res) => {
     const forbiddenFields = forbiddenProductionPatchFields(req.body);

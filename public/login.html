@@ -435,7 +435,7 @@ function storeLogin(result, remember) {
   const safeNext = requestedNext.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext
     : '';
-  window.location.href = safeNext || ('dashboard.html?role=' + result.user.role);
+  window.location.href = result.user.portal_only?'/worker-portal.html':safeNext || ('dashboard.html?role=' + result.user.role);
 }
 
 async function doLogin() {

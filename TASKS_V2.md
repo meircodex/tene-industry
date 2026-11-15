@@ -4,6 +4,18 @@
 
 ## סטטוסים
 
+### פורטל עובד אישי — 15.11.2026
+
+- status: in_progress
+- owner: codex
+- modules: Auth/Admin (credentials and profile link); Production (shared card/status operations)
+- input: אישור מפורש "בסדר הכנס"; כניסה שם משתמש/סיסמה; פורטל בלבד; שפות he/en/th רק בהגדרות; סריקה ועדכון סטטוס בלבד בשלב זה. אין בחירת מכונה, שיוך מכונה, אחסנה או שקילה במסך הזה כעת.
+- output/screens: worker-portal.html בית/סריקה/כרטיס, הגדרות שפה והחלפת עובד; ניהול חשבון מקושר לעובד מתוך Admin > עובדים ו-QR.
+- DB/API: Auth owns hashed password, portal-only flag, credential version/language; worker_portal_accounts owns profile link and allowed start/complete/load actions (all by default). Authenticated /worker-portal endpoints share Production's existing handlers, receipts, audit/events and inventory consumption; no parallel state engine.
+- security: portal tokens cannot use general app APIs or select a different identity/device; profile/permissions checked live; server transition guards, bounded DTO/request fields, no backwards corrections; retries idempotent.
+- Definition of Done: auth/role/isolation/profile permissions/token reset tests; canonical shared status/stock/receipt tests; Hebrew/Thai/English UI and camera/manual scan checks; full suite, deploy and observed live validation. No machine setting or QR mode changed.
+
+
 ### זהות סורק והרשאות עובד + טבלת ייצור קבועה — 15.11.2026
 
 - status: done

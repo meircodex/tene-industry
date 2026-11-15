@@ -29,7 +29,7 @@ function createRealtimeServer(deps) {
   function authenticateWebSocket(req) {
     const token = webSocketToken(req);
     if (token) {
-      try { return authService.verifyAccessToken(token); } catch (_) {}
+      try { const claims=authService.verifyAccessToken(token);return claims.portal_only?null:claims; } catch (_) {}
     }
     applyAuthBypass(req);
     return req.auth || null;

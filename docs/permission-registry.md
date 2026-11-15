@@ -1,5 +1,7 @@
 # Permission Registry
 
+Worker portal (2026-11-15): linked personal accounts only; start/complete/load all enabled by default, configurable by admin. Portal-only tokens cannot call general APIs or join general WebSocket feeds. Identity/profile active and action permissions checked server-side. No machine assignment or backwards correction. See `docs/worker-portal-20261115.md`.
+
 `GET /api/inventory/metrics` (2026-11-09): warehouse, office, manager, admin only; read-only journal/stocktake reporting. No role, stock, reservation or consumption mutation is granted by the new report.
 
 Shared shape catalogue (2026-11-08): read through `GET /api/shape-definitions` for office/sales/production/manager/admin; create/update shared definitions and billing defaults for manager/admin, matching existing catalogue management access. Version conflicts cannot silently overwrite another editor's changes. Public/customer sessions do not gain catalogue-management access. Saving errors remain visible in the editor; local storage is not used as a success fallback for a failed shared save.

@@ -17,6 +17,9 @@ function addColumn(db, table, column, definition) {
 
 function ensureAuthSchema(db) {
   addColumn(db, 'users', 'pin_hash', 'TEXT');
+  addColumn(db, 'users', 'worker_portal_only', 'INTEGER NOT NULL DEFAULT 0');
+  addColumn(db, 'users', 'worker_portal_language', "TEXT NOT NULL DEFAULT 'he'");
+  addColumn(db, 'users', 'worker_auth_version', 'INTEGER NOT NULL DEFAULT 0');
   addColumn(db, 'users', 'failed_attempts', 'INTEGER DEFAULT 0');
   addColumn(db, 'users', 'locked_until', 'DATETIME');
   addColumn(db, 'users', 'password_changed_at', 'DATETIME');
@@ -102,7 +105,7 @@ function createAuthService(db, options = {}) {
 
   function accessTokenFor(user) {
     return jwt.sign(
-      { sub: String(user.id), role: user.role, display_name: user.display_name },
+      { sub: String(user.id), role: user.role, display_name: user.display_name,...(user.worker_portal_only?{portal_only:true,worker_auth_version:user.worker_auth_version}: {}) },
       jwtSecret,
       { expiresIn: accessTokenTtl }
     );
@@ -118,7 +121,7 @@ function createAuthService(db, options = {}) {
   }
 
   function publicUser(user) {
-    return { id: user.id, username: user.username, display_name: user.display_name, role: user.role };
+    return { id: user.id, username: user.username, display_name: user.display_name, role: user.role,...(user.worker_portal_only?{portal_only:true,language:user.worker_portal_language}: {}) };
   }
 
   function authenticate({ username, pin }, meta = {}) {
@@ -163,7 +166,7 @@ function createAuthService(db, options = {}) {
   function refresh(refreshToken, meta = {}) {
     if (!refreshToken) return { ok: false, status: 401, error: 'Refresh token is required' };
     const row = db.prepare(`
-      SELECT rt.*,u.username,u.display_name,u.role,u.active
+      SELECT rt.*,u.username,u.display_name,u.role,u.active,u.worker_portal_only,u.worker_portal_language,u.worker_auth_version
       FROM refresh_tokens rt JOIN users u ON u.id=rt.user_id
       WHERE rt.token_hash=? AND rt.revoked=0
     `).get(sha256(refreshToken));
@@ -187,11 +190,43 @@ function createAuthService(db, options = {}) {
       .run(now().toISOString(), sha256(refreshToken)).changes > 0;
   }
 
+  function savePortalUser({id,username,password,displayName,language,active}){
+    if(typeof username!=='string'||!/^[-\p{L}\p{N}_.]{3,40}$/u.test(username))throw Object.assign(Error('invalid_portal_username'),{status:400});
+    if((!id||password!==undefined&&password!=='')&&(typeof password!=='string'||password.length<8||Buffer.byteLength(password,'utf8')>72))throw Object.assign(Error('invalid_portal_password'),{status:400});
+    const duplicate=db.prepare('SELECT id FROM users WHERE username=?').get(username);
+    if(duplicate&&Number(duplicate.id)!==Number(id))throw Object.assign(Error('portal_username_taken'),{status:409});
+    const changed=now().toISOString();
+    if(id){
+      const before=db.prepare('SELECT * FROM users WHERE id=? AND worker_portal_only=1').get(id);if(!before)throw Object.assign(Error('invalid_portal_account'),{status:409});
+      db.prepare(`UPDATE users SET username=?,display_name=?,worker_portal_language=?,active=?,pin=NULL,pin_hash=?,password_changed_at=?,worker_auth_version=worker_auth_version+? WHERE id=?`).run(username,displayName,language,Number(active),password?hashPin(password,rounds):before.pin_hash,password?changed:before.password_changed_at,password||!active?1:0,id);
+      if(password||!active)db.prepare('UPDATE refresh_tokens SET revoked=1,revoked_at=? WHERE user_id=?').run(changed,id);
+    }else id=db.prepare(`INSERT INTO users(username,display_name,role,pin_hash,active,password_changed_at,worker_portal_only,worker_portal_language)VALUES(?,?,'production',?,?,?,1,?)`).run(username,displayName,hashPin(password,rounds),Number(active),changed,language).lastInsertRowid;
+    return db.prepare('SELECT id,username,worker_portal_language FROM users WHERE id=?').get(id);
+  }
+  function authenticateWorker({username,password},meta){
+    if(typeof username!=='string'||typeof password!=='string'||password.length>128)return {ok:false,status:401,error:'invalid_worker_credentials'};
+    const user=db.prepare('SELECT worker_portal_only FROM users WHERE username=?').get(username);
+    if(!user?.worker_portal_only)return {ok:false,status:401,error:'invalid_worker_credentials'};
+    const result=authenticate({username,pin:password},meta);if(!result.ok)return {...result,error:result.status===423?'worker_login_locked':'invalid_worker_credentials'};
+    return result;
+  }
+  function setPortalLanguage(userId,language){
+    if(!['he','en','th'].includes(language))throw Object.assign(Error('invalid_portal_language'),{status:400});
+    db.prepare('UPDATE users SET worker_portal_language=? WHERE id=? AND worker_portal_only=1').run(language,userId);
+  }
+  function revokePortalSessions(userId){
+    db.transaction(()=>{db.prepare('UPDATE users SET worker_auth_version=worker_auth_version+1 WHERE id=? AND worker_portal_only=1').run(userId);db.prepare('UPDATE refresh_tokens SET revoked=1,revoked_at=? WHERE user_id=?').run(now().toISOString(),userId);})();
+  }
+  function verifyAccessToken(token){
+    const claims=jwt.verify(token,jwtSecret);
+    if(claims.portal_only){const user=db.prepare('SELECT active,worker_portal_only,worker_auth_version FROM users WHERE id=?').get(claims.sub);if(!user?.active||!user.worker_portal_only||Number(user.worker_auth_version)!==Number(claims.worker_auth_version))throw Error('worker_session_revoked');}
+    return claims;
+  }
   return {
-    authenticate,
+    authenticate,authenticateWorker,savePortalUser,setPortalLanguage,revokePortalSessions,
     logout,
     refresh,
-    verifyAccessToken: token => jwt.verify(token, jwtSecret),
+    verifyAccessToken,
   };
 }
 

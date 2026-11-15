@@ -91,6 +91,7 @@ const createBrandingRouter = require('./routes/branding');
 const createAccessRouter   = require('./routes/access');
 const createDeviceEnrollmentRouter = require('./routes/deviceEnrollment');
 const createWorkerInvitationsRouter = require('./routes/workerInvitations');
+const createWorkerPortalRouter=require('./routes/workerPortal');
 const createQrAccessRouter = require('./routes/qrAccess');
 const createMobileAppLinksRouter = require('./services/mobileAppLinks');
 const createAttendedRemoteSupportRouter = require('./routes/attendedRemoteSupport');
@@ -320,7 +321,7 @@ app.use('/api', createWorkerInvitationsRouter({
   getDb: () => db,
   requireRole,
   deviceEnrollment: deviceEnrollmentService,
-  workerInvitations,
+  workerInvitations,authService,
   activationLimiter: workerInvitationActivationLimiter,
   auditLog,
   settingsService,
@@ -341,7 +342,7 @@ const allRouteFactories = [
   createInventoryVisionRouter, createOrderDocumentsRouter, createOrderDeliveryCertificateRouter,
   createOrderPrintA4Router, createProductionMetricsRouter, createProductionShiftsRouter,
   createCatalogRouter, createPriorityRouter, createPriorityExportRouter, createBrandingRouter, createLicenseRouter,
-  createAccessRouter, createDeviceEnrollmentRouter, createQrAccessRouter, createWorkerInvitationsRouter,
+  createAccessRouter, createDeviceEnrollmentRouter, createQrAccessRouter, createWorkerInvitationsRouter,createWorkerPortalRouter,
   createAttendedRemoteSupportRouter, createBugReportsRouter,
 ];
 const routeManifests = allRouteFactories.map(f => f.manifest).filter(Boolean);
@@ -379,6 +380,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/deviceEnrollment.js', factory: createDeviceEnrollmentRouter },
     { file: 'routes/qrAccess.js', factory: createQrAccessRouter },
     { file: 'routes/workerInvitations.js', factory: createWorkerInvitationsRouter },
+    { file: 'routes/workerPortal.js',factory:createWorkerPortalRouter },
     { file: 'routes/finance.js', factory: createFinanceRouter },
     { file: 'routes/financeCredit.js', factory: createFinanceCreditRouter },
     { file: 'routes/financeInvoices.js', factory: createFinanceInvoicesRouter },
@@ -652,7 +654,7 @@ app.use('/api', requireModule('production'), createProductionRouter({
   productionActuals,
   requireApprovedDevice: deviceEnrollmentService.requireApprovedDevice,
   requireQrPermission: qrAccessService.requirePermission,
-  workerCardActivity,
+  workerCardActivity,authService,
 }));
 
 app.use('/api', requireModule('production'), createProductionMetricsRouter({

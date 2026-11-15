@@ -95,7 +95,7 @@ function createWorkerCardActivityService({ db }) {
       throw Object.assign(new Error('invalid_worker_request_id'), { status: 400 });
     }
     const body = Object.fromEntries(Object.keys(req.body).filter(key => key !== 'request_id').sort().map(key => [key, req.body[key]]));
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ itemId: Number(itemId), action, body })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ itemId: Number(itemId), action, body,...(req.portalWorker?{portal_actor:Number(req.portalWorker.user_id)}:{}) })).digest('hex');
     return { id, fingerprint };
   }
 

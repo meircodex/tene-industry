@@ -61,7 +61,7 @@
         });
         if (!response.ok) return null;
         const result = await response.json();
-        storeSession(result, true);
+        storeSession(result, !result.user?.portal_only);
         return result.access_token;
       } finally {
         refreshInFlight = null;
@@ -79,7 +79,7 @@
   }
 
   function isQrWorkflowUrl(url) {
-    return url.includes('/api/qr-access/') || url.includes('/api/device-enrollment/')
+    return url.includes('/api/worker-portal/') || url.includes('/api/qr-access/') || url.includes('/api/device-enrollment/')
       || url.includes('/api/worker-invitations/activation') || url.includes('/api/worker-card')
       || url.includes('/api/loading/card-sessions');
   }

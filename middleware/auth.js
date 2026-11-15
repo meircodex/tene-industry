@@ -39,6 +39,10 @@ function createAuthMiddleware(deps) {
       try { req.auth = authService.verifyAccessToken(token); } catch (_) {}
     }
     applyAuthBypass(req);
+    if(req.auth?.portal_only){
+      const path=req.path.replace(/^\/api(?=\/)/,'');
+      if(!path.startsWith('/worker-portal/')&&!['/auth/login','/auth/worker-login','/auth/refresh','/auth/logout'].includes(path))return _res.status(403).json({error:'worker_portal_only'});
+    }
     next();
   }
 

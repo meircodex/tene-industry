@@ -10,6 +10,8 @@ credentials and creates no extra scan activity. Station GET
 `/station-current` retain role and source guards. No arbitrary device commands.
 See [interface contract](worker-machine-feedback.md).
 
+Personal worker portal (2026-11-15): rate-limited POST `/api/auth/worker-login`; admin GET/PUT `/api/worker-profiles/:id/portal-account`; linked-worker GET `/api/worker-portal/me`, `/history`, `/card`, PATCH `/preferences`, `/card/:id/status`. Portal-only API/WS boundary, live profile permissions, shared Production handlers and actor-bound idempotent receipts. See `docs/worker-portal-20261115.md`.
+
 Production queue lifecycle fix (2026-11-11): GET `/api/production-queue`, including
 visual/machine filters, consumes the canonical Orders active bucket before
 checking released production/item status. Paid, trashed, cancelled and delivered

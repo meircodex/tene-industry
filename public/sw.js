@@ -86,7 +86,7 @@ async function networkFirstAPI(request) {
     return response;
   } catch {
     // A scan acknowledgment must come from the server, never an offline copy.
-    if (url.pathname.startsWith('/api/worker-card') || url.pathname.startsWith('/api/qr-access')) {
+    if (url.pathname.startsWith('/api/worker-portal/') || url.pathname.startsWith('/api/worker-card') || url.pathname.startsWith('/api/qr-access')) {
       return new Response(JSON.stringify({ error: 'scan_confirmation_unavailable', offline: true }), {
         status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
       });

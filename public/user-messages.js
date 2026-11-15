@@ -3,11 +3,26 @@
   if(!root || !root.document || root.IronBendMessages)return;
   root.IronBendMessages=api;
   for(const name of ['alert','confirm','prompt'])if(typeof root[name]==='function'){
-    const original=root[name].bind(root);root[name]=(message,...args)=>original(api.text(message),...args);
+    const original=root[name].bind(root);root[name]=(message,...args)=>original(root.document.documentElement?.getAttribute?.('data-personal-worker-portal')==='1'&&root.document.documentElement.lang!=='he'?message:api.text(message),...args);
   }
 })(typeof window!=='undefined'?window:null,function(){
   'use strict';
   const messages={
+    invalid_worker_credentials:'שם המשתמש או הסיסמה לפורטל העובד אינם נכונים. יש לבדוק את פרטי הכניסה שקיבלת מהמנהל.',
+    worker_login_locked:'בוצעו ניסיונות כניסה רבים מדי לפורטל העובד. יש להמתין ולנסות שוב מאוחר יותר.',
+    worker_portal_only:'זהו חשבון לפורטל עובד בלבד. יש לפתוח את פורטל העובד כדי לסרוק ולעדכן סטטוס.',
+    worker_portal_disabled:'הגישה האישית לפורטל אינה פעילה. יש לפנות למנהל.',
+    worker_portal_action_forbidden:'לעובד אין הרשאה לעדכון הסטטוס הזה. יש לפנות למנהל להגדרת ההרשאות.',
+    worker_portal_invalid_transition:'מצב הכרטיס השתנה או שהמעבר אינו מותר. יש לרענן את הכרטיס ולבחור את הפעולה הבאה.',
+    invalid_portal_username:'שם המשתמש חייב להכיל 3–40 אותיות, ספרות, נקודה, מקף או קו תחתון.',
+    invalid_portal_password:'יש להזין סיסמה של לפחות 8 תווים ועד 72 בתים.',
+    invalid_portal_account:'פרטי חשבון העובד אינם תקינים. יש לבדוק את השפה וההרשאות בטופס.',
+    portal_username_taken:'שם המשתמש כבר קיים. יש לבחור שם אחר.',
+    invalid_portal_status_fields:'הפורטל מיועד לעדכון סטטוס בלבד. אין לשנות דרכו מכונה או נתונים אחרים.',
+    invalid_portal_language:'השפה שנבחרה אינה נתמכת. יש לבחור עברית, אנגלית או תאית.',
+    invalid_portal_page:'טווח הכרטיסים אינו תקין. יש לרענן את רשימת הכרטיסים.',
+    worker_status_required:'חסר מצב הכרטיס שעליו מבוסס העדכון. יש לפתוח את הכרטיס מחדש.',
+
     'PIN is required':'לא הוזן קוד כניסה. יש להזין את קוד הכניסה של המשתמש.',
     'Invalid credentials':'פרטי הכניסה אינם נכונים. יש לבדוק את שם המשתמש וקוד הכניסה.',
     'Account is temporarily locked':'החשבון נעול זמנית ולכן לא ניתן להתחבר. יש להמתין לסיום הנעילה או לפנות למנהל המערכת.',

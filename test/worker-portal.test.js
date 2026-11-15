@@ -1,0 +1,69 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'tene-worker-portal-'));
+process.env.NODE_ENV='test';process.env.DB_PATH=path.join(tmp,'test.db');process.env.BACKUP_DIR=path.join(tmp,'backups');process.env.JWT_SECRET='worker-portal-test-only';process.env.BCRYPT_ROUNDS='4';
+const {server,db,closeServer}=require('../server'),{hashPin}=require('../auth-core');
+let base;
+async function call(url,token,body,method=body?'POST':'GET'){
+ const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),'X-IronBend-Device':'DEV-shared-phone'},...(body?{body:JSON.stringify(body)}:{})});
+ return{status:r.status,body:await r.json(),headers:r.headers};
+}
+function seedItem(){
+ const c=db.prepare('INSERT INTO customers(name)VALUES(?)').run('Portal Customer').lastInsertRowid;
+ const o=db.prepare('INSERT INTO orders(order_num,customer_id,status)VALUES(?,?,?)').run('PORTAL-TEST-1',c,'בתור ייצור').lastInsertRowid;
+ const p=db.prepare('INSERT INTO pallets(order_id,pallet_num)VALUES(?,1)').run(o).lastInsertRowid;
+ return Number(db.prepare(`INSERT INTO items(pallet_id,order_id,shape_id,shape_name,diameter,quantity,production_qty,weight_per_unit,total_weight,status,machine,total_length_mm,segments)
+ VALUES(?,?,'straight','מוט ישר',8,10,10,0.395,3.95,'ממתין','M1',1000,?)`).run(p,o,JSON.stringify([{length_mm:1000,angle_deg:0}])).lastInsertRowid);
+}
+test('personal worker portal reuses production with account identity, scoped permissions and revocable passwords',async t=>{
+ db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active)VALUES(?,?,?,?,1)').run('portal-admin','Admin','admin',hashPin('9911',4));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+server.address().port;
+ t.after(async()=>{await new Promise(resolve=>closeServer(resolve));db.close();fs.rmSync(tmp,{recursive:true,force:true});});
+ const admin=(await call('/api/auth/login',null,{username:'portal-admin',pin:'9911'})).body.access_token;
+ const a=(await call('/api/worker-profiles',admin,{worker_name:'Alice Worker',phone:'0501112211',role:'production',permissions:['production']})).body;
+ const b=(await call('/api/worker-profiles',admin,{worker_name:'Bob Worker',phone:'0501112212',role:'production',permissions:['production']})).body;
+ const save=await call('/api/worker-profiles/'+a.id+'/portal-account',admin,{username:'portal-alice',password:'portal-Test-123!',language:'th'},'PUT');assert.equal(save.status,200,JSON.stringify(save.body));assert.deepEqual(save.body.account.permissions,['start','complete','load']);
+ assert.equal((await call('/api/worker-profiles/'+b.id+'/portal-account',admin,{username:'portal-bob',password:'portal-Test-123!',language:'en'},'PUT')).status,200);
+ const stored=db.prepare('SELECT * FROM users WHERE username=?').get('portal-alice');assert.equal(stored.pin,null);assert.notEqual(stored.pin_hash,'portal-Test-123!');assert.equal(stored.role,'production');
+ assert.equal((await call('/api/auth/worker-login',null,{username:'portal-admin',password:'9911'})).status,401);
+ assert.equal((await call('/api/auth/worker-login',null,{username:'portal-alice',password:'wrong'})).status,401);
+ const login=await call('/api/auth/worker-login',null,{username:'portal-alice',password:'portal-Test-123!'}),alice=login.body.access_token;
+ assert.equal(login.body.user.portal_only,true);assert.equal(login.body.user.language,'th');
+ const bob=(await call('/api/auth/worker-login',null,{username:'portal-bob',password:'portal-Test-123!'})).body.access_token;
+ assert.equal((await call('/api/worker-portal/me')).status,401);
+ assert.equal((await call('/api/worker-portal/me',alice)).body.worker.worker_name,'Alice Worker');
+ for(const url of ['/api/orders','/api/users','/api/machines','/api/reports/production-timing','/api/worker-card?card=1'])assert.equal((await call(url,alice)).status,403,url);
+ const id=seedItem(),card=String(id);
+ assert.equal((await call('/api/worker-portal/card?card='+card+'&original=1',alice)).status,200);
+ const start={card,status:'בייצור',expected_status:'ממתין',request_id:'portal-start-request-0001'};
+ const started=await call('/api/worker-portal/card/'+id+'/status',alice,start,'PATCH');assert.equal(started.status,200,JSON.stringify(started.body));assert.ok(started.body.receipt.id);
+ assert.equal(db.prepare('SELECT actor_user_id,actor_name,device_enrollment_id FROM worker_card_activity WHERE id=?').get(started.body.receipt.id).actor_name,'Alice Worker');
+ assert.equal((await call('/api/worker-portal/card/'+id+'/status',alice,{...start,machine_id:99,request_id:'portal-invalid-request-0001'},'PATCH')).status,400);
+ const finish={card,status:'הושלם',expected_status:'בייצור',request_id:'portal-finish-request-0001'};
+ const finished=await call('/api/worker-portal/card/'+id+'/status',bob,finish,'PATCH');assert.equal(finished.status,200,JSON.stringify(finished.body));
+ assert.equal(db.prepare('SELECT actor_name FROM worker_card_activity WHERE id=?').get(finished.body.receipt.id).actor_name,'Bob Worker');
+ const completed=db.prepare('SELECT completed_at,machine FROM items WHERE id=?').get(id);assert.equal(completed.machine,'M1');
+ const repeat=await call('/api/worker-portal/card/'+id+'/status',bob,finish,'PATCH');assert.equal(repeat.body.receipt.id,finished.body.receipt.id);
+ const noop=await call('/api/worker-portal/card/'+id+'/status',bob,{...finish,expected_status:'הושלם',request_id:'portal-finish-request-0002'},'PATCH');assert.equal(noop.body.unchanged,true);assert.equal(db.prepare('SELECT completed_at FROM items WHERE id=?').get(id).completed_at,completed.completed_at);
+ assert.equal((await call('/api/worker-portal/card/'+id+'/status',alice,finish,'PATCH')).status,409,'another account cannot reuse a receipt');
+ const loaded=await call('/api/worker-portal/card/'+id+'/status',bob,{card,status:'הועמס',expected_status:'הושלם',request_id:'portal-load-bob-request-0001'},'PATCH');assert.equal(loaded.status,200);assert.equal(loaded.body.item.status,'הועמס');
+ assert.equal((await call('/api/worker-portal/card/'+id+'/status',alice,{card,status:'בייצור',expected_status:'הועמס',request_id:'portal-backwards-request-0001'},'PATCH')).status,409);
+ assert.equal((await call('/api/worker-portal/history',alice)).body.total,1);assert.equal((await call('/api/worker-portal/history',bob)).body.total,1);
+ assert.equal((await call('/api/worker-portal/history?limit=500',alice)).status,400);
+ assert.equal((await call('/api/worker-portal/preferences',alice,{language:'en'},'PATCH')).status,200);
+ assert.equal((await call('/api/worker-portal/me',alice)).body.worker.language,'en');
+ assert.equal((await call('/api/worker-portal/preferences',alice,{language:'xx'},'PATCH')).status,400);
+ await call('/api/worker-profiles/'+a.id+'/portal-account',admin,{username:'portal-alice',language:'en',permissions:[]},'PUT');
+ assert.equal((await call('/api/worker-portal/card/'+id+'/status',alice,{card,status:'הועמס',expected_status:'הועמס',request_id:'portal-load-request-0001'},'PATCH')).status,403);
+ await call('/api/worker-profiles/'+a.id+'/portal-account',admin,{username:'portal-alice',language:'en',password:'new-Portal-123!',permissions:['start']},'PUT');
+ assert.equal((await call('/api/worker-portal/me',alice)).status,401);
+ assert.equal((await call('/api/auth/worker-login',null,{username:'portal-alice',password:'portal-Test-123!'})).status,401);
+ const newAlice=(await call('/api/auth/worker-login',null,{username:'portal-alice',password:'new-Portal-123!'})).body.access_token;
+ assert.equal((await call('/api/worker-portal/me',newAlice)).status,200);
+ const socketStatus=await new Promise((resolve,reject)=>{const ws=new (require('ws'))(base.replace('http','ws')+'/?token='+encodeURIComponent(newAlice));ws.on('unexpected-response',(_req,res)=>{res.resume();resolve(res.statusCode);});ws.on('open',()=>{ws.close();reject(Error('portal websocket must be denied'));});ws.on('error',()=>{});});assert.equal(socketStatus,401);
+ const profileDisable=await call('/api/worker-profiles/'+a.id,admin,{worker_name:'Alice Worker',phone:'0501112211',role:'production',permissions:['production'],active:false},'PATCH');assert.equal(profileDisable.status,200);
+ assert.equal((await call('/api/worker-portal/me',newAlice)).status,403,'profile suspension takes effect without re-login');
+ assert.equal((await call('/api/worker-profiles/'+b.id+'/portal-account',admin,{username:'portal-bob',password:'short'},'PUT')).status,400);
+ const logout=await call('/api/auth/logout',bob,{},'POST');assert.equal(logout.status,200);assert.equal((await call('/api/worker-portal/me',bob)).status,401,'worker sign-out revokes the access token');
+ const privateRows=db.prepare("SELECT old_value,new_value FROM audit_log WHERE entity_type='worker_portal'").all();assert.ok(privateRows.length>0);assert.ok(!JSON.stringify(privateRows).includes('new-Portal-123!'));
+});

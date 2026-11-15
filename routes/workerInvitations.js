@@ -57,6 +57,7 @@ function publicWorkerProfile(row) {
     role: row.role,
     permissions: cleanPermissions(JSON.parse(row.permissions_json || '[]'), row.role),
     active: Boolean(row.active),
+    portal_username:row.portal_username||null,portal_active:Boolean(row.portal_active&&row.active),portal_language:row.portal_language||null,
     created_at: row.created_at,
     updated_at: row.updated_at,
     latest_invitation_status: row.latest_invitation_status || null,
@@ -68,6 +69,8 @@ function publicWorkerProfile(row) {
 
 module.exports = function createWorkerInvitationsRouter(deps) {
   const getDb = required('getDb', deps.getDb);
+  const authService=required('authService',deps.authService);
+  const portal=require('../services/workerPortalAccounts');portal.ensureSchema(getDb());
   const requireRole = required('requireRole', deps.requireRole);
   const deviceEnrollment = required('deviceEnrollment', deps.deviceEnrollment);
   const workerInvitations = required('workerInvitations', deps.workerInvitations);
@@ -128,10 +131,22 @@ module.exports = function createWorkerInvitationsRouter(deps) {
     });
   }
 
+  router.get('/worker-profiles/:id/portal-account',requireRole('admin'),(req,res)=>{
+    const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'invalid_worker_profile'});
+    const db=getDb(),link=db.prepare('SELECT user_id FROM worker_portal_accounts WHERE profile_id=?').get(id);
+    if(!db.prepare('SELECT id FROM worker_qr_profiles WHERE id=?').get(id))return res.status(404).json({error:'worker_profile_not_found'});
+    res.set('Cache-Control','no-store');res.json({account:link?portal.publicAccount(portal.accountForUser(db,link.user_id)):null,portal_url:'/worker-portal.html'});
+  });
+  router.put('/worker-profiles/:id/portal-account',requireRole('admin'),(req,res)=>{
+    const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({error:'invalid_worker_profile'});
+    try{res.json({account:portal.saveAccount(getDb(),authService,id,req.body||{},req.auth),portal_url:'/worker-portal.html'});}
+    catch(e){if(e.status)return res.status(e.status).json({error:e.message});throw e;}
+  });
+
   router.get('/worker-profiles', requireRole('admin'), (_req, res) => {
     workerInvitations.expireOutstanding();
     const rows = getDb().prepare(`
-      SELECT p.*,
+      SELECT p.*,pu.username AS portal_username,pu.active AS portal_active,pu.worker_portal_language AS portal_language,
              (SELECT wi.status FROM worker_invitations wi WHERE wi.worker_profile_id=p.id ORDER BY wi.id DESC LIMIT 1) AS latest_invitation_status,
              (SELECT wi.created_at FROM worker_invitations wi WHERE wi.worker_profile_id=p.id ORDER BY wi.id DESC LIMIT 1) AS latest_invitation_at,
              (SELECT d.status FROM device_enrollment_requests d
@@ -140,7 +155,7 @@ module.exports = function createWorkerInvitationsRouter(deps) {
              (SELECT d.device_name FROM device_enrollment_requests d
                 JOIN worker_invitations wi ON wi.id=d.invitation_id
                WHERE wi.worker_profile_id=p.id ORDER BY d.id DESC LIMIT 1) AS device_name
-      FROM worker_qr_profiles p
+      FROM worker_qr_profiles p LEFT JOIN worker_portal_accounts pa ON pa.profile_id=p.id LEFT JOIN users pu ON pu.id=pa.user_id
       ORDER BY p.active DESC,p.worker_name COLLATE NOCASE,p.id
     `).all();
     res.json(rows.map(publicWorkerProfile));

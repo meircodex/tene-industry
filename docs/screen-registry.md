@@ -1,5 +1,7 @@
 # Screen Registry
 
+Worker portal (2026-11-15): `/worker-portal.html`, personal credentials, he/en/th via gear only, home/scan/card/status with no machine controls. Provisioning under Admin > Workers & QR. Ownership and tests: `docs/worker-portal-20261115.md`.
+
 Source-of-truth registry required by Volume 10. Every screen must have one
 module owner, one purpose, one auth mode, and one status. Screens not listed here
 must not be expanded until they are registered.

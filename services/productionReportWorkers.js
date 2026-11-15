@@ -4,9 +4,10 @@ function readWorkers(db,itemIds){
  const ids=new Set(itemIds.map(Number));
  if(!ids.size)return [];
  return db.prepare(`SELECT a.item_id,a.actor_name,a.actor_user_id,a.device_enrollment_id,a.occurred_at,a.action,a.details_json,
-   wi.worker_profile_id FROM worker_card_activity a
+   COALESCE(wi.worker_profile_id,pa.profile_id) AS worker_profile_id FROM worker_card_activity a
    LEFT JOIN device_enrollment_requests d ON d.id=a.device_enrollment_id
    LEFT JOIN worker_invitations wi ON wi.id=d.invitation_id
+   LEFT JOIN worker_portal_accounts pa ON pa.user_id=a.actor_user_id
    WHERE a.action IN ('status_changed','updated') ORDER BY a.occurred_at,a.id`).all()
   .filter(r=>ids.has(Number(r.item_id))).map(r=>{
    let details={};try{details=JSON.parse(r.details_json||'{}');}catch{}

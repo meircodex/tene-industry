@@ -749,7 +749,7 @@ html, body { background:#f0f4f8; color:#1a2533; font-family:'Heebo',sans-serif; 
         <div class="tab-toolbar">
           <div>
             <div class="tab-heading">✉️ עובדים ו־QR אישי</div>
-            <div class="tab-subtitle">שומרים את פרטי העובד פעם אחת. כשרוצים לשלוח, יוצרים עבורו QR אישי שתקף ל־15 דקות — בלי סיסמה ובלי WhatsApp API.</div>
+            <div class="tab-subtitle">לכניסה עם שם משתמש וסיסמה בוחרים “פורטל עובד” ליד העובד. אפשר גם ליצור QR אישי להפעלת מכשיר.</div>
           </div>
           <button class="btn btn-outline" onclick="loadWorkerInvitations()">רענן</button>
         </div>
@@ -1749,6 +1749,7 @@ async function loadWorkerProfiles() {
     <td style="white-space:nowrap">
       <button class="btn btn-primary" style="padding:7px 10px" onclick="createWorkerInvitation(${row.id})">צור ושלח QR</button>
       <button class="btn btn-outline" style="padding:7px 10px" onclick="editWorkerProfile(${row.id})">ערוך</button>
+      <button class="btn btn-outline" style="padding:7px 10px" onclick="openWorkerPortalAccount(${row.id})">פורטל עובד</button>${row.portal_username?`<div style="font-size:11px;color:var(--muted);margin-top:6px">${row.portal_active?'פורטל פעיל':'פורטל מושבת'} · <bdi>${escHtml(row.portal_username)}</bdi></div>`:''}
     </td>
   </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">אין עובדים שמורים. הזן פרטים למעלה ולחץ “שמור פרטי עובד”.</td></tr>';
 }
@@ -2037,6 +2038,7 @@ async function loadAuditLog(append) {
 </script>
 <script src="/help.js"></script>
 
+<script src="/worker-portal-admin.js"></script>
 </body>
 </html>
 
