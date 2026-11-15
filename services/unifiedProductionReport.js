@@ -11,8 +11,19 @@ function parseFilters(query={}){
  const drill_value=text('drill_value');
  const diameter=text('diameter');if(diameter&&(!Number.isFinite(Number(diameter))||Number(diameter)<=0))throw Error('invalid_report_filter');
  const sort=text('sort'),direction=text('direction')||'asc';if((sort&&!Object.hasOwn(require('./productionReportSort').fields,sort))||!['asc','desc'].includes(direction))throw Error('invalid_report_filter');
+ const sets={};
+ for(const key of ['machine','diameter','material','customer','order','status','worker','kind','reliability']){
+  const raw=text(key+'_in',8000);let values=[];
+  if(raw){try{values=JSON.parse(raw);}catch{throw Error('invalid_report_filter');}
+   if(!Array.isArray(values)||values.length>50||values.some(v=>typeof v!=='string'||!v.trim()||v.length>160))throw Error('invalid_report_filter');
+   if(key==='diameter'&&values.some(v=>!Number.isFinite(Number(v))||Number(v)<=0))throw Error('invalid_report_filter');
+   if(key==='material'&&values.some(v=>!['coil','straight','bent','mesh','unknown'].includes(v)))throw Error('invalid_report_filter');
+   if(key==='kind'&&values.some(v=>!KINDS.includes(v)))throw Error('invalid_report_filter');
+   if(key==='reliability'&&values.some(v=>!['reliable','review','unreliable','unknown'].includes(v)))throw Error('invalid_report_filter');
+  }sets[key]=[...new Set(values.map(v=>v.trim()))];
+ }
  const flat=text('flat');if(!['','1'].includes(flat))throw Error('invalid_report_filter');
- return {sort,direction,flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
+ return {sets,sort,direction,flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
 }
 function summary(rows){
  const result={cards:new Set(rows.map(r=>r.item_id)).size,rows:rows.length,reported_cards:0,units:0,weight_kg:0,theoretical_kg:0,measured_kg:0,net_minutes:0,timed_length_mm:0,timed_weight_kg:0,reliable_cards:0,started_cards:0,ended_cards:0,confirmed_units:0};
@@ -50,7 +61,16 @@ function unifiedProductionReport({cards,activity,workers=[]},filters){
  }
  const values=key=>[...new Set(all.map(r=>r[key]).filter(v=>v!==null&&v!==undefined&&v!==''))].sort((a,b)=>String(a).localeCompare(String(b),'he',{numeric:true}));
  const facets={machines:values('machine'),diameters:values('diameter_mm'),customers:values('customer_name'),orders:values('order_num'),statuses:values('status'),workers:[...new Map(workers.map(w=>[w.worker_key,{key:w.worker_key,name:w.actor_name}])).values()]};
+ const kindMatches=(r,kind)=>kind==='all'?true:filters.flat?Boolean(r.activity_kinds[kind]):kind==='started'?Boolean(r.started):kind==='same'?r.same_day_scanned:kind==='prior'?r.ended_from_prior_day:kind==='unmatched'?r.ended_unmatched:kind==='open'?r.not_finished_same_day:kind==='ended'?Boolean(r.ended):kind==='confirmed'?r.confirmed_same_day:false;
  const selected=all.filter(r=>{
+  for(const [key,values] of Object.entries(filters.sets||{})){
+   if(!values.length)continue;
+   if(key==='worker'){if(!r.workers?.some(w=>values.includes(w.worker_key)))return false;continue;}
+   if(key==='kind'){if(!values.some(k=>kindMatches(r,k)))return false;continue;}
+   const field={diameter:'diameter_mm',material:'material_type',customer:'customer_name',order:'order_num',reliability:'reliability_status'}[key]||key;
+   if(key==='diameter'?!values.some(v=>Number(v)===Number(r[field])):!values.includes(String(r[field]??(key==='reliability'?'unknown':''))))return false;
+  }
+
   if(filters.worker&&!r.workers?.some(w=>w.worker_key===filters.worker))return false;
   if(filters.order&&r.order_num!==filters.order)return false;
   if(filters.status&&r.status!==filters.status)return false;
