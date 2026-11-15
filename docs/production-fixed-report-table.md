@@ -13,3 +13,11 @@ Reports owns a read-only projection, not source scans, geometry, weights or acce
 - Worker profiles remain in Admin > Workers & QR, with a shortcut from Users. Profile name/permissions/active status are checked for activated phones in both open and secure modes. Anonymous open scanning remains available as explicitly requested; QR_ACCESS_MODE is not changed by this release.
 - Profile updates retain existing audit, now including active state. Activation uses current profile information and refuses inactive profiles. No historic scan identity rewritten.
 - Validation: cross-day deduplication/totals, server-side filters, anonymous/start-only data, activated open identity, live permission/name changes and inactive denial, existing auth/governance suites, browser filter/columns/detail/CSV QA.
+
+## Observed release verification
+
+- Full suite: 1,323 passed; final focused suite: 98 passed.
+- Deployed commit 02c4d22 / Render dep-dbssdol6e07s73aojbig is live; health endpoint returned 200.
+- Live UI: one table, nine checkbox filter menus; A+B simultaneous selection; column hide/restore; numeric weight ascending/descending and matching CSV order. Local backup copy export: 131 rows, exclusively A/B and diameters 8/12.
+- Four live charts rendered; daily line and diameter pie selected independently, retained after refresh. Date labels visibly separated. Screenshots kept in task-local tmp/graphs-live-final.png and tmp/live-checkbox-menus.png.
+- Five worker profiles remain saved and not yet activated by workers. QR mode observed open. No historical anonymous identity rewritten and no test production weighing/scan/stock movement inserted.
