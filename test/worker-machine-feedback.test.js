@@ -17,6 +17,20 @@ function fixture(t) {
 }
 const input = (overrides={}) => ({requestId:'SYNTHETIC-request',sourceId:'station-6',itemId:9,card:CARD,action:'card.open',payload:{receiptId:1},...overrides});
 
+test('the real factory QR policy keeps open scanning open and still denies unapproved devices in secure mode',async t=>{
+ const f=fixture(t),express=require('express'),app=express();app.use(express.json());let accessMode='open';
+ const qr=require('../services/qrAccess').createQrAccessService({db:f.db,settingsService:{get:()=>accessMode},deviceEnrollment:{statusForRequest:()=>null}});
+ app.use('/api/machine-feedback',require('../routes/workerMachineFeedback')({db:f.db,requireQrPermission:qr.requirePermission,
+  authorizeCard:(req,res,id)=>{if(Number(id)!==9||(req.body?.card||req.query.card)!==CARD){res.status(403).json({error:'invalid_worker_card_token'});return null;}return{id:9};},parseCard:()=>({itemId:9}),wsBroadcast:()=>{}}));
+ const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const url='http://127.0.0.1:'+server.address().port+'/api/machine-feedback';
+ assert.equal((await fetch(url+'/stations')).status,200);
+ assert.equal((await fetch(url+'/requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input({card:'wrong'}))})).status,403);
+ assert.equal((await fetch(url+'/snapshot?sourceId=station-6&card='+CARD)).status,403);
+ accessMode='secure';assert.equal((await fetch(url+'/stations')).status,403);
+ assert.equal((await fetch(url+'/stations',{headers:{'X-User-Role':'admin'}})).status,403);
+});
+
 test('worker request is durable and idempotent, never writes production counts/status, and cannot change payload under one id', t => {
   const f = fixture(t), before = f.db.prepare('SELECT * FROM items').all(), request = input();
   const first = f.service.create('user:1',{id:9},request), retry=f.service.create('user:1',{id:9},request);

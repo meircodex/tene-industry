@@ -20,6 +20,10 @@ angle conventions remain distinct from controller commands until qualified.
 ## Interfaces and ownership
 
 - `/api/machine-feedback/stations`: paged registered source directory.
+- Directory access follows the existing factory QR policy: open mode permits
+  normal scanning without login; secure mode requires an approved device.
+  This feature does not change that factory-wide policy. Card data still require
+  a valid original card token, and the private station channel requires credentials.
 - `/api/machine-feedback/requests`: strict whitelist, actor/card scope, hashes.
 - `/api/machine-feedback/requests/:id`: same actor and authorized card only.
 - `/api/machine-feedback/snapshot`: station credential plus Production card
