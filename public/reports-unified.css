@@ -3,3 +3,4 @@
 .column-picker{background:white;border:1px solid var(--line);border-radius:10px;padding:12px 16px}#columnChoices{display:flex;flex-wrap:wrap;gap:12px 24px;padding-top:14px}#columnChoices label{flex-direction:row;align-items:center}#columnChoices input{width:auto}th{position:sticky;top:0;z-index:1}.report-table-wrap{max-height:70vh}
 
 .column-sort{border:0;border-radius:5px;background:transparent;padding:0;white-space:nowrap;font-weight:700}.column-sort span{margin-inline-start:5px;color:#8292a5}.column-sort.active,.column-sort.active span{color:#b75f19}.column-sort:focus-visible{outline:2px solid #b75f19;outline-offset:4px}
+td{white-space:nowrap}
