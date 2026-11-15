@@ -167,7 +167,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
 
   <!-- Production timing: read-only projection from card/item timestamps. -->
   <div>
-    <div class="section-title">⏱️ זמן וקצב ייצור</div>
+    <div class="section-title">⏱️ זמן וקצב ייצור <a class="btn-export" style="margin-inline-start:12px;font-size:13px" href="#timingCardSection">אמינות לפי כרטיס</a></div>
     <div class="timing-note">זמן נטו = סריקת התחלת ייצור עד סיום בתוך שעות העבודה: א׳–ה׳ משעה 07:00 עד 18:00. שישי עד 14:00 רק כשיש סריקת ייצור באותו יום; שבת לא נספרת. מנוכים צהריים 12:00–12:45 ועצירות מתועדות.</div>
     <div class="timing-note" id="timingLoadState" role="status"></div>
     <div class="machine-grid" id="timingMachineGrid"></div>
@@ -251,7 +251,7 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
   </div>
 
   <div>
-    <div class="section-title">🧾 פירוט זמני כרטיסים <span class="timing-filter" id="timingCardFilter" hidden></span><button class="btn-export timing-filter" id="clearTimingCardFilter" type="button" onclick="clearTimingCardFilter()" hidden>נקה סינון</button></div>
+    <div class="section-title" id="timingCardSection">🧾 פירוט זמני כרטיסים <span class="timing-filter" id="timingCardFilter" hidden></span><button class="btn-export timing-filter" id="clearTimingCardFilter" type="button" onclick="clearTimingCardFilter()" hidden>נקה סינון</button></div>
     <div class="timing-note">הקצב מחושב רק ממדידות אמינות. כמות ומשקל של כל הכרטיסים נשארים בסיכומי התפוקה. רישום קצר או חריג דורש בדיקת מנהל.</div>
     <details class="timing-note"><summary>איך נקבעת אמינות המדידה?</summary>מדידה שאושרה במפורש על ידי מנהל נכללת בסטטיסטיקה. בגלילים ניתן גם אישור אוטומטי כשהקצב מעל מטר לדקה ובטווח של עד פי 3 מחציון לפחות 5 כרטיסים דומים שאושרו, עם סריקות התחלה וסיום. ליפטים וסוג חומר לא מאומת דורשים בדיקת מנהל. רישום התחלה וסיום בתוך 5 שניות מסומן לבדיקה כחשד לדיווח בדיעבד. מנהל יכול לאשר גם קצב חריג או איטי אם בדק שהזמנים נרשמו בזמן העבודה. זמן חסר או לא תקין אינו ניתן לאישור כזמן מדוד.</details>
     <div class="filter-bar"><label for="timingReliabilityFilter">אמינות המדידה</label><select id="timingReliabilityFilter" onchange="renderTimingCards(timingData?.cards||[])"><option value="">כל המדידות</option><option value="reliable">אמינות</option><option value="review">דורשות בדיקה</option><option value="unreliable">לא אמינות</option></select><span id="timingReviewMessage" role="status"></span></div>
