@@ -818,11 +818,11 @@ function renderTimingCards(sourceCards) {
     const status = timingStatus(card);
     return `<tr style="${card.included_in_statistics?'':'background:#fffaf2'}">
       <td>${escH(card.order_num || '—')}</td><td>${escH(card.machine || 'לא שויכה')}</td><td>${escH(card.shapeName || '—')}<br><small>כרטיס #${num(card.item_id)}</small></td>
-      <td>${card.material_type==='coil'?'גליל':card.material_type==='straight'?'ליפט':'סוג לא מאומת'}<br>Ø${num(card.diameterMm) || '—'} מ״מ</td><td>${num(card.quantity)}</td><td>${formatTimingDate(card.started_at)}</td>
-      <td>${formatTimingDate(card.completed_at)}</td><td>${card.net_minutes == null ? 'אין זמן מדוד' : formatMinutes(card.net_minutes)}${card.net_minutes == null ? '' : timingBreakdown(card)}</td>
+      <td>${card.material_type==='coil'?'גליל':card.material_type==='straight'?'ליפט':card.material_type==='bent'?'ברזל מכופף':card.material_type==='mesh'?'רשת':'סוג לא מאומת'}<br>Ø${num(card.diameterMm) || '—'} מ״מ</td><td>${num(card.quantity)}</td><td style="white-space:normal;min-width:85px">${formatTimingDate(card.started_at).split(',').map(escH).join('<br>')}</td>
+      <td style="white-space:normal;min-width:85px">${formatTimingDate(card.completed_at).split(',').map(escH).join('<br>')}</td><td>${card.net_minutes == null ? 'אין זמן מדוד' : formatMinutes(card.net_minutes)}${card.net_minutes == null ? '' : timingBreakdown(card)}</td>
       <td>${card.meters_per_min == null ? '—' : `${formatRate(card.meters_per_min)} מ׳/דק׳`}</td>
       <td>${card.kg_per_min == null ? '—' : `${formatRate(card.kg_per_min)} ק״ג/דק׳`}</td>
-      <td style="min-width:230px"><span class="timing-status ${status.cls}">${status.label}</span><div>${card.included_in_statistics?'נכללת בסטטיסטיקה':'מחוץ לסטטיסטיקה'}</div><small>${(card.reliability_reasons||[]).map(escH).join('<br>')}</small>${renderTimingReview(card)}</td>
+      <td style="min-width:210px;max-width:250px;white-space:normal"><small>כרטיס #${num(card.item_id)} · ${escH(card.order_num||'')}</small><br><span class="timing-status ${status.cls}">${status.label}</span><div>${card.included_in_statistics?'נכללת בסטטיסטיקה':'מחוץ לסטטיסטיקה'}</div><small>${(card.reliability_reasons||[]).map(escH).join('<br>')}</small>${renderTimingReview(card)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:20px">אין כרטיסים שהושלמו בתקופה שנבחרה.</td></tr>';
 }
