@@ -1,7 +1,7 @@
 'use strict';
 // Activity is a read-only projection of scan events. Production amounts are
 // supplied by the canonical timing projection, never reconstructed from scans.
-function dailyScanActivity({records,scans,completedCards,fromDate,toDate,dayOf,parseDate,machineOf}){
+function dailyScanActivity({records,scans,completedCards,fromDate,toDate,dayOf,parseDate,machineOf,materialOf=()=>null}){
  const dayCache=new Map();
  const localDay=value=>{const key=value instanceof Date?value.toISOString():value;if(!dayCache.has(key))dayCache.set(key,dayOf(value));return dayCache.get(key);};
  const inside=day=>day&&day>=fromDate&&day<=toDate;
@@ -44,6 +44,7 @@ function dailyScanActivity({records,scans,completedCards,fromDate,toDate,dayOf,p
    const confirmed=Boolean(sameDay&&row.reported?.included_in_statistics&&near(row.ended.started_at,row.reported.started_at)&&near(row.ended.completed_at,row.reported.completed_at));
    dates.add(row.date);
    entries.push({date:row.date,item_id:id,order_id:Number(item.report_order_id)||null,order_num:item.report_order_num||null,
+    customer_name:item.report_customer_name||null,material_type:materialOf(item),
     shape_name:card?.shapeName||item.shape_name||'ללא צורה',diameter_mm:safe(item.diameter)||null,machine_key:machineKey,machine:machine.name||'לא משויך',
     status:item.status,planned_quantity:Math.max(0,safe(item.quantity)),started:row.started,ended:row.ended,
     same_day_scanned:sameDay,ended_from_prior_day:previousDay,ended_unmatched:Boolean(row.ended&&!sameDay&&!previousDay),

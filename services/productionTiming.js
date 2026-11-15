@@ -335,10 +335,11 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
   const {fridayWorkDates} = scans;
   const rows = db.prepare(`
     SELECT i.*, COALESCE(i.order_id, p.order_id) AS report_order_id,
-           o.order_num AS report_order_num
+           o.order_num AS report_order_num, c.name AS report_customer_name
     FROM items i
     LEFT JOIN pallets p ON p.id=i.pallet_id
     LEFT JOIN orders o ON o.id=COALESCE(i.order_id,p.order_id)
+    LEFT JOIN customers c ON c.id=o.customer_id
     ORDER BY datetime(i.completed_at), i.id
   `).all();
 
@@ -363,6 +364,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       item_id: Number(item.id),
       order_id: Number(item.report_order_id) || null,
       order_num: item.report_order_num || null,
+      customer_name: item.report_customer_name || null,
       machine_id: machineId,
       machine,
       production_day: productionDay,
@@ -712,6 +714,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
   })).sort((a, b) => String(b.date).localeCompare(String(a.date))
     || (a.diameter_mm === null ? 1 : b.diameter_mm === null ? -1 : a.diameter_mm - b.diameter_mm));
 
+  const materials=reliability.materialIndex(db);
   return {
     period: { from: fromDate, to: toDate, time_zone: FACTORY_TIME_ZONE, work: {start:'07:00',end:'18:00',working_days:workingDays||[0,1,2,3,4],friday_end:'14:00',friday_work_dates:fridayWorkDates.filter(day=>day>=fromDate&&day<=toDate),friday_policy:'production_scans_only'}, lunch: { start: '12:00', end: '12:45' } },
     cards: items.sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)) || b.item_id - a.item_id),
@@ -720,7 +723,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     recipes: recipeSummaries,
     daily_diameters,
     transitions: transitions.sort((a, b) => b.transition_minutes - a.transition_minutes || b.item_id - a.item_id),
-    daily_scan_activity: require('./productionDailyScanActivity').dailyScanActivity({records:rows,scans,completedCards:items,fromDate,toDate,dayOf:israelDay,parseDate:asDate,
+    daily_scan_activity: require('./productionDailyScanActivity').dailyScanActivity({records:rows,scans,completedCards:items,fromDate,toDate,dayOf:israelDay,parseDate:asDate,materialOf:item=>materials.get(Number(item.id))||null,
       machineOf:item=>({id:resolveMachineId(item,stopData.machines),name:(item.machine_id&&stopData.names.get(Number(item.machine_id)))||machineDisplayName(item,stopData.names)})}),
     reliability_policy: reliability.POLICY,
     data_quality: {

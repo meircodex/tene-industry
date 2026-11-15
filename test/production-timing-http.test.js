@@ -20,6 +20,12 @@ test('timing API keeps absent weighing distinct from zero and OEE never fabricat
  assert.equal(report.daily_scan_activity.days[0].started_cards,2);
  assert.ok(report.daily_scan_activity.cards.some(c=>c.item_id===Number(openItem)&&c.started&&!c.ended));
  assert.equal(report.cards.length,1,'open starts appear in daily activity without being fabricated as completed work');
+ assert.equal((await fetch(base+'/api'+endpoint+'&unified=1')).status,401);
+ assert.equal((await request(endpoint+'&unified=1&group=not-valid')).status,400);
+ assert.equal((await request(endpoint+'&unified=1&limit=999')).status,400);
+ const unified=await(await request(endpoint+'&unified=1&group=card&limit=1')).json();
+ assert.equal(unified.unified.total,2);assert.equal(unified.unified.facets.machines[0],'A');assert.equal(unified.unified.rows.length,1);assert.equal(unified.unified.summary.units,10);assert.equal(unified.unified.summary.meters_per_min,null);
+ const missing=await(await request(endpoint+'&unified=1&machine=missing')).json();assert.equal(missing.unified.total,0);
  const card=report.cards[0],reviewUrl=base+'/api/production-timing/'+card.item_id+'/review';
  const body={production_day:card.production_day,measurement_key:card.measurement_key,expected_review_revision:0,decision:'include',reason:'checked actual production timing'};
  const patch=(payload,token=auth.access_token)=>fetch(reviewUrl,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});

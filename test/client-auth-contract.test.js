@@ -654,30 +654,17 @@ test('kiosk uses the light operational design language', () => {
   assert.doesNotMatch(kiosk, /black-translucent/);
 });
 
-test('reports screen uses authenticated APIs and escapes API-sourced table fields', () => {
+test('reports screen uses authenticated APIs and one escaped table', () => {
   const reports = read('public/reports.html');
-
+  const client = read('public/reports-unified.js');
   assert.match(reports, /src="\/auth-client\.js"/);
   assert.match(reports, /src="\/safe-dom\.js"/);
-  assert.match(reports, /\/api\/reports\/summary/);
-  assert.match(reports, /\/api\/reports\/production-timing/);
-  assert.match(reports, /\/api\/machines\/oee/);
-  assert.match(reports, /renderTimingCharts/);
-  assert.match(reports, /timingPaceChart/);
-  assert.match(reports, /timingOrderChart/);
-  assert.match(reports, /timingRecipeChart/);
-  assert.match(reports, /timingTransitionChart/);
-  assert.match(reports, /timingCardChart/);
-  assert.match(reports, /dailyDiameterChart/);
-  assert.match(reports, /dailyDiameterTable/);
-  assert.match(reports, /renderDailyDiameters/);
-  assert.match(reports, /escH\(w\.shape_name/);
-  assert.match(reports, /escH\(c\.name/);
-  assert.match(reports, /escH\(m\.order_num/);
-  assert.match(reports, /escH\(m\.name/);
-  assert.doesNotMatch(reports, /\$\{w\.shape_name/);
-  assert.doesNotMatch(reports, /\$\{c\.name/);
-  assert.doesNotMatch(reports, /\$\{m\.order_num/);
+  assert.equal((reports.match(/<table[ >]/g)||[]).length,1);
+  assert.match(client, /\/api\/reports\/production-timing/);
+  assert.match(client, /\/api\/reports\/summary/);
+  assert.match(client, /\/api\/machines\/oee/);
+  assert.match(client, /escH\(fn\(r\)\)/);
+  assert.match(client, /escH\(r\.shape_name\)/);
 });
 
 test('orders screen uses shared status transition contract', () => {
@@ -1827,7 +1814,7 @@ test('display-only production views prefer server-rendered production shape SVG'
   assert.match(worker, /worker-canonical-missing/);
   assert.match(worker, /\/api\/worker-card\?card=/);
   assert.match(worker, /workerCardApi\(id,'\/status'\)/);
-  assert.match(read('public/reports.html'), /\/api\/reports\/worker-card-activity/);
+  assert.match(read('public/reports-unified.js'), /\/api\/reports\/worker-card-activity/);
   assert.match(worker, /if\(!SCAN_ENTRY\)ws\(\)/);
   assert.match(productionRoute, /router\.get\('\/worker-card'/);
   assert.match(productionRoute, /router\.patch\('\/worker-card\/:id'/);

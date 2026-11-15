@@ -680,9 +680,12 @@ module.exports = function createReportsRouter(deps) {
     const period = reportPeriod(req.query);
     if (period.error) return res.status(400).json({ error: period.error });
     try {
-      return res.json(reportProductionTiming(db, period));
+      const unified = require('../services/unifiedProductionReport');
+      const filters = req.query.unified === '1' ? unified.parseFilters(req.query) : null;
+      const report = reportProductionTiming(db, period);
+      return res.json(filters ? {period:report.period,unified:unified.unifiedProductionReport({cards:report.cards,activity:report.daily_scan_activity},filters)} : report);
     } catch (error) {
-      return res.status(400).json({ error: error.message === 'invalid production date range' ? 'invalid_date_range' : 'production_timing_unavailable' });
+      return res.status(400).json({ error: error.message === 'invalid production date range' ? 'invalid_date_range' : error.message==='invalid_report_filter'?'invalid_report_filter':'production_timing_unavailable' });
     }
   });
 
