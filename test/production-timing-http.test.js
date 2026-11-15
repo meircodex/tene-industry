@@ -10,11 +10,16 @@ test('timing API keeps absent weighing distinct from zero and OEE never fabricat
  const order=db.prepare("INSERT INTO orders(order_num,status)VALUES('TIME-QA','הושלם')").run().lastInsertRowid,pallet=db.prepare('INSERT INTO pallets(order_id,pallet_num)VALUES(?,1)').run(order).lastInsertRowid;
  db.prepare("INSERT INTO items(pallet_id,order_id,shape_name,diameter,quantity,total_length_mm,total_weight,segments,status,machine,started_at,completed_at)VALUES(?,?,'straight',12,10,1000,120,'[]','הושלם','A','2026-11-15T06:00:00Z','2026-11-15T07:00:00Z')").run(pallet,order);
  db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)SELECT id,'start',started_at FROM items WHERE order_id=?").run(order);
+ const openItem=db.prepare("INSERT INTO items(pallet_id,order_id,shape_name,diameter,quantity,total_length_mm,total_weight,segments,status,machine,started_at)VALUES(?,?,'straight',12,20,1000,24,'[]','בייצור','A','2026-11-15T08:00:00Z')").run(pallet,order).lastInsertRowid;
+ db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(?,'start','2026-11-15T08:00:00Z')").run(openItem);
  const before=db.prepare('SELECT * FROM items').all();
  const endpoint='/reports/production-timing?from=2026-11-15&to=2026-11-15';
  assert.equal((await fetch(base+'/api'+endpoint)).status,401);
  const response=await request(endpoint);assert.equal(response.status,200);const report=await response.json();
  assert.equal(report.cards[0].weight_kg,120);assert.equal(report.cards[0].weight_source,'theoretical');assert.equal(report.cards[0].kg_per_min,2);assert.equal(report.cards[0].net_minutes,60);
+ assert.equal(report.daily_scan_activity.days[0].started_cards,2);
+ assert.ok(report.daily_scan_activity.cards.some(c=>c.item_id===Number(openItem)&&c.started&&!c.ended));
+ assert.equal(report.cards.length,1,'open starts appear in daily activity without being fabricated as completed work');
  const card=report.cards[0],reviewUrl=base+'/api/production-timing/'+card.item_id+'/review';
  const body={production_day:card.production_day,measurement_key:card.measurement_key,expected_review_revision:0,decision:'include',reason:'checked actual production timing'};
  const patch=(payload,token=auth.access_token)=>fetch(reviewUrl,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(payload)});

@@ -339,7 +339,6 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     FROM items i
     LEFT JOIN pallets p ON p.id=i.pallet_id
     LEFT JOIN orders o ON o.id=COALESCE(i.order_id,p.order_id)
-    WHERE i.completed_at IS NOT NULL
     ORDER BY datetime(i.completed_at), i.id
   `).all();
 
@@ -721,6 +720,8 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     recipes: recipeSummaries,
     daily_diameters,
     transitions: transitions.sort((a, b) => b.transition_minutes - a.transition_minutes || b.item_id - a.item_id),
+    daily_scan_activity: require('./productionDailyScanActivity').dailyScanActivity({records:rows,scans,completedCards:items,fromDate,toDate,dayOf:israelDay,parseDate:asDate,
+      machineOf:item=>({id:resolveMachineId(item,stopData.machines),name:(item.machine_id&&stopData.names.get(Number(item.machine_id)))||machineDisplayName(item,stopData.names)})}),
     reliability_policy: reliability.POLICY,
     data_quality: {
       reliable_cards:items.filter(c=>c.reliability_status==='reliable').length,

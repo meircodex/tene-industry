@@ -90,6 +90,13 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
 .timing-chart-hint{font-size:11px;color:var(--text-muted);margin-top:8px;}
 .timing-filter{font-size:12px;color:var(--info);font-weight:700;}
 .timing-filter[hidden]{display:none;}
+
+.daily-scan-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.daily-scan-metric{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;text-align:right;color:var(--text);cursor:pointer;font:inherit}
+.daily-scan-metric strong{display:block;font-size:30px;color:#1560a8;margin-top:5px}.daily-scan-metric[aria-pressed="true"]{border-color:#c9621a;box-shadow:0 0 0 1px #c9621a}
+.daily-scan-output{padding:14px;border-radius:12px;background:#eaf5ee;border:1px solid #d0e5d8;color:#246344;margin-bottom:10px}
+#dailyScanPanel td{white-space:normal}#dailyScanPanel .filter-bar{margin-bottom:8px}
+
 </style>
 <link rel="stylesheet" href="/theme.css">
 <script src="/auth-client.js"></script>
@@ -170,6 +177,15 @@ body{font-family:'Heebo',sans-serif;background:var(--steel);color:var(--text);mi
     <div class="section-title">⏱️ זמן וקצב ייצור <a class="btn-export" style="margin-inline-start:12px;font-size:13px" href="#timingCardSection">אמינות לפי כרטיס</a></div>
     <div class="timing-note">זמן נטו = סריקת התחלת ייצור עד סיום בתוך שעות העבודה: א׳–ה׳ משעה 07:00 עד 18:00. שישי עד 14:00 רק כשיש סריקת ייצור באותו יום; שבת לא נספרת. מנוכים צהריים 12:00–12:45 ועצירות מתועדות.</div>
     <div class="timing-note" id="timingLoadState" role="status"></div>
+    <section id="dailyScanPanel" aria-label="התחלה וסיום לפי יום" style="margin:18px 0">
+      <div class="section-title">📅 התחלה, סיום ותפוקה לפי יום</div>
+      <div class="filter-bar"><label for="dailyScanDay">יום</label><select id="dailyScanDay" onchange="renderDailyScanDay()"></select><label for="dailyScanMachine">מכונה</label><select id="dailyScanMachine" onchange="renderDailyScanDay()"><option value="all">כל המכונות</option></select></div>
+      <div id="dailyScanCards" class="daily-scan-cards"></div>
+      <div id="dailyScanOutput" class="daily-scan-output"></div>
+      <div class="timing-note">המספרים מציגים מה נרשם בסריקות. כרטיס שהתחיל ביום קודם מוצג בנפרד; ללא דיווחי כמות באמצע אי אפשר לקבוע כמה ממנו יוצר בכל יום. לחיצה על מספר פותחת את הכרטיסים.</div>
+      <div class="timing-note" id="dailyScanDetailTitle" role="status"></div>
+      <div style="overflow-x:auto"><table class="data-table"><thead><tr><th>הזמנה</th><th>כרטיס / צורה</th><th>מכונה</th><th>כמות בכרטיס כיום</th><th>סריקת התחלה</th><th>סיום שנרשם</th><th>סוג הדיווח</th><th>אמינות</th><th></th></tr></thead><tbody id="dailyScanDetails"></tbody></table></div>
+    </section>
     <div class="machine-grid" id="timingMachineGrid"></div>
   </div>
 
@@ -442,6 +458,7 @@ async function loadProductionTiming(from, to) {
   state.textContent=`${num(data.data_quality?.reliable_cards)} מדידות אמינות · ${num(data.data_quality?.review_cards)} דורשות בדיקה · ${num(data.data_quality?.unreliable_cards)} לא אמינות. רק מדידות אמינות נכללות בקצב. תפוקת כל הכרטיסים נשארת בסיכום.`;
   timingData = data;
   timingCardFilter = null;
+  renderDailyScanActivity(data.daily_scan_activity);
   renderTimingMachines(data.machines || []);
   renderMachineEfficiency(reportData?.machineEfficiency || []);
   renderTimingCharts(data);
@@ -577,6 +594,43 @@ function timingBreakdown(row) {
   if(row.net_minutes == null) return 'אין זמן מדוד';
   return `<details><summary>פירוט החישוב</summary>כולל: ${formatMinutes(row.gross_minutes)}<br>שעות סגירה: ${formatMinutes(row.outside_work_minutes)}<br>צהריים: ${formatMinutes(row.lunch_minutes)}<br>עצירות: ${formatMinutes(row.documented_stop_minutes)}<br>נטו: ${formatMinutes(row.net_minutes)}</details>`;
 }
+let dailyScanData=null;
+let dailyScanKind='ended';
+const dailyScanTitles={started:'כרטיסים שהתחילו ביום שנבחר',same:'נסרקו התחלה וסיום באותו יום',prior:'הסתיימו אחרי התחלה ביום קודם',unmatched:'סיום ללא מדידה מלאה',confirmed:'תפוקה מאומתת עם התחלה וסיום באותו יום',ended:'כל הסיומים שנרשמו ביום שנבחר',open:'התחילו ללא סריקת סיום באותו יום'};
+function renderDailyScanActivity(data){
+ dailyScanData=data||{days:[],machine_days:[],machines:[],cards:[]};
+ const day=document.getElementById('dailyScanDay'),machine=document.getElementById('dailyScanMachine'),oldDay=day.value,oldMachine=machine.value;
+ day.innerHTML=(dailyScanData.days||[]).map(row=>`<option value="${escH(row.date)}">${escH(row.date.split('-').reverse().join('.'))}</option>`).join('');
+ day.value=dailyScanData.days.some(row=>row.date===oldDay)?oldDay:dailyScanData.days.some(row=>row.date===document.getElementById('toDate').value)?document.getElementById('toDate').value:(dailyScanData.days[0]?.date||'');
+ machine.innerHTML='<option value="all">כל המכונות</option>'+dailyScanData.machines.map(row=>`<option value="${escH(row.key)}">${escH(row.label)}</option>`).join('');
+ machine.value=dailyScanData.machines.some(row=>row.key===oldMachine)?oldMachine:'all';renderDailyScanDay();
+}
+function renderDailyScanDay(){
+ if(!dailyScanData)return;
+ const day=document.getElementById('dailyScanDay').value,machine=document.getElementById('dailyScanMachine').value;
+ const g=(machine==='all'?dailyScanData.days:dailyScanData.machine_days).find(row=>row.date===day&&row.machine_key===machine);
+ if(!g){document.getElementById('dailyScanCards').textContent='אין סיכום יומי בטווח שנבחר.';document.getElementById('dailyScanOutput').textContent='';document.getElementById('dailyScanDetails').innerHTML='';return;}
+ const metrics=[['started','התחילו ביום',g.started_cards],['same','התחלה וסיום באותו יום',g.same_day_cards],['prior','סיימו אחרי התחלה קודמת',g.prior_day_cards],['unmatched','סיום ללא מדידה מלאה',g.unmatched_end_cards]];
+ document.getElementById('dailyScanCards').innerHTML=metrics.map(([kind,label,value])=>`<button type="button" class="daily-scan-metric" data-scan-kind="${kind}" aria-pressed="${dailyScanKind===kind}">${label}<strong>${num(value)}</strong></button>`).join('');
+ const kg=value=>num(value).toLocaleString('he-IL',{maximumFractionDigits:0}),source=g.confirmed_theoretical_kg>0?(g.confirmed_measured_kg>0?'מדוד ותאורטי':'תאורטי'):'לפי הכרטיסים';
+ document.getElementById('dailyScanOutput').innerHTML=`<button type="button" class="btn-export" data-scan-kind="confirmed">תפוקה מאומתת באותו יום: ${num(g.confirmed_units)} יח׳ · כ־${kg(g.confirmed_weight_kg)} ק״ג (${source}) · ${num(g.confirmed_cards)} כרטיסים אמינים</button><p>סגירות שדווחו ביום זה: ${num(g.reported_completed_cards)} כרטיסים · ${num(g.reported_units)} יח׳ · כ־${kg(g.reported_weight_kg)} ק״ג לפי הכרטיסים. סכום זה כולל גם כרטיסים שהתחילו קודם ודיווחים שלא אומתו, ואינו הוכחה שכל הכמות יוצרה ביום זה.</p><button type="button" class="btn-export" data-scan-kind="ended">כל הסיומים: ${num(g.ended_cards)}</button> <button type="button" class="btn-export" data-scan-kind="open">ללא סריקת סיום באותו יום: ${num(g.not_finished_same_day_cards)}</button>${g.historical_end_without_quantity_cards?`<p>${num(g.historical_end_without_quantity_cards)} סריקות סיום נוספות נשמרו ביומן; הכרטיסים עודכנו מאוחר יותר, ולכן כמותם אינה נזקפת שוב ליום זה.</p>`:''}`;
+ const matches=entry=>dailyScanKind==='started'?Boolean(entry.started):dailyScanKind==='same'?entry.same_day_scanned:dailyScanKind==='prior'?entry.ended_from_prior_day:dailyScanKind==='unmatched'?entry.ended_unmatched:dailyScanKind==='confirmed'?entry.confirmed_same_day:dailyScanKind==='open'?entry.not_finished_same_day:Boolean(entry.ended);
+ const cards=dailyScanData.cards.filter(entry=>entry.date===day&&(machine==='all'||entry.machine_key===machine)&&matches(entry));
+ document.getElementById('dailyScanDetailTitle').textContent=`${dailyScanTitles[dailyScanKind]} · ${day.split('-').reverse().join('.')} · ${cards.length} כרטיסים`;
+ document.getElementById('dailyScanDetails').innerHTML=cards.map(entry=>{
+  const cycle=['started','open'].includes(dailyScanKind)?entry.started:(entry.ended||entry.started);
+  const type=cycle?.corrected?'הסריקה תוקנה מאוחר יותר':entry.same_day_scanned?'התחלה וסיום באותו יום':entry.ended_from_prior_day?'התחיל ביום קודם':entry.ended_unmatched?(!cycle?.started_at?'סיום ללא סריקת התחלה':'סיום ללא סריקת סיום'):cycle?.completed_at?'נסרק סיום ביום אחר':'לא נרשמה סריקת סיום';
+  const quality=entry.reliability_status==='reliable'?'אמינה':entry.reliability_status==='review'?'דורשת בדיקה':entry.reliability_status==='unreliable'?'לא אמינה':'אין מדידה שהסתיימה ביום זה';
+  const canReview=timingData?.cards?.some(card=>card.item_id===entry.item_id);
+  return `<tr><td>${escH(entry.order_num||'—')}</td><td>#${num(entry.item_id)} · ${escH(entry.shape_name)}<br>Ø${num(entry.diameter_mm)||'—'} מ״מ</td><td>${escH(entry.machine)}</td><td>${num(entry.planned_quantity)}</td><td>${formatTimingDate(cycle?.started_at)}</td><td>${formatTimingDate(cycle?.completed_at)}${cycle&&!cycle.scanned?'<br><small>עדכון סטטוס; ללא סריקת סיום</small>':''}</td><td>${type}</td><td>${quality}</td><td>${canReview?`<button class="btn-export" type="button" data-scan-measurement="${num(entry.item_id)}">פירוט המדידה</button>`:''}</td></tr>`;
+ }).join('')||'<tr><td colspan="9">אין כרטיסים בקבוצה זו ביום שנבחר.</td></tr>';
+}
+document.addEventListener('click',event=>{
+ const kind=event.target.closest('[data-scan-kind]');if(kind){dailyScanKind=kind.dataset.scanKind;renderDailyScanDay();return;}
+ const measurement=event.target.closest('[data-scan-measurement]');if(measurement){
+  document.getElementById('timingReliabilityFilter').value='';timingCardFilter={item_id:Number(measurement.dataset.scanMeasurement)};renderTimingCards(timingData?.cards||[]);document.getElementById('timingCardSection').scrollIntoView({behavior:'smooth'});
+ }
+});
 function renderTimingMachines(machines) {
   machines = Array.isArray(machines) ? machines : [];
   document.getElementById('timingMachineGrid').innerHTML = machines.length ? machines.map(machine => `
@@ -797,6 +851,7 @@ function clearTimingCardFilter() {
 function renderTimingCards(sourceCards) {
   const allCards = Array.isArray(sourceCards) ? sourceCards : [];
   let cards = timingCardFilter ? allCards.filter(card => {
+    if(timingCardFilter.item_id)return card.item_id===timingCardFilter.item_id;
     if (card.production_day !== timingCardFilter.day) return false;
     const diameter = Number.isFinite(Number(card.diameterMm)) && Number(card.diameterMm) > 0 ? Number(card.diameterMm) : null;
     return diameter === timingCardFilter.diameter_mm;
@@ -808,7 +863,7 @@ function renderTimingCards(sourceCards) {
   if (timingCardFilter) {
     filter.hidden = false;
     clearButton.hidden = false;
-    filter.textContent = `— ${timingCardFilter.day} · ${timingCardFilter.diameter_mm == null ? 'קוטר לא ידוע' : `Ø${timingCardFilter.diameter_mm} מ״מ`}`;
+    filter.textContent = timingCardFilter.item_id ? `— כרטיס #${timingCardFilter.item_id}` : `— ${timingCardFilter.day} · ${timingCardFilter.diameter_mm == null ? 'קוטר לא ידוע' : `Ø${timingCardFilter.diameter_mm} מ״מ`}`;
   } else {
     filter.hidden = true;
     clearButton.hidden = true;
