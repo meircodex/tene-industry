@@ -447,7 +447,7 @@ async function loadMachines(){
   try{
     const oee = await fetchJSON('/api/machines/oee');
     oeeData = {};
-    (oee||[]).forEach(o=>{ oeeData[o.id||o.machineId] = o.oee||o.value||0; });
+    (oee||[]).forEach(o=>{ const value=o.oee??o.value; oeeData[o.id||o.machineId] = value==null || !Number.isFinite(Number(value)) ? null : Number(value); });
   } catch(e){
     oeeData = {};
   }
