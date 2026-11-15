@@ -6,7 +6,7 @@
 
 ### סריקות התחלה וסיום ותפוקה לפי יום (15.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Production timing / Reports
 - input: להבחין בין התחילו ביום, התחילו והסתיימו באותו יום, הסתיימו אחרי התחלה ביום קודם; לברר דיווחי שישי שנראים חסרים.
@@ -16,6 +16,7 @@
 - screens: תצוגה מקדימה לפני שילוב; כרטיסי סיכום יומי ופירוט בלחיצה. מדידה יומית מאומתת נשענת רק על מדידות אמינות שתחילתן וסופן נסרקו באותו יום.
 - policy: סריקת סיום של כרטיס חוצה ימים אינה הוכחה שכל הכמות יוצרה ביום הסיום; אין חלוקת כמות/משקל בין ימים בלי דיווחי ביניים. סריקות עבר נשארות גלויות גם אם כרטיס נסרק שוב מאוחר יותר. כרטיס נספר פעם אחת ביום בכל קבוצת סריקות; קבוצות התחלה/סיום יכולות לחפוף.
 - Definition of Done: בדיקות open/cross-day/end-without-start/duplicate/reset/daylight timezone, אמינות מול תפוקה מדווחת, היסטוריית שישי; full tests, בדיקה חזותית ופריסה מאומתת.
+- verification: npm test — 1297 passed; local UI cohort counts and review navigation checked. Live commit 94c4a61 / deploy dep-dbsmlobbc2fs73c09leg, health 200. Friday 13.11: 20 end-without-start cards, 2586 units, 4464.06 kg reported; confirmed same-day 0. Sunday: card 1790 remains reliable, 27 units in confirmed same-day output. Read-only reports; no production data corrections performed.
 
 
 ### אמינות מדידת זמן לכל כרטיס (15.11.2026)
