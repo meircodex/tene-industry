@@ -3,6 +3,7 @@
 Reports owns a read-only projection, not source scans, geometry, weights or access grants.
 
 - Existing GET /api/reports/production-timing with unified=1&flat=1 returns exactly one row per card with start/end activity in the requested Israel-local period. Existing role gate (office/finance/manager/admin), date validation and pagination remain. Worker identities retain their existing office/manager/admin gate; finance receives timing without the worker activity projection. No new route or tables.
+- Every data-column header toggles ascending/descending server sorting before pagination. Numeric values sort numerically, missing values stay last, item ID provides deterministic ties. CSV uses the same sort. The detail action has no sort.
 - Filters: machine, diameter, material, customer, order, status, worker, activity kind, reliability and search. Filter before summary/page. CSV uses the same query across pages. Column selection changes presentation only.
 - Start-only and historical end-only rows remain visible. Completion quantities/weights are attributed only if canonical completion is inside the period. Multiple activity dates never multiply totals. Calendar, geometry, weight and reliability remain canonical services.
 - Worker activity is read from Production event snapshots, with stable profile/device/user keys. Anonymous historic scans are not assigned to new workers. No writes or audit/event for this read-only endpoint.

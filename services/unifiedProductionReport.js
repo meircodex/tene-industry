@@ -10,8 +10,9 @@ function parseFilters(query={}){
  const drill_field=text('drill_field');if(!['','order_num','shape_name','machine','diameter_mm','customer_name'].includes(drill_field))throw Error('invalid_report_filter');
  const drill_value=text('drill_value');
  const diameter=text('diameter');if(diameter&&(!Number.isFinite(Number(diameter))||Number(diameter)<=0))throw Error('invalid_report_filter');
+ const sort=text('sort'),direction=text('direction')||'asc';if((sort&&!Object.hasOwn(require('./productionReportSort').fields,sort))||!['asc','desc'].includes(direction))throw Error('invalid_report_filter');
  const flat=text('flat');if(!['','1'].includes(flat))throw Error('invalid_report_filter');
- return {flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
+ return {sort,direction,flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
 }
 function summary(rows){
  const result={cards:new Set(rows.map(r=>r.item_id)).size,rows:rows.length,reported_cards:0,units:0,weight_kg:0,theoretical_kg:0,measured_kg:0,net_minutes:0,timed_length_mm:0,timed_weight_kg:0,reliable_cards:0,started_cards:0,ended_cards:0,confirmed_units:0};
@@ -69,6 +70,7 @@ function unifiedProductionReport({cards,activity,workers=[]},filters){
   for(const r of selected){const key=String(r[field]??'');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
   rows=[...groups].map(([key,list])=>({key,label:key||'לא ידוע',...summary(list)})).sort((a,b)=>filters.group==='day'?b.key.localeCompare(a.key):a.key.localeCompare(b.key,'he',{numeric:true}));
  }
+ if(filters.flat&&filters.sort)rows=require('./productionReportSort').sortedCards(rows,filters.sort,filters.direction);
  const total=rows.length,pages=Math.max(1,Math.ceil(total/filters.limit)),page=Math.min(filters.page,pages);
  return {filters:{...filters,page},facets,summary:totals,total,pages,page,limit:filters.limit,rows:rows.slice((page-1)*filters.limit,page*filters.limit)};
 }
