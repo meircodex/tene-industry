@@ -58,12 +58,13 @@ async function loadReport(){
  $('reportState').textContent='טוען נתונים…';$('exportReport').disabled=true;
  try{
   const data=await api('/api/reports/production-timing?'+filterParams());if(ticket!==requestId)return;
-  current=data.unified;page=current.page;configureColumns();drawTable(current.rows);productionSummary(current.summary);pagination(current.total,current.pages);
+  if(!data.unified||!Array.isArray(data.unified.rows))throw Error('לא התקבלו נתונים עדכניים מהשרת. יש ללחוץ שוב על הצג.');
+  current=data.unified;page=current.page;configureColumns();drawTable(current.rows);productionSummary(current.summary);window.IronBendReportCharts?.render(current.charts);pagination(current.total,current.pages);
   options('machine',current.facets.machines,'כל המכונות');options('diameter',current.facets.diameters,'כל הקטרים');options('customer',current.facets.customers,'כל הלקוחות');options('order',current.facets.orders,'כל ההזמנות');options('status',current.facets.statuses,'כל המצבים');
   options('worker',current.facets.workers.map(w=>({value:w.key,label:w.name})),'כל העובדים');
   $('reportNote').textContent='כל כרטיס מופיע פעם אחת, אם יש לו סריקת התחלה או סיום בטווח התאריכים. הכמות והמשקל נספרים רק כשהסיום בתקופה. בחירת עמודות אינה משנה את הנתונים או את הסיכום. הקצב בסיכום מחושב רק ממדידות אמינות; זמן נטו מנכה שעות סגירה, שבת, הפסקות ועצירות. דיווחים ישנים ללא זיהוי נשארים לא מזוהים.';
   $('reportState').textContent='';$('exportReport').disabled=false;
- }catch(error){if(ticket===requestId){$('reportState').textContent=error.message;current=null;drawTable([]);$('reportSummary').textContent='';pagination(0,1);}}
+ }catch(error){if(ticket===requestId){$('reportState').textContent=error.message;current=null;drawTable([]);$('reportSummary').textContent='';window.IronBendReportCharts?.render(null);pagination(0,1);}}
 }
 function detail(r){
  const c=r.card,title=`כרטיס #${r.item_id} · ${r.order_num||''}`;$('detailTitle').textContent=title;
@@ -96,5 +97,6 @@ document.addEventListener('DOMContentLoaded',()=>{
  $('reportHead').addEventListener('click',event=>{const hide=event.target.closest('[data-hide-column]')?.dataset.hideColumn;if(hide){chosen=chosen.filter(t=>t!==hide);localStorage.setItem('reportColumnsV2',JSON.stringify(chosen));configureColumns();drawTable(current?.rows||[]);return;}const key=event.target.closest('[data-sort]')?.dataset.sort;if(!key)return;sortDirection=sortKey===key&&sortDirection==='asc'?'desc':'asc';sortKey=key;page=1;loadReport();});
  $('prevPage').addEventListener('click',()=>{page--;loadReport();});$('nextPage').addEventListener('click',()=>{page++;loadReport();});
  $('reportBody').addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button)detail(visibleRows[num(button.closest('tr').dataset.row)]);});
+ $('toggleCharts').addEventListener('click',()=>{const show=$('reportCharts').hidden;$('reportCharts').hidden=!show;$('toggleCharts').setAttribute('aria-expanded',String(show));$('toggleCharts').textContent=show?'הסתר גרפים':'הצג גרפים';});
  $('closeDetail').addEventListener('click',()=>$('reportDetail').close());$('exportReport').addEventListener('click',exportReport);setupMulti();configureColumns();loadReport();
 });

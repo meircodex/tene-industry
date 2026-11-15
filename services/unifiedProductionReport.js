@@ -92,6 +92,6 @@ function unifiedProductionReport({cards,activity,workers=[]},filters){
  }
  if(filters.flat&&filters.sort)rows=require('./productionReportSort').sortedCards(rows,filters.sort,filters.direction);
  const total=rows.length,pages=Math.max(1,Math.ceil(total/filters.limit)),page=Math.min(filters.page,pages);
- return {filters:{...filters,page},facets,summary:totals,total,pages,page,limit:filters.limit,rows:rows.slice((page-1)*filters.limit,page*filters.limit)};
+ return {charts:filters.flat?require('./productionReportCharts').reportCharts(selected):null,filters:{...filters,page},facets,summary:totals,total,pages,page,limit:filters.limit,rows:rows.slice((page-1)*filters.limit,page*filters.limit)};
 }
 module.exports={parseFilters,unifiedProductionReport,summary};

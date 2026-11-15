@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/reports-unified.css">
 <script src="/auth-client.js"></script><script src="/safe-dom.js"></script><script src="/nav.js"></script>
 </head><body><main class="page">
-<header class="report-heading"><div><h1>דוחות</h1><p>טבלה אחת · שורה לכל כרטיס · הסינון בידיים שלך</p></div><button id="exportReport" type="button">ייצוא לפי הסינון</button></header>
+<header class="report-heading"><div><h1>דוחות</h1><p>טבלה אחת · שורה לכל כרטיס · הסינון בידיים שלך</p></div><div class="report-view-actions"><button id="toggleCharts" type="button" aria-expanded="false" aria-controls="reportCharts">הצג גרפים</button><button id="exportReport" type="button">ייצוא לפי הסינון</button></div></header>
 <form id="reportFilters" class="report-filters">
 <label>מתאריך<input id="fromDate" type="date" required></label><label>עד תאריך<input id="toDate" type="date" required></label>
 <label id="machineLabel">מכונה<select id="machine"><option value="">כל המכונות</option></select></label>
@@ -23,7 +23,8 @@
 </form>
 <details class="column-picker"><summary>הצגה והסתרה של עמודות</summary><div id="columnChoices"></div></details>
 <div id="reportState" role="status" aria-live="polite"></div><div id="reportSummary" class="report-summary"></div><p id="reportNote" class="report-note"></p>
+<section id="reportCharts" class="report-charts" hidden aria-label="גרפים לפי הסינון הנוכחי"></section>
 <div class="report-table-wrap"><table id="reportTable"><thead id="reportHead"></thead><tbody id="reportBody"></tbody></table></div>
 <footer class="report-pagination"><span id="resultCount"></span><div><button id="prevPage" type="button">הקודם</button><span id="pageNumber"></span><button id="nextPage" type="button">הבא</button></div><label>שורות בעמוד<select id="limit"><option>25</option><option>50</option><option>100</option></select></label></footer>
 </main><dialog id="reportDetail"><div class="detail-header"><h2 id="detailTitle">פרטי כרטיס</h2><button id="closeDetail" type="button" aria-label="סגירת פירוט">✕</button></div><div id="detailBody"></div><div id="reviewMessage" role="status"></div></dialog>
-<script src="/reports-unified.js"></script><script src="/help.js"></script></body></html>
+<script src="/reports-charts.js"></script><script src="/reports-unified.js"></script><script src="/help.js"></script></body></html>
