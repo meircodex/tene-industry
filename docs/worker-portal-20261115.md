@@ -24,3 +24,11 @@ Personal username/password login; phone-first home, QR/barcode/manual card entry
 ## Validation
 
 HTTP tests cover personal identity with shared-device header, auth isolation, no privileged-account takeover, default and updated permissions, password hashing/reset/logout revocation, profile suspension, pagination, language persistence, shared start/finish/load, stale/backward transitions, same-status no-op and actor-bound retries. Camera adapter tests cover QR detection and both asynchronous cancellation races. Dictionary coverage verifies all three languages. Full suite plus auth/governance regression required; local QA uses a copied database and synthetic order only. No worker production passwords are chosen automatically and no production scan is fabricated.
+
+## Observed release verification
+
+- Integrated on top of 73d7cf7 (existing worker-machine feedback retained). Full suite: 1,338 passed. Final account-entry explanation: 14 focused tests passed.
+- Local copied database: personal login, canonical manual QR-code entry, start/full completion/loading, own history, logout, Hebrew/English/Thai and translated in-page confirmations observed. Camera adapter tests cover detection and cancellation; no claim of a physical phone-camera scan.
+- Live commit 150aad3, Render deploy dep-dbt2g76i0phs73egmj1g is live, health 200. Worker login page and Thai/RTL-LTR switching observed; admin account dialog for a real saved employee showed all three status permissions selected, required initial password, and language setting. Five existing profiles retained. No production worker passwords or fake production scans created. Existing QR access mode observed open.
+- Generic persistent employee link: https://ironbend-hmd.onrender.com/worker-portal.html. Manager sets credentials/language per employee from Admin > Workers & QR > Portal. Existing admin accounts receive a clear request for personal worker sign-in, rather than a disabled-portal error.
+- Proof: task-local tmp/portal-account-live.png. Temporary database copies and screenshots stay outside Git.

@@ -6,7 +6,7 @@
 
 ### פורטל עובד אישי — 15.11.2026
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Auth/Admin (credentials and profile link); Production (shared card/status operations)
 - input: אישור מפורש "בסדר הכנס"; כניסה שם משתמש/סיסמה; פורטל בלבד; שפות he/en/th רק בהגדרות; סריקה ועדכון סטטוס בלבד בשלב זה. אין בחירת מכונה, שיוך מכונה, אחסנה או שקילה במסך הזה כעת.
@@ -15,6 +15,8 @@
 - security: portal tokens cannot use general app APIs or select a different identity/device; profile/permissions checked live; server transition guards, bounded DTO/request fields, no backwards corrections; retries idempotent.
 - Definition of Done: auth/role/isolation/profile permissions/token reset tests; canonical shared status/stock/receipt tests; Hebrew/Thai/English UI and camera/manual scan checks; full suite, deploy and observed live validation. No machine setting or QR mode changed.
 
+
+- verified: 1,338 בדיקות מלאות עברו לאחר שילוב origin/main (כולל עדכון תחנות המכונה); 14 בדיקות ממוקדות נוספות לאחר הבהרת כניסה מחשבון מנהל. מקומית נבדקו כניסה, פתיחת כרטיס, התחלה/השלמה/העמסה, שפות he/en/th ואישור סיום מתורגם, היסטוריה והתנתקות; מצלמה נבדקה במתאם בדיקה ללא צילום ממשי. חי: 150aad3 / dep-dbt2g76i0phs73egmj1g במצב live, health 200, דף כניסה ושפות ותפריט חשבון ליד חמשת העובדים נצפו. הרשאות ברירת מחדל start/complete/load; לא נקבעו סיסמאות ייצור ולא נוצרו דיווחי ייצור לבדיקה באתר. QR mode נותר open.
 
 ### זהות סורק והרשאות עובד + טבלת ייצור קבועה — 15.11.2026
 
