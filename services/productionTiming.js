@@ -6,8 +6,11 @@
 
 const FACTORY_TIME_ZONE = 'Asia/Jerusalem';
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const WORK_START_MINUTE = 7 * 60;
+const WORK_END_MINUTE = 18 * 60;
 const LUNCH_START_MINUTE = 12 * 60;
 const LUNCH_END_MINUTE = 12 * 60 + 45;
+const factoryTimeCache = new Map();
 
 function round(value, digits = 3) {
   const numeric = Number(value) || 0;
@@ -63,6 +66,8 @@ function nextDay(day) {
 
 function factoryLocalTimeUtc(day, minuteOfDay, timeZone = FACTORY_TIME_ZONE) {
   if (!validDay(day)) throw new Error('invalid production date');
+  const cacheKey = `${timeZone}|${day}|${minuteOfDay}`;
+  if(factoryTimeCache.has(cacheKey)) return new Date(factoryTimeCache.get(cacheKey));
   const [year, month, date] = day.split('-').map(Number);
   const hour = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
@@ -74,6 +79,8 @@ function factoryLocalTimeUtc(day, minuteOfDay, timeZone = FACTORY_TIME_ZONE) {
     const actualUtcLike = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, local.second || 0);
     result += wantedUtcLike - actualUtcLike;
   }
+  if(factoryTimeCache.size >= 2048) factoryTimeCache.clear();
+  factoryTimeCache.set(cacheKey,result);
   return new Date(result);
 }
 
@@ -131,17 +138,30 @@ function unionMinutes(intervals = []) {
   return total / 60000;
 }
 
-function deductIntervals(start, end, stops = []) {
+function deductIntervals(start, end, stops = [], { workingDays = [0,1,2,3,4], fridayWorkDates = [] } = {}) {
+  const outsideWork = daySequence(start,end).flatMap(day => {
+    const weekday = new Date(day+'T12:00:00Z').getUTCDay();
+    const midnight = factoryLocalTimeUtc(day,0), following = factoryLocalTimeUtc(nextDay(day),0);
+    const isWorkingDay = workingDays.includes(weekday) || (weekday === 5 && fridayWorkDates.includes(day));
+    const closingMinute = weekday === 5 ? 14 * 60 : WORK_END_MINUTE;
+    const intervals = isWorkingDay
+      ? [{start:midnight,end:factoryLocalTimeUtc(day,WORK_START_MINUTE)}, {start:factoryLocalTimeUtc(day,closingMinute),end:following}]
+      : [{start:midnight,end:following}];
+    return intervals.map(i=>intervalIntersection(start,end,i.start,i.end)).filter(Boolean);
+  });
   const lunches = lunchIntervals(start, end)
     .map(interval => intervalIntersection(start, end, interval.start, interval.end))
     .filter(Boolean);
   const overlappingStops = stops
     .map(stop => intervalIntersection(start, end, stop.start, stop.end))
     .filter(Boolean);
-  const lunchMinutes = unionMinutes(lunches);
-  const allDeductionMinutes = unionMinutes([...lunches, ...overlappingStops]);
-  const documentedStopMinutes = Math.max(0, allDeductionMinutes - lunchMinutes);
+  const outsideWorkMinutes = unionMinutes(outsideWork);
+  const scheduledMinutes = unionMinutes([...outsideWork,...lunches]);
+  const lunchMinutes = Math.max(0,scheduledMinutes-outsideWorkMinutes);
+  const allDeductionMinutes = unionMinutes([...outsideWork,...lunches,...overlappingStops]);
+  const documentedStopMinutes = Math.max(0,allDeductionMinutes-scheduledMinutes);
   return {
+    outsideWorkMinutes: round(outsideWorkMinutes,3),
     lunchMinutes: round(lunchMinutes, 3),
     documentedStopMinutes: round(documentedStopMinutes, 3),
     deductedMinutes: round(allDeductionMinutes, 3),
@@ -155,6 +175,7 @@ function parseJson(value, fallback = null) {
 }
 
 function numberOrNull(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && !value.trim())) return null;
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
 }
@@ -269,9 +290,23 @@ function median(values = []) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
-function reportProductionTiming(db, { fromDate, toDate } = {}) {
+function fridayDatesWithProductionScans(db) {
+  const dates = new Set();
+  const add = raw => { const day = israelDay(raw); if(day && new Date(day+'T12:00:00Z').getUTCDay()===5) dates.add(day); };
+  for(const row of db.prepare("SELECT scanned_at FROM scan_log WHERE action IN ('start','complete','close_prev')").all()) add(row.scanned_at);
+  if(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='worker_card_activity'").get()) {
+    for(const row of db.prepare("SELECT occurred_at,details_json FROM worker_card_activity WHERE action='status_changed'").all()) {
+      const details = parseJson(row.details_json,{}) || {};
+      if(!details.correction && ['בייצור','הושלם'].includes(details.to_status)) add(row.occurred_at);
+    }
+  }
+  return [...dates].sort();
+}
+
+function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
   if (!validDay(fromDate) || !validDay(toDate) || fromDate > toDate) throw new Error('invalid production date range');
   const stopData = stopIndex(db);
+  const fridayWorkDates = fridayDatesWithProductionScans(db);
   const rows = db.prepare(`
     SELECT i.*, COALESCE(i.order_id, p.order_id) AS report_order_id,
            o.order_num AS report_order_num
@@ -317,7 +352,7 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       continue;
     }
     const stops = machineId ? (stopData.byMachineId.get(machineId) || []) : [];
-    const deductions = deductIntervals(startedAt, completedAt, stops);
+    const deductions = deductIntervals(startedAt, completedAt, stops, {workingDays,fridayWorkDates});
     const grossMinutes = (completedAt - startedAt) / 60000;
     const netMinutes = Math.max(0, grossMinutes - deductions.deductedMinutes);
     const cutLengthMm = profile.unitCutLengthMm * quantity;
@@ -327,6 +362,7 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       measurement_status: netMinutes > 0 ? 'measured' : 'zero_net_time',
       measurement_reason: netMinutes > 0 ? null : 'אין זמן ייצור נטו לאחר ניכויים',
       gross_minutes: round(grossMinutes, 3),
+      outside_work_minutes: deductions.outsideWorkMinutes,
       lunch_minutes: deductions.lunchMinutes,
       documented_stop_minutes: deductions.documentedStopMinutes,
       net_minutes: round(netMinutes, 3),
@@ -379,7 +415,7 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
         transitions.push({ machine_id: machineId, machine: current.machine, previous_item_id: previous.item_id, item_id: current.item_id, gap_status: 'overlap', overlap_minutes: round((start - end) / 60000, 3), gross_gap_minutes: 0, lunch_minutes: 0, documented_stop_minutes: 0, coil_load_minutes: 0, transition_minutes: 0 });
         continue;
       }
-      const deductions = deductIntervals(start, end, stops);
+      const deductions = deductIntervals(start, end, stops, {workingDays,fridayWorkDates});
       const coilIntervals = stops.filter(stop => stop.reasonCode === 'COIL_LOAD')
         .map(stop => intervalIntersection(start, end, stop.start, stop.end)).filter(Boolean);
       const coilMinutes = unionMinutes(coilIntervals);
@@ -394,6 +430,7 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
         order_num: current.order_num,
         shape_name: current.shapeName,
         gross_gap_minutes: round(grossGap, 3),
+        outside_work_minutes: deductions.outsideWorkMinutes,
         lunch_minutes: deductions.lunchMinutes,
         documented_stop_minutes: deductions.documentedStopMinutes,
         coil_load_minutes: round(coilMinutes, 3),
@@ -455,6 +492,8 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
     if (item.measurement_status === 'measured') {
       current.measured_cards += 1;
       current.net_minutes += item.net_minutes;
+      current.gross_minutes = (current.gross_minutes || 0) + item.gross_minutes;
+      current.outside_work_minutes = (current.outside_work_minutes || 0) + item.outside_work_minutes;
       current.measured_cut_length_mm += item.cut_length_mm;
       current.timed_weight_kg += item.weight_kg;
     } else {
@@ -471,7 +510,11 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       estimated_weight_kg: 0, total_bends: 0, transition_minutes: 0, coil_load_minutes: 0,
     };
     current.measured_cards += 1;
+    current.timed_weight_kg = (current.timed_weight_kg || 0) + item.weight_kg;
+    current.timed_cut_length_mm = (current.timed_cut_length_mm || 0) + item.cut_length_mm;
     current.net_minutes += item.net_minutes;
+    current.gross_minutes = (current.gross_minutes || 0) + item.gross_minutes;
+    current.outside_work_minutes = (current.outside_work_minutes || 0) + item.outside_work_minutes;
     current.lunch_minutes += item.lunch_minutes;
     current.documented_stop_minutes += item.documented_stop_minutes;
     current.cut_length_mm += item.cut_length_mm;
@@ -495,7 +538,11 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       profiles: new Set(),
     };
     order.measured_cards += 1;
+    order.timed_weight_kg = (order.timed_weight_kg || 0) + item.weight_kg;
+    order.timed_cut_length_mm = (order.timed_cut_length_mm || 0) + item.cut_length_mm;
     order.net_minutes += item.net_minutes;
+    order.gross_minutes = (order.gross_minutes || 0) + item.gross_minutes;
+    order.outside_work_minutes = (order.outside_work_minutes || 0) + item.outside_work_minutes;
     order.lunch_minutes += item.lunch_minutes;
     order.documented_stop_minutes += item.documented_stop_minutes;
     order.cut_length_mm += item.cut_length_mm;
@@ -511,6 +558,10 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       estimated_weight_kg: 0, total_bends: 0, transition_minutes: 0, coil_load_minutes: 0,
     };
     current.unmeasured_cards += 1;
+    current.weight_kg += item.weight_kg;
+    current.cut_length_mm += item.unitCutLengthMm * item.quantity;
+    if (item.weight_source === 'measured') current.measured_weight_kg += item.weight_kg;
+    else current.estimated_weight_kg += item.weight_kg;
     machineSummaries.set(key, current);
 
     const orderKey = item.order_id ? `order:${item.order_id}` : `unlinked:${item.item_id}`;
@@ -527,6 +578,8 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
       profiles: new Set(),
     };
     order.unmeasured_cards += 1;
+    order.weight_kg += item.weight_kg;
+    order.cut_length_mm += item.unitCutLengthMm * item.quantity;
     order.profiles.add(`${item.shapeName} · Ø${item.diameterMm} מ״מ`);
     orderSummaries.set(orderKey, order);
   }
@@ -546,6 +599,9 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
   const machines = [...machineSummaries.values()].map(row => ({
     ...row,
     net_minutes: round(row.net_minutes, 3),
+    avg_card_minutes: row.measured_cards > 0 ? round(row.net_minutes / row.measured_cards,3) : null,
+    gross_minutes: round(row.gross_minutes,3),
+    outside_work_minutes: round(row.outside_work_minutes,3),
     lunch_minutes: round(row.lunch_minutes, 3),
     documented_stop_minutes: round(row.documented_stop_minutes, 3),
     cut_length_mm: round(row.cut_length_mm, 3),
@@ -554,8 +610,8 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
     estimated_weight_kg: round(row.estimated_weight_kg, 3),
     transition_minutes: round(row.transition_minutes, 3),
     coil_load_minutes: round(row.coil_load_minutes, 3),
-    meters_per_min: row.net_minutes > 0 ? round(row.cut_length_mm / 1000 / row.net_minutes, 4) : null,
-    kg_per_min: row.net_minutes > 0 ? round(row.weight_kg / row.net_minutes, 4) : null,
+    meters_per_min: row.net_minutes > 0 ? round((row.timed_cut_length_mm || 0) / 1000 / row.net_minutes, 4) : null,
+    kg_per_min: row.net_minutes > 0 ? round((row.timed_weight_kg || 0) / row.net_minutes, 4) : null,
     bends_per_min: row.net_minutes > 0 && row.total_bends > 0 ? round(row.total_bends / row.net_minutes, 4) : null,
   })).sort((a, b) => b.net_minutes - a.net_minutes || a.machine.localeCompare(b.machine, 'he'));
 
@@ -588,12 +644,14 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
     ...order,
     profiles: [...order.profiles].sort((a, b) => a.localeCompare(b, 'he')),
     net_minutes: round(order.net_minutes, 3),
+    gross_minutes: round(order.gross_minutes,3),
+    outside_work_minutes: round(order.outside_work_minutes,3),
     lunch_minutes: round(order.lunch_minutes, 3),
     documented_stop_minutes: round(order.documented_stop_minutes, 3),
     cut_length_mm: round(order.cut_length_mm, 3),
     weight_kg: round(order.weight_kg, 3),
-    meters_per_min: order.net_minutes > 0 ? round(order.cut_length_mm / 1000 / order.net_minutes, 4) : null,
-    kg_per_min: order.net_minutes > 0 ? round(order.weight_kg / order.net_minutes, 4) : null,
+    meters_per_min: order.net_minutes > 0 ? round((order.timed_cut_length_mm || 0) / 1000 / order.net_minutes, 4) : null,
+    kg_per_min: order.net_minutes > 0 ? round((order.timed_weight_kg || 0) / order.net_minutes, 4) : null,
   })).sort((a, b) => b.net_minutes - a.net_minutes || String(a.order_num).localeCompare(String(b.order_num), 'he'));
 
   const daily_diameters = [...dailyDiameterSummaries.values()].map(row => ({
@@ -616,7 +674,7 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
     || (a.diameter_mm === null ? 1 : b.diameter_mm === null ? -1 : a.diameter_mm - b.diameter_mm));
 
   return {
-    period: { from: fromDate, to: toDate, time_zone: FACTORY_TIME_ZONE, lunch: { start: '12:00', end: '12:45' } },
+    period: { from: fromDate, to: toDate, time_zone: FACTORY_TIME_ZONE, work: {start:'07:00',end:'18:00',working_days:workingDays||[0,1,2,3,4],friday_end:'14:00',friday_work_dates:fridayWorkDates.filter(day=>day>=fromDate&&day<=toDate),friday_policy:'production_scans_only'}, lunch: { start: '12:00', end: '12:45' } },
     cards: items.sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)) || b.item_id - a.item_id),
     orders,
     machines,
@@ -635,6 +693,8 @@ function reportProductionTiming(db, { fromDate, toDate } = {}) {
 
 module.exports = {
   FACTORY_TIME_ZONE,
+  WORK_START_MINUTE,
+  WORK_END_MINUTE,
   LUNCH_START_MINUTE,
   LUNCH_END_MINUTE,
   asDate,

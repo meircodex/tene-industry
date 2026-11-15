@@ -1,0 +1,19 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const folder=fs.mkdtempSync(path.join(os.tmpdir(),'tene-time-http-'));process.env.NODE_ENV='test';process.env.JWT_SECRET='timing-local-http-test';process.env.BCRYPT_ROUNDS='4';process.env.DB_PATH=path.join(folder,'test.db');process.env.BACKUP_DIR=path.join(folder,'backups');
+const {server,db,closeServer}=require('../server'),{hashPin}=require('../auth-core');
+test('timing API keeps absent weighing distinct from zero and OEE never fabricates a standard',async t=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>closeServer(r));db.close();assert.ok(path.resolve(folder).startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(folder,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port;
+ db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active,password_changed_at)VALUES(?,?,?,?,1,?)').run('timing-admin','QA','admin',hashPin('1234',4),new Date().toISOString());
+ const auth=await(await fetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'timing-admin',pin:'1234'})})).json();
+ const request=url=>fetch(base+'/api'+url,{headers:{Authorization:'Bearer '+auth.access_token}});
+ const order=db.prepare("INSERT INTO orders(order_num,status)VALUES('TIME-QA','הושלם')").run().lastInsertRowid,pallet=db.prepare('INSERT INTO pallets(order_id,pallet_num)VALUES(?,1)').run(order).lastInsertRowid;
+ db.prepare("INSERT INTO items(pallet_id,order_id,shape_name,diameter,quantity,total_length_mm,total_weight,segments,status,machine,started_at,completed_at)VALUES(?,?,'straight',12,10,1000,120,'[]','הושלם','A','2026-11-15T06:00:00Z','2026-11-15T07:00:00Z')").run(pallet,order);
+ const before=db.prepare('SELECT * FROM items').all();
+ const endpoint='/reports/production-timing?from=2026-11-15&to=2026-11-15';
+ assert.equal((await fetch(base+'/api'+endpoint)).status,401);
+ const response=await request(endpoint);assert.equal(response.status,200);const report=await response.json();
+ assert.equal(report.cards[0].weight_kg,120);assert.equal(report.cards[0].weight_source,'theoretical');assert.equal(report.cards[0].kg_per_min,2);assert.equal(report.cards[0].net_minutes,60);
+ const machines=await(await request('/machines/oee')).json();assert.ok(machines.length);assert.ok(machines.every(m=>m.oee===null&&m.measurement_status==='insufficient_data'));
+ assert.deepEqual(db.prepare('SELECT * FROM items').all(),before);
+});

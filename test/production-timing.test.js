@@ -170,12 +170,72 @@ test('production timing subtracts lunch separately on every Israel calendar day'
       completed_at: '2026-08-14T09:50:00.000Z',
       actual_weight_kg: 10,
     });
-    const report = reportProductionTiming(db, { fromDate: '2026-08-14', toDate: '2026-08-14' });
+    const report = reportProductionTiming(db, { fromDate: '2026-08-14', toDate: '2026-08-14', workingDays:[0,1,2,3,4,5] });
     const card = report.cards[0];
     assert.equal(card.lunch_minutes, 90);
     assert.equal(card.gross_minutes, 1500);
-    assert.equal(card.net_minutes, 1410);
+    assert.equal(card.outside_work_minutes, 780);
+    assert.equal(card.net_minutes, 630);
   } finally {
     db.close();
   }
+});
+
+test('missing weighing uses theoretical mass and untimed completed work stays in totals, never in pace',()=>{
+ const db=createDb();try{
+  seedBase(db);
+  seedItem(db,{id:1,started_at:'2026-11-15T06:00:00Z',completed_at:'2026-11-15T07:00:00Z',total_weight:120});
+  seedItem(db,{id:2,completed_at:'2026-11-15T08:00:00Z',total_weight:240});
+  const report=reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
+  assert.equal(report.cards.find(x=>x.item_id===1).weight_source,'theoretical');
+  assert.equal(report.cards.find(x=>x.item_id===1).weight_kg,120);
+  assert.equal(report.daily_diameters[0].estimated_weight_kg,360);
+  for(const row of [report.machines[0],report.orders[0]]){
+   assert.equal(row.weight_kg,360);assert.equal(row.cut_length_mm,20000);
+   assert.equal(row.kg_per_min,2);assert.equal(row.meters_per_min,0.1667);
+   assert.equal(row.measured_cards,1);assert.equal(row.unmeasured_cards,1);
+  }
+ }finally{db.close();}
+});
+
+test('work clock excludes closing hours, partial boundary overlaps, weekends when configured, and overlapping stops',()=>{
+ const check=(start,end,stops=[],calendar)=>deductIntervals(new Date(start),new Date(end),stops,calendar);
+ // Israel winter: 17:00 Sunday through 08:00 Monday = 900 elapsed, 120 work minutes.
+ assert.equal(check('2026-11-15T15:00:00Z','2026-11-16T06:00:00Z').outsideWorkMinutes,780);
+ assert.equal(check('2026-11-15T15:00:00Z','2026-11-16T06:00:00Z').deductedMinutes,780);
+ assert.equal(check('2026-11-15T04:30:00Z','2026-11-15T05:30:00Z').outsideWorkMinutes,30);
+ assert.equal(check('2026-11-15T16:30:00Z','2026-11-15T22:00:00Z').deductedMinutes,330);
+ // No overlap is deducted twice when a documented stop crosses closing time.
+ const stop={start:new Date('2026-11-15T15:30:00Z'),end:new Date('2026-11-16T05:30:00Z')};
+ const result=check('2026-11-15T15:00:00Z','2026-11-16T06:00:00Z',[stop,stop]);
+ assert.equal(result.documentedStopMinutes,60);assert.equal(result.deductedMinutes,840);
+ const weekend=check('2026-11-13T15:00:00Z','2026-11-15T06:00:00Z',[],{workingDays:[0,1,2,3,4,5]});
+ assert.equal(weekend.deductedMinutes,2280); // Friday after 14:00 and all Saturday are closed.
+ // Summer opening follows Israel local time (07:00 = 04:00 UTC).
+ assert.equal(check('2026-08-13T03:30:00Z','2026-08-13T04:30:00Z').outsideWorkMinutes,30);
+});
+
+test('Friday is closed without production scans, opens 07–14 with scan evidence, and Saturday stays closed',()=>{
+ const db=createDb();try{
+  seedBase(db);seedItem(db,{id:1,started_at:'2026-11-12T15:00:00Z',completed_at:'2026-11-15T06:00:00Z'});
+  const report=()=>reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
+  assert.equal(report().cards[0].net_minutes,120);
+  db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(1,'start','2026-11-13 06:00:00')").run();
+  assert.equal(report().cards[0].net_minutes,495);
+  assert.equal(report().cards[0].lunch_minutes,45);
+ }finally{db.close();}
+});
+
+test('opening a Friday card is not production evidence; an explicit scanned start is, without rewriting history',()=>{
+ const db=createDb();try{
+  seedBase(db);seedItem(db,{id:1,started_at:'2026-11-12T15:00:00Z',completed_at:'2026-11-15T06:00:00Z'});
+  db.exec('CREATE TABLE worker_card_activity(action TEXT,details_json TEXT,occurred_at TEXT)');
+  const report=()=>reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'});
+  db.prepare("INSERT INTO worker_card_activity VALUES('opened','{}','2026-11-13 06:00:00')").run();
+  assert.equal(report().cards[0].net_minutes,120);
+  db.prepare("INSERT INTO worker_card_activity VALUES('status_changed',?,'2026-11-13 06:01:00')").run(JSON.stringify({to_status:'בייצור',correction:false}));
+  const before=db.prepare('SELECT * FROM items').all();
+  assert.equal(report().cards[0].net_minutes,495);
+  assert.deepEqual(db.prepare('SELECT * FROM items').all(),before);
+ }finally{db.close();}
 });

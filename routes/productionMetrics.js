@@ -42,29 +42,24 @@ module.exports = function createProductionMetricsRouter(deps) {
     const actualByMachine = new Map(productionActuals.getDailyProductionActuals(db, today).machines.map(row => [row.machine, row]));
     const machines = db.prepare('SELECT * FROM machines WHERE retired_at IS NULL').all();
     const result = machines.map(m => {
-      // Availability: 1 - downtime / shift_hours (assume 8h shift = 480 min)
       const stopMins = db.prepare(
         `SELECT COALESCE(SUM(duration_min),0) as mins FROM machine_stops WHERE machine_id=? AND DATE(started_at)=?`
       ).get(m.id, today).mins;
-      const availability = Math.max(0, Math.min(1, 1 - stopMins / 480));
 
       // Performance: produced pieces vs. theoretical (rough estimate)
       const pieces = db.prepare(
         `SELECT COALESCE(SUM(quantity),0) as q FROM items WHERE machine=? AND DATE(completed_at)=?`
       ).get(m.name, today).q;
 
-      // Quality: pass rate from quality_checks today
-      const qc = db.prepare(
-        `SELECT SUM(pass_qty) as p, SUM(pass_qty+fail_qty) as t FROM quality_checks WHERE DATE(checked_at)=?`
-      ).get(today);
-      const quality = qc && qc.t > 0 ? qc.p / qc.t : 1;
-
       // Prefer measured output; completed items without a measurement use their
       // saved theoretical weight and are exposed separately as estimates.
       const tonsToday = Number(actualByMachine.get(m.name)?.tons) || 0;
 
-      const oee = Math.round(availability * 1 * quality * 100); // simplified (no performance factor)
-      return { ...m, availability: Math.round(availability*100), quality: Math.round(quality*100), oee, pieces_today: pieces, tons_today: tonsToday, downtime_min: stopMins };
+      // OEE requires a planned calendar, ideal cycle standard and machine-specific
+      // quality data. A constant performance factor must never imply 100% OEE.
+      return { ...m, availability:null, quality:null, oee:null,
+        measurement_status:'insufficient_data', measurement_reason:'חסרים זמני תקן ותוכנית עבודה לחישוב OEE',
+        pieces_today:pieces, tons_today:tonsToday, downtime_min:stopMins };
     });
     res.json(result);
   });
