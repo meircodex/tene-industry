@@ -30,7 +30,7 @@
   points.forEach((p,i)=>{const xx=x(i),yy=y(p.value),width=Math.max(1,Math.min(52,w/points.length*.65)),title=`<title>${esc(p.label)}: ${esc(fmt(p.value))} ${esc(spec.unit)}</title>`;
    markup+=type==='line'?`<circle cx="${xx}" cy="${yy}" r="4" fill="${colors[0]}">${title}</circle>`:`<rect x="${xx-width/2}" y="${yy}" width="${width}" height="${Math.max(0,bottom-yy)}" rx="3" fill="${colors[i%colors.length]}">${title}</rect>`;
    if(points.length<=10)markup+=`<text x="${xx}" y="${yy-8}" text-anchor="middle" fill="#193753" font-size="14">${esc(fmt(p.value))}</text>`;
-   if(i%Math.max(1,Math.ceil(points.length/7))===0||i===points.length-1)markup+=`<text x="${xx}" y="237" text-anchor="middle" fill="#526c84" font-size="13">${esc(p.label)}</text>`;
+   if(i===points.length-1||(i%Math.max(1,Math.ceil(points.length/5))===0&&i<=points.length-1-Math.max(1,Math.ceil(points.length/5))))markup+=`<text x="${xx}" y="237" text-anchor="middle" fill="#526c84" font-size="13">${esc(p.label)}</text>`;
   });
   return markup+'</svg>';
  }
