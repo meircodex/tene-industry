@@ -244,7 +244,7 @@ test('opening a Friday card is not production evidence; an explicit scanned star
   assert.equal(report().cards[0].net_minutes,120);
   db.prepare("INSERT INTO worker_card_activity(item_id,action,details_json,occurred_at) VALUES(999,'status_changed',?,'2026-11-13 06:01:00')").run(JSON.stringify({to_status:'בייצור',correction:false}));
   const before=db.prepare('SELECT * FROM items').all();
-  assert.equal(report().cards[0].net_minutes,495);
+  assert.equal(report().cards[0].net_minutes,120,'a different card working Friday cannot extend this card duration');
   assert.deepEqual(db.prepare('SELECT * FROM items').all(),before);
  }finally{db.close();}
 });
@@ -263,7 +263,7 @@ test('manual starts do not establish scan timing, and late duplicate completion 
  }finally{db.close();}
 });
 
-test('trusted baselines are independent of the report date filter and excluded time never changes production totals',()=>{
+test('physical reliability is independent of peers and excluded time never changes production totals',()=>{
  const db=createDb();try{
   seedBase(db);
   for(let id=1;id<=7;id++){
@@ -279,10 +279,31 @@ test('trusted baselines are independent of the report date filter and excluded t
   const wide=reportProductionTiming(db,{fromDate:'2026-11-12',toDate:'2026-11-15'});
   assert.equal(selected.cards.find(c=>c.item_id===6).reliability_status,'reliable');
   assert.equal(selected.cards.find(c=>c.item_id===6).measurement_key,wide.cards.find(c=>c.item_id===6).measurement_key);
-  assert.equal(selected.cards.find(c=>c.item_id===7).reliability_status,'review');
+  assert.equal(selected.cards.find(c=>c.item_id===7).reliability_status,'unreliable');
   assert.equal(selected.machines[0].weight_kg,20);assert.equal(selected.machines[0].net_minutes,2);assert.equal(selected.machines[0].kg_per_min,5);
   assert.equal(selected.daily_diameters[0].weight_kg,20);assert.equal(selected.daily_diameters[0].timed_weight_kg,10);
   db.prepare('UPDATE items SET quantity=11 WHERE id=1').run();
-  assert.equal(reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'}).cards.find(c=>c.item_id===6).reliability_status,'review');
+  assert.equal(reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'}).cards.find(c=>c.item_id===6).reliability_status,'reliable');
+ }finally{db.close();}
+});
+
+test('card 1833 weekend interval counts zero Saturday and exposes each working day',()=>{
+ const start=new Date('2026-11-12T12:11:41Z'),end=new Date('2026-11-15T06:52:32Z');
+ const d=deductIntervals(start,end,[],{fridayWorkDates:['2026-11-13']});
+ assert.equal(d.dailyBreakdown.find(r=>r.date==='2026-11-14').net_minutes,0);
+ assert.equal(d.dailyBreakdown.find(r=>r.date==='2026-11-13').net_minutes,375);
+ const net=(end-start)/60000-d.deductedMinutes;
+ assert.ok(Math.abs(net-715.85)<.01);assert.ok(Math.abs(d.dailyBreakdown.reduce((n,r)=>n+r.net_minutes,0)-net)<.005);
+});
+
+test('card 1833 does not inherit Friday activity from other cards and crossing days requires review',()=>{
+ const db=createDb();try{
+  seedBase(db);seedItem(db,{id:1,quantity:54,total_length_mm:1850,started_at:'2026-11-12T12:11:41Z',completed_at:'2026-11-15T06:52:32Z'});
+  db.prepare("INSERT INTO scan_log(item_id,action,scanned_at)VALUES(1,'complete','2026-11-15T06:52:32Z'),(999,'start','2026-11-13T06:00:00Z')").run();
+  db.prepare("INSERT INTO inventory_reservations(order_id,item_id,diameter,material_type,reserved_kg)VALUES(1,1,12,'coil',10)").run();
+  const c=reportProductionTiming(db,{fromDate:'2026-11-15',toDate:'2026-11-15'}).cards[0];
+  assert.ok(Math.abs(c.net_minutes-340.85)<.01);assert.equal(c.included_in_statistics,false);
+  assert.equal(c.working_day_breakdown.find(d=>d.date==='2026-11-13').net_minutes,0);assert.equal(c.working_day_breakdown.find(d=>d.date==='2026-11-14').net_minutes,0);
+  assert.ok(c.reliability_reasons.some(r=>r.includes('חוצות ימים')));
  }finally{db.close();}
 });

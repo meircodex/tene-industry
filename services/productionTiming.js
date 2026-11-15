@@ -161,7 +161,14 @@ function deductIntervals(start, end, stops = [], { workingDays = [0,1,2,3,4], fr
   const lunchMinutes = Math.max(0,scheduledMinutes-outsideWorkMinutes);
   const allDeductionMinutes = unionMinutes([...outsideWork,...lunches,...overlappingStops]);
   const documentedStopMinutes = Math.max(0,allDeductionMinutes-scheduledMinutes);
+  const dailyBreakdown=daySequence(start,end).map(day=>{
+    const window=intervalIntersection(start,end,factoryLocalTimeUtc(day,0),factoryLocalTimeUtc(nextDay(day),0));
+    const within=intervals=>intervals.map(i=>intervalIntersection(window.start,window.end,i.start,i.end)).filter(Boolean);
+    const gross=(window.end-window.start)/60000,outside=unionMinutes(within(outsideWork)),scheduled=unionMinutes(within([...outsideWork,...lunches])),deducted=unionMinutes(within([...outsideWork,...lunches,...overlappingStops]));
+    return {date:day,gross_minutes:round(gross,3),outside_work_minutes:round(outside,3),lunch_minutes:round(scheduled-outside,3),documented_stop_minutes:round(deducted-scheduled,3),net_minutes:round(Math.max(0,gross-deducted),3)};
+  });
   return {
+    dailyBreakdown,
     outsideWorkMinutes: round(outsideWorkMinutes,3),
     lunchMinutes: round(lunchMinutes, 3),
     documentedStopMinutes: round(documentedStopMinutes, 3),
@@ -343,8 +350,6 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     ORDER BY datetime(i.completed_at), i.id
   `).all();
 
-  const approvedOutsidePeriod=new Set(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='production_timing_reviews'").get()
-    ? db.prepare("SELECT item_id FROM production_timing_reviews WHERE decision='include'").all().map(r=>r.item_id):[]);
   const allItems = [];
   for (const item of rows) {
     const recordedCompletion = asDate(item.completed_at);
@@ -353,7 +358,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
     const completedAt = scan.end;
     const productionDay = israelDay(completedAt);
     if (!productionDay) continue;
-    if((productionDay<fromDate||productionDay>toDate)&&!approvedOutsidePeriod.has(item.id)) continue;
+    if(productionDay<fromDate||productionDay>toDate) continue;
     const startedAt = scan.start;
     const profile = shapeProfile(item);
     const machineId = resolveMachineId(item, stopData.machines);
@@ -389,7 +394,8 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       continue;
     }
     const stops = machineId ? (stopData.byMachineId.get(machineId) || []) : [];
-    const deductions = deductIntervals(startedAt, completedAt, stops, {workingDays,fridayWorkDates});
+    const cardFridayWorkDates=[...new Set((scans.byItem.get(Number(item.id))||[]).filter(e=>e.kind==='start'||e.kind==='end').map(e=>israelDay(e.at)).filter(day=>day&&new Date(day+'T12:00:00Z').getUTCDay()===5))];
+    const deductions = deductIntervals(startedAt, completedAt, stops, {workingDays,fridayWorkDates:cardFridayWorkDates});
     const grossMinutes = (completedAt - startedAt) / 60000;
     const netMinutes = Math.max(0, grossMinutes - deductions.deductedMinutes);
     const cutLengthMm = profile.unitCutLengthMm * quantity;
@@ -402,6 +408,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
       outside_work_minutes: deductions.outsideWorkMinutes,
       lunch_minutes: deductions.lunchMinutes,
       documented_stop_minutes: deductions.documentedStopMinutes,
+      working_day_breakdown: deductions.dailyBreakdown,
       net_minutes: round(netMinutes, 3),
       net_minutes_exact: netMinutes,
       cut_length_mm: round(cutLengthMm, 3),
@@ -717,7 +724,7 @@ function reportProductionTiming(db, { fromDate, toDate, workingDays } = {}) {
 
   const materials=reliability.materialIndex(db);
   return {
-    period: { from: fromDate, to: toDate, time_zone: FACTORY_TIME_ZONE, work: {start:'07:00',end:'18:00',working_days:workingDays||[0,1,2,3,4],friday_end:'14:00',friday_work_dates:fridayWorkDates.filter(day=>day>=fromDate&&day<=toDate),friday_policy:'production_scans_only'}, lunch: { start: '12:00', end: '12:45' } },
+    period: { from: fromDate, to: toDate, time_zone: FACTORY_TIME_ZONE, work: {start:'07:00',end:'18:00',working_days:workingDays||[0,1,2,3,4],friday_end:'14:00',friday_work_dates:fridayWorkDates.filter(day=>day>=fromDate&&day<=toDate),friday_policy:'card_production_scans_only'}, lunch: { start: '12:00', end: '12:45' } },
     cards: items.sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)) || b.item_id - a.item_id),
     orders,
     machines,

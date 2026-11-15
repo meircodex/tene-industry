@@ -1,6 +1,6 @@
 'use strict';
 const crypto=require('node:crypto');
-const POLICY=Object.freeze({version:1,coil_min_meters_per_min:1,approved_peer_min:5,peer_ratio_limit:3,lifts:'manager_review',close_scan_seconds:5});
+const POLICY=Object.freeze({version:2,coil_min_meters_per_min:1,coil_single_max_meters_per_min:30,coil_double_max_meters_per_min:60,min_auto_seconds:60,lifts:'manager_review',upper_bound:'observed_throughput'});
 const exists=(db,name)=>Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
 function ensureReviews(db){db.exec(`CREATE TABLE IF NOT EXISTS production_timing_reviews(
  item_id INTEGER PRIMARY KEY,measurement_key TEXT NOT NULL,measurement_json TEXT NOT NULL DEFAULT '{}',decision TEXT NOT NULL CHECK(decision IN ('include','exclude')),
@@ -16,34 +16,26 @@ function materialIndex(db){
  const result=new Map();for(const id of new Set([...usage.keys(),...reserved.keys()])){const types=usage.get(id)||reserved.get(id);result.set(id,types.size===1?[...types][0]:null);}return result;
 }
 function keyFor(card){return crypto.createHash('sha256').update(JSON.stringify({id:card.item_id,start:card.started_at,end:card.completed_at,end_source:card.timing_end_source,quantity:card.quantity,weight:card.weight_kg,profile:card.fingerprint,geometry_revision:card.geometry_revision,machine:card.machine_id||card.machine,material:card.material_type,net:card.net_minutes,gross:card.gross_minutes,outside:card.outside_work_minutes,lunch:card.lunch_minutes,stops:card.documented_stop_minutes})).digest('hex');}
-function peerKey(card){return JSON.stringify([card.machine_id||card.machine,card.material_type,card.fingerprint,card.geometry_revision]);}
-function median(values){const a=[...values].sort((a,b)=>a-b),mid=Math.floor(a.length/2);return a.length%2?a[mid]:(a[mid-1]+a[mid])/2;}
 function classify(db,cards){
  const materials=materialIndex(db),reviews=exists(db,'production_timing_reviews')?new Map(db.prepare('SELECT item_id,measurement_key,decision,reason,revision,reviewer_id,reviewer_name,reviewed_at FROM production_timing_reviews').all().map(r=>[r.item_id,r])):new Map();
  for(const c of cards){c.material_type=materials.get(c.item_id)||null;c.measurement_key=keyFor(c);const review=reviews.get(c.item_id);c.timing_review=review?.measurement_key===c.measurement_key?review:null;c.review_stale=Boolean(review&&!c.timing_review);c.review_revision=review?.revision||0;}
- const approved=new Map();
- for(const c of cards)if(c.measurement_status==='measured'&&c.net_minutes>0&&c.quantity>0&&c.unitCutLengthMm>0&&c.timing_review?.decision==='include'){
-  const key=peerKey(c);if(!approved.has(key))approved.set(key,[]);approved.get(key).push(c);
- }
  for(const c of cards){
   let status='review',reasons=[],include=false;
   const eligible=c.measurement_status==='measured'&&c.net_minutes>0&&c.quantity>0&&c.unitCutLengthMm>0;
-  const peers=(approved.get(peerKey(c))||[]).filter(p=>p.item_id!==c.item_id);
-  const baseline=peers.length>=POLICY.approved_peer_min?median(peers.map(p=>p.net_minutes/p.quantity)):null;
-  const ratio=baseline>0?(c.net_minutes/c.quantity)/baseline:null;
-  c.reliability_comparison={approved_peers:peers.length,median_min_per_unit:baseline,ratio};
+  c.reliability_comparison={policy_version:POLICY.version,min_meters_per_min:1,single_wire_max:30,double_wire_max:60};
   if(!eligible){status='unreliable';reasons.push(c.measurement_reason||'חסרים זמן תקין או נתוני אורך וכמות');}
+  else if(c.material_type==='coil'&&c.meters_per_min>POLICY.coil_double_max_meters_per_min){status='unreliable';reasons.push('הקצב שנרשם גבוה מ־60 מטר לדקה, מעבר לתקרה גם בחוט כפול — יש לבדוק את הסריקות והכמות');}
   else if(c.timing_review?.decision==='exclude'){status='unreliable';reasons.push('מנהל סימן את המדידה כלא אמינה: '+c.timing_review.reason);}
   else if(c.timing_review?.decision==='include'){status='reliable';include=true;reasons.push('אושרה על ידי מנהל: '+c.timing_review.reason);}
   else {
-   if(c.gross_minutes*60<=POLICY.close_scan_seconds)reasons.push('התחלה וסיום נרשמו בתוך 5 שניות — ייתכן דיווח בדיעבד');
    if(c.review_stale)reasons.push('נתוני המדידה השתנו מאז בדיקת המנהל');
    if(c.material_type==='coil'){
-    if(!(c.meters_per_min>POLICY.coil_min_meters_per_min))reasons.push('קצב גלילים אינו מעל מטר לדקה');
-    if(baseline===null)reasons.push('טרם אושרו לפחות 5 כרטיסים דומים להשוואה');
-    else if(ratio>POLICY.peer_ratio_limit||ratio<1/POLICY.peer_ratio_limit)reasons.push('קצב חריג ביותר מפי 3 מול חציון כרטיסים דומים שאושרו');
+    const minutes=c.net_minutes_exact??c.net_minutes,pace=c.meters_per_min;
+    if(!(pace>POLICY.coil_min_meters_per_min))reasons.push('קצב גלילים אינו מעל 1 מטר לדקה — זמן ארוך ביחס לאורך שדווח; ייתכן שלא נסרק סיום בזמן');
+    if((c.working_day_breakdown||[]).length>1)reasons.push('הסריקות חוצות ימים — אי אפשר לאמת עבודה רצופה בין היציאה לחזרה; נדרשת בדיקת זמן הייצור בפועל');
+    if(minutes*60<POLICY.min_auto_seconds)reasons.push('פחות מדקה בין סריקות בתוך שעות העבודה — מדידה קצרה דורשת בדיקה לפני הכללה בקצב');
     if(c.timing_end_source!=='scan')reasons.push('סיום הייצור אינו מגובה בסריקת סיום');
-    if(!reasons.length){status='reliable';include=true;reasons.push('עומדת בסף גלילים ובטווח ההשוואה למדידות שאושרו');}
+    if(!reasons.length){status='reliable';include=true;reasons.push('סריקות תקינות, לפחות דקת עבודה וקצב מעל 1 ועד 60 מטר לדקה; אין צורך בכרטיסי השוואה');}
    } else if(c.material_type==='straight')reasons.push('ליפטים נכללים בסטטיסטיקה לאחר אישור מנהל');
    else reasons.push(c.material_type?'לסוג חומר זה נדרש אישור מנהל':'סוג חומר הגלם אינו מאומת');
   }
@@ -62,6 +54,7 @@ function saveReview(db,{itemId,day,measurementKey,decision,reason,expectedReview
   const card=reportProductionTiming(db,{fromDate:day,toDate:day}).cards.find(c=>c.item_id===itemId);
   if(!card||card.measurement_key!==measurementKey)fail(409,'המדידה השתנתה. יש לרענן ולבדוק שוב');
   if(decision==='include'&&(card.measurement_status!=='measured'||!(card.net_minutes>0)||!(card.unitCutLengthMm>0)))fail(422,'אי אפשר לאשר זמן חסר או לא תקין; לא נוצר זמן משוער');
+  if(decision==='include'&&card.material_type==='coil'&&card.meters_per_min>POLICY.coil_double_max_meters_per_min)fail(422,'קצב מעל 60 מטר לדקה אינו סביר פיזיקלית; יש לתקן את דיווח המקור לפני אישור');
   const before=db.prepare('SELECT * FROM production_timing_reviews WHERE item_id=?').get(itemId)||null;
   if((before?.revision||0)!==expectedReviewRevision)fail(409,'בדיקת המנהל השתנתה. יש לרענן לפני שמירה');
   const snapshot=JSON.stringify(Object.fromEntries(['item_id','order_id','order_num','material_type','machine_id','machine','started_at','completed_at','quantity','weight_kg','weight_source','unitCutLengthMm','geometry_revision','fingerprint','net_minutes','gross_minutes','outside_work_minutes','lunch_minutes','documented_stop_minutes','meters_per_min','kg_per_min','timing_source','timing_end_source','reliability_comparison'].map(key=>[key,card[key]])));
