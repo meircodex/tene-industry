@@ -6,7 +6,7 @@
 
 ### זמן ייצור נטו ואמינות משקל בדוחות (15.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Production timing / Reports
 - input: סריקת התחלה עד סיום בתוך שעות העבודה 07:00–18:00, ללא צהריים 12:00–12:45; א׳–ה׳, שישי עד 14:00 רק ביום עם סריקת התחלה/סיום, שבת סגורה.
@@ -14,9 +14,10 @@
 - DB: projection read-only; אין שינוי נתוני מלאי או זמני מקור היסטוריים.
 - API/events: reports/production-timing הקיים; הרשאות קיימות; אין אירוע כתיבה חדש.
 - screens: תצוגה מקדימה לפני שילוב; סיכום כיסוי מדידה ומקור המשקל ופירוט ניכויים.
-- scope: services/productionTiming.js, public/reports.html, routes/productionMetrics.js, דוחות ותיעוד, בדיקות ממוקדות.
+- scope: services/productionTiming.js, public/reports.html, public/warroom.html (שמירת OEE חסר כ-null), routes/productionMetrics.js, דוחות ותיעוד, בדיקות ממוקדות.
 - reliability: משקל null אינו שקילה אפס; כרטיסים חסרי זמן נשמרים בסיכום אך אינם במונה הקצב. OEE אינו מציג 100% מומצא כשאין תקן ביצוע ותוכנית עבודה; תאריכי פעילות UTC מוצגים בשעון ישראל.
 - Definition of Done: בדיקות לילה/צהריים/עצירות חופפות/מעבר ימים/שעות ישראל, null weight וסיכומי כרטיסים חסרי התחלה; בדיקת רישומי סריקה, preview, בדיקות מלאות לפני שילוב.
+- verified: 15.11.2026 — npm test: 1288 passed. מקור זמן מאומת בסריקת התחלה; סיום סרוק ראשון אינו מתארך בדיווח כפול; מקור ידני מסומן כחסר. עותק מסד אמיתי נשאר ללא שינוי (items/raw_material/raw_material_usage/delivery_notes). Render c24d066 / dep-dbskpalg1s2s73ffmdv0 live, health 200. דוח חי 13.11: 20 כרטיסים, 4464.06 ק״ג תאורטי, ללא זמן התחלה מאומת; בתקופה 16.10–15.11: 24 כרטיסים מאומתים. נבדקו פירוט כרטיסים, מקור משקל, ממוצע מאותו projection, OEE חסר והודעת שגיאת טעינה. צילום tmp/live-report-13-nov.png.
 
 
 ### תור ייצור בעמודות קוטר ומרשם המכונות המאושר (13.11.2026)
