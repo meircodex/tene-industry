@@ -6,7 +6,7 @@
 
 ### אמינות לפי זמן ואורך וגבולות מכונה — 15.11.2026
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Production timing / Reports
 - input: ביטול חסימת 5 מדידות; זיהוי דיווח קצר/מהיר מדי וארוך/איטי מדי; שבת אינה עבודה.
@@ -15,6 +15,7 @@
 - API/events: שדות הסבר ב-production-timing הקיים; אין route או הרשאה חדשים. ביקורות ממשיכות ב-API הקיים.
 - screens: אותו מסך דוחות ופירוט; תיקון חישוב וסיווג, ללא פריסה חדשה.
 - Definition of Done: 2 שניות/100 מטר מוחרג, 4 הכרטיסים הסבירים נכנסים בלי עמיתים, קצב איטי מוחרג, תקרה 30/60, שבת אפס ולוח מפעל מאומת, בדיקות ופריסה חיה.
+- verification: 1308 tests passed (concurrency 1). Live fff19f6 / dep-dbspde942hec73de3r50, health 200. Cards 1871–1874 automatically reliable; card 1833: Friday and Saturday each 0, 340.85 possible working minutes, 0.29 m/min, excluded with cross-day explanation. Shared source used by card detail, daily/monthly groupings, machine/order/shape summaries and filtered export; other output KPIs retain canonical quantities/weights, OEE remains unavailable without standards. No production records, scans or stock transactions edited.
 
 ### טבלת דוחות מאוחדת עם סינונים וקצב מטר לדקה (15.11.2026)
 
