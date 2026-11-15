@@ -6,22 +6,22 @@
 <link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/reports-unified.css">
 <script src="/auth-client.js"></script><script src="/safe-dom.js"></script><script src="/nav.js"></script>
 </head><body><main class="page">
-<header class="report-heading"><div><h1>דוחות</h1><p>כל המידע במקום אחד</p></div><button id="exportReport" type="button">ייצוא לפי הסינון</button></header>
+<header class="report-heading"><div><h1>דוחות</h1><p>טבלה אחת · שורה לכל כרטיס · הסינון בידיים שלך</p></div><button id="exportReport" type="button">ייצוא לפי הסינון</button></header>
 <form id="reportFilters" class="report-filters">
-<label>מה לבדוק<select id="topic"><option value="production">ייצור וסריקות</option><option value="workers">פעילות עובדים</option><option value="waste">פחת</option><option value="recipes">מתכוני ייצור</option><option value="transitions">זמן בין כרטיסים</option><option value="customers">לקוחות</option><option value="orders">הזמנות לפי יום</option><option value="finance">מרווח הזמנות אחרונות</option><option value="oee">בריאות מכונות היום</option></select></label>
-<label id="groupLabel">הצגה לפי<select id="group"><option value="card">כרטיס</option><option value="day">יום</option><option value="machine">מכונה</option><option value="diameter">קוטר</option><option value="order">הזמנה</option><option value="customer">לקוח</option><option value="shape">צורה</option></select></label>
 <label>מתאריך<input id="fromDate" type="date" required></label><label>עד תאריך<input id="toDate" type="date" required></label>
 <label id="machineLabel">מכונה<select id="machine"><option value="">כל המכונות</option></select></label>
 <label id="diameterLabel">קוטר<select id="diameter"><option value="">כל הקטרים</option></select></label>
 <label id="materialLabel">סוג חומר<select id="material"><option value="">כל הסוגים</option><option value="coil">גליל</option><option value="straight">ליפט</option><option value="bent">ברזל מכופף</option><option value="mesh">רשת</option><option value="unknown">לא מאומת</option></select></label>
 <label id="customerLabel">לקוח<select id="customer"><option value="">כל הלקוחות</option></select></label>
+<label>הזמנה<select id="order"><option value="">כל ההזמנות</option></select></label>
+<label>מצב כרטיס<select id="status"><option value="">כל המצבים</option></select></label>
 <label id="kindLabel">סוג הדיווח<select id="kind"><option value="all">כל הדיווחים</option><option value="started">התחילו בתקופה</option><option value="same">התחלה וסיום באותו יום</option><option value="prior">סיום אחרי התחלה ביום קודם</option><option value="unmatched">סיום ללא מדידה מלאה</option><option value="open">ללא סריקת סיום באותו יום</option><option value="ended">כל הסיומים</option><option value="confirmed">תפוקה מאומתת באותו יום</option></select></label>
 <label id="reliabilityLabel">אמינות<select id="reliability"><option value="">כל המדידות</option><option value="reliable">אמינות</option><option value="review">דורשות בדיקה</option><option value="unreliable">לא אמינות</option><option value="unknown">טרם נמדדו</option></select></label>
-<label id="workerLabel" hidden>עובד<select id="worker"><option value="">כל העובדים</option></select></label>
+<label id="workerLabel">עובד<select id="worker"><option value="">כל העובדים</option></select></label>
 <label class="report-search">חיפוש<input id="search" type="search" placeholder="לקוח, הזמנה, כרטיס או צורה"></label>
 <div class="filter-actions"><button type="submit" class="primary">הצג</button><button type="button" id="clearFilters">נקה סינונים</button></div>
 </form>
-<button type="button" id="clearDrill" hidden>נקה סינון מתוך סיכום</button>
+<details class="column-picker"><summary>בחירת עמודות</summary><div id="columnChoices"></div></details>
 <div id="reportState" role="status" aria-live="polite"></div><div id="reportSummary" class="report-summary"></div><p id="reportNote" class="report-note"></p>
 <div class="report-table-wrap"><table id="reportTable"><thead id="reportHead"></thead><tbody id="reportBody"></tbody></table></div>
 <footer class="report-pagination"><span id="resultCount"></span><div><button id="prevPage" type="button">הקודם</button><span id="pageNumber"></span><button id="nextPage" type="button">הבא</button></div><label>שורות בעמוד<select id="limit"><option>25</option><option>50</option><option>100</option></select></label></footer>

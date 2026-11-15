@@ -324,9 +324,9 @@ test('production enforces order item ownership boundaries', async (t) => {
       FROM worker_card_activity WHERE item_id=? ORDER BY id
     `).all(approved.itemId);
     assert.deepEqual(activity.map(row => [row.action, row.actor_name, row.device_name]), [
-      ['opened', 'production-boundary', 'Boundary Phone'],
-      ['opened', 'production-boundary', 'Boundary Phone'],
-      ['updated', 'production-boundary', 'Boundary Phone'],
+      ['opened', 'Boundary Worker', 'Boundary Phone'],
+      ['opened', 'Boundary Worker', 'Boundary Phone'],
+      ['updated', 'Boundary Worker', 'Boundary Phone'],
     ]);
     assert.deepEqual(JSON.parse(activity[2].details_json), {
       from_status: statusContracts.ITEM_STATUS.WAITING,
@@ -343,7 +343,7 @@ test('production enforces order item ownership boundaries', async (t) => {
     assert.equal(reportResponse.status, 200);
     const report = await reportResponse.json();
     const reportRow = report.rows.find(row => row.item_id === approved.itemId && row.action === 'updated');
-    assert.equal(reportRow.actor_name, 'production-boundary');
+    assert.equal(reportRow.actor_name, 'Boundary Worker');
     assert.equal(reportRow.device_name, 'Boundary Phone');
     assert.equal(reportRow.details.produced_qty, 2);
   });

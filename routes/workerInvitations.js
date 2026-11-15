@@ -171,6 +171,7 @@ module.exports = function createWorkerInvitationsRouter(deps) {
   router.patch('/worker-profiles/:id', requireRole('admin'), (req, res) => {
     const id = Number(req.params.id);
     const details = workerDetails(req.body);
+    if(req.body?.active!==undefined&&typeof req.body.active!=='boolean')return res.status(400).json({error:'invalid_worker_active'});
     if (!Number.isInteger(id) || id <= 0 || !details.valid) {
       return res.status(400).json({ error: 'invalid_worker_profile' });
     }
@@ -182,15 +183,15 @@ module.exports = function createWorkerInvitationsRouter(deps) {
     try {
       db.prepare(`
         UPDATE worker_qr_profiles
-           SET worker_name=?,phone=?,phone_normalized=?,role=?,permissions_json=?,updated_by=?,updated_by_name=?,updated_at=CURRENT_TIMESTAMP
+           SET worker_name=?,phone=?,phone_normalized=?,role=?,permissions_json=?,active=?,updated_by=?,updated_by_name=?,updated_at=CURRENT_TIMESTAMP
          WHERE id=?
       `).run(details.workerName, details.phone, details.phoneNormalized, details.role,
-        JSON.stringify(details.permissions), actorId, actorName, id);
+        JSON.stringify(details.permissions), req.body.active===undefined?before.active:Number(req.body.active), actorId, actorName, id);
       const row = db.prepare('SELECT * FROM worker_qr_profiles WHERE id=?').get(id);
       auditLog('worker_qr_profile', id, details.phoneNormalized, 'update', 'profile', JSON.stringify({
-        worker_name: before.worker_name, phone: before.phone, role: before.role, permissions_json: before.permissions_json,
+        worker_name: before.worker_name, phone: before.phone, role: before.role, permissions_json: before.permissions_json, active: Boolean(before.active),
       }), JSON.stringify({
-        worker_name: row.worker_name, phone: row.phone, role: row.role, permissions_json: row.permissions_json,
+        worker_name: row.worker_name, phone: row.phone, role: row.role, permissions_json: row.permissions_json, active: Boolean(row.active),
       }), details.workerName, actorId, actorName);
       return res.json(publicWorkerProfile(row));
     } catch (error) {
@@ -296,6 +297,9 @@ module.exports = function createWorkerInvitationsRouter(deps) {
           error.status = failure.status;
           throw error;
         }
+        const profile=invite.worker_profile_id?getDb().prepare('SELECT * FROM worker_qr_profiles WHERE id=?').get(invite.worker_profile_id):null;
+        if(invite.worker_profile_id&&(!profile||!profile.active))throw Object.assign(Error('worker_disabled'),{status:403});
+        if(profile){invite.worker_name=profile.worker_name;invite.phone=profile.phone;invite.role=profile.role;invite.permissions_json=profile.permissions_json;}
         const permissions = cleanPermissions(JSON.parse(invite.permissions_json || '[]'), invite.role);
         if (invite.worker_profile_id) {
           getDb().prepare(`

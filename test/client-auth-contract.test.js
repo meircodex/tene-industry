@@ -661,10 +661,11 @@ test('reports screen uses authenticated APIs and one escaped table', () => {
   assert.match(reports, /src="\/safe-dom\.js"/);
   assert.equal((reports.match(/<table[ >]/g)||[]).length,1);
   assert.match(client, /\/api\/reports\/production-timing/);
-  assert.match(client, /\/api\/reports\/summary/);
-  assert.match(client, /\/api\/machines\/oee/);
+  assert.doesNotMatch(reports, /id="topic"|id="group"/);
+  assert.match(client, /flat:'1'/);
+  assert.match(reports, /id="columnChoices"/);
   assert.match(client, /escH\(fn\(r\)\)/);
-  assert.match(client, /escH\(r\.shape_name\)/);
+  assert.match(client, /escH\(fn\(r\)\)/);
 });
 
 test('orders screen uses shared status transition contract', () => {
@@ -1814,7 +1815,7 @@ test('display-only production views prefer server-rendered production shape SVG'
   assert.match(worker, /worker-canonical-missing/);
   assert.match(worker, /\/api\/worker-card\?card=/);
   assert.match(worker, /workerCardApi\(id,'\/status'\)/);
-  assert.match(read('public/reports-unified.js'), /\/api\/reports\/worker-card-activity/);
+  assert.match(read('public/reports-unified.js'), /\/api\/reports\/production-timing/);
   assert.match(worker, /if\(!SCAN_ENTRY\)ws\(\)/);
   assert.match(productionRoute, /router\.get\('\/worker-card'/);
   assert.match(productionRoute, /router\.patch\('\/worker-card\/:id'/);

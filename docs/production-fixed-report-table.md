@@ -1,0 +1,12 @@
+# דוח ייצור: טבלה קבועה וזהות עובד — 15.11.2026
+
+Reports owns a read-only projection, not source scans, geometry, weights or access grants.
+
+- Existing GET /api/reports/production-timing with unified=1&flat=1 returns exactly one row per card with start/end activity in the requested Israel-local period. Existing role gate (office/finance/manager/admin), date validation and pagination remain. No new route or tables.
+- Filters: machine, diameter, material, customer, order, status, worker, activity kind, reliability and search. Filter before summary/page. CSV uses the same query across pages. Column selection changes presentation only.
+- Start-only and historical end-only rows remain visible. Completion quantities/weights are attributed only if canonical completion is inside the period. Multiple activity dates never multiply totals. Calendar, geometry, weight and reliability remain canonical services.
+- Worker activity is read from Production event snapshots, with stable profile/device/user keys. Anonymous historic scans are not assigned to new workers. No writes or audit/event for this read-only endpoint.
+- Removed report-topic/group UI and unrelated report API fetching. Existing API consumers remain compatible. The displayed dataset always consists of cards.
+- Worker profiles remain in Admin > Workers & QR, with a shortcut from Users. Profile name/permissions/active status are checked for activated phones in both open and secure modes. Anonymous open scanning remains available as explicitly requested; QR_ACCESS_MODE is not changed by this release.
+- Profile updates retain existing audit, now including active state. Activation uses current profile information and refuses inactive profiles. No historic scan identity rewritten.
+- Validation: cross-day deduplication/totals, server-side filters, anonymous/start-only data, activated open identity, live permission/name changes and inactive denial, existing auth/governance suites, browser filter/columns/detail/CSV QA.

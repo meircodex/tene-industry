@@ -120,6 +120,24 @@ test('a personal worker invitation activates one passwordless device with server
     body: JSON.stringify({ kind: 'card', value: 'ORDER-000001', scanner_id: 'open-test-scanner' }),
   });
   assert.equal(openScan.status, 200);
+  const namedOpen = await request('/api/qr-access/scan', {
+    method:'POST',headers:{'Content-Type':'application/json','X-IronBend-Device':claimed.device_credential},
+    body:JSON.stringify({kind:'card',value:'ORDER-000001'})
+  });
+  assert.equal(namedOpen.status,200);
+  assert.equal(db.prepare('SELECT actor_name FROM qr_scan_activity ORDER BY id DESC LIMIT 1').get().actor_name,'דוד כהן');
+  const profileBody={worker_name:'דוד מעודכן',phone:'0501234567',role:'production',permissions:['warehouse'],active:true};
+  assert.equal((await request(`/api/worker-profiles/${profile.id}`,{method:'PATCH',headers:adminHeaders,body:JSON.stringify(profileBody)})).status,200);
+  const deniedOpen=await request('/api/qr-access/scan',{method:'POST',headers:{'Content-Type':'application/json','X-IronBend-Device':claimed.device_credential},body:JSON.stringify({kind:'card',value:'ORDER-000001'})});
+  assert.equal(deniedOpen.status,403);
+  assert.equal((await deniedOpen.json()).error,'qr_permission_denied');
+  assert.equal(db.prepare('SELECT actor_name FROM qr_scan_activity ORDER BY id DESC LIMIT 1').get().actor_name,'דוד מעודכן');
+  profileBody.permissions=['production'];profileBody.active=false;
+  assert.equal((await request(`/api/worker-profiles/${profile.id}`,{method:'PATCH',headers:adminHeaders,body:JSON.stringify(profileBody)})).status,200);
+  const disabled=await request('/api/qr-access/scan',{method:'POST',headers:{'Content-Type':'application/json','X-IronBend-Device':claimed.device_credential},body:JSON.stringify({kind:'card',value:'ORDER-000001'})});
+  assert.equal(disabled.status,403);assert.equal((await disabled.json()).error,'worker_disabled');
+  profileBody.active=true;profileBody.worker_name='דוד כהן';
+  assert.equal((await request(`/api/worker-profiles/${profile.id}`,{method:'PATCH',headers:adminHeaders,body:JSON.stringify(profileBody)})).status,200);
   const secureMode = await request('/api/qr-access/mode', {
     method: 'PATCH', headers: adminHeaders, body: JSON.stringify({ mode: 'secure' }),
   });
@@ -149,6 +167,9 @@ test('a personal worker invitation activates one passwordless device with server
   const activity = db.prepare('SELECT access_mode,permission,outcome,actor_name FROM qr_scan_activity ORDER BY id').all();
   assert.deepEqual(activity.map(row => [row.access_mode, row.permission, row.outcome, row.actor_name]), [
     ['open', 'production', 'allowed', 'סריקה פתוחה'],
+    ['open','production','allowed','דוד כהן'],
+    ['open','production','qr_permission_denied','דוד מעודכן'],
+    ['open','production','worker_disabled','דוד מעודכן'],
     ['secure', 'production', 'allowed', 'דוד כהן'],
     ['secure', 'warehouse', 'qr_permission_denied', 'דוד כהן'],
     ['secure', 'production', 'device_activation_required', 'דוד כהן'],

@@ -10,7 +10,8 @@ function parseFilters(query={}){
  const drill_field=text('drill_field');if(!['','order_num','shape_name','machine','diameter_mm','customer_name'].includes(drill_field))throw Error('invalid_report_filter');
  const drill_value=text('drill_value');
  const diameter=text('diameter');if(diameter&&(!Number.isFinite(Number(diameter))||Number(diameter)<=0))throw Error('invalid_report_filter');
- return {group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
+ const flat=text('flat');if(!['','1'].includes(flat))throw Error('invalid_report_filter');
+ return {flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
 }
 function summary(rows){
  const result={cards:new Set(rows.map(r=>r.item_id)).size,rows:rows.length,reported_cards:0,units:0,weight_kg:0,theoretical_kg:0,measured_kg:0,net_minutes:0,timed_length_mm:0,timed_weight_kg:0,reliable_cards:0,started_cards:0,ended_cards:0,confirmed_units:0};
@@ -24,14 +25,34 @@ function summary(rows){
  result.kg_per_min=result.net_minutes>0?result.timed_weight_kg/result.net_minutes:null;
  return result;
 }
-function unifiedProductionReport({cards,activity},filters){
+function unifiedProductionReport({cards,activity,workers=[]},filters){
  const canonical=new Map(cards.map(c=>[c.item_id,c]));
- const all=activity.cards.map(r=>({...r,card:r.reported_complete?canonical.get(r.item_id)||null:null,
+ let all=activity.cards.map(r=>({...r,card:r.reported_complete?canonical.get(r.item_id)||null:null,
   customer_name:r.customer_name||canonical.get(r.item_id)?.customer_name||'',
   material_type:canonical.get(r.item_id)?.material_type||r.material_type||'unknown'}));
+ if(filters.flat){
+  const grouped=new Map(),byWorkerItem=new Map();
+  for(const w of workers){const id=Number(w.item_id);if(!byWorkerItem.has(id))byWorkerItem.set(id,[]);byWorkerItem.get(id).push(w);}
+  for(const row of all){if(!grouped.has(row.item_id))grouped.set(row.item_id,[]);grouped.get(row.item_id).push(row);}
+  all=[...grouped.values()].map(list=>{
+   list.sort((a,b)=>b.date.localeCompare(a.date));
+   const base=list.find(r=>r.reported_complete)||list[0],c=canonical.get(base.item_id)||null;
+   const people=byWorkerItem.get(base.item_id)||[];
+   return {...base,card:base.reported_complete?c:null,
+    produced_length_mm:base.reported_complete&&c?.unitCutLengthMm>0?c.unitCutLengthMm*c.quantity:null,
+    started:list.find(r=>r.started)?.started||base.started,
+    activity_dates:list.map(r=>r.date),activity_kinds:{started:list.some(r=>r.started),same:list.some(r=>r.same_day_scanned),prior:list.some(r=>r.ended_from_prior_day),unmatched:list.some(r=>r.ended_unmatched),open:list.some(r=>r.not_finished_same_day),ended:list.some(r=>r.ended),confirmed:list.some(r=>r.confirmed_same_day)},
+    workers:people,worker_names:[...new Set(people.map(w=>w.actor_name))].join(' · ')||'לא מזוהה',
+    start_worker:people.filter(w=>w.to_status==='בייצור').at(-1)?.actor_name||null,
+    end_worker:people.filter(w=>w.to_status==='הושלם').at(-1)?.actor_name||null};
+  }).sort((a,b)=>b.date.localeCompare(a.date)||b.item_id-a.item_id);
+ }
  const values=key=>[...new Set(all.map(r=>r[key]).filter(v=>v!==null&&v!==undefined&&v!==''))].sort((a,b)=>String(a).localeCompare(String(b),'he',{numeric:true}));
- const facets={machines:values('machine'),diameters:values('diameter_mm'),customers:values('customer_name')};
+ const facets={machines:values('machine'),diameters:values('diameter_mm'),customers:values('customer_name'),orders:values('order_num'),statuses:values('status'),workers:[...new Map(workers.map(w=>[w.worker_key,{key:w.worker_key,name:w.actor_name}])).values()]};
  const selected=all.filter(r=>{
+  if(filters.worker&&!r.workers?.some(w=>w.worker_key===filters.worker))return false;
+  if(filters.order&&r.order_num!==filters.order)return false;
+  if(filters.status&&r.status!==filters.status)return false;
   if(filters.drill_field&&String(r[filters.drill_field]??'')!==filters.drill_value)return false;
   if(filters.machine&&r.machine!==filters.machine)return false;
   if(filters.diameter&&Number(r.diameter_mm)!==Number(filters.diameter))return false;
@@ -39,10 +60,11 @@ function unifiedProductionReport({cards,activity},filters){
   if(filters.customer&&r.customer_name!==filters.customer)return false;
   if(filters.reliability&&(r.reliability_status||'unknown')!==filters.reliability)return false;
   if(filters.search&&![r.order_num,r.item_id,r.shape_name,r.customer_name].join(' ').toLocaleLowerCase('he').includes(filters.search.toLocaleLowerCase('he')))return false;
+  if(filters.flat)return filters.kind==='all'||Boolean(r.activity_kinds[filters.kind]);
   return filters.kind==='started'?Boolean(r.started):filters.kind==='same'?r.same_day_scanned:filters.kind==='prior'?r.ended_from_prior_day:filters.kind==='unmatched'?r.ended_unmatched:filters.kind==='open'?r.not_finished_same_day:filters.kind==='ended'?Boolean(r.ended):filters.kind==='confirmed'?r.confirmed_same_day:true;
  });
  const totals=summary(selected);let rows=selected;
- if(filters.group!=='card'){
+ if(!filters.flat&&filters.group!=='card'){
   const field={day:'date',machine:'machine',diameter:'diameter_mm',order:'order_num',customer:'customer_name',shape:'shape_name'}[filters.group],groups=new Map();
   for(const r of selected){const key=String(r[field]??'');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);}
   rows=[...groups].map(([key,list])=>({key,label:key||'לא ידוע',...summary(list)})).sort((a,b)=>filters.group==='day'?b.key.localeCompare(a.key):a.key.localeCompare(b.key,'he',{numeric:true}));

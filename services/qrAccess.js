@@ -68,10 +68,14 @@ function createQrAccessService({ db, settingsService, deviceEnrollment }) {
 
   function invitationFor(device) {
     if (!device?.invitation_id) return null;
-    return db.prepare('SELECT worker_name,phone,role,permissions_json FROM worker_invitations WHERE id=?').get(device.invitation_id) || null;
+    const invite=db.prepare('SELECT worker_name,phone,role,permissions_json,worker_profile_id FROM worker_invitations WHERE id=?').get(device.invitation_id);
+    if(!invite)return null;
+    const profile=invite.worker_profile_id?db.prepare('SELECT id,worker_name,phone,role,permissions_json,active FROM worker_qr_profiles WHERE id=?').get(invite.worker_profile_id):null;
+    return profile?{...invite,...profile,worker_profile_id:profile.id}:invite;
   }
 
   function allowedPermissions(req, device, invitation) {
+    if(invitation?.worker_profile_id)return parsePermissions(invitation.permissions_json);
     const explicit = parsePermissions(device?.permissions_json);
     if (explicit.length) return explicit;
     const invited = parsePermissions(invitation?.permissions_json);
@@ -83,19 +87,16 @@ function createQrAccessService({ db, settingsService, deviceEnrollment }) {
   function authorize(req, permission) {
     if (!QR_PERMISSIONS.has(permission)) return { ok: false, status: 400, error: 'invalid_qr_permission' };
     const accessMode = mode();
-    if (accessMode === 'open') {
-      const grant = { mode: accessMode, permission, actor_name: 'סריקה פתוחה', device: null, invitation: null };
-      req.qrAccess = grant;
-      return { ok: true, ...grant };
-    }
-
     const device = deviceEnrollment.statusForRequest(req);
     const invitation = invitationFor(device);
+    if(accessMode==='open'&&(!device||device.status!=='approved')){
+      const grant={mode:accessMode,permission,actor_name:cleanText(req.auth?.display_name,120)||'סריקה פתוחה',device:null,invitation:null};req.qrAccess=grant;return {ok:true,...grant};
+    }
     if (device) {
       req.qrAccess = {
         mode: accessMode,
         permission,
-        actor_name: cleanText(req.auth?.display_name, 120) || invitation?.worker_name || device.requester_name,
+        actor_name: invitation?.worker_name || device.requester_name || cleanText(req.auth?.display_name,120),
         actor_phone: invitation?.phone || null,
         device,
         invitation,
@@ -110,6 +111,7 @@ function createQrAccessService({ db, settingsService, deviceEnrollment }) {
         mode: accessMode,
       };
     }
+    if(invitation?.active===0)return {ok:false,status:403,error:'worker_disabled',mode:accessMode,device_status:device.status};
     if (!allowedPermissions(req, device, invitation).includes(permission)) {
       return { ok: false, status: 403, error: 'qr_permission_denied', mode: accessMode, device_status: device.status };
     }
