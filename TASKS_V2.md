@@ -6,7 +6,7 @@
 
 ### טבלת דוחות מאוחדת עם סינונים וקצב מטר לדקה (15.11.2026)
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Reports / Production timing
 - input: איחוד טבלאות למסך אחד, סינונים וקצב מטר לדקה; תצוגה אושרה ונדרש לפרוס.
@@ -16,6 +16,7 @@
 - screens: reports.html; התצוגות הישנות והגרפים המפוצלים מוסרים.
 - policy: סיכום קצב = סך מטרים במדידות אמינות / סך דקות נטו שלהן; ללא ממוצע קצבים וללא ספירה כפולה של כרטיסים חוצי ימים. יתר הנושאים נשארים בבעלות המקור שלהם.
 - Definition of Done: בדיקות קיבוץ/סינון/קצב/חציית ימים/הרשאות, בדיקה חזותית, בדיקות מלאות ופריסה חיה מאומתת.
+- verification: 1303 full tests passed (test concurrency 4), focused timing/filter/auth checks passed after precision update. Local UI: grouping, drilldown, open-coil filtering, reliable detail and filtered CSV verified. Live 611a342 / dep-dbsng29srm7s73drope0, health 200. Friday 13.11: 20 cards / 2586 units / 4464.06 kg; card 1790 retains approval and displays 28.29 m/min identically in row and filtered summary. One table; no inventory/status/scan history corrections.
 
 ### סריקות התחלה וסיום ותפוקה לפי יום (15.11.2026)
 
