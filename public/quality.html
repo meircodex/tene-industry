@@ -119,6 +119,7 @@ tr.clickable:hover td{background:rgba(0,0,0,0.02);}
 <script src="/auth-client.js"></script>
 <script src="/safe-dom.js"></script>
 <script src="/display-units.js"></script>
+<link rel="stylesheet" href="/quality-weighings.css">
 </head>
 <body data-page="quality">
 <nav class="topnav">
@@ -139,13 +140,26 @@ tr.clickable:hover td{background:rgba(0,0,0,0.02);}
 <div class="page">
   <!-- TAB BAR -->
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('qc')">🔍 בקרת איכות</button>
+    <button class="tab-btn active" onclick="switchTab('weigh')">⚖ שקילת איכות</button>
+    <button class="tab-btn" onclick="switchTab('qc')">🔍 בקרת איכות</button>
     <button class="tab-btn" onclick="switchTab('ncr')">⚠️ NCR – אי-התאמה</button>
     <button class="tab-btn" onclick="switchTab('capa')">🔧 CAPA – פעולות מתקנות</button>
   </div>
 
+
+<section class="tab-panel active" id="tab-weigh" aria-label="שקילת איכות">
+ <div class="qw-toolbar"><h2 style="margin:0;margin-inline-end:auto">שקילת איכות</h2><button type="button" id="qwNewView">שקילה חדשה</button><button type="button" id="qwHistoryView">היסטוריית שקילות</button></div>
+ <div id="qwNew" class="qw-new"><div class="qw-readonly" id="qwReadonly" hidden>אפשר לבחור ולבדוק משקלים. שמירת בדיקה דורשת הרשאת איכות או מנהל.</div>
+ <div class="qw-mobile-summary"><span id="qwMobileCount">בחר הזמנות</span><button type="button" id="qwGoWeight">הזן משקל ←</button></div>
+ <div class="qw-layout"><section><div class="qw-filter"><label for="qwCustomer">לקוח<select id="qwCustomer"><option value="">כל הלקוחות</option></select></label><div><div class="qw-note">מצב הזמנה</div><div class="qw-status"><button type="button" data-qw-status="production">בייצור</button><button type="button" data-qw-status="completed">הושלמו</button><button type="button" data-qw-status="all" class="active">הכול</button></div></div></div>
+ <div id="qwOrderState" class="qw-note" role="status"></div><div id="qwOrders"></div><div class="qw-pages"><button type="button" id="qwOrderPrev">הקודם</button><span id="qwOrderPage"></span><button type="button" id="qwOrderNext">הבא</button></div></section>
+ <aside class="qw-summary"><h3>מה בחרנו לשקול?</h3><strong id="qwSelectionCount">0 הזמנות</strong><div id="qwSelected" class="qw-selected"></div><button type="button" id="qwClear">נקה בחירה</button><label>משקל מחושב לבחירה</label><div class="qw-target" id="qwExpected">—</div><label for="qwWeight">משקל נטו שנשקל (ק״ג)</label><input id="qwWeight" type="number" inputmode="decimal" min="0.001" max="10000000" step="0.001" aria-describedby="qwWeightError"><div id="qwWeightError" class="qw-message" role="status"></div><p class="qw-note">הקלדת המשקל בלבד · ללא אריזה או מתלה</p><div id="qwDelta" class="qw-delta">הזן משקל להצגת הפער</div><button id="qwSave" type="button" class="qw-save" disabled>שמור בדיקת שקילה</button><p class="qw-note">תאריך ובודק נשמרים אוטומטית. הפער הוא לקבוצה שנשקלה כולה, ללא סף מומצא של תקין / נכשל.</p><div id="qwMessage" class="qw-message" role="status" aria-live="polite"></div><button type="button" id="qwLastSaved" hidden>פתח את הבדיקה שנשמרה</button></aside>
+ </div></div>
+ <section id="qwHistory" class="qw-history" hidden><h3>היסטוריית שקילות</h3><div class="qw-history-filters"><label>לקוח<select id="qwHistoryCustomer"><option value="">כל הלקוחות</option></select></label><label>מתאריך<input type="date" id="qwHistoryFrom"></label><label>עד תאריך<input type="date" id="qwHistoryTo"></label><button type="button" id="qwExport">ייצוא התוצאות</button></div><p id="qwHistoryState" class="qw-note" role="status"></p><div class="qw-history-scroll"><table><thead><tr><th>תאריך</th><th>הזמנות</th><th>בחירה</th><th>פריטים</th><th>מחושב ק״ג</th><th>נטו ק״ג</th><th>פער ק״ג / אחוז</th><th>בודק</th><th></th></tr></thead><tbody id="qwHistoryBody"></tbody></table></div><div class="qw-pages"><button type="button" id="qwHistoryPrev">הקודם</button><span id="qwHistoryPage"></span><button type="button" id="qwHistoryNext">הבא</button></div></section>
+</section>
+
   <!-- ===== TAB: QC ===== -->
-  <div class="tab-panel active" id="tab-qc">
+  <div class="tab-panel" id="tab-qc">
     <div class="kpi-row">
       <div class="kpi-card">
         <div class="kpi-label">סה"כ בדיקות</div>
@@ -517,10 +531,10 @@ tr.clickable:hover td{background:rgba(0,0,0,0.02);}
 ============================================================ -->
 <script>
 /* -------- UTILS -------- */
-let _tabActive = 'qc';
+let _tabActive = 'weigh';
 function switchTab(t) {
   _tabActive = t;
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', ['qc','ncr','capa'][i]===t));
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active', ['weigh','qc','ncr','capa'][i]===t));
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id==='tab-'+t));
   if (t==='ncr') { loadNCR(); }
   if (t==='capa') { loadCAPA(); }
@@ -1091,6 +1105,8 @@ function closeCapaPanel() {
 loadStats();
 loadChecks();
 </script>
+<dialog id="qwDetail" class="qw-detail"><div class="qw-detail-head"><h2 id="qwDetailTitle"></h2><button type="button" id="qwDetailClose" aria-label="סגור פירוט שקילה">✕</button></div><div id="qwDetailBody"></div></dialog>
+<script src="/quality-weighings.js"></script>
 <script src="/nav.js"></script>
 </body>
 </html>

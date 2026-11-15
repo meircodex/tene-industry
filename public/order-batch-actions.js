@@ -46,5 +46,6 @@
     if(!eligibility.ok){root.alert(eligibility.message);return;}
     root.location.href='/order-operations.html?orders='+[...selected].join(',');
   }
-  return {CROSS_CUSTOMER_MESSAGE,deliveryEligibility,sync,checkbox,master,toggle,toggleVisible,clear,render,cutting,delivery,selectedIds:()=>[...selected]};
+  function weighing(){if(!selected.size)return;root.location.href='/quality.html?weigh_orders='+[...selected].join(',');}
+  return {CROSS_CUSTOMER_MESSAGE,deliveryEligibility,sync,checkbox,master,toggle,toggleVisible,clear,render,cutting,delivery,weighing,selectedIds:()=>[...selected]};
 });

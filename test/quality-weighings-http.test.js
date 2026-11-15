@@ -1,0 +1,22 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const folder=fs.mkdtempSync(path.join(os.tmpdir(),'tene-quality-weigh-http-'));process.env.NODE_ENV='test';process.env.JWT_SECRET='quality-weigh-http-test';process.env.BCRYPT_ROUNDS='4';process.env.DB_PATH=path.join(folder,'test.db');process.env.BACKUP_DIR=path.join(folder,'backups');
+const {server,db,closeServer}=require('../server'),{hashPin}=require('../auth-core');
+test('weighing routes require module roles, trust authenticated inspectors and reject forged/stale measurements',async t=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>closeServer(r));db.close();assert.ok(path.resolve(folder).startsWith(path.resolve(os.tmpdir())+path.sep));fs.rmSync(folder,{recursive:true,force:true});});
+ const base='http://127.0.0.1:'+server.address().port+'/api';
+ const login=async role=>{const name='weigh-'+role;db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active,password_changed_at)VALUES(?,?,?,?,1,?)').run(name,name,role,hashPin('1234',4),new Date().toISOString());return (await(await fetch(base+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:name,pin:'1234'})})).json()).access_token;};
+ const admin=await login('admin'),office=await login('office'),quality=await login('quality');
+ db.exec("INSERT INTO orders(id,order_num,status)VALUES(1,'QC-HTTP','בייצור');INSERT INTO pallets(id,order_id,pallet_num)VALUES(1,1,1);INSERT INTO items(id,pallet_id,order_id,quantity,weight_per_unit,total_weight,shape_name,status)VALUES(1,1,1,10,10,100,'straight','הושלם');");
+ const req=(url,token=admin,method='GET',body)=>fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ for(const url of ['/quality/weighing-orders','/quality/weighing-orders/1','/quality/weighings','/quality/weighings/1'])assert.equal((await req(url,null)).status,401);
+ assert.equal((await req('/quality/weighing-orders',quality)).status,200);assert.equal((await req('/quality/weighing-orders?limit=999')).status,400);
+ const choice={orders:[{order_id:1,mode:'full'}]},preview=await(await req('/quality/weighings/preview',quality,'POST',choice)).json();assert.equal(preview.expected_weight_kg,100);
+ const body={...choice,actual_weight_kg:98,expected_fingerprint:preview.fingerprint,idempotency_key:'quality-http-test-0001',inspector_id:999,expected_weight_kg:500};
+ assert.equal((await req('/quality/weighings',null,'POST',body)).status,401);assert.equal((await req('/quality/weighings',office,'POST',body)).status,403);
+ const response=await req('/quality/weighings',quality,'POST',body);assert.equal(response.status,200);const saved=await response.json();assert.equal(saved.inspector_name,'weigh-quality');assert.equal(saved.expected_weight_kg,100);assert.equal(saved.delta_pct,-2);assert.equal(saved.lines.length,1);
+ assert.equal((await(await req('/quality/weighings',quality,'POST',body)).json()).replay,true);assert.equal((await(await req('/quality/weighings',office)).json()).total,1);
+ assert.equal(db.prepare('SELECT total_weight FROM items WHERE id=1').get().total_weight,100);assert.equal(db.prepare("SELECT count(*) n FROM audit_log WHERE entity_type='quality_weighing'").get().n,1);
+ db.exec('UPDATE items SET quantity=11 WHERE id=1');assert.equal((await req('/quality/weighings',quality,'POST',{...body,idempotency_key:'quality-http-test-0002'})).status,409);
+ const snapshot=await(await req('/quality/weighings/'+saved.id,office)).json();assert.equal(snapshot.lines[0].order_quantity,10);
+});

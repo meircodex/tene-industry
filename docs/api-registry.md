@@ -253,3 +253,17 @@ Existing manager/admin create/update calls accept definition.recognitionRules
 (version=1; boolean enabled/allowReverse/allowMirror). Existing role/version/audit
 checks remain. /shapeRecognition.js exposes the same pure, non-mutating matcher.
 See product-trait-recognition-20261110.md. -->
+
+
+### Quality weighing observations (15.11.2026)
+
+Owner: Quality. Mounted as a child of routes/quality.js; the existing Quality module/license gate applies. All reads and previews require quality/production/office/manager/admin; saves require quality/manager/admin.
+
+- GET /api/quality/weighing-orders — paginated eligible order picker, customer/status filters and customer facets.
+- GET /api/quality/weighing-orders/:id — read-only canonical item quantities/specification/expected weights and fingerprint.
+- POST /api/quality/weighings/preview — validated full/partial multi-order selection, server-computed expected weight and optional actual/delta preview. No DB writes.
+- POST /api/quality/weighings — immutable observation, authenticated inspector, expected fingerprint, positive actual net kg and idempotency key. Header, order links, line snapshots, audit and quality.weighing.recorded event ledger commit atomically. No write to Orders/Production/Inventory.
+- GET /api/quality/weighings — paginated history; customer/order and Israel-local checked-day range filters use EXISTS to avoid duplicating grouped weights.
+- GET /api/quality/weighings/:id — saved historical facts, independent of later order edits. No update/delete observation endpoint.
+
+A shared weighing has one actual weight and one signed delta for the entire selected group. Do not fabricate actual per-order or per-item weights. Canonical expected weights exclude prior actual_weight_kg values; preserve the original basis/source in each snapshot. Limits: 100 orders, 5000 selected item lines, 100 rows per page.

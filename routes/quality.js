@@ -39,6 +39,7 @@ function qualityItemContext(db, itemId) {
 module.exports = function createQualityRouter(deps) {
   const db = required('db', deps.db);
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
+  router.use(require('./qualityWeighings')({db,requireAnyRole}));
   router.get('/quality', requireAnyRole(['quality', 'production', 'office', 'manager', 'admin']), (req, res) => {
     const { order_id, item_id, result, limit=100 } = req.query;
     let sql = `SELECT q.*,u.display_name as inspector_name,
@@ -238,7 +239,7 @@ module.exports.manifest = {
     roles: { admin: 'edit', manager: 'edit', office: 'read', production: 'read', quality: 'edit' },
   },
   consumes: [{ table: 'quality_checks' }, { table: 'incidents' }, { table: 'ncr' }, { table: 'capa' }],
-  produces: [],
+  produces: [{table:'quality_weighings'},{table:'quality_weighing_orders'},{table:'quality_weighing_lines'},{table:'quality_weighing_events'}],
 };
 
 

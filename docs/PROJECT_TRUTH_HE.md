@@ -1178,3 +1178,12 @@ IronBend V2 היא לא “מערכת הזמנות ברזל”.
 - 30 מ׳/דק׳ הוא דוגמת חוט יחיד, 60 הוא הגבול הכולל שנבחר לפי הספק נצפה; אין דרישה למידע על מספר חוטים. משקל וכמות של דיווחים מוחרגים נשארים בתפוקה.
 - working_day_breakdown משתמש באותם חלונות עבודה/הפסקות/עצירות של deductIntervals. שבת 0, שישי 07–14 רק עם סריקה של אותו כרטיס; סריקת כרטיס אחר אינה עדות לעבודה על הכרטיס הפתוח. פירוט יומי מופיע בתוך פירוט הזמן. הסכום אינו משחזר זמן מכונה פעיל שלא תועד.
 - דוגמת 1833: 12.11.2026 14:11:41 עד 15.11.2026 08:52:32 מקומי, ללא סריקת אותו כרטיס בשישי: חמישי 228.317 דקות, שישי 0, שבת 0, ראשון 112.533; סה״כ 340.85 דקות אפשריות. סריקות חוצות ימים אינן מאמתות עבודה רצופה; המדידה מוחרגת עד בירור גם אם הקצב הנגזר נראה סביר. אין להמציא משך עבודה בפועל מזמני יציאה/חזרה.
+
+
+### שקילת איכות להזמנות מלאות/חלקיות — 15.11.2026
+
+- Quality owns the immutable observation header, order links, item quantity/specification snapshots, numeric expected/actual/delta facts and event ledger. Orders and Steel remain read-only sources; items, production actuals and stock ledgers are not changed by a QC weighing.
+- quality.html adds an approved weighing selection tab: customer + production/completed filters, full/partial multiple orders, click-based quantity controls, only actual net kg requires typing. Date and inspector come from the server. Selection persists across picker filter changes. Orders exposes single-order and selected-orders entry points.
+- The canonical Steel itemShapeMetrics is called with prior actual weighing fields excluded to retain the order's comparison basis. Missing/ambiguous baseline blocks the affected selection rather than saving a fictitious comparison.
+- Server preview and save share the same selection service. Any changed item/order context invalidates the preview; the user must review the refreshed basis. Safe retries reuse a key and do not add a second observation. A new weighing creates a new historical record.
+- Group observations cannot be counted once per linked order, nor can the measured total be proportionally assigned to individual orders as measured data. History CSV contains one row per weighing; detail retains all selected item quantities and original specification snapshots for later analysis.

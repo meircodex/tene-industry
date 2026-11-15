@@ -451,6 +451,7 @@ Screens:
 Extracted routes:
 
 - `routes/quality.js` for quality checks, incidents, NCR, and CAPA.
+- `routes/qualityWeighings.js`, `services/qualityWeighings.js`, `db/qualityWeighingSchema.js`: Quality-owned immutable multi-order weighing observations; read-only Orders/Steel context, authenticated inspector, audit and event ledger.
 
 API route families:
 

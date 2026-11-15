@@ -426,6 +426,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
     <strong id="orderBatchCount"></strong>
     <button type="button" class="order-batch-action" id="orderBatchCutting" onclick="IronBendOrderBatch.cutting()"><span class="order-batch-icon" aria-hidden="true">✂️</span>תוכנית חיתוך</button>
     <button type="button" class="order-batch-action" id="orderBatchDelivery" onclick="IronBendOrderBatch.delivery()"><span class="order-batch-icon" aria-hidden="true">📄</span>תעודת משלוח מרכזת / חלקית</button>
+    <button type="button" class="order-batch-action" onclick="IronBendOrderBatch.weighing()">⚖ שקילת הנבחרות</button>
     <button type="button" class="order-batch-action" onclick="IronBendOrderBatch.clear()">נקה בחירה</button>
   </div>
   <div class="trash-notice" id="trashNotice" hidden>סל המחזור שומר את ההזמנה וההיסטוריה וניתן לשחזר ממנו. הסתרה מהרשימה אינה מבטלת ייצור או הקצאות מלאי. מחיקה לצמיתות דורשת סיסמת מנהל ונחסמת כשיש היסטוריה מקושרת.</div>
@@ -3011,6 +3012,7 @@ function buildDetailHTML(o, pkgs) {
         <div class="metric-box"><div class="metric-label">משקל</div><div class="metric-value" style="color:var(--accent)">${(o.total_weight||0).toFixed(1)} ק"ג</div></div>
       </div>
       ${orderHeroInfoHtml(o, driverNotes)}
+      <a class="btn-sm" href="/quality.html?weigh_orders=${Number(o.id)}">⚖ שקילת איכות להזמנה</a>
     </div>
     <div class="hero-card">
       <div class="hero-title">סטטוס הזמנה</div>
