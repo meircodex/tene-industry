@@ -6,7 +6,7 @@
 
 ### בדיקות שקילת הזמנה בבקרת איכות — 15.11.2026
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Quality (owner of observations), Orders/Steel (read-only scope and canonical theoretical weights)
 - input: עדכון מאיר: בחירה לפי לקוח וסטטוס בייצור/הושלם, הזמנה מלאה/חלקית או כמה הזמנות, בדומה לריכוז תעודת משלוח. כניסה מתוך הזמנה או בחירת הזמנות מרובות. אין הקלדה נדרשת מלבד המשקל הנטו; פריטים וכמויות נבחרים בלחיצות.
@@ -16,6 +16,7 @@
 - screens: לשונית שקילת איכות ב-quality.html: סינון לקוח ומצבי הזמנה בלחיצה, הזמנות עם בחירה מלאה/פריטים, +/- לכמות, סיכום לצד הבחירה ומשקל נטו בלבד. כפתור מתוך הזמנה וכפתור שקילת נבחרות ב-toolbar הקיים של orders.html. בחירה מועברת אוטומטית. תצוגה מעודכנת: tmp/quality-weighing-selection-preview.png; התצוגה אושרה על ידי מאיר; מימוש ופריסה מאומתת.
 - policy: ללא סף מומצא לתקין/נכשל; אין שינוי מלאי, משקל תיאורטי או תפוקה עקב בדיקת איכות. תוצאה היסטורית אינה משתנה כשמשנים הזמנה. הנתונים הנדרשים לניתוח נשמרים כשדות מספריים/שורות בדיקה ולא כהערת טקסט בלבד.
 - Definition of Done: אישור תצוגה לפני הטמעה; בדיקות הזמנה מלאה/חלקית/כמות חלקית ומשקל נטו, פערים, נתונים חסרים/שגויים, שינוי הזמנה במקביל, הרשאות/ביקורת, בדיקות חוזרות והיסטוריה לאחר פתיחה מחדש; בדיקה חזותית ופריסה אחרי אישור.
+- verification: 1314 full tests passed; 149 auth/governance/client checks passed after UI hookup. Local UI verified multi-order full+partial quantities, net weight, atomic history save, reload, CSV, single-order entry, batch entry and mobile shortcut. QA record 1975 expected / 1955 net / -20 kg survived DB close/reopen; orders/items/inventory hash unchanged. Live 8e73a10 / dep-dbsquu0ae00c738r2kpg, health 200: 130 full + item 1873 from 129 partial = 7897.54 kg; selected count/weight shown separately; production history remained empty (no dummy weighing saved).
 
 ### אמינות לפי זמן ואורך וגבולות מכונה — 15.11.2026
 
