@@ -1,0 +1,57 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'tene-system-link-'));
+process.env.NODE_ENV='test';process.env.JWT_SECRET='system-link-signin-test';process.env.DB_PATH=path.join(dir,'test.db');process.env.BACKUP_DIR=path.join(dir,'backups');process.env.BCRYPT_ROUNDS='4';
+const {db,server,closeServer}=require('../server'),{hashPin}=require('../auth-core');let base;
+async function call(url,{token,cookie,body,method=body?'POST':'GET'}={}){const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(cookie?{Cookie:cookie}:{})},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json(),cookies:r.headers.getSetCookie(),cache:r.headers.get('cache-control')};}
+const linkToken=link=>new URLSearchParams(link.body.activation_path.split('#')[1]).get('token');
+const cookie=response=>response.cookies.find(value=>value.startsWith('refresh_token=')).split(';')[0];
+test('personal system link is one-time, preserves current permissions and remains revocable through refresh and logout',async t=>{
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+server.address().port;t.after(async()=>{await new Promise(resolve=>closeServer(resolve));db.close();fs.rmSync(dir,{recursive:true,force:true});});
+ db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active)VALUES(?,?,?,?,1)').run('system-link-admin','Admin','admin',hashPin('9913',4));
+ const admin=(await call('/api/auth/login',{body:{username:'system-link-admin',pin:'9913'}})).body.access_token;
+ const created=await call('/api/users',{token:admin,body:{username:'link-target','display_name':'Target','role':'production'}});assert.equal(created.status,200);const id=created.body.id;
+ for(const pin of ['null','undefined'])assert.equal((await call('/api/auth/login',{body:{username:'link-target',pin}})).status,401,'a link-only account must not acquire a synthetic PIN from an empty database field');
+ const issue=()=>call('/api/users/'+id+'/system-login-link',{token:admin,body:{}});
+ assert.equal((await call('/api/users/'+id+'/system-login-link',{body:{}})).status,401);
+ const first=await issue();assert.equal(first.status,201);assert.equal(first.cache,'no-store');
+ assert.ok(first.body.activation_path.startsWith('/system-invite.html#token='));
+ const secret=linkToken(first),stored=db.prepare('SELECT * FROM auth_system_login_links WHERE id=?').get(first.body.id);
+ assert.ok(new Date(stored.expires_at)-new Date(stored.created_at)<=15*60000);assert.ok(!JSON.stringify(stored).includes(secret));
+ const preview=await call('/api/auth/system-link/preview',{body:{token:secret}});assert.equal(preview.status,200);assert.equal(preview.body.user.display_name,'Target');assert.ok(!preview.cookies.some(value=>value.startsWith('refresh_token='))); 
+ assert.equal((await call('/api/auth/system-link/claim',{body:{token:secret,user_id:1}})).status,400);
+ const claims=await Promise.all([call('/api/auth/system-link/claim',{body:{token:secret}}),call('/api/auth/system-link/claim',{body:{token:secret}})]);
+ assert.deepEqual(claims.map(c=>c.status).sort(),[200,409]);const activation=claims.find(c=>c.status===200),access=activation.body.access_token;
+ assert.equal(activation.body.user.id,id);assert.ok(activation.cookies.find(value=>value.startsWith('refresh_token=')).includes('HttpOnly'));assert.ok(activation.cookies.find(value=>value.startsWith('refresh_token=')).includes('SameSite=Strict'));assert.ok(activation.cookies.find(value=>value.startsWith('refresh_token=')).includes('Max-Age=31536000'));
+ assert.equal((await call('/api/users',{token:access})).status,403);assert.equal((await call('/api/access/me',{token:access})).body.role,'production');
+ assert.equal((await call('/api/users/'+id+'/system-login-link',{token:access,body:{}})).status,403);
+ // Same already-issued JWT changes privileges without another login or PIN.
+ assert.equal((await call('/api/users/'+id,{token:admin,method:'PATCH',body:{role:'admin'}})).status,200);
+ assert.equal((await call('/api/users',{token:access})).status,200);
+ assert.equal((await call('/api/users/'+id,{token:admin,method:'PATCH',body:{role:'warehouse'}})).status,200);
+ assert.equal((await call('/api/users',{token:access})).status,403);assert.equal((await call('/api/access/me',{token:access})).body.role,'warehouse');
+ const refreshed=await call('/api/auth/refresh',{cookie:cookie(activation),body:{}});assert.equal(refreshed.status,200);assert.equal(refreshed.body.user.role,'warehouse');assert.ok(refreshed.cookies.find(value=>value.startsWith('refresh_token=')).includes('Max-Age=31536000'));
+ assert.equal((await call('/api/auth/refresh',{cookie:cookie(activation),body:{}})).status,401);
+ const second=await issue();assert.equal((await call('/api/access/me',{token:access})).status,200,'issuing a replacement does not log the user out before activation');
+ const replacement=await call('/api/auth/system-link/claim',{body:{token:linkToken(second)}});assert.equal(replacement.status,200);
+ assert.equal((await call('/api/access/me',{token:access})).status,401);assert.equal((await call('/api/auth/refresh',{cookie:cookie(refreshed),body:{}})).status,401);
+ assert.equal((await call('/api/users/'+id+'/system-login-link',{token:admin,method:'DELETE'})).status,200);
+ assert.equal((await call('/api/access/me',{token:replacement.body.access_token})).status,401);assert.equal((await call('/api/auth/refresh',{cookie:cookie(replacement),body:{}})).status,401);
+ const expired=await issue();db.prepare('UPDATE auth_system_login_links SET expires_at=? WHERE id=?').run('2000-01-01T00:00:00.000Z',expired.body.id);
+ assert.equal((await call('/api/auth/system-link/claim',{body:{token:linkToken(expired)}})).status,410);
+ const pending1=await issue(),pending2=await issue();assert.equal((await call('/api/auth/system-link/claim',{body:{token:linkToken(pending1)}})).status,410);
+ const current=await call('/api/auth/system-link/claim',{body:{token:linkToken(pending2)}});assert.equal(current.status,200);
+ assert.equal((await call('/api/users/'+id,{token:admin,method:'PATCH',body:{active:0}})).status,200);
+ assert.equal((await call('/api/access/me',{token:current.body.access_token})).status,401);
+ assert.equal((await call('/api/users/'+id,{token:admin,method:'PATCH',body:{active:1}})).status,200);
+ assert.equal((await call('/api/access/me',{token:current.body.access_token})).status,401,'reenabling does not resurrect a disabled link session');
+ const last=await issue(),lastSession=await call('/api/auth/system-link/claim',{body:{token:linkToken(last)}});
+ const signedOut=await call('/api/auth/logout',{token:lastSession.body.access_token,cookie:cookie(lastSession),body:{}});assert.equal(signedOut.status,200);
+ assert.equal((await call('/api/access/me',{token:lastSession.body.access_token})).status,401);assert.equal((await call('/api/auth/refresh',{cookie:cookie(lastSession),body:{}})).status,401);
+ const portal=Number(db.prepare("INSERT INTO users(username,display_name,role,active,worker_portal_only)VALUES('portal-only-link','Portal','production',1,1)").run().lastInsertRowid);
+ assert.equal((await call('/api/users/'+portal+'/system-login-link',{token:admin,body:{}})).status,403);
+ assert.equal((await call('/api/auth/system-link/claim',{body:{token:'invalid'}})).status,404);
+ assert.ok(db.prepare("SELECT COUNT(*) AS n FROM auth_system_login_link_events WHERE event='activated'").get().n>=4);
+ const audits=db.prepare("SELECT * FROM audit_log WHERE entity_type IN('auth_system_login_link','user')").all();assert.ok(audits.length>0);assert.ok(!JSON.stringify(audits).includes(secret));
+});
+

@@ -73,6 +73,8 @@ function ensureAuthSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_device_enrollment_invitation
       ON device_enrollment_requests(invitation_id);
   `);
+  addColumn(db, 'refresh_tokens', 'system_link_id', 'INTEGER');
+  require('./services/systemLoginLinks').ensureSchema(db);
 }
 
 function migratePlaintextPins(db, options = {}) {
@@ -98,14 +100,15 @@ function createAuthService(db, options = {}) {
   const maxFailedAttempts = Number(options.maxFailedAttempts || 5);
   const lockMinutes = Number(options.lockMinutes || 15);
   const now = options.now || (() => new Date());
+  const systemLinks=require('./services/systemLoginLinks').createService({db,now});
 
   // Access tokens are long-lived (default 3h) so an active shift never hits a
   // re-login prompt; the refresh cookie renews silently for longer gaps.
   const accessTokenTtl = options.accessTokenTtl || process.env.ACCESS_TOKEN_TTL || '3h';
 
-  function accessTokenFor(user) {
+  function accessTokenFor(user, systemLinkId=null) {
     return jwt.sign(
-      { sub: String(user.id), role: user.role, display_name: user.display_name,...(user.worker_portal_only?{portal_only:true,worker_auth_version:user.worker_auth_version}: {}) },
+      { sub: String(user.id), role: user.role, display_name: user.display_name,...(systemLinkId?{system_link_id:systemLinkId}:{}),...(user.worker_portal_only?{portal_only:true,worker_auth_version:user.worker_auth_version}: {}) },
       jwtSecret,
       { expiresIn: accessTokenTtl }
     );
@@ -113,10 +116,10 @@ function createAuthService(db, options = {}) {
 
   function storeRefreshToken(userId, meta = {}) {
     const token = crypto.randomBytes(64).toString('hex');
-    const expiresAt = new Date(now().getTime() + refreshDays * 86400000).toISOString();
+    const expiresAt = new Date(now().getTime() + (meta.systemLinkId?365:refreshDays) * 86400000).toISOString();
     db.prepare(
-      'INSERT INTO refresh_tokens (user_id,token_hash,expires_at,user_agent,ip_address) VALUES (?,?,?,?,?)'
-    ).run(userId, sha256(token), expiresAt, meta.userAgent || null, meta.ipAddress || null);
+      'INSERT INTO refresh_tokens (user_id,token_hash,expires_at,user_agent,ip_address,system_link_id) VALUES (?,?,?,?,?,?)'
+    ).run(userId, sha256(token), expiresAt, meta.userAgent || null, meta.ipAddress || null,meta.systemLinkId||null);
     return token;
   }
 
@@ -131,7 +134,7 @@ function createAuthService(db, options = {}) {
       : db.prepare("SELECT * FROM users WHERE active=1 AND (pin_hash IS NOT NULL OR pin IS NOT NULL)").all();
     const user = candidates.find(candidate => candidate.pin_hash
       ? bcrypt.compareSync(String(pin), candidate.pin_hash)
-      : String(candidate.pin) === String(pin));
+      : candidate.pin != null && String(candidate.pin) !== '' && String(candidate.pin) === String(pin));
 
     if (!user) {
       if (username && candidates[0]) recordFailure(candidates[0]);
@@ -173,19 +176,23 @@ function createAuthService(db, options = {}) {
     if (!row || !row.active || new Date(row.expires_at) <= now()) {
       return { ok: false, status: 401, error: 'Refresh token is invalid or expired' };
     }
+    if(row.system_link_id){try{systemLinks.session(row.system_link_id,row.user_id);}catch{return {ok:false,status:401,error:'system_link_session_revoked'};}}
     db.prepare('UPDATE refresh_tokens SET revoked=1,revoked_at=? WHERE id=?')
       .run(now().toISOString(), row.id);
     const user = { ...row, id: row.user_id };
     return {
       ok: true,
-      accessToken: accessTokenFor(user),
-      refreshToken: storeRefreshToken(row.user_id, meta),
+      accessToken: accessTokenFor(user,row.system_link_id),
+      refreshToken: storeRefreshToken(row.user_id, {...meta,systemLinkId:row.system_link_id}),
+      refreshDays: row.system_link_id?365:refreshDays,
       user: publicUser(user),
     };
   }
 
   function logout(refreshToken) {
     if (!refreshToken) return false;
+    const row=db.prepare('SELECT user_id,system_link_id FROM refresh_tokens WHERE token_hash=?').get(sha256(refreshToken));
+    if(row?.system_link_id)systemLinks.logout(row.system_link_id,row.user_id);
     return db.prepare('UPDATE refresh_tokens SET revoked=1,revoked_at=? WHERE token_hash=? AND revoked=0')
       .run(now().toISOString(), sha256(refreshToken)).changes > 0;
   }
@@ -219,10 +226,14 @@ function createAuthService(db, options = {}) {
   }
   function verifyAccessToken(token){
     const claims=jwt.verify(token,jwtSecret);
+    if(claims.system_link_id){const current=systemLinks.session(claims.system_link_id,claims.sub);return {...claims,role:current.role,display_name:current.display_name};}
     if(claims.portal_only){const user=db.prepare('SELECT active,worker_portal_only,worker_auth_version FROM users WHERE id=?').get(claims.sub);if(!user?.active||!user.worker_portal_only||Number(user.worker_auth_version)!==Number(claims.worker_auth_version))throw Error('worker_session_revoked');}
     return claims;
   }
   return {
+    createSystemLoginLink:systemLinks.create,previewSystemLoginLink:systemLinks.preview,revokeSystemLoginLinks:systemLinks.revoke,
+    logoutSystemLoginLink:systemLinks.logout,
+    claimSystemLoginLink(token,meta={}){return db.transaction(()=>{const grant=systemLinks.claim(token);db.prepare('UPDATE users SET last_login=? WHERE id=?').run(now().toISOString(),grant.user.id);return {ok:true,accessToken:accessTokenFor(grant.user,grant.id),refreshToken:storeRefreshToken(grant.user.id,{...meta,systemLinkId:grant.id}),refreshDays:365,user:publicUser(grant.user)};})();},
     authenticate,authenticateWorker,savePortalUser,setPortalLanguage,revokePortalSessions,
     logout,
     refresh,

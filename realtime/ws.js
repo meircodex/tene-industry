@@ -45,11 +45,17 @@ function createRealtimeServer(deps) {
     req.auth = auth;
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.auth = auth;
+      ws.authToken=webSocketToken(req);
       wss.emit('connection', ws, req);
     });
   }
 
   // BUG-15: Add eventId, timestamp, sourceService to every broadcast.
+  function currentLinkedAccess(ws){
+    if(!ws.auth?.system_link_id)return true;
+    try{ws.auth=authService.verifyAccessToken(ws.authToken);return true;}
+    catch{ws.close(1008,'Access revoked');return false;}
+  }
   function wsBroadcast(type, data) {
     const now = new Date().toISOString();
     const prev = eventStats.get(type) || { type, count: 0, firstSeen: now, lastSeen: null };
@@ -67,7 +73,7 @@ function createRealtimeServer(deps) {
       sourceService: 'ironbend-server',
     };
     const msg = JSON.stringify(envelope);
-    wss.clients.forEach(ws => { if (ws.readyState === 1) ws.send(msg); });
+    wss.clients.forEach(ws => { if (ws.readyState === 1&&currentLinkedAccess(ws)) ws.send(msg); });
   }
 
   wss.on('connection', (ws, req) => {
@@ -80,6 +86,7 @@ function createRealtimeServer(deps) {
   // Keeps connections alive through Render's 60s nginx timeout.
   const wsHeartbeat = setInterval(() => {
     wss.clients.forEach(ws => {
+      if(!currentLinkedAccess(ws))return;
       if (ws.isAlive === false) { ws.terminate(); return; }
       ws.isAlive = false;
       ws.ping();

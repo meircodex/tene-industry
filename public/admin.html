@@ -680,7 +680,7 @@ html, body { background:#f0f4f8; color:#1a2533; font-family:'Heebo',sans-serif; 
         <div class="tab-toolbar">
           <div>
             <div class="tab-heading">👥 משתמשים ותפקידים</div>
-            <div class="tab-subtitle">כניסה ב-PIN לטאבלט · שליטה בהרשאות</div>
+            <div class="tab-subtitle">קישור אישי למערכת ללא קוד · שליטה בהרשאות גם אחרי הכניסה · PIN חלופי</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="showTab('worker-invites',document.querySelector('[data-tab-worker-invites]'))">עובדי ייצור וקישורי סריקה</button><button class="btn btn-primary" onclick="openAddUser()">+ משתמש חדש</button></div>
         </div>
@@ -1607,7 +1607,8 @@ async function loadUsers() {
     <td style="padding:10px 12px">${u.pin_configured ? 'מוגדר' : '—'}</td>
     <td style="padding:10px 12px;font-size:12px">${escHtml(u.phone||'—')}</td>
     <td style="padding:10px 12px"><span style="color:${u.active?'var(--success)':'var(--muted)'};font-weight:700">${u.active?'✅':'❌'}</span></td>
-    <td style="padding:10px 12px;display:flex;gap:6px">
+    <td style="padding:10px 12px;display:flex;gap:6px;flex-wrap:wrap">
+      ${!u.worker_portal_only?`<button onclick="openSystemLoginLink(${u.id})" ${u.active?'':'disabled'} class="btn btn-outline" style="padding:4px 10px;font-size:11px">קישור למערכת · 15 דקות</button><button onclick="openRevokeSystemLoginLinks(${u.id})" class="btn btn-outline" style="padding:4px 10px;font-size:11px">בטל כניסה בקישור</button>`:''}
       <button onclick="editUser(${u.id})" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">עריכה</button>
       <button onclick="resetUserPin(${u.id})" style="padding:4px 10px;border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">אפס PIN</button>
       <button onclick="toggleUser(${u.id},${u.active?0:1})" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;cursor:pointer;font-family:'Heebo',sans-serif;background:transparent">${u.active?'השבת':'הפעל'}</button>
@@ -2038,7 +2039,7 @@ async function loadAuditLog(append) {
 </script>
 <script src="/help.js"></script>
 
-<script src="/worker-portal-admin.js"></script><script src="/worker-portal-resources-admin.js"></script>
+<script src="/worker-portal-admin.js"></script><script src="/worker-portal-resources-admin.js"></script><script src="/system-login-links-admin.js"></script>
 </body>
 </html>
 

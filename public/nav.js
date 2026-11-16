@@ -345,8 +345,8 @@
     // No token at all → this page requires login. window.fetch is patched to
     // auto-refresh, so a merely-expired token still resolves below; we only
     // land here with a truly-absent session.
-    const token = localStorage.getItem('ib_access_token') || sessionStorage.getItem('ib_access_token');
-    if (!token) { gotoLogin(); return; }
+    let token = sessionStorage.getItem('ib_access_token') || localStorage.getItem('ib_access_token');
+    if(!token){try{token=await window.IronBendAuth?.refreshAccessToken();}catch{}if(!token){gotoLogin();return;}}
     let res;
     try {
       res = await fetch('/api/access/me', { headers: { Authorization: 'Bearer ' + token } });
@@ -356,8 +356,9 @@
     if (res.status === 401) { gotoLogin(); return; }
     if (!res.ok) return;
     try {
-      const { screens } = await res.json();
+      const { screens,role } = await res.json();
       if (!Array.isArray(screens)) return;
+      if(role)localStorage.setItem('ib_role',role);
       const visibleIds = new Set(screens.map(s => s.id));
       // Role-gate the current page: if this screen is hidden for the role,
       // send the user to the dashboard (always allowed) instead of the shell.
@@ -578,6 +579,9 @@
   document.body.appendChild(searchOverlay);
   refreshLicensedModules();
   applyAccessControl();
+  // A manager can change a linked user's role while their screen remains open.
+  setInterval(()=>{if(!document.hidden)applyAccessControl();},30000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)applyAccessControl();});
   watchWindowBackControls();
 
     document.getElementById('ib-hamburger')?.addEventListener('click', openDrawer);

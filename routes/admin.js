@@ -192,7 +192,7 @@ module.exports = function createAdminRouter(deps) {
 
   router.get('/users', requireRole('admin'), (req, res) => {
     res.json(db().prepare(`
-      SELECT id,username,display_name,role,phone,active,last_login,created_at,
+      SELECT id,username,display_name,role,phone,active,last_login,created_at,worker_portal_only,
              CASE WHEN COALESCE(pin_hash,'')<>'' OR COALESCE(pin,'')<>'' THEN 1 ELSE 0 END AS pin_configured
       FROM users ORDER BY role,display_name
     `).all());
@@ -227,8 +227,13 @@ module.exports = function createAdminRouter(deps) {
     const clean = Object.hasOwn(f, 'pin') ? cleanPin(f.pin) : null;
     if (clean?.error) return res.status(400).json({ error: clean.error });
     const changingPin = Boolean(clean);
+    const before=db().prepare('SELECT role,active FROM users WHERE id=?').get(req.params.id);
+    db().transaction(()=>{
+    if(f.active===0)require('../services/systemLoginLinks').createService({db:db()}).revoke(Number(req.params.id),req.auth);
     db().prepare('UPDATE users SET display_name=COALESCE(?,display_name),role=COALESCE(?,role),pin=CASE WHEN ? THEN NULL ELSE pin END,pin_hash=COALESCE(?,pin_hash),phone=COALESCE(?,phone),active=COALESCE(?,active),password_changed_at=CASE WHEN ? THEN ? ELSE password_changed_at END WHERE id=?')
       .run(f.display_name || null, f.role || null, changingPin ? 1 : 0, hashPin(clean), f.phone || null, f.active ?? null, changingPin ? 1 : 0, changingPin ? new Date().toISOString() : null, req.params.id);
+    if(before)for(const field of ['role','active'])if(f[field]!==undefined&&String(f[field])!==String(before[field]))db().prepare("INSERT INTO audit_log(entity_type,entity_id,action,field_name,old_value,new_value,user_id,user_name)VALUES('user',?,'access_changed',?,?,?,?,?)").run(Number(req.params.id),field,String(before[field]),String(f[field]),Number(req.auth.sub),req.auth.display_name||'');
+    })();
     res.json({ success: true });
   });
 

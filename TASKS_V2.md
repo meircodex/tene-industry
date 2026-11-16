@@ -4,6 +4,16 @@
 
 ## סטטוסים
 
+### קישור אישי למערכת לפי הרשאות משתמש — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: משתמש מבקש לשלוח גם קישור למערכת, ללא קוד לאחר הפעלה; אישר הרשאות חשבון קיימות ושינוי שלהן מרחוק ללא אישור העובד.
+- ownership: Auth owns short-lived invitation grants and existing access/refresh sessions. Admin exposes create/revoke beside regular users. Worker portal/device enrollment remains separate and cannot gain general system access.
+- DB/API/events: hashed 15-minute single-use auth links and audit/event ledger; administrator-only create/revoke; token-scoped preview/claim; issue existing Auth tokens with revocable link provenance, current user role/active checked each API request and refresh. Existing Production/stock unchanged.
+- screens: existing user row gains personal system link and revoke action; activation page names actual user and current role, one explicit activation button; system icon and home destination; admin copies/shares manually. No PIN form for link activation.
+- DoD: expiry/replay/race/replacement/disabled/role-change/revoke/logout/refresh/scope tests, no token in logs/history, isolated local browser preview, full suite, deploy and live read-only verification. No production invitations or access grants issued by agent.
+- local verification: 101 focused checks plus 14 final message/identity checks passed; final full suite 1,345 passed, including null-PIN guard. Local browser: system activation without code, dashboard reopening, admin user-row create/modal/copy/share controls and hidden revoke action verified. Isolated disposable DB only.
+
 ### הפרדת אייקון עובד מהמערכת — 16.11.2026
 - status: done
 - owner: codex

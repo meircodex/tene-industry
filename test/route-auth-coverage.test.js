@@ -88,6 +88,8 @@ function extractExpressRoutes(source, options = {}) {
 }
 
 const PUBLIC_OR_SCOPED_API_ROUTES = new Set([
+  'POST /api/auth/system-link/preview', // hashed, bounded 15-minute single-use capability; no session issued
+  'POST /api/auth/system-link/claim', // rate-limited atomic claim; never accepts a user id or requested role
   'POST /api/worker-portal/logout', // credential-scoped self revocation; unauthenticated cookie expiry grants nothing
   'GET /api/health',
   'GET /api/branding',
