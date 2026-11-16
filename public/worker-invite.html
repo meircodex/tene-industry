@@ -35,7 +35,7 @@
     </form>
 
     <div class="notice" id="notice" role="status" aria-live="polite">טוען…</div>
-    <div class="install" id="installBox" hidden>
+    <div id="activationDestinations" hidden><p>לפורטל האישי נכנסים עם שם המשתמש והסיסמה שהמנהל הגדיר.</p><a href="/worker-portal.html" style="display:block;padding:14px;background:#ff6808;color:white;text-align:center;border-radius:10px;margin-top:12px;text-decoration:none;font-weight:700">פתח פורטל עובד אישי</a><a href="/scan.html?enrolled=1" style="display:block;padding:12px;text-align:center">המשך לסריקה באמצעות הפעלת המכשיר</a></div><div class="install" id="installBox" hidden>
       <strong>להתקנה נוחה במסך הבית:</strong><br>
       באנדרואיד אפשר לבחור “התקן אפליקציה” בדפדפן. באייפון בוחרים שיתוף ואז “הוסף למסך הבית”.
       <br><button id="installButton" type="button" hidden>התקן אפליקציית עובדים</button>
@@ -115,8 +115,8 @@
         localStorage.setItem(DEVICE_KEY, result.device_credential);
         invitationToken = '';
         document.getElementById('registrationForm').hidden = true;
-        setNotice('המכשיר הופעל בהצלחה. מעכשיו אפשר לסרוק בלי סיסמה. פותח את מסך הסריקה…');
-        setTimeout(() => { location.replace('/scan.html?enrolled=1'); }, 1200);
+        setNotice('המכשיר הופעל בהצלחה. בחר כיצד להמשיך.');
+        document.getElementById('activationDestinations').hidden=false;
       } catch (error) {
         setNotice(errorText(error.message), true);
         button.disabled = false;

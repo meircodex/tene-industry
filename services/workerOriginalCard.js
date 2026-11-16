@@ -2,6 +2,7 @@
 const cards=require('./productionCards');
 const face=require('../public/production-card-face');
 const units=require('../public/display-units');
+const QRCode=require('qrcode');
 const {expandProductionCardsForOrder}=require('./productionCardPrintPage');
 
 function buildWorkerOriginalCard(db,item,token=''){
@@ -25,7 +26,11 @@ function buildWorkerOriginalCard(db,item,token=''){
   const length=cards.shapeTotalLengthMmFromItem(original);
   const isAssembly=original.pile_card_type==='pile_assembly';
   const reference=cards.itemOrderLineLabel(parent)+' · '+(original.struct_element||item.customer_name||'');
-  const html=face.render({orderNumber:item.order_num,customer:item.customer_name,diameterLabel:isAssembly?String(Number(diameter)/10)+' cm':diameter,reference,shapeSvg:cards.shapeSvgForProductionCard(original),lengthCm:units.formatLengthCmFromMm(length).replace(/\s*ס[״"]מ\s*$/,''),quantity:quantity??'—',isPileAssembly:isAssembly,splitLabel:count>1?index+'/'+count:'',workerCode:''});
-  return{html,item_id:Number(item.id),card_index:index,card_total:count,card_quantity:quantity??null,read_only:true};
+  let html=face.render({orderNumber:item.order_num,customer:item.customer_name,diameterLabel:isAssembly?String(Number(diameter)/10)+' cm':diameter,reference,shapeSvg:cards.shapeSvgForProductionCard(original),lengthCm:units.formatLengthCmFromMm(length).replace(/\s*ס[״"]מ\s*$/,''),quantity:quantity??'—',isPileAssembly:isAssembly,splitLabel:count>1?index+'/'+count:'',workerCode:String(token||item.id)});
+  const qr=QRCode.create(String(token||item.id),{errorCorrectionLevel:'M'}),size=qr.modules.size;
+  let blocks='';for(let y=0;y<size;y++)for(let x=0;x<size;x++)if(qr.modules.get(y,x))blocks+=`M${x+2} ${y+2}h1v1h-1z`;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size+4} ${size+4}" role="img" aria-label="QR"><rect width="100%" height="100%" fill="white"/><path d="${blocks}" fill="black"/></svg>`;
+  html=html.replace(/(<div class="pc-print-qr-code"[^>]*>)(<\/div>)/,'$1'+svg+'$2');
+  return{html,whole_item:!original.virtual_card&&count===1,item_id:Number(item.id),card_index:index,card_total:count,card_quantity:quantity??null,read_only:true};
 }
 module.exports={buildWorkerOriginalCard};

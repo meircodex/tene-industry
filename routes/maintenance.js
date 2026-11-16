@@ -157,6 +157,8 @@ module.exports.manifest = {
     roles: { admin: 'edit', manager: 'edit', quality: 'read', maintenance: 'edit' },
   },
   consumes: [{ table: 'maintenance_logs' }, { table: 'machines' }, { table: 'loto' }, { table: 'pm_schedule' }],
-  produces: [{ event: 'machine_update' }],
+  produces: [
+    { table: 'worker_fault_reports' },
+    { table: 'worker_help_documents' },{ event: 'machine_update' }],
 };
 

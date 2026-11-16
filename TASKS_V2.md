@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### פורטל עובד תואם תמונת ייחוס מלאה — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: אישור מפורש לבנות בדיוק לפי התמונות, ולאחר הבנייה סוכן עצמאי ישווה. בית: תפוקה יומית אישית, סריקה, אחרונים, ארבעה קיצורי עזרה ודיווח צילום. כרטיס: מקור, סטטוס/אחסנה/שקילה ובחירה לפני שמירה אחת. he/en/th בהגדרות, התקנה לטלפון, ללא בחירת מכונה.
+- ownership: Production status/actuals/receipts and read-only daily projection; Warehouse owns item.zone update through service; Maintenance owns fault/photo and published worker guidance. Portal orchestrates no duplicate stock/state engine.
+- DB/API: extend scoped worker portal DTO/save, personal summary, zones, support documents/report; admin published content management; immutable weight completion snapshot in existing receipts; no historical stock rewrite.
+- output: phone home/card/settings/help, bottom storage sheet, explicit save/retry and discard guard, real authenticated personal data, dedicated PWA manifest.
+- DoD: matched screenshot sections at phone size, he/en/th, identity/idempotency/permissions/atomic save/weight/zone/daily boundary tests, full suite, independent agent review AFTER construction, fix findings, deploy and verify live without test production writes.
+- verification: 1,340 full tests passed; 4 focused tests passed after final fault singleflight guard; local browser 390px he/en/th no horizontal overflow, real printed QR URL, staged save/confirmation and actual/zone receipt, fault photo upload/report. Agent reference_review completed code + 8 screenshot comparison; all actionable findings corrected, no remaining blocker. Deployment pending.
+
+
 ### התאמת פורטל עובד לתמונת הטלפון — 16.11.2026
 
 - status: done

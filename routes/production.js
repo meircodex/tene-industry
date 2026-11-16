@@ -36,6 +36,8 @@ module.exports = function createProductionRouter(deps) {
   const workerCardActivity = required('workerCardActivity', deps.workerCardActivity);
   const { ORDER_STATUS, ITEM_STATUS } = statusContracts;
   const portal=require('../services/workerPortalAccounts');portal.ensureSchema(db);
+  const storage=require('../services/warehouseCardStorage');
+  const {itemShapeMetrics}=require('../services/shapeSnapshot');
   const authService=required('authService',deps.authService);
   router.use(require('./productionTimingReviews')({db,requireAnyRole,wsBroadcast}));
   // Repair only active queued orders with persisted production evidence. No item,
@@ -126,7 +128,7 @@ module.exports = function createProductionRouter(deps) {
     const item = db.prepare(`
       SELECT i.id, i.pallet_id, i.shape_id, i.shape_name, i.diameter, i.machine_id,
              i.quantity, i.produced_qty, i.total_weight AS weight, i.status, i.machine,
-             i.actual_weight_kg, i.weight_deviation_pct, i.cancelled_at, i.production_stopped_at,
+             i.zone, i.completed_at, (SELECT MAX(a.occurred_at) FROM worker_card_activity a WHERE a.item_id=i.id AND a.action IN ('status_changed','updated')) AS last_saved_at, i.actual_weight_kg, i.weight_deviation_pct, i.cancelled_at, i.production_stopped_at,
              i.segments, i.shape_snapshot_json, i.spiral_diameter_mm, i.spiral_turns,
              i.total_length_mm, i.note, i.qc_status,
              p.order_id, p.pallet_num,
@@ -422,6 +424,22 @@ module.exports = function createProductionRouter(deps) {
     }
   };
 
+  function portalSupplement(req,item,status){
+    if(!req.portalWorker)return;
+    if(req.body.expected_status!==item.status)throw Object.assign(Error('worker_status_changed'),{status:409});
+    if(isCancellationStopped(item)||!isActiveOrder(item))throw Object.assign(Error('production_stopped_by_cancellation'),{status:409});
+    let zone;
+    if(req.body.zone!==undefined)zone=storage.validate(db,item,req.body.zone,status);
+    const weight=req.body.actual_weight_kg;
+    if(weight!==undefined&&(typeof weight!=='number'||!Number.isFinite(weight)||weight<=0||weight>1000000))throw Object.assign(Error('invalid_actual_weight'),{status:400});
+    if(zone!==undefined){storage.setZone(db,item,zone,req.auth);wsBroadcast('warehouse_changed',{item_id:item.id,zone});}
+    if(weight!==undefined){
+      db.prepare('UPDATE items SET actual_weight_kg=?,weight_deviation_pct=? WHERE id=?').run(weight,item.total_weight>0?(weight-item.total_weight)/item.total_weight*100:null,item.id);
+      productionActuals.recordActualWeightChange(db,{itemId:item.id,orderId:item.order_id,beforeKg:Number(item.actual_weight_kg)||0,afterKg:weight,actorId:Number(req.userId),source:'worker_portal_weighing',metadata:{worker_name:req.portalWorker.worker_name}});
+      db.prepare(`INSERT INTO audit_log(entity_type,entity_id,action,field_name,old_value,new_value,user_id,user_name)VALUES('item',?,'weighed','actual_weight_kg',?,?,?,?)`).run(item.id,String(item.actual_weight_kg??''),String(weight),Number(req.userId),req.portalWorker.worker_name);
+      item.actual_weight_kg=weight;wsBroadcast('item_weighed',{id:item.id,actual_weight_kg:weight});
+    }
+  }
   const updateWorkerCardStatus=workerCardWrite((req, res) => {
     const status = req.body?.status;
     if (!statusContracts.isValidItemStatus(status)) return res.status(400).json({ error: 'invalid status', allowed: statusContracts.VALID_ITEM_STATUSES });
@@ -431,8 +449,11 @@ module.exports = function createProductionRouter(deps) {
     if (replay) return { ...replay, item: selectWorkerCardById(item.id) };
     if(req.portalWorker){
       portal.statusAllowed(db,req);
+      let original;try{original=buildWorkerOriginalCard(db,item,req.body.card);}catch(e){throw Object.assign(e,{status:e.statusCode||400});}
+      if(!original.whole_item)throw Object.assign(Error('partial_worker_card_requires_production'),{status:409});
       if(item.status===status){
-        const receipt=workerCardActivity.record(req,item,'status_changed',{from_status:status,to_status:status,correction:false,unchanged:true});
+        portalSupplement(req,item,status);
+        const receipt=workerCardActivity.record(req,item,'status_changed',{from_status:status,to_status:status,correction:false,unchanged:true,zone:req.body.zone??null,actual_weight_kg:req.body.actual_weight_kg??null});
         const response={ok:true,unchanged:true,receipt,item:selectWorkerCardById(item.id)};workerCardActivity.rememberResponse(req,item.id,'status_changed',response);return response;
       }
     }
@@ -447,6 +468,7 @@ module.exports = function createProductionRouter(deps) {
     const previouslyReopened = status === ITEM_STATUS.IN_PRODUCTION && isPreviouslyReopenedItem(db, item);
     const pendingApproval = [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(statusContracts.normalizeOrderStatus(item.order_status));
     if (status === ITEM_STATUS.IN_PRODUCTION && (pendingApproval || (!backwards && !previouslyReopened && !isProductionGateOpen(item)))) return sendProductionGateError(res, item);
+    portalSupplement(req,item,status);
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
     if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
@@ -459,7 +481,7 @@ module.exports = function createProductionRouter(deps) {
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run('item', item.id, item.order_num, 'item_status_correction', 'status', item.status,
           status, correctionReason, req.userId || null, req.auth?.display_name || req.qrAccess?.actor_name || null);
     }
-    const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status, correction: backwards });
+    const receipt = workerCardActivity.record(req, item, 'status_changed', { from_status: item.status, to_status: status, correction: backwards, ...(status===ITEM_STATUS.DONE?{completed_weight_kg:itemShapeMetrics({...item,actual_weight_kg:null,actualWeightKg:null}).totalWeightKg}:{}), zone:req.portalWorker?req.body.zone??null:null, actual_weight_kg:req.portalWorker?req.body.actual_weight_kg??null:null });
     const orderStatus = backwards || previouslyReopened
       ? reopenOrderAfterItemCorrection(db, item, status, { reason: correctionReason, userId: req.userId, userName: req.auth?.display_name || req.qrAccess?.actor_name })
       : syncOrderStatusAfterItemStatus(item, status, req);
@@ -472,7 +494,7 @@ module.exports = function createProductionRouter(deps) {
   });
   router.get('/worker-card',requireQrPermission('production'),openWorkerCard);
   router.patch('/worker-card/:id/status',requireQrPermission('production'),updateWorkerCardStatus);
-  router.use(require('./workerPortal')({db,requireAnyRole,authService,openCard:openWorkerCard,updateStatus:updateWorkerCardStatus}));
+  router.use(require('./workerPortal')({db,requireAnyRole,authService,openCard:openWorkerCard,updateStatus:updateWorkerCardStatus,wsBroadcast}));
 
   router.patch('/worker-card/:id', requireQrPermission('production'), workerCardWrite((req, res) => {
     const forbiddenFields = forbiddenProductionPatchFields(req.body);
@@ -948,6 +970,8 @@ module.exports.manifest = {
     { event: 'end_of_day' },
     { event: 'item_status' },
     { event: 'item_progress' },
+    { event: 'warehouse_changed' },
+    { event: 'item_weighed' },
     { event: 'order_complete' },
   ],
 };

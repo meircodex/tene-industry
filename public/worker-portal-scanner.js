@@ -20,7 +20,7 @@ window.createWorkerPortalScanner=function({onCode,onError}){
   try{if(!navigator.mediaDevices?.getUserMedia||(!('BarcodeDetector' in window)&&!window.jsQR))throw Error('camera');
    detector='BarcodeDetector' in window?new BarcodeDetector({formats:['qr_code']}):null;
    const acquired=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'}}});if(startedGeneration!==generation){acquired.getTracks().forEach(t=>t.stop());return;}stream=acquired;video.srcObject=stream;await video.play();if(startedGeneration!==generation)return;shell.classList.add('active');document.getElementById('startCamera').hidden=true;document.getElementById('stopCamera').hidden=false;frame();
-  }catch{const cancelled=startedGeneration!==generation;stop();if(!cancelled)onError();}finally{busy=false;}
+  }catch(error){const cancelled=startedGeneration!==generation;stop();if(!cancelled)onError(error);}finally{busy=false;}
  }
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});window.addEventListener('pagehide',stop);
  return{start,stop};

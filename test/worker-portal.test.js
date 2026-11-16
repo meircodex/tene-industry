@@ -22,7 +22,7 @@ test('personal worker portal reuses production with account identity, scoped per
  const admin=(await call('/api/auth/login',null,{username:'portal-admin',pin:'9911'})).body.access_token;
  const a=(await call('/api/worker-profiles',admin,{worker_name:'Alice Worker',phone:'0501112211',role:'production',permissions:['production']})).body;
  const b=(await call('/api/worker-profiles',admin,{worker_name:'Bob Worker',phone:'0501112212',role:'production',permissions:['production']})).body;
- const save=await call('/api/worker-profiles/'+a.id+'/portal-account',admin,{username:'portal-alice',password:'portal-Test-123!',language:'th'},'PUT');assert.equal(save.status,200,JSON.stringify(save.body));assert.deepEqual(save.body.account.permissions,['start','complete','load']);
+ const save=await call('/api/worker-profiles/'+a.id+'/portal-account',admin,{username:'portal-alice',password:'portal-Test-123!',language:'th'},'PUT');assert.equal(save.status,200,JSON.stringify(save.body));assert.deepEqual(save.body.account.permissions,['start','complete','load','store','weigh']);
  assert.equal((await call('/api/worker-profiles/'+b.id+'/portal-account',admin,{username:'portal-bob',password:'portal-Test-123!',language:'en'},'PUT')).status,200);
  const stored=db.prepare('SELECT * FROM users WHERE username=?').get('portal-alice');assert.equal(stored.pin,null);assert.notEqual(stored.pin_hash,'portal-Test-123!');assert.equal(stored.role,'production');
  assert.equal((await call('/api/auth/worker-login',null,{username:'portal-admin',password:'9911'})).status,401);
