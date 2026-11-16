@@ -5,7 +5,7 @@
 ## סטטוסים
 
 ### מסכי עובד קומפקטיים ומהירים לטלפון — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: כל עמוד אצל העובד צריך להתאים למסך טלפון, קיצור הסברים ורווחים, כמה שפחות לחיצות; להחליף את מיקום אחסנה והעמסה יחד עם הפעולות/כיתובים.
 - ownership: worker portal/invitation presentation only; existing scan/save/confirmation, account permissions, stock, status and audit remain unchanged.
@@ -13,7 +13,7 @@
 - DB/API/events: no change. Preserve 3 history items/page and existing one-save flow. Storage remains warehouse icon/store; loading remains truck/load, reordered only.
 - DoD: control/ID and action mapping checks, functional portal tests, readable touch targets and responsive layout budgets, no new hidden primary actions or scroll locks, all three languages; full suite, deploy and live verification without browser control or production test actions.
 
-- verification: 69 focused tests and full suite 1,356 passed. Syntax and diff checks passed. No phone/browser visual verification performed; long help/errors remain accessible with natural scrolling. Deployment pending.
+- verification: 69 focused tests and full suite 1,356 passed. Syntax and diff checks passed. No phone/browser visual verification performed; long help/errors remain accessible with natural scrolling. Live: a796aa8 / dep-dbtg6o942hec73bd81lg. All five changed public assets returned 200 and matched source; health 200, anonymous me/history 401, QR mode remains open. Control IDs unique and resolved; all three languages have action labels.
 
 ### עובד נשאר מחובר וסגירת הגדרות אחרי שינוי שפה — 16.11.2026
 - status: done
