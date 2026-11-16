@@ -88,6 +88,7 @@ function extractExpressRoutes(source, options = {}) {
 }
 
 const PUBLIC_OR_SCOPED_API_ROUTES = new Set([
+  'POST /api/worker-portal/logout', // credential-scoped self revocation; unauthenticated cookie expiry grants nothing
   'GET /api/health',
   'GET /api/branding',
   'GET /api/license/modules',

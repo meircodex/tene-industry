@@ -1208,3 +1208,13 @@ IronBend V2 היא לא “מערכת הזמנות ברזל”.
 - Dedicated worker-portal-manifest.json opens the personal portal from a home-screen icon. Existing refresh-cookie/version controls restore the worker session without persisting passwords. Legacy activation still activates the device only; it offers an explicit choice between personal username/password portal and legacy device scanning. The old manifest/QR open policy remain intact.
 - Current printed customer-scan?code=, legacy card/item URL, raw tokens and web+ironbend links normalize through one bounded portal parser. A split/virtual card cannot complete/weigh/move the entire parent item; the portal explains that partial reporting uses Production. This release does not introduce a new sub-card status engine.
 - Independent agent /root/reference_review inspected code and home/card/storage screenshots against every supplied image section after construction; reported no remaining blocker after fixes. Layout/order/colors match closely, not pixel identity of sample drawings/avatar/icons. Actual phone installation and physical camera hardware are not claimed verified by desktop tests.
+
+
+### כניסת עובד בקישור אישי — 16.11.2026
+
+- קישור ההפעלה הקיים תקף ל-15 דקות ולשימוש אחד. הטלפון הראשון שמפעיל אותו משויך לעובד; לפני ההפעלה ניתן להעביר את הקישור, ולכן אין הבטחה למניעת העברה מראש.
+- לעובד בעל הרשאת production נוצר או ממוחזר חשבון portal-only בתוך אותה עסקת הפעלה. סיסמה פנימית אקראית אינה מוצגת; שם משתמש וסיסמה הם כניסה חלופית בלבד. שפה והרשאות קיימות נשמרות.
+- workerPortalDeviceAccess מאמת את המכשיר רק בתוך נתיבי worker-portal. בכל בקשה נבדקים הזמנה שנתבעה, מכשיר מאושר, עובד וחשבון פעילים והרשאת ייצור. לא מונפק JWT כללי. Authorization מפורש מקבל קדימות ואינו יכול ליפול לזהות אחרת של מכשיר.
+- מכשיר חלופי מבטל את הקודם. השבתה או ביטול אישור חוסמים מיידית גישה. logout מסיר cookie אישי ומבטל רק את המכשיר שהציג הוכחת בעלות, כולל ניסיון חוזר לאחר ביטול; אינו מעניק הרשאת קריאה. cookie הוא HttpOnly, SameSite=Strict, Secure בייצור ותחום לנתיב הפורטל.
+- הפעלה מציגה קישור ישיר לפורטל והוראות הוספה למסך הבית בשפות he/en/th. ההתקנה דורשת פעולה של העובד ותלויה בדפדפן; אינה מתבצעת בשקט. במכשיר מזוהה הפורטל נפתח ללא הקלדת סיסמה יומית.
+- פעולות סטטוס, אחסנה, שקילה וזהות הסורק ממשיכות דרך השירותים וההרשאות הקיימים. לא הונפקו קישורי בדיקה או חשבונות באתר החי ולא שונו תנועות מלאי היסטוריות.

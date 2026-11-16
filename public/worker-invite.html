@@ -7,8 +7,9 @@
   <meta name="theme-color" content="#021A48">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="טנא עובדים">
-  <link rel="manifest" href="/worker-manifest.json">
+  <link rel="manifest" href="/worker-portal-manifest.json">
   <link rel="stylesheet" href="/theme.css">
+  <script src="/worker-portal-i18n.js"></script>
   <title>הפעלת אפליקציית עובדים – טנא תעשיות</title>
   <style>
     :root{--navy:#021a48;--orange:#c9621a;--line:#cedbe6;--soft:#f1f6f9;--danger:#aa3227;--success:#14613e}
@@ -23,44 +24,41 @@
 </head>
 <body>
   <main><section class="card">
-    <div class="brand"><b>ט</b><span>טנא תעשיות · אפליקציית עובדים</span></div>
+    <details style="float:left"><summary aria-label="Language / שפה">⚙</summary><select id="inviteLanguage" aria-label="Language / שפה"><option value="he">עברית</option><option value="en">English</option><option value="th">ภาษาไทย</option></select></details><div class="brand"><b>ט</b><span>טנא תעשיות · אפליקציית עובדים</span></div>
     <h1 id="title">בודקים את ההזמנה האישית…</h1>
     <p class="lead" id="lead">הקישור הזה מיועד לעובד אחד בלבד ותקף למשך 15 דקות.</p>
     <div class="info" id="inviteInfo" hidden></div>
 
     <form id="registrationForm" hidden onsubmit="activateWorker(event)">
-      <label>שם העובד<input id="workerName" readonly></label>
-      <label>שם המכשיר<input id="deviceName" maxlength="100" required placeholder="למשל: הטלפון של דוד"></label>
-      <button id="activateButton" type="submit">הפעל את המכשיר</button>
+      <label><span data-invite-i18n="workerName">שם העובד</span><input id="workerName" readonly></label>
+      <label hidden>שם המכשיר<input id="deviceName" maxlength="100" required placeholder="למשל: הטלפון של דוד"></label>
+      <button id="activateButton" type="submit" data-invite-i18n="activatePhone">הפעל את המכשיר</button>
     </form>
 
     <div class="notice" id="notice" role="status" aria-live="polite">טוען…</div>
-    <div id="activationDestinations" hidden><p>לפורטל האישי נכנסים עם שם המשתמש והסיסמה שהמנהל הגדיר.</p><a href="/worker-portal.html" style="display:block;padding:14px;background:#ff6808;color:white;text-align:center;border-radius:10px;margin-top:12px;text-decoration:none;font-weight:700">פתח פורטל עובד אישי</a><a href="/scan.html?enrolled=1" style="display:block;padding:12px;text-align:center">המשך לסריקה באמצעות הפעלת המכשיר</a></div><div class="install" id="installBox" hidden>
-      <strong>להתקנה נוחה במסך הבית:</strong><br>
-      באנדרואיד אפשר לבחור “התקן אפליקציה” בדפדפן. באייפון בוחרים שיתוף ואז “הוסף למסך הבית”.
-      <br><button id="installButton" type="button" hidden>התקן אפליקציית עובדים</button>
+    <div id="activationDestinations" hidden><a id="openActivatedPortal" href="/worker-portal.html?activated=1" style="display:block;padding:14px;background:#ff6808;color:white;text-align:center;border-radius:10px;margin-top:12px;text-decoration:none;font-weight:700">פתח את הפורטל שלי</a></div><div class="install" id="installBox" hidden>
+      <strong data-invite-i18n="install">הוספה למסך הבית</strong><br><span id="installInstructions">
+      באנדרואיד אפשר לבחור “התקן אפליקציה” בדפדפן. באייפון בוחרים שיתוף ואז “הוסף למסך הבית”.</span>
+      <br><button id="installButton" type="button" hidden data-invite-i18n="install">התקן אפליקציית עובדים</button>
     </div>
-    <p class="small">הקישור אישי וחד־פעמי. לאחר ההפעלה נשמר במכשיר Token מאובטח, ואין צורך בסיסמה או בקוד נוסף בכל יום.</p>
+    <p class="small" data-invite-i18n="linkPrivacy">הקישור אישי וחד־פעמי. אחרי ההפעלה הכניסה נשמרת בטלפון, ללא סיסמה בכל יום. אין להעביר את הקישור לפני ההפעלה.</p>
   </section></main>
   <script>
     const DEVICE_KEY = 'ironbend_device_credential_v1';
     let invitationToken = new URLSearchParams(location.search).get('token') || '';
-    let installPrompt = null;
+    let installPrompt = null,invitationData=null,activated=false;
+    let language=localStorage.getItem('workerPortalLanguage')||'he';
+    function text(key){return(window.WorkerPortalI18n[language]||window.WorkerPortalI18n.he)[key]||window.WorkerPortalI18n.he[key]||key;}
+    function applyInviteLanguage(value){language=['he','en','th'].includes(value)?value:'he';document.documentElement.lang=language;document.documentElement.dir=language==='he'?'rtl':'ltr';document.getElementById('inviteLanguage').value=language;localStorage.setItem('workerPortalLanguage',language);for(const el of document.querySelectorAll('[data-invite-i18n]'))el.textContent=text(el.dataset.inviteI18n);document.getElementById('installInstructions').textContent=text('installAndroid')+' '+text('installIos');if(invitationData){document.getElementById('title').textContent=text(activated?'activatedPhone':'inviteTitle');document.getElementById('lead').textContent=text(activated?'activatedLead':'inviteLead');document.getElementById('openActivatedPortal').textContent=text('openMyPortal');}}
+    document.getElementById('inviteLanguage').addEventListener('change',e=>applyInviteLanguage(e.target.value));
+    applyInviteLanguage(language);
 
     function setNotice(message, error=false) {
       const el = document.getElementById('notice');
       el.textContent = message;
       el.className = `notice${error ? ' error' : ''}`;
     }
-    function errorText(code) {
-      return ({
-        invitation_expired:'תוקף הקישור הסתיים. יש לבקש הזמנה חדשה מהמנהל.',
-        invitation_cancelled:'ההזמנה בוטלה. יש לפנות למנהל.',
-        invitation_already_used:'הקישור כבר הופעל. יש לפתוח את אפליקציית העובדים או לפנות למנהל.',
-        invitation_not_found:'הקישור אינו תקין.',
-        worker_registration_details_required:'יש להזין שם מכשיר תקין.',
-      })[code] || 'לא ניתן להשלים את הבקשה. נסה שוב או פנה למנהל.';
-    }
+    function errorText(code){const keys={invitation_expired:'inviteExpired',invitation_cancelled:'inviteCancelled',invitation_already_used:'inviteUsed',invitation_not_found:'invalidCode',worker_registration_details_required:'invalidCode',worker_device_unavailable:'deviceUnavailable'};return text(keys[code]||'error');}
     function roleLabel(role) {
       return ({production:'ייצור',warehouse:'מחסן',driver:'נהג',quality:'איכות',maintenance:'תחזוקה'})[role] || role;
     }
@@ -71,27 +69,27 @@
     }
     async function loadInvitation() {
       if (!invitationToken) {
-        document.getElementById('title').textContent = 'נדרש קישור אישי';
-        setNotice('יש לפתוח את קישור ההזמנה שנשלח אליך בוואטסאפ.', true);
+        document.getElementById('title').textContent=text('inviteLinkNeeded');
+        setNotice(text('openPersonalLink'),true);
         return;
       }
       try {
         const response = await fetch(`/api/worker-invitations/activation?token=${encodeURIComponent(invitationToken)}`, { credentials:'same-origin' });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.user_message || result.error || 'invitation_not_found');
-        document.getElementById('title').textContent = 'הפעלת אפליקציית עובדים';
-        document.getElementById('lead').textContent = 'מלא פרטים אישיים. הבקשה תישלח לאישור מנהל המפעל.';
+        if (!response.ok) throw new Error(result.error || 'invitation_not_found');
+        invitationData=result;applyInviteLanguage(result.language||language);document.querySelector('link[rel=manifest]').href=result.portal_available?'/worker-portal-manifest.json':'/worker-manifest.json';
+        document.getElementById('lead').textContent=text('inviteLead');
         document.getElementById('workerName').value = result.worker_name;
         document.getElementById('deviceName').value = localDeviceName(result.worker_name);
-        document.getElementById('inviteInfo').innerHTML = `<strong>${escapeHtml(result.worker_name)}</strong> · תפקיד: ${escapeHtml(roleLabel(result.role))}`;
+        document.getElementById('inviteInfo').textContent=result.worker_name;
         document.getElementById('inviteInfo').hidden = false;
         document.getElementById('registrationForm').hidden = false;
-        document.getElementById('installBox').hidden = false;
-        setNotice('ההזמנה תקפה עד ' + new Date(result.expires_at).toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' }) + '.');
+        document.getElementById('installBox').hidden = true;
+        setNotice(text('linkExpires')+' '+new Date(result.expires_at).toLocaleTimeString(language==='he'?'he-IL':language==='th'?'th-TH':'en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jerusalem'}));
         // The secret should not remain in browser history once the page has read it.
         history.replaceState(null, '', '/worker-invite.html');
       } catch (error) {
-        document.getElementById('title').textContent = 'לא ניתן להפעיל את ההזמנה';
+        document.getElementById('title').textContent=text('error');
         setNotice(errorText(error.message), true);
         invitationToken = '';
       }
@@ -100,22 +98,28 @@
       event.preventDefault();
       const button = document.getElementById('activateButton');
       button.disabled = true;
-      setNotice('מפעיל את המכשיר…');
+      setNotice(text('saving'));
       try {
         const response = await fetch('/api/worker-invitations/activation', {
           method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
-            token: invitationToken,
+            token: invitationToken,language,
             device_name: document.getElementById('deviceName').value,
             platform: navigator.userAgent,
           }),
         });
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.user_message || result.error || 'worker_registration_failed');
+        if (!response.ok) throw new Error(result.error || 'worker_registration_failed');
+        if(result.portal_available){localStorage.removeItem('workerPortalSignedOut');for(const store of[localStorage,sessionStorage])for(const key of['ib_access_token','ib_role','ib_user'])store.removeItem(key);}
         localStorage.setItem(DEVICE_KEY, result.device_credential);
         invitationToken = '';
         document.getElementById('registrationForm').hidden = true;
-        setNotice('המכשיר הופעל בהצלחה. בחר כיצד להמשיך.');
+        activated=true;applyInviteLanguage(language);document.querySelector('link[rel=manifest]').href=result.portal_available?'/worker-portal-manifest.json':'/worker-manifest.json';document.getElementById('title').textContent=text('activatedPhone');
+        document.getElementById('lead').textContent=text('activatedLead');
+        setNotice(text('activatedSaved'));
+        document.getElementById('installBox').hidden=false;
+        document.getElementById('openActivatedPortal').href=result.portal_url||'/scan.html?enrolled=1';
+        document.getElementById('openActivatedPortal').textContent=result.portal_available?text('openMyPortal'):text('scanCard');
         document.getElementById('activationDestinations').hidden=false;
       } catch (error) {
         setNotice(errorText(error.message), true);
@@ -132,6 +136,7 @@
       installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null;
       document.getElementById('installButton').hidden = true;
     });
+    if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
     loadInvitation();
   </script>
 </body>

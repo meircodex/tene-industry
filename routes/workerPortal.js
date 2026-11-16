@@ -5,8 +5,22 @@ module.exports=function createWorkerPortalRouter({db,requireAnyRole,authService,
  const support=require('../services/workerPortalSupport');support.ensureSchema(db);
  const storage=require('../services/warehouseCardStorage');
  function run(fn){return(req,res,next)=>{try{return fn(req,res);}catch(e){if(e.status)return res.status(e.status).json({error:e.message});next(e);}};}
+ const deviceAccess=require('../services/workerPortalDeviceAccess');
+ const enrollment=require('../services/deviceEnrollment').createDeviceEnrollmentService({getDb:()=>db});
+ // Scoped self-logout accepts proof of the registered credential even when revoked or JWT expired.
+ // It never authenticates a reader; anonymous requests can only clear their own browser cookie.
+ router.post('/worker-portal/logout',run((req,res)=>{
+  res.set('Cache-Control','no-store');res.append('Set-Cookie',deviceAccess.cookie('',0));
+  if(Object.keys(req.body||{}).length)return res.status(400).json({error:'invalid_logout_fields'});
+  const proof=deviceAccess.logoutProof(db,req);
+  if(proof){enrollment.revokeApprovedEnrollment(proof.id,{sub:proof.user_id,display_name:proof.worker_name});return res.json({ok:true});}
+  if(req.auth?.portal_only&&portal.accountForUser(db,req.auth.sub))return res.json({ok:true});
+  return res.status(401).json({error:'worker_device_required'});
+ }));
+ router.use('/worker-portal',(req,res,next)=>{try{deviceAccess.authenticate(db,req);next();}catch(e){res.status(e.status||403).json({error:e.message});}});
  const allowed=['production','warehouse','quality','maintenance','kiosk','manager','admin'];
  function identify(req,res,next){try{portal.identify(db,req);res.set('Cache-Control','no-store');next();}catch(e){res.status(e.status||500).json({error:e.message});}}
+
  router.get('/worker-portal/me',requireAnyRole(allowed),identify,(req,res)=>res.json({worker:req.portalWorker}));
  router.patch('/worker-portal/preferences',requireAnyRole(allowed),identify,(req,res)=>{
   if(Object.keys(req.body||{}).some(k=>k!=='language')||!portal.LANGUAGES.includes(req.body?.language))return res.status(400).json({error:'invalid_portal_language'});

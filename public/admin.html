@@ -749,7 +749,7 @@ html, body { background:#f0f4f8; color:#1a2533; font-family:'Heebo',sans-serif; 
         <div class="tab-toolbar">
           <div>
             <div class="tab-heading">✉️ עובדים ו־QR אישי</div>
-            <div class="tab-subtitle">לכניסה עם שם משתמש וסיסמה בוחרים “פורטל עובד” ליד העובד. אפשר גם ליצור QR אישי להפעלת מכשיר.</div>
+            <div class="tab-subtitle">יוצרים קישור אישי ל־15 דקות ושולחים לעובד. בלחיצה אחת הטלפון משויך אליו. ב״פורטל עובד״ מגדירים שפה והרשאות.</div>
           </div>
           <button class="btn btn-outline" onclick="loadWorkerInvitations()">רענן</button>
         </div>
@@ -1747,9 +1747,9 @@ async function loadWorkerProfiles() {
     <td>${escHtml(workerProfilePermissions(row))}</td>
     <td>${workerProfileDevice(row)}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-primary" style="padding:7px 10px" onclick="createWorkerInvitation(${row.id})">צור ושלח QR</button>
+      <button class="btn btn-primary" style="padding:7px 10px" onclick="createWorkerInvitation(${row.id})">קישור אישי ל־15 דקות</button>
       <button class="btn btn-outline" style="padding:7px 10px" onclick="editWorkerProfile(${row.id})">ערוך</button>
-      <button class="btn btn-outline" style="padding:7px 10px" onclick="openWorkerPortalAccount(${row.id})">פורטל עובד</button>${row.portal_username?`<div style="font-size:11px;color:var(--muted);margin-top:6px">${row.portal_active?'פורטל פעיל':'פורטל מושבת'} · <bdi>${escHtml(row.portal_username)}</bdi></div>`:''}
+      <button class="btn btn-outline" style="padding:7px 10px" onclick="openWorkerPortalAccount(${row.id})">פורטל עובד</button>${row.portal_username?`<div style="font-size:11px;color:var(--muted);margin-top:6px">${row.portal_active?'פורטל פעיל':'פורטל מושבת'} · כניסה בקישור אישי</div>`:''}
     </td>
   </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">אין עובדים שמורים. הזן פרטים למעלה ולחץ “שמור פרטי עובד”.</td></tr>';
 }
@@ -1858,7 +1858,7 @@ async function createWorkerInvitation(profileId) {
   document.getElementById('workerInviteWhatsApp').href = `https://wa.me/${waDigits}?text=${encodeURIComponent(result.whatsapp_message || result.activation_url)}`;
   document.getElementById('workerInviteCreated').hidden = false;
   document.getElementById('workerInviteCreated').scrollIntoView({ behavior:'smooth', block:'center' });
-  toast(`✓ QR אישי עבור ${profile.worker_name} נוצר. תוקפו 15 דקות`);
+  toast(`✓ קישור אישי עבור ${profile.worker_name} נוצר. תוקפו 15 דקות`);
   loadWorkerInvitations();
 }
 

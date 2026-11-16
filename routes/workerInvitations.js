@@ -70,6 +70,7 @@ function publicWorkerProfile(row) {
 module.exports = function createWorkerInvitationsRouter(deps) {
   const getDb = required('getDb', deps.getDb);
   const authService=required('authService',deps.authService);
+  const deviceAccess=require('../services/workerPortalDeviceAccess');
   const portal=require('../services/workerPortalAccounts');portal.ensureSchema(getDb());
   const requireRole = required('requireRole', deps.requireRole);
   const deviceEnrollment = required('deviceEnrollment', deps.deviceEnrollment);
@@ -286,6 +287,7 @@ module.exports = function createWorkerInvitationsRouter(deps) {
   // The invite token is intentionally the only credential accepted here. It
   // never returns a token hash, a user list, or any factory data.
   router.get('/worker-invitations/activation', activationLimiter, (req, res) => {
+    res.set('Cache-Control','no-store');
     const row = workerInvitations.markOpened(req.query?.token);
     if (!row || !['pending', 'opened'].includes(workerInvitations.effectiveStatus(row))) {
       const failure = publicActivationError(row, workerInvitations);
@@ -298,6 +300,7 @@ module.exports = function createWorkerInvitationsRouter(deps) {
     const token = String(req.body?.token || '').trim();
     const deviceName = cleanText(req.body?.device_name, 100);
     const platform = cleanText(req.body?.platform, 160);
+    if(req.body.language!==undefined&&!portal.LANGUAGES.includes(req.body.language))return res.status(400).json({error:'invalid_portal_language'});
     if (deviceName.length < 2) {
       return res.status(400).json({ error: 'worker_registration_details_required' });
     }
@@ -341,7 +344,9 @@ module.exports = function createWorkerInvitationsRouter(deps) {
           WHERE id=? AND status IN ('pending','opened')
         `).run(enrollment.row.id, invite.id);
         if (updated.changes !== 1) throw new Error('invitation_already_used');
-        return { invite, enrollment, permissions };
+        const portalAccount=profile?deviceAccess.provision(getDb(),authService,profile,{sub:invite.created_by,display_name:invite.created_by_name||'ניהול עובדים'}):null;
+        if(portalAccount&&req.body.language){authService.setPortalLanguage(portalAccount.user_id,req.body.language);auditLog('worker_portal',profile.id,invite.invitation_uid,'preference','language',portalAccount.language,req.body.language,'הפעלת קישור אישי',portalAccount.user_id,profile.worker_name);}
+        return { invite, enrollment, permissions,portalAccount };
       })();
     } catch (error) {
       const status = Number(error.status) || (String(error.message).includes('UNIQUE') ? 409 : 400);
@@ -353,7 +358,11 @@ module.exports = function createWorkerInvitationsRouter(deps) {
       claimed.invite.status, 'claimed', `${claimed.invite.worker_name} · ${claimed.enrollment.row.device_name}`,
       null, claimed.invite.worker_name,
     );
+    if(claimed.portalAccount){res.append('Set-Cookie',deviceAccess.cookie(claimed.enrollment.credential));res.append('Set-Cookie','refresh_token=; HttpOnly; SameSite=Strict; Path=/api/auth; Max-Age=0'+(process.env.NODE_ENV==='production'?'; Secure':''));}
+    res.set('Cache-Control','no-store');
     res.status(201).json({
+      portal_available:Boolean(claimed.portalAccount),
+      portal_url:claimed.portalAccount?'/worker-portal.html?activated=1':null,
       status: 'approved',
       worker_name: claimed.invite.worker_name,
       permissions: claimed.permissions,

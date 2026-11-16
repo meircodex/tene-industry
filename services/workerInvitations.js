@@ -107,7 +107,11 @@ function createWorkerInvitationService({ getDb, now = () => new Date() }) {
 
   function publicInvite(row) {
     if (!row) return null;
+    let language='he';
+    if(row.worker_profile_id&&getDb().prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='worker_portal_accounts'").get())language=getDb().prepare('SELECT u.worker_portal_language language FROM worker_portal_accounts a JOIN users u ON u.id=a.user_id WHERE a.profile_id=?').get(row.worker_profile_id)?.language||'he';
     return {
+      language,
+      portal_available:Boolean(row.worker_profile_id&&parsePermissions(row.permissions_json).includes('production')),
       invitation_uid: row.invitation_uid,
       worker_name: row.worker_name,
       role: row.role,

@@ -1,0 +1,51 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'tene-link-'));
+process.env.NODE_ENV='test';process.env.JWT_SECRET='link-signin-test';process.env.DB_PATH=path.join(dir,'test.db');process.env.BACKUP_DIR=path.join(dir,'backups');process.env.BCRYPT_ROUNDS='4';
+const {db,server,closeServer}=require('../server'),{hashPin}=require('../auth-core');let base;
+async function call(url,{token,device,cookie,body,method=body?'POST':'GET'}={}){const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(device?{'X-IronBend-Device':device}:{}),...(cookie?{Cookie:cookie}:{})},...(body?{body:JSON.stringify(body)}:{})});return{status:r.status,body:await r.json(),cookies:r.headers.getSetCookie()};}
+test('15-minute single-use worker link grants only portal access, persists identity and revokes/replaces devices live',async t=>{
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+server.address().port;t.after(async()=>{await new Promise(resolve=>closeServer(resolve));db.close();fs.rmSync(dir,{recursive:true,force:true});});
+ db.prepare('INSERT INTO users(username,display_name,role,pin_hash,active)VALUES(?,?,?,?,1)').run('link-admin','Admin','admin',hashPin('9911',4));
+ const admin=(await call('/api/auth/login',{body:{username:'link-admin',pin:'9911'}})).body.access_token;
+ const profile=(await call('/api/worker-profiles',{token:admin,body:{worker_name:'Link Worker',phone:'0503334455',role:'production',permissions:['production']}})).body;
+ async function invite(){const response=await call('/api/worker-profiles/'+profile.id+'/invitations',{token:admin,body:{}});assert.equal(response.status,201);return{...response.body,token:new URL(response.body.activation_url).searchParams.get('token')};}
+ const first=await invite();assert.ok(Math.abs(new Date(first.invitation.expires_at)-Date.now()-900000)<3000);
+ assert.equal((await call('/api/worker-portal/me')).status,401);
+ const claims=await Promise.all(['Phone A','Phone B'].map(device_name=>call('/api/worker-invitations/activation',{body:{token:first.token,device_name}})));
+ assert.deepEqual(claims.map(r=>r.status).sort(),[201,409]);const claim=claims.find(r=>r.status===201),device=claim.body.device_credential;
+ assert.equal(claim.body.portal_available,true);assert.equal(claim.body.portal_url,'/worker-portal.html?activated=1');
+ const cookie=claim.cookies.find(c=>c.startsWith('ironbend_worker_device='));assert.ok(cookie.includes('HttpOnly'));assert.ok(cookie.includes('SameSite=Strict'));assert.ok(cookie.includes('Path=/api/worker-portal'));const cookieHeader=cookie.split(';')[0];
+ const me=await call('/api/worker-portal/me',{device});assert.equal(me.status,200,JSON.stringify(me.body));assert.equal(me.body.worker.worker_name,'Link Worker');assert.equal(me.body.worker.access_mode,'device');assert.equal((await call('/api/worker-portal/me',{cookie:cookieHeader})).body.worker.user_id,me.body.worker.user_id);
+ for(const url of ['/api/users','/api/orders','/api/machines','/api/reports/production-timing'])assert.equal((await call(url,{device})).status,401,url+' must not accept device as global login');
+ assert.equal((await call('/api/worker-portal/manage/help',{device})).status,403);
+ assert.equal((await call('/api/worker-portal/me',{device:'DEV-00000000.bad'})).status,403);
+ assert.equal((await call('/api/worker-portal/me',{device,token:'invalid-access-token'})).status,401,'bad JWT must not fall back to another device identity');
+ const other=(await call('/api/worker-profiles',{token:admin,body:{worker_name:'Other Worker',phone:'0503334456',role:'production',permissions:['production']}})).body;
+ await call('/api/worker-profiles/'+other.id+'/portal-account',{token:admin,method:'PUT',body:{username:'other-worker',password:'other-worker-123!'}});
+ const otherToken=(await call('/api/auth/worker-login',{body:{username:'other-worker',password:'other-worker-123!'}})).body.access_token;
+ assert.equal((await call('/api/worker-portal/me',{device,token:otherToken})).body.worker.worker_name,'Other Worker','valid personal JWT must retain its own identity');
+
+ const linked=db.prepare('SELECT * FROM users WHERE id=?').get(me.body.worker.user_id);assert.equal(linked.role,'production');assert.equal(linked.worker_portal_only,1);assert.equal(linked.pin,null);assert.ok(linked.pin_hash);assert.ok(!linked.pin_hash.includes('Link Worker'));
+ assert.equal((await call('/api/worker-invitations/activation',{body:{token:first.token,device_name:'Forwarded phone'}})).status,409);
+ await call('/api/worker-profiles/'+profile.id+'/portal-account',{token:admin,method:'PUT',body:{username:linked.username,language:'th',permissions:['start']}});
+ const second=await invite();const secondClaim=await call('/api/worker-invitations/activation',{body:{token:second.token,device_name:'Replacement phone'}});assert.equal(secondClaim.status,201);const d2=secondClaim.body.device_credential;
+ assert.equal((await call('/api/worker-portal/me',{device})).status,403);const sameWorker=(await call('/api/worker-portal/me',{device:d2})).body.worker;assert.equal(sameWorker.user_id,me.body.worker.user_id);assert.equal(sameWorker.language,'th');assert.deepEqual(sameWorker.permissions,['start']);
+ const d2id=db.prepare('SELECT claimed_device_id id FROM worker_invitations WHERE id=?').get(second.invitation.id).id;
+ await call('/api/device-enrollment/requests/'+d2id,{token:admin,method:'PATCH',body:{status:'revoked'}});assert.equal((await call('/api/worker-portal/me',{device:d2})).status,403);
+ await call('/api/device-enrollment/requests/'+d2id,{token:admin,method:'PATCH',body:{status:'approved'}});
+ const rollbackInvite=await invite();
+ db.prepare('UPDATE users SET active=0 WHERE id=?').run(me.body.worker.user_id);
+ const beforeCount=db.prepare('SELECT COUNT(*) n FROM device_enrollment_requests').get().n;
+ const denied=await call('/api/worker-invitations/activation',{body:{token:rollbackInvite.token,device_name:'Blocked phone'}});assert.equal(denied.status,403);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM device_enrollment_requests').get().n,beforeCount,'failed provisioning must roll back enrollment');assert.equal(db.prepare('SELECT status FROM device_enrollment_requests WHERE id=?').get(d2id).status,'approved','failed provision must not revoke the prior device');
+ assert.ok(['pending','opened'].includes(db.prepare('SELECT status FROM worker_invitations WHERE id=?').get(rollbackInvite.invitation.id).status));
+ db.prepare('UPDATE users SET active=1 WHERE id=?').run(me.body.worker.user_id);
+ const expired=await invite();db.prepare("UPDATE worker_invitations SET expires_at=datetime('now','-1 second') WHERE id=?").run(expired.invitation.id);assert.equal((await call('/api/worker-invitations/activation',{body:{token:expired.token,device_name:'Expired phone'}})).status,410);
+ const third=await invite();const d3=(await call('/api/worker-invitations/activation',{body:{token:third.token,device_name:'Active phone'}})).body.device_credential;
+ await call('/api/worker-profiles/'+profile.id,{token:admin,method:'PATCH',body:{worker_name:'Link Worker',phone:'0503334455',role:'production',permissions:['production'],active:false}});assert.equal((await call('/api/worker-portal/me',{device:d3})).status,403);
+ await call('/api/worker-profiles/'+profile.id,{token:admin,method:'PATCH',body:{worker_name:'Link Worker',phone:'0503334455',role:'production',permissions:['production'],active:true}});
+ const out=await call('/api/worker-portal/logout',{device:d3,body:{}});assert.equal(out.status,200);assert.ok(out.cookies.some(c=>c.includes('Max-Age=0')));assert.equal((await call('/api/worker-portal/me',{device:d3})).status,403);
+ const repeatedOut=await call('/api/worker-portal/logout',{device:d3,token:'expired-access-token',body:{}});assert.equal(repeatedOut.status,200);assert.ok(repeatedOut.cookies.some(c=>c.includes('Max-Age=0')));
+ const anonymousOut=await call('/api/worker-portal/logout',{body:{}});assert.equal(anonymousOut.status,401);assert.ok(anonymousOut.cookies.some(c=>c.includes('Max-Age=0')));
+});

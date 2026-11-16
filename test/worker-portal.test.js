@@ -5,7 +5,7 @@ process.env.NODE_ENV='test';process.env.DB_PATH=path.join(tmp,'test.db');process
 const {server,db,closeServer}=require('../server'),{hashPin}=require('../auth-core');
 let base;
 async function call(url,token,body,method=body?'POST':'GET'){
- const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),'X-IronBend-Device':'DEV-shared-phone'},...(body?{body:JSON.stringify(body)}:{})});
+ const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token,'X-IronBend-Device':'DEV-shared-phone'}:{})},...(body?{body:JSON.stringify(body)}:{})});
  return{status:r.status,body:await r.json(),headers:r.headers};
 }
 function seedItem(){

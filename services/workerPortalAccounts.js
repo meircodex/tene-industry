@@ -24,7 +24,7 @@ function saveAccount(db,authService,profileId,body,actor){
  if(!LANGUAGES.includes(language)||!Array.isArray(permissions)||permissions.some(p=>!ACTIONS.includes(p))||(body.active!==undefined&&typeof body.active!=='boolean'))fail(400,'invalid_portal_account');
  const before=db.prepare('SELECT * FROM worker_portal_accounts WHERE profile_id=?').get(profileId);
  return db.transaction(()=>{
-  const user=authService.savePortalUser({id:before?.user_id,username:body.username,password:body.password,displayName:profile.worker_name,language,active:body.active??true});
+  const user=authService.savePortalUser({id:before?.user_id,username:body.username,password:body.password||(!before?require('node:crypto').randomBytes(48).toString('base64url'):undefined),displayName:profile.worker_name,language,active:body.active??true});
   db.prepare(`INSERT INTO worker_portal_accounts(profile_id,user_id,permissions_json)VALUES(?,?,?)
    ON CONFLICT(profile_id)DO UPDATE SET permissions_json=excluded.permissions_json,updated_at=CURRENT_TIMESTAMP`).run(profileId,user.id,JSON.stringify([...new Set(permissions)]));
   db.prepare(`INSERT INTO audit_log(entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,user_id,user_name)
@@ -36,10 +36,10 @@ function identify(db,req){
  const account=accountForUser(db,req.auth?.sub);
  if(!account)fail(403,'worker_portal_account_required');
  if(!account.profile_active||!account.user_active)fail(403,'worker_portal_disabled');
- req.portalWorker=publicAccount(account);req.userId=String(account.user_id);
+ req.portalWorker={...publicAccount(account),access_mode:req.workerPortalDevice?'device':'password'};req.userId=String(account.user_id);
  req.auth={...req.auth,display_name:account.worker_name};
  // A shared device's former enrollment must never override the logged-in worker.
- req.approvedDevice=null;req.qrAccess={mode:'personal',permission:'production',actor_name:account.worker_name,device:null,invitation:null};
+ req.approvedDevice=req.workerPortalDevice||null;req.qrAccess={mode:'personal',permission:'production',actor_name:account.worker_name,device:req.approvedDevice,invitation:null};
  return req.portalWorker;
 }
 function statusAllowed(db,req){
