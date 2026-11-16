@@ -29,7 +29,7 @@ test('year/month charts share filtered card totals across pagination without rep
  const f=unifiedProductionReport({cards,activity},parseFilters({...q,diameter_in:'["12"]'}));assert.equal(f.charts.timeline.reduce((s,p)=>s+p.value,0),300);assert.equal(f.charts.machines.length,0);
  const empty=reportCharts([],{bucket:'day',from:'2026-11-01',to:'2026-11-07'});assert.equal(empty.timeline.length,7);assert.ok(empty.timeline.every(p=>p.value===0));
 });
-function fixture(){const els={};const el=id=>els[id]||=( {value:'',innerHTML:'',textContent:'',hidden:false,attrs:{},listeners:{},setAttribute(k,v){this.attrs[k]=v},addEventListener(k,fn){this.listeners[k]=fn},focus(){}});for(const id of ['chartPlot','chartType','chartTitle','chartMetric'])el(id);const window={IronBendSafe:{escapeHtml:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}};const c={window,document:{getElementById:el},localStorage:{getItem:()=>null,setItem(){}}};vm.runInNewContext(fs.readFileSync('public/reports-charts.js','utf8'),c);return{els,api:window.IronBendReportCharts};}
+function fixture(){const els={};const el=id=>els[id]||=( {value:'',innerHTML:'',textContent:'',hidden:false,attrs:{},listeners:{},setAttribute(k,v){this.attrs[k]=v},addEventListener(k,fn){this.listeners[k]=fn},focus(){}});for(const id of ['chartPlot','chartType','chartTitle','chartMetric','chartZoom','chartZoomLevel','chartZoomIn','chartZoomOut'])el(id);const window={IronBendReportPeriods:periods,IronBendSafe:{escapeHtml:v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}};const c={window,document:{getElementById:el},localStorage:{getItem:()=>null,setItem(){}}};vm.runInNewContext(fs.readFileSync('public/reports-charts.js','utf8'),c);return{els,api:window.IronBendReportCharts};}
 test('one graph switches metrics/types, renders actual selected period, and clears stale results',()=>{
  const {els,api}=fixture();api.render({bucket:'hour',period:{from:'2026-11-16',to:'2026-11-16'},timeline:[{key:'08',value:100}],diameters:[{key:'<script>',value:50}],machines:[{key:'MEP',value:20}]});assert.match(els.chartPlot.innerHTML,/08:00/);assert.match(els.chartTitle.textContent,/16\.11\.2026/);assert.equal((els.chartPlot.innerHTML.match(/<svg /g)||[]).length,1);
  els.chartMetric.listeners.change({target:{value:'diameters'}});assert.doesNotMatch(els.chartPlot.innerHTML,/<script>/);assert.match(els.chartPlot.innerHTML,/&lt;script>/);
@@ -50,4 +50,27 @@ test('invalid date change releases an in-flight busy state and blocks exporting 
  const els={fromDate:{value:''},toDate:{value:'2026-11-16'},reportState:{},reportCharts:{setAttribute(k,v){this[k]=v}},exportReport:{}};
  const table={setAttribute(k,v){this[k]=v}};const c={requestId:4,$:id=>els[id],document:{querySelector:()=>table}};
  vm.runInNewContext(fs.readFileSync('public/reports-unified.js','utf8').match(/async function loadReport\(\)\{[\s\S]*?\n\}/)[0],c);await c.loadReport();assert.equal(table['aria-busy'],'false');assert.equal(els.reportCharts['aria-busy'],'false');assert.equal(els.exportReport.disabled,true);
+});
+test('every date is labelled in a weekly chart, including zero days, with space instead of skipped labels',()=>{
+ const {els,api}=fixture();api.render({bucket:'day',period:{from:'2026-11-15',to:'2026-11-21'},daily:[{key:'2026-11-15',value:9869.73},{key:'2026-11-16',value:14827.98}]});
+ for(let day=15;day<=21;day++){assert.match(els.chartPlot.innerHTML,new RegExp('data-axis-label="2026-11-'+day+'"'));assert.match(els.chartPlot.innerHTML,new RegExp('>'+day+'\\.11</tspan>'));}
+ assert.equal((els.chartPlot.innerHTML.match(/data-axis-label=/g)||[]).length,7);assert.doesNotMatch(els.chartPlot.innerHTML,/NaN|Infinity/);assert.match(els.chartPlot.innerHTML,/min-width:\d+px/);assert.equal(els.chartZoomLevel.textContent,'ימים');
+ api.render({bucket:'day',period:{from:'2026-11-15',to:'2026-11-21'},daily:[]});assert.equal((els.chartPlot.innerHTML.match(/data-axis-label=/g)||[]).length,7);
+});
+test('quarter zoom changes months to clipped calendar weeks and days without discarding dates or changing totals',()=>{
+ const period={from:'2026-10-01',to:'2026-12-31'},daily=[{key:'2026-10-01',value:100},{key:'2026-10-03',value:50},{key:'2026-10-04',value:70},{key:'2026-12-31',value:300}];
+ for(const level of ['day','week','month'])assert.equal(periods.groupDays(daily,period,level).reduce((s,p)=>s+p.value,0),520);
+ const weeks=periods.groupDays(daily,period,'week');assert.equal(weeks[0].key,'2026-09-27');assert.equal(weeks[0].value,150);assert.equal(weeks[1].value,70);
+ assert.equal(periods.groupDays(daily,period,'day').length,92);assert.equal(periods.groupDays(daily,period,'month').length,3);
+ const {els,api}=fixture();api.render({bucket:'month',period,daily});assert.equal(els.chartZoomLevel.textContent,'חודשים');assert.equal(els.chartZoomOut.disabled,true);
+ els.chartZoomIn.listeners.click();assert.equal(els.chartZoomLevel.textContent,'שבועות');assert.match(els.chartPlot.innerHTML,/>01\.10<\/tspan>/);assert.match(els.chartPlot.innerHTML,/>03\.10<\/tspan>/);
+ els.chartZoomIn.listeners.click();assert.equal(els.chartZoomLevel.textContent,'ימים');assert.equal(els.chartZoomIn.disabled,true);assert.equal((els.chartPlot.innerHTML.match(/data-axis-label=/g)||[]).length,92);
+ els.chartMetric.listeners.change({target:{value:'machines'}});assert.equal(els.chartZoom.hidden,true);els.chartMetric.listeners.change({target:{value:'daily'}});assert.equal(els.chartZoomLevel.textContent,'ימים');
+ els.chartZoomOut.listeners.click();assert.equal(els.chartZoomLevel.textContent,'שבועות');
+ api.render({bucket:'day',period:{from:'2026-11-15',to:'2026-11-21'},daily:[]});assert.equal(els.chartZoomLevel.textContent,'ימים');
+});
+test('year/day zoom retains leap day and clips a year-crossing week at the selected boundaries',()=>{
+ assert.equal(periods.groupDays([],{from:'2024-01-01',to:'2024-12-31'},'day').length,366);
+ const p={from:'2025-12-31',to:'2026-01-02'},daily=[{key:'2025-12-31',value:10},{key:'2026-01-01',value:20}];assert.deepEqual(periods.groupDays(daily,p,'week'),[{key:'2025-12-28',value:30}]);
+ const {els,api}=fixture();api.render({bucket:'hour',period:{from:'2026-11-16',to:'2026-11-16'},daily:[{key:'2026-11-16',value:30}],timeline:[{key:'08',value:30}]});assert.equal(els.chartZoomLevel.textContent,'שעות');assert.equal(els.chartZoomIn.disabled,true);els.chartZoomOut.listeners.click();assert.equal(els.chartZoomLevel.textContent,'ימים');assert.equal(els.chartZoomOut.disabled,true);assert.match(els.chartPlot.innerHTML,/16\.11/);
 });

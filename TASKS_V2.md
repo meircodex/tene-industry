@@ -4,6 +4,16 @@
 
 ## סטטוסים
 
+### גרפים: כל תאריך וזום שבוע/חודש/יום — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: approved compact report; every daily bar must show its own date, including zero days; quarter zooms between month/week/day, without changing the selected period or table filters.
+- ownership: Reports presentation aggregation of existing canonical daily totals only. No new endpoint, DB, scan, status, stock or reliability changes.
+- output/screens: compact minus/group label/plus controls for time graph, all axis labels and values with sufficient spacing and horizontal scrolling when needed; preset date controls and other metrics/types retained.
+- DoD: verify zero days and total invariance across day/week/month, clipped calendar-week boundaries and date range resets, every daily axis date, no hidden data due to scale; focused/full suite, docs, deploy and live checks.
+- verification: 25 focused report tests and full suite 1,373 passed; syntax/diff checks passed. Deployment pending.
+
+
 ### דוחות מצומצמים ובחירת יום/שבוע/רבעון/שנה — 16.11.2026
 - status: done
 - owner: codex

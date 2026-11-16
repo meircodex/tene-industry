@@ -19,3 +19,7 @@ td{white-space:nowrap}
 @media(pointer:coarse){.period-buttons button,.chart-toolbar select,.column-picker summary{min-height:44px}.column-picker summary{display:flex;align-items:center}}
 
 .report-table-wrap[aria-busy=true],.report-charts[aria-busy=true]{opacity:.4;pointer-events:none}
+
+#chartPlot{overflow-x:auto;direction:ltr;overscroll-behavior-x:contain}#chartPlot .chart-empty,#chartPlot .chart-legend{direction:rtl}#chartPlot svg{height:240px;width:100%;max-width:none}
+.chart-zoom{display:flex;align-items:center;gap:5px}.chart-zoom button{padding:2px 9px;min-width:34px;min-height:34px;font-size:20px}.chart-zoom span{font-size:13px;min-width:48px;text-align:center}
+@media(pointer:coarse){.chart-zoom button{min-height:44px;min-width:44px}}

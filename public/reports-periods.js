@@ -13,6 +13,27 @@
   return {from:iso(start),to:iso(end)};
  }
  const bucket=mode=>mode==='day'?'hour':['quarter','year'].includes(mode)?'month':'day';
+
+ // Re-bin supplied report totals only; never calculate source production weights.
+ function groupDays(series,{from,to},granularity){
+  const days=new Map();
+  if(valid(from)&&valid(to)&&from<=to){
+   const span=(Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000;
+   for(let n=0;n<=span;n++)days.set(iso(new Date(Date.parse(from+'T12:00:00Z')+n*86400000)),0);
+  }
+  for(const point of series||[]){if(!valid(point.key)||from&&point.key<from||to&&point.key>to)continue;days.set(point.key,(days.get(point.key)||0)+(Number(point.value)||0));}
+  const groups=new Map();
+  for(const [day,value] of days){
+   const key=granularity==='month'?day.slice(0,7):granularity==='week'?range('week',day).from:day;
+   groups.set(key,(groups.get(key)||0)+value);
+  }
+  return [...groups].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,value])=>({key,value}));
+ }
+ function zoomLevels({from,to}={}){
+  if(from&&from===to)return ['hour','day'];
+  const span=(Date.parse(to+'T12:00:00Z')-Date.parse(from+'T12:00:00Z'))/86400000;
+  return span<7?['day','week']:['day','week','month'];
+ }
  const display=day=>day.split('-').reverse().join('.');
  let active='week';
  function setup({load}){
@@ -33,5 +54,5 @@
   for(const id of ['fromDate','toDate'])$(id).addEventListener('change',()=>apply());
   apply(false);
  }
- return {range,bucket,valid,setup,selected:()=>active};
+ return {range,bucket,valid,groupDays,zoomLevels,setup,selected:()=>active};
 });
