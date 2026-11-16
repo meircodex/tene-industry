@@ -21,7 +21,7 @@ function kindText(r){return r.same_day_scanned?'התחלה וסיום באותו
 async function api(url,options){const res=await fetch(url,options);let data;try{data=await res.json();}catch{throw Error('הנתונים לא נטענו. יש לנסות שוב.');}if(!res.ok)throw Error(res.status===403?'אין הרשאה לצפייה בדוח זה':res.status===401?'נדרשת התחברות מחדש':res.status===409?'המדידה השתנתה. טען שוב לפני שמירת החלטה.':'הפעולה לא הושלמה. בדוק את השדות ונסה שוב.');return data;}
 const multiFields=['machine','diameter','material','customer','order','status','worker','kind','reliability'];
 function selectedValues(id){return [...$(id).selectedOptions].map(o=>o.value).filter(v=>v&&v!=='all');}
-function filterParams(targetPage=page){const p=new URLSearchParams({from:$('fromDate').value,to:$('toDate').value,unified:'1',flat:'1',group:'card',page:String(targetPage),limit:$('limit').value});for(const key of multiFields){const values=selectedValues(key);if(values.length)p.set(key+'_in',JSON.stringify(values));}if($('search').value)p.set('search',$('search').value);if(sortKey){p.set('sort',sortKey);p.set('direction',sortDirection);}return p;}
+function filterParams(targetPage=page){const p=new URLSearchParams({from:$('fromDate').value,to:$('toDate').value,unified:'1',flat:'1',group:'card',page:String(targetPage),limit:$('limit').value,chart_bucket:window.IronBendReportPeriods.bucket(window.IronBendReportPeriods.selected())});for(const key of multiFields){const values=selectedValues(key);if(values.length)p.set(key+'_in',JSON.stringify(values));}if($('search').value)p.set('search',$('search').value);if(sortKey){p.set('sort',sortKey);p.set('direction',sortDirection);}return p;}
 function renderMulti(id){const select=$(id),box=document.querySelector(`[data-multi="${id}"]`);if(!box)return;
  const items=[...select.options].filter(o=>o.value&&o.value!=='all'),values=selectedValues(id),title=[...select.selectedOptions].filter(o=>o.value&&o.value!=='all').map(o=>o.textContent);
  box.querySelector('summary').textContent=title.length?title.slice(0,2).join(' · ')+(title.length>2?` +${title.length-2}`:''):(select.options[0]?.textContent||'הכול');box.classList.toggle('has-selection',!!values.length);
@@ -51,20 +51,20 @@ const sortFields=['card','order','customer','shape','diameter','material','machi
 function columnSort(title){return sortFields[productionColumns().findIndex(([t])=>t===title)]||'';}
 function drawTable(rows){visibleRows=rows;$('reportHead').innerHTML='<tr>'+columns.map(([title])=>{const key=columnSort(title),active=key===sortKey;return `<th scope="col" ${active?`aria-sort="${sortDirection==='asc'?'ascending':'descending'}"`:''}>${key?`<span class="column-heading"><button type="button" class="column-sort ${active?'active':''}" data-sort="${key}" title="מיון לפי ${escH(title)} — לחץ להחלפת כיוון">${escH(title)} <span aria-hidden="true">${active?(sortDirection==='asc'?'↑':'↓'):'↕'}</span></button><button type="button" class="column-hide" data-hide-column="${escH(title)}" title="הסתר עמודה: ${escH(title)}" aria-label="הסתר עמודה: ${escH(title)}">×</button></span>`:escH(title)}</th>`;}).join('')+'</tr>';$('reportBody').innerHTML=rows.map((r,index)=>`<tr data-row="${index}">${columns.map(([,fn,html])=>`<td>${html?fn(r):escH(fn(r))}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${columns.length}" style="text-align:center;padding:32px">אין תוצאות לסינון שנבחר</td></tr>`;}
 function pagination(total,pages){$('resultCount').textContent=`${fmt(total)} תוצאות`;$('pageNumber').textContent=`${page} / ${pages}`;$('prevPage').disabled=page<=1;$('nextPage').disabled=page>=pages;}
-function productionSummary(s){$('reportSummary').innerHTML=[['כרטיסים',fmt(s.cards)],['כרטיסים שהושלמו',fmt(s.reported_cards)],['משקל שיוצר',fmt(s.weight_kg,1)+' ק״ג'],['זמן אמין',formatMinutes(s.net_minutes)],['מטר לדקה',rate(s.meters_per_min)],['מדידות אמינות',fmt(s.reliable_cards)]].map(([k,v])=>`<span>${k}<strong>${escH(v)}</strong></span>`).join('');}
 async function loadReport(){
  const ticket=++requestId;
- if(!$('fromDate').value||!$('toDate').value||$('fromDate').value>$('toDate').value){$('reportState').textContent='יש לבחור טווח תאריכים תקין';return;}
+ if(!$('fromDate').value||!$('toDate').value||$('fromDate').value>$('toDate').value){$('reportState').textContent='יש לבחור טווח תאריכים תקין';document.querySelector('.report-table-wrap').setAttribute('aria-busy','false');$('reportCharts').setAttribute('aria-busy','false');$('exportReport').disabled=true;return;}
+ document.querySelector('.report-table-wrap').setAttribute('aria-busy','true');$('reportCharts').setAttribute('aria-busy','true');
  $('reportState').textContent='טוען נתונים…';$('exportReport').disabled=true;
  try{
   const data=await api('/api/reports/production-timing?'+filterParams());if(ticket!==requestId)return;
   if(!data.unified||!Array.isArray(data.unified.rows))throw Error('לא התקבלו נתונים עדכניים מהשרת. יש ללחוץ שוב על הצג.');
-  current=data.unified;page=current.page;configureColumns();drawTable(current.rows);productionSummary(current.summary);window.IronBendReportCharts?.render(current.charts);pagination(current.total,current.pages);
+  current=data.unified;page=current.page;configureColumns();drawTable(current.rows);window.IronBendReportCharts?.render(current.charts);pagination(current.total,current.pages);
   options('machine',current.facets.machines,'כל המכונות');options('diameter',current.facets.diameters,'כל הקטרים');options('customer',current.facets.customers,'כל הלקוחות');options('order',current.facets.orders,'כל ההזמנות');options('status',current.facets.statuses,'כל המצבים');
   options('worker',current.facets.workers.map(w=>({value:w.key,label:w.name})),'כל העובדים');
-  $('reportNote').textContent='כל כרטיס מופיע פעם אחת, אם יש לו סריקת התחלה או סיום בטווח התאריכים. הכמות והמשקל נספרים רק כשהסיום בתקופה. בחירת עמודות אינה משנה את הנתונים או את הסיכום. הקצב בסיכום מחושב רק ממדידות אמינות; זמן נטו מנכה שעות סגירה, שבת, הפסקות ועצירות. דיווחים ישנים ללא זיהוי נשארים לא מזוהים.';
+
   $('reportState').textContent='';$('exportReport').disabled=false;
- }catch(error){if(ticket===requestId){$('reportState').textContent=error.message;current=null;drawTable([]);$('reportSummary').textContent='';window.IronBendReportCharts?.render(null);pagination(0,1);}}
+ }catch(error){if(ticket===requestId){$('reportState').textContent=error.message;current=null;drawTable([]);window.IronBendReportCharts?.render(null);pagination(0,1);}}finally{if(ticket===requestId){document.querySelector('.report-table-wrap').setAttribute('aria-busy','false');$('reportCharts').setAttribute('aria-busy','false');}}
 }
 function detail(r){
  const c=r.card,title=`כרטיס #${r.item_id} · ${r.order_num||''}`;$('detailTitle').textContent=title;
@@ -88,7 +88,7 @@ async function exportReport(){const button=$('exportReport');button.disabled=tru
  const url=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`ironbend-cards-${$('fromDate').value}.csv`;a.click();URL.revokeObjectURL(url);
  }catch(error){$('reportState').textContent=error.message;}finally{button.disabled=false;}}
 document.addEventListener('DOMContentLoaded',()=>{
- const now=new Date(),today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);$('toDate').value=today;$('fromDate').value=new Date(Date.parse(today+'T12:00:00Z')-30*86400000).toISOString().slice(0,10);
+ window.IronBendReportPeriods.setup({load:()=>{page=1;loadReport();}});
  $('reportFilters').addEventListener('submit',event=>{event.preventDefault();page=1;loadReport();});
  for(const id of ['limit'])$(id).addEventListener('change',()=>{page=1;loadReport();});
  $('clearFilters').addEventListener('click',()=>{for(const id of multiFields){for(const o of $(id).options)o.selected=false;renderMulti(id);}$('search').value='';page=1;loadReport();});
@@ -97,6 +97,6 @@ document.addEventListener('DOMContentLoaded',()=>{
  $('reportHead').addEventListener('click',event=>{const hide=event.target.closest('[data-hide-column]')?.dataset.hideColumn;if(hide){chosen=chosen.filter(t=>t!==hide);localStorage.setItem('reportColumnsV2',JSON.stringify(chosen));configureColumns();drawTable(current?.rows||[]);return;}const key=event.target.closest('[data-sort]')?.dataset.sort;if(!key)return;sortDirection=sortKey===key&&sortDirection==='asc'?'desc':'asc';sortKey=key;page=1;loadReport();});
  $('prevPage').addEventListener('click',()=>{page--;loadReport();});$('nextPage').addEventListener('click',()=>{page++;loadReport();});
  $('reportBody').addEventListener('click',event=>{const button=event.target.closest('[data-action]');if(button)detail(visibleRows[num(button.closest('tr').dataset.row)]);});
- $('toggleCharts').addEventListener('click',()=>{const show=$('reportCharts').hidden;$('reportCharts').hidden=!show;$('toggleCharts').setAttribute('aria-expanded',String(show));$('toggleCharts').textContent=show?'הסתר גרפים':'הצג גרפים';});
+ $('toggleCharts').addEventListener('click',()=>{const show=$('reportCharts').hidden;$('reportCharts').hidden=!show;$('toggleCharts').setAttribute('aria-expanded',String(show));$('toggleCharts').textContent=show?'הסתר גרף':'הצג גרף';});
  $('closeDetail').addEventListener('click',()=>$('reportDetail').close());$('exportReport').addEventListener('click',exportReport);setupMulti();configureColumns();loadReport();
 });

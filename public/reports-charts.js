@@ -4,13 +4,13 @@
  const fmt=v=>Number(v||0).toLocaleString('he-IL',{maximumFractionDigits:2});
  const colors=['#2868a8','#db7d24','#37956a','#9973bf','#e0b23e','#529ba9','#c65c69','#6f83b5','#8f9364','#b67e55','#65a18c','#a37f9d'];
  const specs={
-  daily:{title:'משקל שיוצר לפי יום',unit:'ק״ג',note:'המשקל נזקף ליום סיום הכרטיס.',types:['bar','line','pie'],label:k=>String(k).split('-').reverse().join('.')},
-  diameters:{title:'משקל שיוצר לפי קוטר',unit:'ק״ג',note:'לפי כרטיסים שהושלמו בסינון הנוכחי.',types:['bar','line','pie'],label:k=>k==='unknown'?'קוטר לא ידוע':'Ø'+k},
-  machines:{title:'קצב עבודה לפי מכונה',unit:'מטר לדקה',note:'רק מדידות אמינות: סך המטרים חלקי סך הדקות בכל מכונה.',types:['bar','line'],label:k=>k},
-  reliability:{title:'אמינות המדידות',unit:'כרטיסים',note:'כל הכרטיסים שנמצאים בסינון הנוכחי.',types:['bar','pie'],label:k=>({reliable:'אמינות',review:'דורשות בדיקה',unreliable:'לא אמינות',unknown:'טרם נמדדו'})[k]||k}
+  daily:{title:'משקל שיוצר לפי יום',unit:'ק״ג',types:['bar','line','pie'],label:k=>String(k).split('-').reverse().join('.')},
+  diameters:{title:'משקל שיוצר לפי קוטר',unit:'ק״ג',types:['bar','line','pie'],label:k=>k==='unknown'?'קוטר לא ידוע':'Ø'+k},
+  machines:{title:'קצב עבודה לפי מכונה',unit:'מטר לדקה',types:['bar','line'],label:k=>k},
+  reliability:{title:'אמינות המדידות',unit:'כרטיסים',types:['bar','pie'],label:k=>({reliable:'אמינות',review:'דורשות בדיקה',unreliable:'לא אמינות',unknown:'טרם נמדדו'})[k]||k}
  };
  const typeNames={bar:'עמודות',line:'קו',pie:'עוגה'};
- let data=null,prefs={};try{prefs=JSON.parse(localStorage.getItem('reportChartTypesV1'))||{};}catch{}
+ let data=null,metric='daily',prefs={};try{prefs=JSON.parse(localStorage.getItem('reportChartTypesV1'))||{};}catch{}
  function plot(series,spec,type){
   const points=series.map(p=>({...p,label:spec.label(p.key),value:Number(p.value)||0}));
   if(!points.some(p=>p.value>0))return '<div class="chart-empty">אין נתונים מתאימים בסינון הנוכחי</div>';
@@ -35,16 +35,23 @@
   return markup+'</svg>';
  }
  function render(next){
-  data=next;const host=document.getElementById('reportCharts');if(!host)return;
-  host.innerHTML=Object.entries(specs).map(([key,spec])=>{
-   const type=spec.types.includes(prefs[key])?prefs[key]:'bar';
-   return `<article class="chart-card"><div class="chart-heading"><div><h2>${esc(spec.title)}</h2><p>${esc(spec.unit)}</p></div><label>סוג גרף<select data-chart-type="${key}" aria-label="סוג גרף — ${esc(spec.title)}">${spec.types.map(t=>`<option value="${t}" ${t===type?'selected':''}>${typeNames[t]}</option>`).join('')}</select></label></div>${plot(next?.[key]||[],spec,type)}<p>${esc(spec.note)}</p></article>`;
-  }).join('');
+  data=next;const host=document.getElementById('chartPlot');if(!host)return;
+  const spec={...specs[metric]};
+  if(metric==='daily'){
+   const bucket=next?.bucket||'day';spec.title='תפוקה';
+   spec.label=k=>k==='unknown'?'שעה לא ידועה':bucket==='hour'?k+':00':bucket==='month'?k.slice(5,7)+'.'+k.slice(0,4):String(k).split('-').reverse().slice(0,2).join('.');
+  }
+  const type=spec.types.includes(prefs[metric])?prefs[metric]:'bar',select=document.getElementById('chartType');
+  select.innerHTML=spec.types.map(t=>`<option value="${t}" ${t===type?'selected':''}>${typeNames[t]}</option>`).join('');
+  const period=next?.period;const date=v=>String(v).split('-').reverse().join('.');
+  document.getElementById('chartTitle').textContent=spec.title+' · '+spec.unit+(period?.from?' · '+date(period.from)+(period.to!==period.from?'–'+date(period.to):''):'');
+  host.innerHTML=plot(metric==='daily'?(next?.timeline||next?.daily||[]):next?.[metric]||[],spec,type);
  }
- document.addEventListener('change',event=>{
-  const key=event.target.dataset.chartType;if(!specs[key]||!specs[key].types.includes(event.target.value))return;
-  prefs[key]=event.target.value;try{localStorage.setItem('reportChartTypesV1',JSON.stringify(prefs));}catch{}
-  render(data);document.querySelector(`[data-chart-type="${key}"]`)?.focus();
+ document.getElementById('chartMetric').addEventListener('change',event=>{metric=event.target.value;if(!specs[metric])metric='daily';render(data);});
+ document.getElementById('chartType').addEventListener('change',event=>{
+  if(!specs[metric].types.includes(event.target.value))return;
+  prefs[metric]=event.target.value;try{localStorage.setItem('reportChartTypesV1',JSON.stringify(prefs));}catch{}
+  render(data);document.getElementById('chartType').focus();
  });
  window.IronBendReportCharts={render};
 })();

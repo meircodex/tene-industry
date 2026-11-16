@@ -22,8 +22,10 @@ function parseFilters(query={}){
    if(key==='reliability'&&values.some(v=>!['reliable','review','unreliable','unknown'].includes(v)))throw Error('invalid_report_filter');
   }sets[key]=[...new Set(values.map(v=>v.trim()))];
  }
+ const chart_bucket=text('chart_bucket')||'day';if(!['hour','day','month'].includes(chart_bucket))throw Error('invalid_report_filter');
+ const from=text('from'),to=text('to');for(const day of [from,to])if(day&&!require('./productionTiming').validDay(day))throw Error('invalid_report_filter');
  const flat=text('flat');if(!['','1'].includes(flat))throw Error('invalid_report_filter');
- return {sets,sort,direction,flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
+ return {chart_bucket,from,to,sets,sort,direction,flat:flat==='1',worker:text('worker'),order:text('order'),status:text('status'),group,kind,reliability,material,diameter,drill_field,drill_value,machine:text('machine'),search:text('search'),customer:text('customer'),page:integer('page',1,100000),limit:integer('limit',25,200)};
 }
 function summary(rows){
  const result={cards:new Set(rows.map(r=>r.item_id)).size,rows:rows.length,reported_cards:0,units:0,weight_kg:0,theoretical_kg:0,measured_kg:0,net_minutes:0,timed_length_mm:0,timed_weight_kg:0,reliable_cards:0,started_cards:0,ended_cards:0,confirmed_units:0};
@@ -92,6 +94,6 @@ function unifiedProductionReport({cards,activity,workers=[]},filters){
  }
  if(filters.flat&&filters.sort)rows=require('./productionReportSort').sortedCards(rows,filters.sort,filters.direction);
  const total=rows.length,pages=Math.max(1,Math.ceil(total/filters.limit)),page=Math.min(filters.page,pages);
- return {charts:filters.flat?require('./productionReportCharts').reportCharts(selected):null,filters:{...filters,page},facets,summary:totals,total,pages,page,limit:filters.limit,rows:rows.slice((page-1)*filters.limit,page*filters.limit)};
+ return {charts:filters.flat?require('./productionReportCharts').reportCharts(selected,{bucket:filters.chart_bucket,from:filters.from,to:filters.to}):null,filters:{...filters,page},facets,summary:totals,total,pages,page,limit:filters.limit,rows:rows.slice((page-1)*filters.limit,page*filters.limit)};
 }
 module.exports={parseFilters,unifiedProductionReport,summary};

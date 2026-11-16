@@ -6,9 +6,10 @@
 <link rel="stylesheet" href="/theme.css"><link rel="stylesheet" href="/reports-unified.css">
 <script src="/auth-client.js"></script><script src="/safe-dom.js"></script><script src="/nav.js"></script>
 </head><body><main class="page">
-<header class="report-heading"><div><h1>דוחות</h1><p>טבלה אחת · שורה לכל כרטיס · הסינון בידיים שלך</p></div><div class="report-view-actions"><button id="toggleCharts" type="button" aria-expanded="false" aria-controls="reportCharts">הצג גרפים</button><button id="exportReport" type="button">ייצוא לפי הסינון</button></div></header>
+<header class="report-heading"><div><h1>דוחות</h1></div><div class="report-view-actions"><button id="toggleCharts" type="button" aria-expanded="true" aria-controls="reportCharts">הסתר גרף</button><button id="exportReport" type="button">ייצוא לפי הסינון</button></div></header>
+<div class="report-period-bar"><div id="reportPeriods" class="period-buttons" aria-label="תקופה"><button type="button" data-period="day" aria-pressed="false">יום</button><button type="button" data-period="week" aria-pressed="true">שבוע</button><button type="button" data-period="quarter" aria-pressed="false">רבעון</button><button type="button" data-period="year" aria-pressed="false">שנה</button><button type="button" data-period="custom" aria-pressed="false">טווח</button></div><label id="periodAnchorLabel">תאריך<input id="periodAnchor" type="date" required></label><strong id="periodTitle" aria-live="polite"></strong></div>
 <form id="reportFilters" class="report-filters">
-<label>מתאריך<input id="fromDate" type="date" required></label><label>עד תאריך<input id="toDate" type="date" required></label>
+<label class="custom-period" hidden>מתאריך<input id="fromDate" type="date" required></label><label class="custom-period" hidden>עד תאריך<input id="toDate" type="date" required></label>
 <label id="machineLabel">מכונה<select id="machine"><option value="">כל המכונות</option></select></label>
 <label id="diameterLabel">קוטר<select id="diameter"><option value="">כל הקטרים</option></select></label>
 <label id="materialLabel">סוג חומר<select id="material"><option value="">כל הסוגים</option><option value="coil">גליל</option><option value="straight">ליפט</option><option value="bent">ברזל מכופף</option><option value="mesh">רשת</option><option value="unknown">לא מאומת</option></select></label>
@@ -21,10 +22,11 @@
 <label class="report-search">חיפוש<input id="search" type="search" placeholder="לקוח, הזמנה, כרטיס או צורה"></label>
 <div class="filter-actions"><button type="submit" class="primary">הצג</button><button type="button" id="clearFilters">נקה סינונים</button></div>
 </form>
-<details class="column-picker"><summary>הצגה והסתרה של עמודות</summary><div id="columnChoices"></div></details>
-<div id="reportState" role="status" aria-live="polite"></div><div id="reportSummary" class="report-summary"></div><p id="reportNote" class="report-note"></p>
-<section id="reportCharts" class="report-charts" hidden aria-label="גרפים לפי הסינון הנוכחי"></section>
+
+<div id="reportState" role="status" aria-live="polite"></div>
+<section id="reportCharts" class="report-charts" aria-label="גרף לפי הסינון"><div class="chart-toolbar"><label>מדד<select id="chartMetric"><option value="daily">תפוקה</option><option value="diameters">לפי קוטר</option><option value="machines">קצב מכונות</option><option value="reliability">אמינות</option></select></label><label>סוג גרף<select id="chartType"><option value="bar">עמודות</option><option value="line">קו</option><option value="pie">עוגה</option></select></label><strong id="chartTitle"></strong></div><div id="chartPlot" aria-live="polite"></div></section>
+<div class="table-tools"><details class="column-picker"><summary>עמודות</summary><div id="columnChoices"></div></details></div>
 <div class="report-table-wrap"><table id="reportTable"><thead id="reportHead"></thead><tbody id="reportBody"></tbody></table></div>
 <footer class="report-pagination"><span id="resultCount"></span><div><button id="prevPage" type="button">הקודם</button><span id="pageNumber"></span><button id="nextPage" type="button">הבא</button></div><label>שורות בעמוד<select id="limit"><option>25</option><option>50</option><option>100</option></select></label></footer>
 </main><dialog id="reportDetail"><div class="detail-header"><h2 id="detailTitle">פרטי כרטיס</h2><button id="closeDetail" type="button" aria-label="סגירת פירוט">✕</button></div><div id="detailBody"></div><div id="reviewMessage" role="status"></div></dialog>
-<script src="/reports-charts.js"></script><script src="/reports-unified.js"></script><script src="/help.js"></script></body></html>
+<script src="/reports-periods.js"></script><script src="/reports-charts.js"></script><script src="/reports-unified.js"></script><script src="/help.js"></script></body></html>
