@@ -5,7 +5,7 @@
 ## סטטוסים
 
 ### כניסת עובד בקישור אישי והוספת אייקון — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: אישור המשתמש לקישור אישי חד-פעמי ל-15 דקות, הטלפון הראשון מפעיל; כניסה נשמרת ללא סיסמה, אייקון במסך הבית בלחיצת העובד. הובהר שלא ניתן למנוע העברת קישור לפני הפעלה.
 - ownership: existing worker invitations/device enrollment own claim, expiry/revoke and credential hash; Auth owns scoped portal user; Production portal authenticates registered device only within worker-portal routes. No token grants access to general modules.
@@ -13,6 +13,7 @@
 - screens: activation with automatic device name, clear installation step and direct portal link; portal auto opens enrolled identity; admin personal-link action and optional password fallback.
 - DoD: expiry/replay/concurrent activation/replacement/revoked-device/profile/permissions/scope tests; browser activation + reopening + install UX; full suite; deploy and live read-only verification. No live test credentials or invitation issuance.
 - local verification: 1,341 tests passed; local browser activation and reopen without password verified; independent reference_review completed with no blocking findings. Physical phone installation remains a device check.
+- live verification: 09f85ce / dep-dbtcm20ae00c73ac2p90 observed live. Health 200; seven portal/invite/admin static assets match source hashes. me/summary/manage require authentication (401). Live browser shows personal-link instructions and collapsed optional password form. QR mode remains open. No live invitation, credential or stock test writes.
 
 
 ### פורטל עובד תואם תמונת ייחוס מלאה — 16.11.2026
