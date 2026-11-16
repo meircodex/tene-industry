@@ -1,6 +1,7 @@
 'use strict';
 const {hashEvent} = require('../../contracts/machine-station/v1');
 const {ITEM_STATUS} = require('../../status-contracts');
+const {assertCardMachine}=require('./automaticConnection');
 const ACTIONS = new Set(['card.open', 'mirror.read', 'completion.prepare', 'completion.record']);
 const fail = (code, status = 422) => {throw Object.assign(Error(code), {status});};
 const text = (v, max = 200) => typeof v === 'string' && v.length > 0 && v.length <= max && !/[\x00-\x1f]/.test(v);
@@ -34,6 +35,7 @@ class WorkerFeedback {
         Number(input.itemId) !== Number(item.id) || !ACTIONS.has(input.action)) fail('INVALID_WORKER_MACHINE_REQUEST');
     const binding = this.db.prepare('SELECT * FROM mi_station_bindings WHERE source_id=? AND active=1').get(input.sourceId);
     if (!binding) fail('MACHINE_STATION_NOT_REGISTERED', 404);
+    assertCardMachine(this.db,binding,item);
     const payload = input.payload || {}, allowed = input.action === 'card.open' ? ['receiptId'] : input.action === 'completion.record'
       ? ['runId', 'proposalId', 'saveRecipe', 'receiptId'] : ['runId'];
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).some(k => !allowed.includes(k))) fail('INVALID_WORKER_MACHINE_PAYLOAD');

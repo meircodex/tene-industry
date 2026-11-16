@@ -175,3 +175,8 @@ Current code-only roles that need reconciliation:
 - Settings and database routes cannot be accessed through spoofed headers.
 
 Item correction preview uses the item-status operational role guard (production/kiosk/warehouse/office/manager/admin). Cancelling an unshipped source certificate through the status endpoint additionally requires office/manager/admin and an unchanged preview.
+
+
+## Automatic station identity (2026-11-16)
+
+The public challenge/connect pair accepts only a deployment-provisioned Ed25519 key, source and logical machine. The connect proof is single-use, expires in 60 seconds and issues a station credential without any user role. Existing station-only operations and the activity-free card snapshot accept verified station credentials as an alternative to their user/QR guard; original worker mutations, general orders, registration administration, event listing and manufacturing-intent writes retain existing guards. Station reads of assigned cards and manufacturing intents enforce the bound central machine.

@@ -5,6 +5,14 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('automatic machine connection owns installation trust without adding production status or controller writes',()=>{
+ const route=fs.readFileSync(path.join(root,'routes/machineStation.js'),'utf8');
+ const service=fs.readFileSync(path.join(root,'services/machineIntegration/automaticConnection.js'),'utf8');
+ assert.match(route,/automatic\/challenge/);assert.match(route,/automatic\/connect/);assert.match(route,/stationAccess/);
+ assert.match(service,/IB_STATION_GRANT_/);assert.match(service,/verify\(null,proofBytes/);
+ assert.doesNotMatch(service,/UPDATE items|UPDATE orders|modbus\.|writeParams|access_token|refresh_token/);
+});
+
 test('worker machine feedback is additive, QR-scoped, and does not own the existing status mutation',()=>{
   const route=fs.readFileSync(path.join(root,'routes/workerMachineFeedback.js'),'utf8');
   const production=fs.readFileSync(path.join(root,'routes/production.js'),'utf8');

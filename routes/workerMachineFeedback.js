@@ -4,6 +4,7 @@ const {StationInbox} = require('../services/machineIntegration/stationInbox');
 const {WorkerFeedback} = require('../services/machineIntegration/workerFeedback');
 const {createHash} = require('node:crypto');
 const {buildWorkerOriginalCard} = require('../services/workerOriginalCard');
+const {stationOrRole,assertCardMachine}=require('../services/machineIntegration/automaticConnection');
 const required = (name, value) => {if (!value) throw Error('routes/workerMachineFeedback missing dependency: ' + name); return value;};
 module.exports = function createWorkerMachineFeedbackRouter(deps) {
   const db = required('db', deps.db), requireQrPermission = required('requireQrPermission', deps.requireQrPermission),
@@ -12,11 +13,12 @@ module.exports = function createWorkerMachineFeedbackRouter(deps) {
   const actor = req => req.userId || req.auth?.sub ? 'user:' + (req.userId || req.auth.sub) : req.approvedDevice?.id
     ? 'device:' + req.approvedDevice.id : 'qr:' + createHash('sha256').update(String(req.query.card || req.body?.card || '')).digest('hex');
   router.get('/stations', requireQrPermission('production'), (req, res) => {try{res.set('Cache-Control','no-store');res.json(service.stations({limit:Number(req.query.limit||100),offset:Number(req.query.offset||0)}));}catch(error){res.status(error.status||400).json({error:error.message});}});
-  router.get('/snapshot',requireQrPermission('production'),(req,res)=>{
+  router.get('/snapshot',stationOrRole(service,requireQrPermission('production')),(req,res)=>{
     try{
       service.authorize(req.query.sourceId,req.headers['x-station-credential']);
       const parsed=parseCard(req.query.card);if(!parsed?.itemId)return res.status(422).json({error:'invalid_worker_card_token'});
       const item=authorizeCard(req,res,parsed.itemId);if(!item)return;
+      assertCardMachine(db,req.stationBinding,item);
       const original=deps.snapshotBuilder?deps.snapshotBuilder(item,req.query.card):buildWorkerOriginalCard(db,item,req.query.card);
       const {html,...original_card}=original;
       res.set('Cache-Control','no-store');res.json({items:[item],original_card,activityFree:true});

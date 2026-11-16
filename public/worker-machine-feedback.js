@@ -37,9 +37,8 @@
  function render(){
   if(!S.stations.length||!S.current)return;const el=host();if(!el)return;
   const m=S.mirror,source=S.stations.find(s=>s.sourceId===S.source),expected=m?.expected?.sidesMm||[];
-  el.innerHTML='<div class="mif-head"><strong>פרמטרים במכונה</strong><select aria-label="תחנת המוניטור" id="mif-source"><option value="">בחר תחנת מכונה</option>'+S.stations.map(s=>'<option value="'+esc(s.sourceId)+'"'+(s.sourceId===S.source?' selected':'')+'>'+esc(s.label)+'</option>').join('')+'</select><span class="mif-status" data-live="false">ממתין לקריאת בקר</span></div>';
-  document.getElementById('mif-source').onchange=e=>{S.generation++;S.source=e.target.value||null;save(KEY,S.source);S.runId=null;S.mirror=null;S.current.openRequestId=uuid();render();tick();};
-  if(!source){status('בחר את המכונה של עמדת העבודה');return;}
+  el.innerHTML='<div class="mif-head"><strong>פרמטרים במכונה</strong><span class="mif-machine-label">'+(source?'מכונה '+esc(source.label):'שיוך אוטומטי')+'</span><span class="mif-status" data-live="false">ממתין לקריאת בקר</span></div>';
+  if(!source){status('אין תחנה מקוונת ותואמת לכרטיס · העבודה הרגילה ממשיכה');return;}
   if(!m){status(source.online?'מתחבר למוניטור…':'המוניטור אינו זמין · העבודה הרגילה ממשיכה');return;}
   if(!m.rows?.length){status('אין קריאת בקר עדכנית לכרטיס הזה');return;}
   const count=Math.max(expected.length,...m.rows.filter(r=>r.length!==null&&r.length!==0||r.angle!==null&&r.angle!==0).map(r=>r.slot),1);
@@ -51,11 +50,10 @@
  function chooseSource(item){
   // `machine` is a directory label even when numeric. Only `machine_id`
   // is an explicit central ID: physical machine 6 may be database row 7.
-  const saved=stored(KEY),selected=S.stations.find(s=>s.sourceId===saved),declared=String(item.machine??'').trim();
+  const declared=String(item.machine??'').trim();
   const hasId=Number.isSafeInteger(Number(item.machine_id))&&Number(item.machine_id)>0;
   const matchesItem=s=>hasId?Number(s.machineId)===Number(item.machine_id):!!declared&&s.label===declared;
-  if(selected&&(!declared&&!hasId||matchesItem(selected)))return saved;
-  const matches=S.stations.filter(matchesItem);
+  const matches=S.stations.filter(s=>s.online&&matchesItem(s));
   return matches.length===1?matches[0].sourceId:null;
  }
  async function onCardOpened({item,card,receipt}){
@@ -117,12 +115,12 @@
   const pending=outbox();if(pending.length>=100){status('הכרטיס הושלם · תור משוב המוניטור מלא');return;}pending.push(entry);save(OUTBOX,pending);flush();
  }
  async function refreshStations(){
-  try{const result=await json('/api/machine-feedback/stations');S.stations=Array.isArray(result.items)?result.items:[];if(S.current){S.source=chooseSource(S.current);render();tick();}}catch{}
+  try{const result=await json('/api/machine-feedback/stations');S.stations=Array.isArray(result.items)?result.items:[];if(S.current){const next=chooseSource(S.current);if(next!==S.source){S.generation++;S.source=next;S.runId=null;S.mirror=null;S.current.openRequestId=uuid();}render();tick();}}catch{}
  }
  async function initialize(){
   await refreshStations();
   setInterval(()=>{tick();flush();},4000);
-  setInterval(()=>{if(!document.hidden&&S.current&&!S.source)refreshStations();},30000);
+  setInterval(()=>{if(!document.hidden)refreshStations();},10000);
  }
  root.IronBendMachineFeedback={onCardOpened,beforeComplete,afterComplete};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize,{once:true});else initialize();

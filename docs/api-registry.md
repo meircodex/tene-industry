@@ -1,5 +1,11 @@
 # API Registry
 
+## Automatic station connection (2026-11-16)
+
+Owner: Machine Integration. POST `/api/machine-integration/automatic/challenge` is scoped to a deployment-provisioned public installation key, source ID and logical machine; it returns only a bounded 60-second challenge. POST `/automatic/connect` consumes a valid one-use Ed25519 proof and returns a station credential, never a user session. No new DB tables. Grant configuration is `IB_STATION_GRANT_<fingerprint>` and contains public key + exact directory label; private keys remain on the station.
+
+GET `/api/machine-integration/station-identity` and the existing station request/result/current/report POSTs accept a verified source credential as an alternative to existing user roles. Manufacturing-intent reads additionally enforce the bound central machine. GET `/api/machine-feedback/snapshot` accepts the same narrow station identity and rejects cards assigned to another machine, without generating scan activity. Station authentication is not accepted for business completion, general orders, registration administration or intent writes.
+
 ## Existing worker machine feedback (2026-11-15)
 
 Machine Integration Edge owns GET `/api/machine-feedback/stations`, POST

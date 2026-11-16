@@ -673,3 +673,6 @@ quantity ownership. `routes/workerMachineFeedback.js` is a child of Production;
 `mi_station_presence`, `mi_station_current` and the registered-station relay.
 The existing worker page embeds optional feedback assets. No new screen is added.
 See [interfaces and rollback](worker-machine-feedback.md).
+
+
+Machine Integration (2026-11-16): `services/machineIntegration/automaticConnection.js` owns provisioned installation challenge/proof validation. `routes/machineStation.js` owns enrollment and station identity routes; `workerMachineFeedback.js` keeps activity-free card reading. Production alone owns scan and DONE mutations. See `station-auto-integration-20261116.md`.

@@ -2,21 +2,37 @@
 const express=require('express');
 const {StationInbox}=require('../services/machineIntegration/stationInbox');
 const {WorkerFeedback}=require('../services/machineIntegration/workerFeedback');
+const {AutomaticConnection,stationOrRole}=require('../services/machineIntegration/automaticConnection');
 function required(name,value){if(!value)throw Error('routes/machineStation missing dependency: '+name);return value;}
-function principal(req){const id=req.auth?.sub??req.user?.id;return id==null?null:{id,displayName:req.auth?.display_name||req.user?.name||''};}
+function principal(req){if(req.stationBinding)return{id:'station:'+req.stationBinding.source_id,displayName:'תחנת מכונה'};const id=req.auth?.sub??req.user?.id;return id==null?null:{id,displayName:req.auth?.display_name||req.user?.name||''};}
 module.exports=function createMachineStationRouter(deps){
  const db=required('db',deps.db),requireAnyRole=required('requireAnyRole',deps.requireAnyRole),auditLog=required('auditLog',deps.auditLog),wsBroadcast=required('wsBroadcast',deps.wsBroadcast);
  const router=express.Router(),service=new StationInbox({db});
  const workerFeedback=new WorkerFeedback({db,inbox:service});
- router.post('/machine-integration/station-current',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+ const automatic=new AutomaticConnection({db,inbox:service,...(deps.automaticConnection||{})});
+ const stationAccess=roles=>stationOrRole(workerFeedback,requireAnyRole(roles));
+ router.post('/machine-integration/automatic/challenge',(req,res)=>{
+  try{res.set('Cache-Control','no-store');res.json(automatic.begin(req.body));}catch(error){res.status(error.status||400).json({error:error.message});}
+ });
+ router.post('/machine-integration/automatic/connect',(req,res)=>{
+  try{const result=automatic.finish(req.body);auditLog('machine_station',result.sourceId,result.sourceId,'register','machine_id',null,result.machineId,'חיבור אוטומטי של התקנה מורשית',null,'מערכת');
+   wsBroadcast('machine_station_registered',{sourceId:result.sourceId,machineId:result.machineId});res.set('Cache-Control','no-store');res.status(201).json(result);
+  }catch(error){res.status(error.status||400).json({error:error.message});}
+ });
+ router.get('/machine-integration/station-identity',stationAccess(['manager','admin']),(req,res)=>{
+  try{const b=workerFeedback.authorize(req.query.sourceId,req.headers['x-station-credential']);const m=db.prepare('SELECT * FROM machines WHERE id=?').get(b.central_machine_id);
+   res.set('Cache-Control','no-store');res.json({sourceId:b.source_id,logicalMachineId:b.logical_machine_id,machineId:b.central_machine_id,label:m?.label||m?.name||'',connected:true});
+  }catch(error){res.status(error.status||403).json({error:error.message});}
+ });
+ router.post('/machine-integration/station-current',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
   try{res.json(workerFeedback.publish(req.query.sourceId,req.headers['x-station-credential'],req.body));}
   catch(error){res.status(error.status||400).json({error:error.message});}
  });
- router.get('/machine-integration/station-requests',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+ router.get('/machine-integration/station-requests',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
   try{res.set('Cache-Control','no-store');res.json(workerFeedback.pending(req.query.sourceId,req.headers['x-station-credential'],{limit:Number(req.query.limit||10),offset:Number(req.query.offset||0)}));}
   catch(error){res.status(error.status||400).json({error:error.message});}
  });
- router.post('/machine-integration/station-requests/result',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+ router.post('/machine-integration/station-requests/result',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
   try{const result=workerFeedback.respond(req.query.sourceId,req.headers['x-station-credential'],req.body);
    wsBroadcast('worker_machine_result',{sourceId:req.query.sourceId,requestId:result.id});res.json(result);}
   catch(error){res.status(error.status||400).json({error:error.message});}
@@ -27,7 +43,7 @@ module.exports=function createMachineStationRouter(deps){
    wsBroadcast('machine_station_registered',{sourceId:result.sourceId,machineId:result.machineId});res.status(201).json(result);
   }catch(error){res.status(error.status||400).json({error:error.message});}
  });
- router.post('/machine-integration/station-events',requireAnyRole(['production','maintenance','manager','admin']),(req,res)=>{
+ router.post('/machine-integration/station-events',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
   try{const result=service.ingest(principal(req),req.body,req.headers['x-station-credential']);
    const accepted=result.results.filter(r=>r.status==='accepted').length;if(accepted)wsBroadcast('machine_station_events',{accepted});res.json(result);
   }catch(error){res.status(error.status||400).json({error:error.message});}
@@ -36,8 +52,8 @@ module.exports=function createMachineStationRouter(deps){
   try{res.json(service.list({machineId:req.query.machineId?Number(req.query.machineId):null,sourceId:req.query.sourceId||'',limit:Number(req.query.limit||50),offset:Number(req.query.offset||0)}));}
   catch(error){res.status(error.status||400).json({error:error.message});}
  });
- router.get('/machine-integration/manufacturing-intent',requireAnyRole(['office','production','maintenance','manager','admin']),(req,res)=>{
-  try{const record=service.getIntent({shapeId:req.query.shapeId,shapeVersion:Number(req.query.shapeVersion),geometryHash:req.query.geometryHash,machineId:Number(req.query.machineId)});res.json({found:!!record,record});}
+ router.get('/machine-integration/manufacturing-intent',stationAccess(['office','production','maintenance','manager','admin']),(req,res)=>{
+  try{if(req.stationBinding&&Number(req.query.machineId)!==req.stationBinding.central_machine_id)return res.status(403).json({error:'STATION_SCOPE_FORBIDDEN'});const record=service.getIntent({shapeId:req.query.shapeId,shapeVersion:Number(req.query.shapeVersion),geometryHash:req.query.geometryHash,machineId:Number(req.query.machineId)});res.json({found:!!record,record});}
   catch(error){res.status(error.status||400).json({error:error.message});}
  });
  router.post('/machine-integration/manufacturing-intents',requireAnyRole(['office','manager','admin']),(req,res)=>{

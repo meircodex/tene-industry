@@ -88,6 +88,8 @@ function extractExpressRoutes(source, options = {}) {
 }
 
 const PUBLIC_OR_SCOPED_API_ROUTES = new Set([
+  'POST /api/machine-integration/automatic/challenge', // allowlisted installation key/source; bounded 60-second challenge, no credential
+  'POST /api/machine-integration/automatic/connect', // one-use Ed25519 proof against deployment-provisioned machine scope
   'POST /api/auth/system-link/preview', // hashed, bounded 15-minute single-use capability; no session issued
   'POST /api/auth/system-link/claim', // rate-limited atomic claim; never accepts a user id or requested role
   'POST /api/worker-portal/logout', // retired: constant 410; no cookie clearing, authentication or state mutation
@@ -119,6 +121,8 @@ const PUBLIC_OR_SCOPED_API_ROUTES = new Set([
 ]);
 
 const AUTH_GUARD_MARKERS = [
+  'stationAccess(', // verified source credential OR the explicit role guard; never a role supplied by headers
+  'stationOrRole(', // same narrow credential policy for activity-free card snapshots only
   'requireRole(',
   'requireAnyRole(',
   'requireQrPermission(',

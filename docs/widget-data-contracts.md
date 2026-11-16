@@ -220,3 +220,8 @@ geometry and the pure shapeRecognition module. Matches are provisional until
 item approval. Unique matches bind existing identity/policy without replacing
 geometry; ambiguities and unmatched items require explicit resolution. Existing
 snapshots retain their policies. See product-trait-recognition-20261110.md.
+
+
+## Background machine connection (2026-11-16)
+
+The existing worker parameter panel reads `/api/machine-feedback/stations`. Its machine label is the exact directory label of the sole online station matching card `machine_id` or card `machine` label; it never treats a directory ID as a printed machine number. There is no worker station selector. Multiple/offline/unassigned matches remain unresolved and never display another machine’s values. Controller values and physical-accuracy limits retain the existing mirror contract.
