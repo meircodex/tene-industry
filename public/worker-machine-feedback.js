@@ -52,7 +52,7 @@
   // is an explicit central ID: physical machine 6 may be database row 7.
   const declared=String(item.machine??'').trim();
   const hasId=Number.isSafeInteger(Number(item.machine_id))&&Number(item.machine_id)>0;
-  const matchesItem=s=>hasId?Number(s.machineId)===Number(item.machine_id):!!declared&&s.label===declared;
+  const matchesItem=s=>(hasId||!!declared)&&(!hasId||Number(s.machineId)===Number(item.machine_id))&&(!declared||s.label===declared);
   const matches=S.stations.filter(s=>s.online&&matchesItem(s));
   return matches.length===1?matches[0].sourceId:null;
  }
@@ -87,7 +87,7 @@
   if(!S.current||S.current.completed||S.current.itemId!==Number(itemId)||S.current.card!==card||!S.source||!S.runId)return null;
   const generation=S.generation,context={...S.current,sourceId:S.source,runId:S.runId};
   try{
-   const result=await request(context,'completion.prepare',{runId:context.runId},{timeout:2500});
+   const result=await request(context,'completion.prepare',{runId:context.runId},{timeout:6000});
    if(generation!==S.generation)return {cancelled:true};
    if(result.card!==context.card||result.runId!==context.runId||result.sourceId!==context.sourceId)throw Error('MACHINE_SCOPE_MISMATCH');
    const choice=result.proposal.requiresParameterConfirmation?await confirmDialog(result.proposal):{cancelled:false,saveRecipe:false};

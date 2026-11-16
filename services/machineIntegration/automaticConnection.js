@@ -64,7 +64,7 @@ function stationOrRole(feedback,fallback){
 function assertCardMachine(db,binding,item){
  if(!binding)return;
  const explicit=Number(item.machine_id),label=String(item.machine||'').trim();
- if(Number.isSafeInteger(explicit)&&explicit>0){if(explicit!==binding.central_machine_id)fail('STATION_CARD_MACHINE_MISMATCH',409);return;}
+ if(Number.isSafeInteger(explicit)&&explicit>0&&explicit!==binding.central_machine_id)fail('STATION_CARD_MACHINE_MISMATCH',409);
  if(label){const machine=db.prepare('SELECT * FROM machines WHERE id=?').get(binding.central_machine_id);
   if(label!==String(machine?.label||machine?.name||'').trim())fail('STATION_CARD_MACHINE_MISMATCH',409);}
 }

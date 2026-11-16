@@ -69,3 +69,11 @@ test('worker UI contains automatic matching and no station selection control',()
  const fs=require('node:fs'),path=require('node:path'),source=fs.readFileSync(path.join(__dirname,'../public/worker-machine-feedback.js'),'utf8');
  assert.doesNotMatch(source,/<select|בחר תחנת מכונה|בחר את המכונה של עמדת העבודה/);assert.match(source,/s\.online&&matchesItem\(s\)/);
 });
+test('a contradictory card machine label and directory ID cannot select or authorize a different machine',t=>{
+ const f=fixture(t),c=f.service.begin(f.identity),result=f.service.finish(f.finish(c));
+ const binding=f.inbox.authorize({sourceId:f.identity.sourceId,machineId:'machine6'},result.credential);
+ const {assertCardMachine}=require('../services/machineIntegration/automaticConnection');
+ assert.doesNotThrow(()=>assertCardMachine(f.db,binding,{machine_id:7,machine:'6'}));
+ assert.throws(()=>assertCardMachine(f.db,binding,{machine_id:7,machine:'תלת מימד'}),/STATION_CARD_MACHINE_MISMATCH/);
+ assert.throws(()=>assertCardMachine(f.db,binding,{machine_id:6,machine:'6'}),/STATION_CARD_MACHINE_MISMATCH/);
+});
