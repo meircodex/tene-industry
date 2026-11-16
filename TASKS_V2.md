@@ -5,13 +5,14 @@
 ## סטטוסים
 
 ### הפרדת אייקון עובד מהמערכת — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: תיקון מאושר מיד: אייקון כתום לסריקת עובדים, אייקון מערכת קיים; שמות ויעדי פתיחה ברורים.
 - ownership: PWA presentation and installation metadata only. DB/API/events/auth remain unchanged.
 - output/screens: dedicated worker icons (PNG + vector source), worker-only scope and stable installed identity, system label, installation from actual portal after activation; updated install guidance he/en/th.
 - DoD: verify actual manifest/icon resources, app identity compatibility and launch targets; focused portal tests, full suite, visual icon comparison, deploy and read-only live validation. No installation/removal on user's device.
 - local verification: 5 focused tests and 1,342 full tests passed. Browser settings icon and he/en/th verified at phone size; actual icon comparison inspected. Physical phone installation/update still requires device verification.
+- live verification: 40579fe / dep-dbtctabncjis739t42qg observed live. All 12 manifest/icon/portal/SW assets match source; health 200, private portal endpoints 401, QR mode open. Live browser settings show distinct worker identity and guidance.
 
 ### כניסת עובד בקישור אישי והוספת אייקון — 16.11.2026
 - status: done
