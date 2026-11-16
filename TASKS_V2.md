@@ -4,6 +4,16 @@
 
 ## סטטוסים
 
+### פורטל עובד: רק כרטיסים שהעובד עדכן — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: המשתמש מבקש להסיר מהרשימה האישית צפייה/סריקה ללא פעולה; רישום פתיחה יכול להישאר במערכת.
+- ownership: Production worker portal read projection only. Existing activity/audit events, completion statistics, status/stock services and credentials remain unchanged.
+- DB/API/events: filter history in the server projection by real saved updates, using the latest eligible activity for that actor/item; total and pagination share the same condition. No deletion or rewriting of activity logs. Existing authenticated endpoint and validation retained.
+- screens: same approved layout, title "כרטיסים שעדכנת" and matching empty state in he/en/th. No extra scan/view row or badge.
+- DoD: view-only and no-op excluded; real start/complete/load/zone/weight updates retained; later views do not reorder work; own-user scope, totals/pages, existing audit retained; local browser preview, full tests, deploy and live read-only verification.
+- local verification: 6 focused projection/auth/portal checks passed. Local browser opened completed item #1894 without saving, returned home: own list empty, daily 0, one opened activity retained. Dedicated disposable database only. Final full suite: 1,353 passed. An earlier unrelated customer-merge test process failed without an assertion, then all 10 of its checks and the final full suite passed.
+
 ### הפעלת עובד ב-WhatsApp ומעבר לדפדפן — 16.11.2026
 - status: done
 - owner: codex

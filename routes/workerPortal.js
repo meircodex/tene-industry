@@ -33,13 +33,7 @@ module.exports=function createWorkerPortalRouter({db,requireAnyRole,authService,
  router.get('/worker-portal/history',requireAnyRole(allowed),identify,(req,res)=>{
   const page=Number(req.query.page||1),limit=Number(req.query.limit||10);
   if(!Number.isInteger(page)||page<1||page>100000||!Number.isInteger(limit)||limit<1||limit>50)return res.status(400).json({error:'invalid_portal_page'});
-  const total=db.prepare('SELECT COUNT(DISTINCT item_id) AS n FROM worker_card_activity WHERE actor_user_id=?').get(req.userId).n;
-  const rows=db.prepare(`SELECT a.item_id,a.occurred_at,a.action,a.card_token,i.status,i.shape_name,i.diameter,i.quantity,i.zone,i.total_weight,o.order_num,c.name AS customer_name
-   FROM worker_card_activity a JOIN items i ON i.id=a.item_id LEFT JOIN pallets p ON p.id=i.pallet_id
-   LEFT JOIN orders o ON o.id=COALESCE(i.order_id,p.order_id) LEFT JOIN customers c ON c.id=o.customer_id
-   WHERE a.id IN(SELECT MAX(id) FROM worker_card_activity WHERE actor_user_id=? GROUP BY item_id)
-   ORDER BY a.id DESC LIMIT ? OFFSET ?`).all(req.userId,limit,(page-1)*limit);
-  res.json({rows,page,limit,total});
+  res.json(require('../services/workerPortalProjection').history(db,Number(req.userId),page,limit));
  });
  router.get('/worker-portal/summary',requireAnyRole(allowed),identify,run((req,res)=>res.json(require('../services/workerPortalProjection').daily(db,Number(req.userId)))));
  router.get('/worker-portal/zones',requireAnyRole(allowed),identify,run((req,res)=>res.json({zones:storage.zones(db)})));

@@ -36,6 +36,8 @@ test('personal worker portal reuses production with account identity, scoped per
  for(const url of ['/api/orders','/api/users','/api/machines','/api/reports/production-timing','/api/worker-card?card=1'])assert.equal((await call(url,alice)).status,403,url);
  const id=seedItem(),card=String(id);
  assert.equal((await call('/api/worker-portal/card?card='+card+'&original=1',alice)).status,200);
+ assert.equal((await call('/api/worker-portal/history',alice)).body.total,0,'opening a card must not attribute production work to its viewer');
+ assert.ok(db.prepare("SELECT COUNT(*) AS n FROM worker_card_activity WHERE action='opened' AND actor_name='Alice Worker'").get().n>0,'view audit stays available to the system');
  const start={card,status:'בייצור',expected_status:'ממתין',request_id:'portal-start-request-0001'};
  const started=await call('/api/worker-portal/card/'+id+'/status',alice,start,'PATCH');assert.equal(started.status,200,JSON.stringify(started.body));assert.ok(started.body.receipt.id);
  assert.equal(db.prepare('SELECT actor_user_id,actor_name,device_enrollment_id FROM worker_card_activity WHERE id=?').get(started.body.receipt.id).actor_name,'Alice Worker');
