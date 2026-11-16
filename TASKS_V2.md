@@ -5,7 +5,7 @@
 ## סטטוסים
 
 ### קישור אישי למערכת לפי הרשאות משתמש — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: משתמש מבקש לשלוח גם קישור למערכת, ללא קוד לאחר הפעלה; אישר הרשאות חשבון קיימות ושינוי שלהן מרחוק ללא אישור העובד.
 - ownership: Auth owns short-lived invitation grants and existing access/refresh sessions. Admin exposes create/revoke beside regular users. Worker portal/device enrollment remains separate and cannot gain general system access.
@@ -13,6 +13,7 @@
 - screens: existing user row gains personal system link and revoke action; activation page names actual user and current role, one explicit activation button; system icon and home destination; admin copies/shares manually. No PIN form for link activation.
 - DoD: expiry/replay/race/replacement/disabled/role-change/revoke/logout/refresh/scope tests, no token in logs/history, isolated local browser preview, full suite, deploy and live read-only verification. No production invitations or access grants issued by agent.
 - local verification: 101 focused checks plus 14 final message/identity checks passed; final full suite 1,345 passed, including null-PIN guard. Local browser: system activation without code, dashboard reopening, admin user-row create/modal/copy/share controls and hidden revoke action verified. Isolated disposable DB only.
+- live verification: db37ca8 / dep-dbtd8am7bikc73dpknq0 observed live. Ten app/manifest assets match source. Health 200; create/revoke without admin 401; invalid capability preview/claim 404 without session. Worker endpoint 401 and QR mode open unchanged. Live browser shows system identity and rejects missing link. Runtime started successfully with no error-level logs observed. No live test account or invitation created.
 
 ### הפרדת אייקון עובד מהמערכת — 16.11.2026
 - status: done
