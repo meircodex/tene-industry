@@ -5,7 +5,7 @@
 ## סטטוסים
 
 ### הפעלת עובד ב-WhatsApp ומעבר לדפדפן — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: המשתמש אישר שהפעלת מערכת הצליחה, אך קישור עובד הופעל בתוך WhatsApp ונחסם כשנפתח ב-Chrome. לתקן את תהליך ההפעלה בלי להפוך קישור משומש להרשאה חדשה.
 - ownership: Worker invitation presentation/browser handoff only; existing invitation claim, device credentials, scopes and stock/state services remain unchanged. No transfer of a claimed device credential between browser stores.
@@ -13,6 +13,7 @@
 - screens: clear before-activation browser instructions, Android Chrome intent and copy-link fallback, block known embedded browsers before claiming; used-link page offers the already-authenticated portal only after own-device verification, otherwise asks for a fresh link in the final browser. he/en/th.
 - DoD: browser detection/URL/used-link recovery tests, retained expiry/replay protections, isolated visual preview, full suite, deployment and live read-only validation. Actual WhatsApp-to-Chrome launch remains physical-device verification.
 - local verification: 20 focused tests initially passed; six final browser-flow tests include copied pending link after history stripping and language changes. Local browser he/en/th, first activation, reopening original used link, named own-device continuation and opening the actual portal passed. No production enrollment touched. Final full suite: 1,351 passed. One earlier unrelated order-loading test process failed without an assertion; it passed alone and in the final complete run.
+- live verification: 227657a / dep-dbtdscetlv9c73f2uieg observed live. Three invitation/helper/i18n assets match source; health 200, anonymous own-portal 401, invalid invitation 404, QR mode open unchanged. Live browser missing-link state verified. No production invitation/device activation issued.
 
 ### קישור אישי למערכת לפי הרשאות משתמש — 16.11.2026
 - status: done
