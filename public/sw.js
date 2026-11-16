@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'ironbend-v34';
+const CACHE_VERSION = 'ironbend-v35';
 const STATIC_CACHE  = `${CACHE_VERSION}-static`;
 const API_CACHE     = `${CACHE_VERSION}-api`;
 
@@ -10,6 +10,10 @@ const STATIC_ASSETS = [
   '/scan.html',
   '/worker-invite.html',
   '/worker-manifest.json',
+  '/worker-portal-manifest.json',
+  '/worker-icon-180-v1.png',
+  '/worker-icon-192-v1.png',
+  '/worker-icon-512-v1.png',
   '/customer-scan.html',
   '/orders.html',
   '/machine.html',
@@ -65,7 +69,7 @@ self.addEventListener('fetch', e => {
   }
 
   // JS and CSS: always network-first so code changes are seen immediately
-  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.endsWith('manifest.json')) {
     e.respondWith(networkFirstHTML(e.request));
     return;
   }

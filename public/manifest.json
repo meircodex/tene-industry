@@ -1,6 +1,6 @@
 {
   "name": "טנא תעשיות ברזל – IronBend",
-  "short_name": "טנא ברזל",
+  "short_name": "טנא מערכת",
   "description": "מערכת ניהול הזמנות, כיפוף וייצור ברזל",
   "start_url": "/dashboard.html",
   "display": "standalone",

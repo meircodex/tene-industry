@@ -1,1 +1,16 @@
-{"id":"/worker-portal","name":"טנא תעשיות ברזל — פורטל עובד","short_name":"טנא עובדים","start_url":"/worker-portal.html","scope":"/","display":"standalone","background_color":"#ffffff","theme_color":"#062e49","lang":"he","dir":"rtl","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "id": "/worker-portal",
+  "name": "טנא עובדים — סריקת כרטיסים",
+  "short_name": "טנא עובדים",
+  "start_url": "/worker-portal.html",
+  "scope": "/worker-portal.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#062e49",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    { "src": "/worker-icon-192-v1.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/worker-icon-512-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
