@@ -5,14 +5,14 @@
 ## סטטוסים
 
 ### דוחות מצומצמים ובחירת יום/שבוע/רבעון/שנה — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: approved compact preview; one selected chart, period/date/metric/type controls; remove overview summary and explanatory paragraphs; small column menu beside table.
 - ownership: Reporting presentation/read-only aggregation. No production, stock, status, identity or reliability-rule writes.
 - output/screens: day by completion hour in factory timezone, Sunday-based week by day, quarter/year by month, custom dates preserved; same filters for chart and table and CSV. Exact period heading, all existing metric/type choices preserved, one chart at a time.
 - DB/events: none. API: existing authorized production-timing report gains validated chart_bucket with no new routes, retaining daily compatibility and aggregation before pagination.
 - DoD: test date/leap/year/quarter/week boundaries, local completion attribution, filtered totals and pagination parity, weighted reliable pace, controls and failure handling; full suite, docs and verified live release.
-- verification: 22 focused and 1,362 full-suite tests passed; source/diff checks passed. Deployment pending.
+- verification: 22 focused and 1,362 full-suite tests passed; source/diff checks passed. Live: 994c0e0 / dep-dbthlrek1f9s73ckgun0. Five changed public assets returned 200 and matched source. Health 200; unauthenticated hourly report 401; QR mode still open. Initial deploy transition returned 502; repeat verification after live succeeded. No production data writes or browser/phone visual verification.
 
 
 ### מסכי עובד קומפקטיים ומהירים לטלפון — 16.11.2026
