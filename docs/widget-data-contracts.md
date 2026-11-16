@@ -1,5 +1,7 @@
 # Widget Data Contracts
 
+`stationProductionQueue` (2026-11-16, Machine Integration) reads `/station/v1/production-queue`, backed by the authenticated central `/api/machine-integration/station-queue` and Production's original queue projection. Fields: `machine`, `items[].itemId/scanToken/revision`, `orderNumber/customerName/shapeName/shapeSvg`, `quantityPieces/producedPieces/remainingPieces`, `diameterMm/status`, `total/machineTotal`, `query`, `observedAtUtc/fetchedAtUtc`, `sourceStatus`, `canOpenCards`. Quantities are pieces and refer to whole order items; printed split cards keep their own scan token and quantity. No conversion to pairs occurs here. Missing source means `total:null`, never an empty live queue. Offline copies are labelled and cannot open work. Queue refresh never selects a job or changes counts/status. A manually selected analysis card is not replaced by the active-machine refresh; staged cards cannot borrow live measurements of another run.
+
 `workerMachineFeedback` (2026-11-15, Machine Integration Edge) is an optional
 section in the existing `worker-visual.html`. Its registered source/card/run
 values, freshness, expected geometry and actual controller rows come from

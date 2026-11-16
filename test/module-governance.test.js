@@ -5,6 +5,12 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('station queue is a scoped read projection of Production and does not own scheduling or manufacturing writes',()=>{
+ const route=fs.readFileSync(path.join(root,'routes/machineStation.js'),'utf8'),service=fs.readFileSync(path.join(root,'services/machineIntegration/productionQueue.js'),'utf8');
+ assert.match(route,/station-queue',stationAccess/);assert.match(service,/readProductionQueueItems/);assert.match(service,/itemScanCode/);
+ assert.doesNotMatch(service,/UPDATE items|UPDATE orders|INSERT INTO items|modbus\.|writeParams/);
+});
+
 test('automatic machine connection owns installation trust without adding production status or controller writes',()=>{
  const route=fs.readFileSync(path.join(root,'routes/machineStation.js'),'utf8');
  const service=fs.readFileSync(path.join(root,'services/machineIntegration/automaticConnection.js'),'utf8');
@@ -28,7 +34,8 @@ test('production eligibility consumes the Orders workspace lifecycle contract', 
   assert.match(policy, /workspace\.bucket/);
   const route = fs.readFileSync(path.join(root, 'routes/production.js'), 'utf8');
   const machine = fs.readFileSync(path.join(root, 'routes/productionMachines.js'), 'utf8');
-  assert.match(route, /productionQueueCondition\(\{ visual:/);
+  assert.match(route, /services\/productionQueue/);
+  assert.match(fs.readFileSync(path.join(root,'services/productionQueue.js'),'utf8'), /productionQueueCondition\(\{ visual/);
   assert.match(machine, /services\/productionEligibility/);
 });
 

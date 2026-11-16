@@ -1,5 +1,7 @@
 # Module Inventory
 
+Production queue projection (2026-11-16): Production owns `services/productionQueue.js` and the barcode formatter `productionCards.itemScanCode`. Machine Integration consumes the same query through `services/machineIntegration/productionQueue.js` and the source-scoped station queue route. This adds a read-only station projection, not a second scheduling or status owner. No schema changes. See `station-production-queue-20261116.md`.
+
 Straight-bar length planning (2026-11-11): Inventory owns the read-only
 `inventoryPlanning` projection and length identity helper. Steel/Rebar supplies
 canonical kg/m; Orders supplies lift shape snapshots. Inventory rows and

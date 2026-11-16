@@ -3,6 +3,7 @@ const express=require('express');
 const {StationInbox}=require('../services/machineIntegration/stationInbox');
 const {WorkerFeedback}=require('../services/machineIntegration/workerFeedback');
 const {AutomaticConnection,stationOrRole}=require('../services/machineIntegration/automaticConnection');
+const {StationProductionQueue}=require('../services/machineIntegration/productionQueue');
 function required(name,value){if(!value)throw Error('routes/machineStation missing dependency: '+name);return value;}
 function principal(req){if(req.stationBinding)return{id:'station:'+req.stationBinding.source_id,displayName:'תחנת מכונה'};const id=req.auth?.sub??req.user?.id;return id==null?null:{id,displayName:req.auth?.display_name||req.user?.name||''};}
 module.exports=function createMachineStationRouter(deps){
@@ -11,6 +12,13 @@ module.exports=function createMachineStationRouter(deps){
  const workerFeedback=new WorkerFeedback({db,inbox:service});
  const automatic=new AutomaticConnection({db,inbox:service,...(deps.automaticConnection||{})});
  const stationAccess=roles=>stationOrRole(workerFeedback,requireAnyRole(roles));
+ const productionQueue=new StationProductionQueue({db});
+ router.get('/machine-integration/station-queue',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
+  try{if(Object.keys(req.query).some(k=>!['sourceId','limit','offset','q','diameter','status'].includes(k)))return res.status(422).json({error:'INVALID_STATION_QUEUE_FILTER'});
+   const binding=workerFeedback.authorize(req.query.sourceId||req.headers['x-station-source'],req.headers['x-station-credential']);
+   res.set('Cache-Control','no-store');res.json(productionQueue.page(binding,{limit:Number(req.query.limit||20),offset:Number(req.query.offset||0),q:req.query.q||'',diameter:req.query.diameter||'',status:req.query.status||''}));
+  }catch(error){res.status(error.status||400).json({error:error.message});}
+ });
  router.post('/machine-integration/automatic/challenge',(req,res)=>{
   try{res.set('Cache-Control','no-store');res.json(automatic.begin(req.body));}catch(error){res.status(error.status||400).json({error:error.message});}
  });

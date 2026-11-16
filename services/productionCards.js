@@ -951,9 +951,13 @@ function masterCard(allItems, order, printDate, deliveryDate, numPallets) {
   '</div>';
 }
 
-function itemCard(item, order, printDate, rebarWeights) {
+function itemScanCode(item, orderNumber) {
   const scanSuffix = item.scan_suffix ? `-${String(item.scan_suffix).replace(/[^a-zA-Z0-9_-]/g, '')}` : '';
-  const barcode = `${order.order_num || ''}-${String(item.id).padStart(6, '0')}${scanSuffix}`;
+  return `${orderNumber || ''}-${String(item.id).padStart(6, '0')}${scanSuffix}`;
+}
+
+function itemCard(item, order, printDate, rebarWeights) {
+  const barcode = itemScanCode(item, order.order_num);
   const segments = shapeSegmentsFromItem(item);
   const visualShapeSvg = shapeSvgForProductionCard(item, segments);
   const title = itemHumanTitle(item);
@@ -1007,6 +1011,7 @@ function itemCard(item, order, printDate, rebarWeights) {
 }
 
 module.exports = {
+  itemScanCode,
   escapeHtml,
   printableItemNote,
   shapeSvg,

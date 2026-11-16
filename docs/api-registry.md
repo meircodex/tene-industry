@@ -1,5 +1,11 @@
 # API Registry
 
+## Station production queue (2026-11-16)
+
+Machine Integration owns GET `/api/machine-integration/station-queue`, guarded by `stationAccess` plus a verified source credential. The bound central machine supplies the scope; a caller cannot choose another machine. `limit` (1–100), `offset`, `q`, `diameter` and `status` are the only filters. Production owns `services/productionQueue.js`, the shared original query, eligibility, assignment and priority projection also consumed by `/api/production-queue`. No queue or business status writes.
+
+The existing GET `/api/machine-feedback/snapshot` supports `queueOnly=1&queueRevision=<definitionHash>` for opening a whole-item queue card. It revalidates current queue membership, machine and card definition before returning an activity-free snapshot. Printed split barcodes retain the original ordinary snapshot path and split quantity. Native GET `/station/v1/production-queue` is a scoped display/cache projection; POST `/station/v1/production-queue/open` uses the existing local session/Origin guards and StationRuns, never business scan/status or PLC writes. See `station-production-queue-20261116.md`.
+
 ## Automatic station connection (2026-11-16)
 
 Owner: Machine Integration. POST `/api/machine-integration/automatic/challenge` is scoped to a deployment-provisioned public installation key, source ID and logical machine; it returns only a bounded 60-second challenge. POST `/automatic/connect` consumes a valid one-use Ed25519 proof and returns a station credential, never a user session. No new DB tables. Grant configuration is `IB_STATION_GRANT_<fingerprint>` and contains public key + exact directory label; private keys remain on the station.

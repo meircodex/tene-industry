@@ -1,5 +1,7 @@
 # API Route Permission Map
 
+Station production queue (2026-11-16): GET `/api/machine-integration/station-queue` requires the matching station source credential under `stationAccess`; role-only callers still need the scoped credential. Scope comes from `mi_station_bindings`, never a query machine ID. Whole-item queue openings revalidate live eligibility and card definition through the existing protected activity-free snapshot. No new user session, public queue access or completion mutation is granted. See `station-production-queue-20261116.md`.
+
 Worker feedback uses `requireQrPermission('production')` plus existing item/card
 authorization. Activity-free snapshot additionally requires a bound station
 credential. Station relay/current routes require production/maintenance/manager/
