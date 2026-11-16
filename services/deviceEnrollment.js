@@ -95,12 +95,7 @@ function createDeviceEnrollmentService({ getDb }) {
     next();
   }
 
-  function revokeApprovedEnrollment(id,actor){
-    const db=getDb();return db.transaction(()=>{const changed=db.prepare("UPDATE device_enrollment_requests SET status='revoked',reviewed_at=CURRENT_TIMESTAMP,reviewed_by=?,reviewed_by_name=? WHERE id=? AND status='approved'").run(Number(actor.sub),actor.display_name,id);
-    if(changed.changes)db.prepare(`INSERT INTO audit_log(entity_type,entity_id,action,field_name,new_value,user_id,user_name)VALUES('device_enrollment',?,'worker_logout','status','revoked',?,?)`).run(id,Number(actor.sub),actor.display_name);return changed.changes;})();
-  }
   return {
-    revokeApprovedEnrollment,
     credentialFromRequest,
     createApprovedEnrollment,
     createPendingEnrollment,

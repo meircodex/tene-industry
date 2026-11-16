@@ -4,6 +4,16 @@
 
 ## סטטוסים
 
+### עובד נשאר מחובר וסגירת הגדרות אחרי שינוי שפה — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: העובד לחץ התנתקות/החלפת עובד ונדרש לשם וסיסמה. המשתמש דורש שאין התנתקות עצמית: מנהל מפעיל ומבטל גישה. בנוסף חלון ההגדרות לא נסגר אחרי שינוי שפה.
+- ownership: worker portal UI and retirement of self-device-logout only. Manager enrollment review/replacement/profile deactivation and existing server permissions remain authoritative; no general system login/logout changes.
+- DB/API/events: existing self-logout endpoint becomes a no-write retired response so old clients cannot revoke an enrollment. Remove exclusive self-logout helpers; retain active/inactive/revoked checks, audit history, no restoration of revoked devices. Bootstrap always checks actual access and ignores obsolete local sign-out marker.
+- screens: remove username/password form and logout control; inactive device gets personal-link guidance and retry only. Central settings open/close with explicit accessible X, backdrop and Escape; scroll-bounded panel and larger gear target, he/en/th.
+- DoD: no credential entry or self-logout UI/call; repeat opening retains device; old logout does not alter cookie/enrollment, manager revoke still blocks; settings dismissal in all languages and narrow phone layout, focused/full tests, visual preview and verified live deploy.
+- verification: 20 focused tests passed, then persistent-cookie/settings checks passed; final full suite 1,356 passed. Earlier unrelated quality HTTP process failed without an assertion, passed alone and in final suite. User stopped Windows browser inspection and requested continuation without browser; no further app inputs used, no visual/real-phone verification claimed.
+
 ### פורטל עובד: רק כרטיסים שהעובד עדכן — 16.11.2026
 - status: done
 - owner: codex

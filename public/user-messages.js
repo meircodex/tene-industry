@@ -8,6 +8,7 @@
 })(typeof window!=='undefined'?window:null,function(){
   'use strict';
   const messages={
+    worker_logout_managed_only:'הכניסה לפורטל נשמרת במכשיר. החלפת עובד או ביטול גישה נעשים דרך המנהל בלבד.',
     system_link_session_revoked:'הכניסה באמצעות הקישור אינה פעילה עוד. יש לפנות למנהל לקבלת קישור חדש.',
     system_link_invalid:'הקישור האישי אינו תקין. יש לבקש מהמנהל קישור חדש.',
     system_link_expired:'תוקף הקישור הסתיים. יש לבקש מהמנהל קישור חדש.',

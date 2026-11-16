@@ -33,11 +33,4 @@ function authenticate(db,req){
  req.auth={sub:String(account.user_id),role:'production',display_name:account.worker_name,portal_only:true,portal_device_id:device.id};
  db.prepare("UPDATE device_enrollment_requests SET last_seen_at=CURRENT_TIMESTAMP WHERE id=? AND (last_seen_at IS NULL OR last_seen_at<datetime('now','-5 minutes'))").run(device.id);
 }
-function logoutProof(db,req){
- const credential=String(req.get('X-IronBend-Device')||credentialCookie(req)).trim();
- if(!credential||credential.length>200)return null;
- return db.prepare(`SELECT d.id,a.user_id,p.worker_name FROM device_enrollment_requests d JOIN worker_invitations i ON i.id=d.invitation_id
- JOIN worker_qr_profiles p ON p.id=i.worker_profile_id JOIN worker_portal_accounts a ON a.profile_id=p.id
- WHERE d.credential_hash=? AND i.status='claimed' AND i.claimed_device_id=d.id`).get(sha256(credential))||null;
-}
-module.exports={canUsePortal,provision,authenticate,cookie,logoutProof};
+module.exports={canUsePortal,provision,authenticate,cookie};

@@ -42,10 +42,14 @@ test('15-minute single-use worker link grants only portal access, persists ident
  assert.ok(['pending','opened'].includes(db.prepare('SELECT status FROM worker_invitations WHERE id=?').get(rollbackInvite.invitation.id).status));
  db.prepare('UPDATE users SET active=1 WHERE id=?').run(me.body.worker.user_id);
  const expired=await invite();db.prepare("UPDATE worker_invitations SET expires_at=datetime('now','-1 second') WHERE id=?").run(expired.invitation.id);assert.equal((await call('/api/worker-invitations/activation',{body:{token:expired.token,device_name:'Expired phone'}})).status,410);
- const third=await invite();const d3=(await call('/api/worker-invitations/activation',{body:{token:third.token,device_name:'Active phone'}})).body.device_credential;
+ const third=await invite();const thirdActivation=await call('/api/worker-invitations/activation',{body:{token:third.token,device_name:'Active phone'}});const d3=thirdActivation.body.device_credential;const d3Cookie=thirdActivation.cookies.find(c=>c.startsWith('ironbend_worker_device=')).split(';')[0];
  await call('/api/worker-profiles/'+profile.id,{token:admin,method:'PATCH',body:{worker_name:'Link Worker',phone:'0503334455',role:'production',permissions:['production'],active:false}});assert.equal((await call('/api/worker-portal/me',{device:d3})).status,403);
  await call('/api/worker-profiles/'+profile.id,{token:admin,method:'PATCH',body:{worker_name:'Link Worker',phone:'0503334455',role:'production',permissions:['production'],active:true}});
- const out=await call('/api/worker-portal/logout',{device:d3,body:{}});assert.equal(out.status,200);assert.ok(out.cookies.some(c=>c.includes('Max-Age=0')));assert.equal((await call('/api/worker-portal/me',{device:d3})).status,403);
- const repeatedOut=await call('/api/worker-portal/logout',{device:d3,token:'expired-access-token',body:{}});assert.equal(repeatedOut.status,200);assert.ok(repeatedOut.cookies.some(c=>c.includes('Max-Age=0')));
- const anonymousOut=await call('/api/worker-portal/logout',{body:{}});assert.equal(anonymousOut.status,401);assert.ok(anonymousOut.cookies.some(c=>c.includes('Max-Age=0')));
+ const out=await call('/api/worker-portal/logout',{device:d3,body:{}});assert.equal(out.status,410);assert.equal(out.body.error,'worker_logout_managed_only');assert.ok(!out.cookies.some(c=>c.startsWith('ironbend_worker_device=')));assert.equal((await call('/api/worker-portal/me',{device:d3})).status,200,'old self-logout must not disconnect an approved phone');
+ for(let reopen=0;reopen<3;reopen++)assert.equal((await call('/api/worker-portal/me',{cookie:d3Cookie})).status,200,'reopening with the saved cookie requires no code');
+ const repeatedOut=await call('/api/worker-portal/logout',{device:d3,token:'expired-access-token',body:{}});assert.equal(repeatedOut.status,410);assert.ok(!repeatedOut.cookies.some(c=>c.includes('Max-Age=0')));
+ const anonymousOut=await call('/api/worker-portal/logout',{body:{}});assert.equal(anonymousOut.status,410);assert.ok(!anonymousOut.cookies.some(c=>c.startsWith('ironbend_worker_device=')));
+ const d3id=db.prepare("SELECT id FROM device_enrollment_requests WHERE credential_hash=?").get(require('../auth-core').sha256(d3)).id;
+ await call('/api/device-enrollment/requests/'+d3id,{token:admin,method:'PATCH',body:{status:'revoked'}});
+ assert.equal((await call('/api/worker-portal/me',{device:d3})).status,403,'manager revocation remains immediate');assert.equal((await call('/api/worker-portal/me',{cookie:d3Cookie})).status,403);
 });
