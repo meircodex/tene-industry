@@ -5,14 +5,14 @@
 ## סטטוסים
 
 ### מקור עובדים אחיד בדוחות — 16.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: missing workers in report filter; user requests systemic solution, not a per-worker patch.
-- ownership: read-only Reporting identity projection consuming explicit profile/account/device and legacy worker/scan links. No guessed identity matches, historic rewrites, profile/account or production writes.
+- ownership: read-only Reporting identity projection plus immutable server-derived identity metadata on existing Production receipts. No guessed matches, historic rewrites, profile/account, production status/quantity/weight or stock changes.
 - output: complete authorized worker directory independent of selected period, stable namespaced identities and explicit aliases; all real update/scan sources represented in card worker filtering, including an unknown option; users without period activity remain selectable with empty results. Existing finance privacy boundary retained.
-- DB/events: no migration or writes. Existing report route composes catalog plus activity from one service; existing permission gate unchanged. Preserve audit snapshots and amounts/statistics.
+- DB/events: no migration or historical writes; future existing receipts include server-derived identity metadata. Existing report route composes catalog plus activity from one service; existing permission gate unchanged. Preserve audit snapshots and amounts/statistics.
 - DoD: schema-backed multi-source identity tests, no-activity/inactive/rename/anonymous and ID namespace cases, filter/summary/pagination parity, role/auth/governance regressions, docs, full suite, deploy and live checks.
-- verification: 136 focused checks and full suite 1,379 passed. Immutable receipt snapshot, manager/device priority, all-person directory and unknown/multi-source filtering verified on isolated databases; no source history rewritten. Deployment pending.
+- verification: 136 focused checks and full suite 1,379 passed. Immutable receipt snapshot, manager/device priority, all-person directory and unknown/multi-source filtering verified on isolated databases; no source history rewritten. Live: aee7bcd / dep-dbtifvou01pc73dfm5hg. Changed report client returned 200 and matched source; health 200; anonymous unified/raw worker reports 401; QR mode still open. No production test records or historic mutations; live role/data verification limited to read-only anonymous HTTP, with authenticated directory/privacy coverage on isolated test databases.
 
 
 ### גרפים: כל תאריך וזום שבוע/חודש/יום — 16.11.2026
