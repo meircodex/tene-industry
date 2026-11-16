@@ -6,14 +6,14 @@
 
 ### התאמת פורטל עובד לתמונת הטלפון — 16.11.2026
 
-- status: in_progress
+- status: done
 - owner: codex
 - modules: Production / Worker Portal presentation only
 - input: המשתמש מבקש שהפורטל לטלפון יהיה כמו תמונת הייחוס: פס כחול, סריקה כתומה גדולה, כרטיס מקורי מרכזי, שורות קומפקטיות וניווט עם אייקונים. ההחלטות המאוחרות נשמרות: סריקה וסטטוס בלבד, אין בחירת מכונה; שפה בגלגל השיניים.
 - output/screens: worker-portal.html/CSS/JS/i18n; mobile-first width, original card visible by default, status grid with only valid next step enabled, home/history/help and settings.
 - DB/API/events: no change to source data, credentials, production state engine, stock, routes or receipts. No invented daily weights or nonfunctional storage/weighing buttons.
 - Definition of Done: visual preview matched against reference; phone-size/he/en/th readability and no horizontal overflow; existing portal/auth/status tests; deploy and observed live validation. Source image contains capabilities excluded from the agreed first phase, so do not reintroduce them.
-- local verification: 1,338 tests passed; focused portal/auth/scanner/messages 17 passed. Copied local database only: personal login, card open, start and completion confirmation/receipt, enlarged original, help and he/en/th checked in browser. At ~406px viewport, document scroll width 401px in all three languages. Live validation pending.
+- local verification: 1,338 tests passed; focused portal/auth/scanner/messages 17 passed. Copied local database only: personal login, card open, start and completion confirmation/receipt, enlarged original, help and he/en/th checked in browser. At ~406px viewport, document scroll width 401px in all three languages. Live: dc1d648 / dep-dbta2el6e07s73bsa3ug observed live; health/static assets 200, personal endpoint 401 without login, QR mode open unchanged. Live login page and mobile shell verified in browser; no production credentials or production/stock records changed.
 
 
 ### פורטל עובד אישי — 15.11.2026
