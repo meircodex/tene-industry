@@ -334,6 +334,7 @@ test('production enforces order item ownership boundaries', async (t) => {
       produced_qty: 2,
       actual_weight_kg: 10,
       note_updated: true,
+      _actor_identity: {kind:'device',id:Number(db.prepare("SELECT id FROM device_enrollment_requests WHERE request_uid='DEV-BOUNDARY'").get().id)},
     });
 
     const today = new Date().toISOString().slice(0, 10);

@@ -39,8 +39,9 @@ function summary(rows){
  result.kg_per_min=result.net_minutes>0?result.timed_weight_kg/result.net_minutes:null;
  return result;
 }
-function unifiedProductionReport({cards,activity,workers=[]},filters){
+function unifiedProductionReport({cards,activity,workers=[],workerDirectory=[],workerIdentitiesVisible=true},filters){
  const canonical=new Map(cards.map(c=>[c.item_id,c]));
+ const canonicalKey=key=>workerDirectory.find(w=>w.aliases?.includes(key))?.key||key;
  let all=activity.cards.map(r=>({...r,card:r.reported_complete?canonical.get(r.item_id)||null:null,
   customer_name:r.customer_name||canonical.get(r.item_id)?.customer_name||'',
   material_type:canonical.get(r.item_id)?.material_type||r.material_type||'unknown'}));
@@ -56,24 +57,32 @@ function unifiedProductionReport({cards,activity,workers=[]},filters){
     produced_length_mm:base.reported_complete&&c?.unitCutLengthMm>0?c.unitCutLengthMm*c.quantity:null,
     started:list.find(r=>r.started)?.started||base.started,
     activity_dates:list.map(r=>r.date),activity_kinds:{started:list.some(r=>r.started),same:list.some(r=>r.same_day_scanned),prior:list.some(r=>r.ended_from_prior_day),unmatched:list.some(r=>r.ended_unmatched),open:list.some(r=>r.not_finished_same_day),ended:list.some(r=>r.ended),confirmed:list.some(r=>r.confirmed_same_day)},
-    workers:people,worker_names:[...new Set(people.map(w=>w.actor_name))].join(' · ')||'לא מזוהה',
+    workers:people,worker_keys:workerIdentitiesVisible?[...new Set(people.length?people.map(w=>canonicalKey(w.worker_key)):['anonymous'])]:[],worker_names:[...new Set(people.map(w=>w.actor_name))].join(' · ')||'לא מזוהה',
     start_worker:people.filter(w=>w.to_status==='בייצור').at(-1)?.actor_name||null,
     end_worker:people.filter(w=>w.to_status==='הושלם').at(-1)?.actor_name||null};
   }).sort((a,b)=>b.date.localeCompare(a.date)||b.item_id-a.item_id);
  }
  const values=key=>[...new Set(all.map(r=>r[key]).filter(v=>v!==null&&v!==undefined&&v!==''))].sort((a,b)=>String(a).localeCompare(String(b),'he',{numeric:true}));
- const facets={machines:values('machine'),diameters:values('diameter_mm'),customers:values('customer_name'),orders:values('order_num'),statuses:values('status'),workers:[...new Map(workers.map(w=>[w.worker_key,{key:w.worker_key,name:w.actor_name}])).values()]};
+ const directory=new Map();
+ if(workerIdentitiesVisible){
+  for(const w of workers)directory.set(canonicalKey(w.worker_key),{key:canonicalKey(w.worker_key),name:w.worker_key==='anonymous'?'לא מזוהה':w.actor_name});
+  for(const w of workerDirectory)directory.set(w.key,w);
+  directory.set('anonymous',{key:'anonymous',name:'לא מזוהה'});
+ }
+
+ const matchesWorker=(r,values)=>values.some(key=>(r.worker_keys||r.workers?.map(w=>w.worker_key)||[]).includes(canonicalKey(key)));
+ const facets={machines:values('machine'),diameters:values('diameter_mm'),customers:values('customer_name'),orders:values('order_num'),statuses:values('status'),workers:[...directory.values()].sort((a,b)=>a.name.localeCompare(b.name,'he',{numeric:true})||a.key.localeCompare(b.key))};
  const kindMatches=(r,kind)=>kind==='all'?true:filters.flat?Boolean(r.activity_kinds[kind]):kind==='started'?Boolean(r.started):kind==='same'?r.same_day_scanned:kind==='prior'?r.ended_from_prior_day:kind==='unmatched'?r.ended_unmatched:kind==='open'?r.not_finished_same_day:kind==='ended'?Boolean(r.ended):kind==='confirmed'?r.confirmed_same_day:false;
  const selected=all.filter(r=>{
   for(const [key,values] of Object.entries(filters.sets||{})){
    if(!values.length)continue;
-   if(key==='worker'){if(!r.workers?.some(w=>values.includes(w.worker_key)))return false;continue;}
+   if(key==='worker'){if(!matchesWorker(r,values))return false;continue;}
    if(key==='kind'){if(!values.some(k=>kindMatches(r,k)))return false;continue;}
    const field={diameter:'diameter_mm',material:'material_type',customer:'customer_name',order:'order_num',reliability:'reliability_status'}[key]||key;
    if(key==='diameter'?!values.some(v=>Number(v)===Number(r[field])):!values.includes(String(r[field]??(key==='reliability'?'unknown':''))))return false;
   }
 
-  if(filters.worker&&!r.workers?.some(w=>w.worker_key===filters.worker))return false;
+  if(filters.worker&&!matchesWorker(r,[filters.worker]))return false;
   if(filters.order&&r.order_num!==filters.order)return false;
   if(filters.status&&r.status!==filters.status)return false;
   if(filters.drill_field&&String(r[filters.drill_field]??'')!==filters.drill_value)return false;

@@ -1591,6 +1591,12 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.ok(Array.isArray(timing.machines));
     assert.ok(Array.isArray(timing.transitions));
 
+    const flatQuery=`/api/reports/production-timing?from=${today}&to=${today}&unified=1&flat=1`;
+    const privateFinance=await (await request(flatQuery,{headers:authHeaders(finance)})).json();
+    assert.deepEqual(privateFinance.unified.facets.workers,[]);
+    assert.ok(privateFinance.unified.rows.every(row=>row.worker_keys.length===0));
+    const managerDirectory=await (await request(flatQuery,{headers:authHeaders(manager)})).json();
+    assert.ok(managerDirectory.unified.facets.workers.some(w=>w.name==='manager'));
     assert.equal((await request('/api/reports/worker-card-activity')).status, 401);
     assert.equal((await request('/api/reports/worker-card-activity', { headers: authHeaders(production) })).status, 403);
     assert.equal((await request('/api/reports/worker-card-activity', { headers: authHeaders(finance) })).status, 403);

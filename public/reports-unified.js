@@ -61,7 +61,8 @@ async function loadReport(){
   if(!data.unified||!Array.isArray(data.unified.rows))throw Error('לא התקבלו נתונים עדכניים מהשרת. יש ללחוץ שוב על הצג.');
   current=data.unified;page=current.page;configureColumns();drawTable(current.rows);window.IronBendReportCharts?.render(current.charts);pagination(current.total,current.pages);
   options('machine',current.facets.machines,'כל המכונות');options('diameter',current.facets.diameters,'כל הקטרים');options('customer',current.facets.customers,'כל הלקוחות');options('order',current.facets.orders,'כל ההזמנות');options('status',current.facets.statuses,'כל המצבים');
-  options('worker',current.facets.workers.map(w=>({value:w.key,label:w.name})),'כל העובדים');
+  const workers=current.facets.workers,names=new Map();for(const w of workers)names.set(w.name,(names.get(w.name)||0)+1);
+  options('worker',workers.map(w=>({value:w.key,label:w.name+(names.get(w.name)>1?' · '+(({profile:'פורטל',station:'תחנה',user:'מערכת',device:'מכשיר'})[w.source]||'דיווח'):'')+(w.active===false?' (לא פעיל)':'')})),'כל העובדים');
 
   $('reportState').textContent='';$('exportReport').disabled=false;
  }catch(error){if(ticket===requestId){$('reportState').textContent=error.message;current=null;drawTable([]);window.IronBendReportCharts?.render(null);pagination(0,1);}}finally{if(ticket===requestId){document.querySelector('.report-table-wrap').setAttribute('aria-busy','false');$('reportCharts').setAttribute('aria-busy','false');}}

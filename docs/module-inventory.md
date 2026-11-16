@@ -676,3 +676,6 @@ See [interfaces and rollback](worker-machine-feedback.md).
 
 
 Machine Integration (2026-11-16): `services/machineIntegration/automaticConnection.js` owns provisioned installation challenge/proof validation. `routes/machineStation.js` owns enrollment and station identity routes; `workerMachineFeedback.js` keeps activity-free card reading. Production alone owns scan and DONE mutations. See `station-auto-integration-20261116.md`.
+
+
+Reporting worker projection (16.11.2026): read-only consumers declared in routes/reports manifest for worker profiles, portal account links, users, legacy workers, scan_log, worker_card_activity, device enrollments and invitations. Identity writes remain Production receipt snapshots through WorkerCardActivity/WorkerIdentity; no backfill or profile/account mutations.

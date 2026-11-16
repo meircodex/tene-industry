@@ -683,7 +683,7 @@ module.exports = function createReportsRouter(deps) {
       const unified = require('../services/unifiedProductionReport');
       const filters = req.query.unified === '1' ? unified.parseFilters(req.query) : null;
       const report = reportProductionTiming(db, period);
-      return res.json(filters ? {period:report.period,unified:unified.unifiedProductionReport({cards:report.cards,activity:report.daily_scan_activity,workers:filters.flat&&['office','manager','admin'].includes(req.auth?.role)?require('../services/productionReportWorkers').readWorkers(db,report.daily_scan_activity.cards.map(r=>r.item_id)):[]},filters)} : report);
+      return res.json(filters ? {period:report.period,unified:unified.unifiedProductionReport({cards:report.cards,activity:report.daily_scan_activity,...(filters.flat&&['office','manager','admin'].includes(req.auth?.role)?require('../services/productionReportWorkers').readWorkerData(db,report.daily_scan_activity.cards.map(r=>r.item_id),{to:period.toDate}):{workers:[],workerDirectory:[],workerIdentitiesVisible:false})},filters)} : report);
     } catch (error) {
       return res.status(400).json({ error: error.message === 'invalid production date range' ? 'invalid_date_range' : error.message==='invalid_report_filter'?'invalid_report_filter':'production_timing_unavailable' });
     }
@@ -909,6 +909,6 @@ module.exports.manifest = {
     default: 'hidden',
     roles: { admin: 'edit', manager: 'edit', office: 'read', finance: 'read', quality: 'read', maintenance: 'read' },
   },
-  consumes: [{ table: 'orders' }, { table: 'items' }, { table: 'invoices' }, { table: 'production_timing_reviews' }, { table: 'inventory_reservations' }, { table: 'raw_material_usage' }, { table: 'raw_material' }],
+  consumes: [{ table: 'worker_qr_profiles' }, { table: 'worker_portal_accounts' }, { table: 'users' }, { table: 'workers' }, { table: 'scan_log' }, { table: 'worker_card_activity' }, { table: 'device_enrollment_requests' }, { table: 'worker_invitations' }, { table: 'orders' }, { table: 'items' }, { table: 'invoices' }, { table: 'production_timing_reviews' }, { table: 'inventory_reservations' }, { table: 'raw_material_usage' }, { table: 'raw_material' }],
   produces: [],
 };

@@ -225,3 +225,7 @@ snapshots retain their policies. See product-trait-recognition-20261110.md.
 ## Background machine connection (2026-11-16)
 
 The existing worker parameter panel reads `/api/machine-feedback/stations`. Its machine label is the exact directory label of the sole online station matching card `machine_id` or card `machine` label; it never treats a directory ID as a printed machine number. There is no worker station selector. Multiple/offline/unassigned matches remain unresolved and never display another machine’s values. Controller values and physical-accuracy limits retain the existing mirror contract.
+
+
+### Reporting worker directory — 16.11.2026
+Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.

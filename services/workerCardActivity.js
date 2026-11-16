@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const workerIdentity = require('./workerIdentity');
 
 function positiveInteger(value) {
   const number = Number(value);
@@ -77,7 +78,7 @@ function createWorkerCardActivityService({ db }) {
       actorName,
       deviceEnrollmentId,
       deviceName,
-      JSON.stringify(details || {}),
+      JSON.stringify({ ...(details || {}), _actor_identity: workerIdentity.snapshot(req) }),
     );
     const receipt = db.prepare(`
       SELECT id,item_id,action,strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) AS occurred_at

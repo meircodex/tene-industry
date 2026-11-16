@@ -180,3 +180,7 @@ Item correction preview uses the item-status operational role guard (production/
 ## Automatic station identity (2026-11-16)
 
 The public challenge/connect pair accepts only a deployment-provisioned Ed25519 key, source and logical machine. The connect proof is single-use, expires in 60 seconds and issues a station credential without any user role. Existing station-only operations and the activity-free card snapshot accept verified station credentials as an alternative to their user/QR guard; original worker mutations, general orders, registration administration, event listing and manufacturing-intent writes retain existing guards. Station reads of assigned cards and manufacturing intents enforce the bound central machine.
+
+
+### Reporting worker directory — 16.11.2026
+Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.

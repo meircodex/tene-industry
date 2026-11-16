@@ -285,3 +285,7 @@ Owner: Quality. Mounted as a child of routes/quality.js; the existing Quality mo
 - GET /api/quality/weighings/:id — saved historical facts, independent of later order edits. No update/delete observation endpoint.
 
 A shared weighing has one actual weight and one signed delta for the entire selected group. Do not fabricate actual per-order or per-item weights. Canonical expected weights exclude prior actual_weight_kg values; preserve the original basis/source in each snapshot. Limits: 100 orders, 5000 selected item lines, 100 rows per page.
+
+
+### Reporting worker directory — 16.11.2026
+Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.
