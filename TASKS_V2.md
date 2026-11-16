@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### מסכי עובד קומפקטיים ומהירים לטלפון — 16.11.2026
+- status: in_progress
+- owner: codex
+- input: כל עמוד אצל העובד צריך להתאים למסך טלפון, קיצור הסברים ורווחים, כמה שפחות לחיצות; להחליף את מיקום אחסנה והעמסה יחד עם הפעולות/כיתובים.
+- ownership: worker portal/invitation presentation only; existing scan/save/confirmation, account permissions, stock, status and audit remain unchanged.
+- screens: compact home with overview, direct scan, same recent-update pagination and help actions; compact card/source thumbnail and all status/storage/weight/save controls visible; scan/report/help/settings/activation trimmed without extra disclosure steps. Published instructions, errors and original-card enlargement remain readable; exceptional long content must stay accessible rather than clipped.
+- DB/API/events: no change. Preserve 3 history items/page and existing one-save flow. Storage remains warehouse icon/store; loading remains truck/load, reordered only.
+- DoD: control/ID and action mapping checks, functional portal tests, readable touch targets and responsive layout budgets, no new hidden primary actions or scroll locks, all three languages; full suite, deploy and live verification without browser control or production test actions.
+
+- verification: 69 focused tests and full suite 1,356 passed. Syntax and diff checks passed. No phone/browser visual verification performed; long help/errors remain accessible with natural scrolling. Deployment pending.
+
 ### עובד נשאר מחובר וסגירת הגדרות אחרי שינוי שפה — 16.11.2026
 - status: done
 - owner: codex

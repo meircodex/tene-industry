@@ -3,7 +3,7 @@
 <head>
 <script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
   <meta name="theme-color" content="#021A48">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="טנא עובדים">
@@ -24,13 +24,15 @@
     button{min-height:53px;border:0;border-radius:12px;background:var(--orange);color:#fff;font:inherit;font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px #c9621a35}button:disabled{opacity:.6;cursor:wait}.notice{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#edf7f1;color:var(--success);font-weight:800;line-height:1.5}.notice.error{background:#fff0ee;color:var(--danger)}.install{margin-top:20px;border-top:1px solid var(--line);padding-top:18px;color:#4e6879;font-size:13px;line-height:1.55}.install button{min-height:auto;box-shadow:none;padding:8px 12px;font-size:13px;background:var(--navy);margin-top:8px}.small{font-size:12px;color:#647b8a;line-height:1.55;margin:18px 0 0}
     [hidden]{display:none!important}
     .browser-guide{margin-top:18px;padding:14px;border:1px solid #dbe5ec;background:#f3f7fb;border-radius:12px;font-size:14px;line-height:1.6}.browser-guide p{margin:6px 0 12px}.browser-actions{display:flex;flex-wrap:wrap;gap:8px}.browser-actions a,.browser-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 12px;font:inherit;font-weight:800;border-radius:9px;text-decoration:none;box-shadow:none}.browser-actions a{background:var(--navy);color:white}.browser-actions button{color:var(--navy);background:white;border:1px solid var(--line)}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+    @media(max-width:540px){body{padding:10px}main{padding:4px 0}.card{padding:18px;border-radius:16px}.brand{margin-bottom:12px;font-size:14px}.brand b{width:32px;height:32px;font-size:17px}h1{font-size:24px;margin:0 0 8px}.info{margin:10px 0;padding:10px;font-size:16px}form{gap:10px;margin-top:12px}input{min-height:44px;padding:8px 10px;font-size:17px}button{min-height:46px;font-size:17px}.notice{margin-top:10px;padding:10px;font-size:14px}.browser-guide{padding:10px;margin-top:10px;font-size:14px}.browser-guide p{margin:4px 0 8px}.browser-actions{gap:6px}.browser-actions a,.browser-actions button{padding:8px 10px;min-height:44px;font-size:14px}.small{margin-top:12px;font-size:12px}.install{margin-top:12px;padding-top:12px;font-size:14px}}
   </style>
 </head>
 <body>
   <main><section class="card">
     <details style="float:left"><summary aria-label="Language / שפה">⚙</summary><select id="inviteLanguage" aria-label="Language / שפה"><option value="he">עברית</option><option value="en">English</option><option value="th">ภาษาไทย</option></select></details><div class="brand"><b>ט</b><span>טנא תעשיות · אפליקציית עובדים</span></div>
     <h1 id="title">בודקים את ההזמנה האישית…</h1>
-    <p class="lead" id="lead">הקישור הזה מיועד לעובד אחד בלבד ותקף למשך 15 דקות.</p>
+    <p class="lead sr-only" id="lead">הקישור הזה מיועד לעובד אחד בלבד ותקף למשך 15 דקות.</p>
     <div class="info" id="inviteInfo" hidden></div>
     <section class="browser-guide" id="browserGuide" hidden><strong data-invite-i18n="beforeActivation">לפני ההפעלה</strong><p id="browserAdvice"></p><div class="browser-actions"><a id="openInChrome" hidden data-invite-i18n="openInChrome">פתיחה ב־Chrome</a><button id="copyBrowserLink" type="button" data-invite-i18n="copyBrowserLink">העתק קישור לדפדפן</button></div><p id="browserFeedback" role="status" hidden></p></section>
 
@@ -98,7 +100,7 @@
         document.getElementById('workerName').value = result.worker_name;
         document.getElementById('deviceName').value = localDeviceName(result.worker_name);
         document.getElementById('inviteInfo').textContent=result.worker_name;
-        document.getElementById('inviteInfo').hidden = false;
+        document.getElementById('inviteInfo').hidden = true;
         document.getElementById('registrationForm').hidden = false;
         document.getElementById('installBox').hidden = true;
         setNotice(text('linkExpires')+' '+new Date(result.expires_at).toLocaleTimeString(language==='he'?'he-IL':language==='th'?'th-TH':'en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jerusalem'}));

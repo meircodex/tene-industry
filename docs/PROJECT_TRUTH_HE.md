@@ -1268,3 +1268,7 @@ IronBend V2 היא לא “מערכת הזמנות ברזל”.
 - General system Auth login/logout and legacy server-side portal password authentication remain compatible; password entry has been removed from the worker UI. Normal device sessions remain persistent and every request still checks actual approved device and active worker/account. No claim is made about resisting browser data deletion or device replacement.
 - createWorkerPortalSettings centrally handles gear, close X, backdrop and Escape; all dismissals hide both the panel and backdrop and update aria-expanded. Keyboard focus is contained in the modal and restored to the gear on dismissal. Language changes reuse the same controls, so RTL/LTR changes do not lose close handlers. The panel is height-bounded and scrollable, with a sticky heading and 44px close/gear targets. he/en/th guidance matches the manager-only access model.
 - Windows browser inspection was stopped by the user; no further app inputs were issued after that interruption. Validation for this change is automated backend/session and UI-controller tests, source checks and live read-only verification, not an observed real-phone settings test.
+
+
+### מסכי עובד בטלפון — 16.11.2026
+מסכי הפורטל והפעלת המכשיר מצומצמים לטלפון: סיכום הבית בשורה, הסרת הסברים כפולים, כרטיס מקור מוקטן עם הגדלה קיימת, פעולות ומשקלים צמודים וכפתור סריקה ישירה. אחסנה והעמסה החליפו מקום ככפתורים מלאים עם סמלים תואמים. שלוש שפות, הרשאות, אישורי שמירה ו־3 עדכונים בעמוד נשמרים. תוכן ארוך, שגיאות והוראות בטיחות נשארים נגישים ללא חיתוך או חסימת גלילה.
