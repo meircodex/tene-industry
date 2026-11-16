@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" href="/worker-icon-192-v1.png">
   <link rel="stylesheet" href="/theme.css">
   <script src="/worker-portal-i18n.js"></script>
+  <script src="/worker-invite-browser.js"></script>
   <title>הפעלת אפליקציית עובדים – טנא תעשיות</title>
   <style>
     :root{--navy:#021a48;--orange:#c9621a;--line:#cedbe6;--soft:#f1f6f9;--danger:#aa3227;--success:#14613e}
@@ -22,6 +23,7 @@
     form{display:grid;gap:14px;margin-top:22px}label{font-size:13px;color:#415c6d;font-weight:900;display:grid;gap:6px}input{width:100%;min-height:51px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font:inherit;color:#142b3b;background:#fff}input:focus{outline:3px solid #c9621a22;border-color:var(--orange)}input[readonly]{background:#f5f8fa;color:#506b7b}
     button{min-height:53px;border:0;border-radius:12px;background:var(--orange);color:#fff;font:inherit;font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px #c9621a35}button:disabled{opacity:.6;cursor:wait}.notice{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#edf7f1;color:var(--success);font-weight:800;line-height:1.5}.notice.error{background:#fff0ee;color:var(--danger)}.install{margin-top:20px;border-top:1px solid var(--line);padding-top:18px;color:#4e6879;font-size:13px;line-height:1.55}.install button{min-height:auto;box-shadow:none;padding:8px 12px;font-size:13px;background:var(--navy);margin-top:8px}.small{font-size:12px;color:#647b8a;line-height:1.55;margin:18px 0 0}
     [hidden]{display:none!important}
+    .browser-guide{margin-top:18px;padding:14px;border:1px solid #dbe5ec;background:#f3f7fb;border-radius:12px;font-size:14px;line-height:1.6}.browser-guide p{margin:6px 0 12px}.browser-actions{display:flex;flex-wrap:wrap;gap:8px}.browser-actions a,.browser-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 12px;font:inherit;font-weight:800;border-radius:9px;text-decoration:none;box-shadow:none}.browser-actions a{background:var(--navy);color:white}.browser-actions button{color:var(--navy);background:white;border:1px solid var(--line)}
   </style>
 </head>
 <body>
@@ -30,6 +32,7 @@
     <h1 id="title">בודקים את ההזמנה האישית…</h1>
     <p class="lead" id="lead">הקישור הזה מיועד לעובד אחד בלבד ותקף למשך 15 דקות.</p>
     <div class="info" id="inviteInfo" hidden></div>
+    <section class="browser-guide" id="browserGuide" hidden><strong data-invite-i18n="beforeActivation">לפני ההפעלה</strong><p id="browserAdvice"></p><div class="browser-actions"><a id="openInChrome" hidden data-invite-i18n="openInChrome">פתיחה ב־Chrome</a><button id="copyBrowserLink" type="button" data-invite-i18n="copyBrowserLink">העתק קישור לדפדפן</button></div><p id="browserFeedback" role="status" hidden></p></section>
 
     <form id="registrationForm" hidden onsubmit="activateWorker(event)">
       <label><span data-invite-i18n="workerName">שם העובד</span><input id="workerName" readonly></label>
@@ -48,10 +51,13 @@
   <script>
     const DEVICE_KEY = 'ironbend_device_credential_v1';
     let invitationToken = new URLSearchParams(location.search).get('token') || '';
-    let installPrompt = null,invitationData=null,activated=false;
+    if(invitationToken)history.replaceState(null,'','/worker-invite.html');
+    let installPrompt = null,invitationData=null,activated=false,resumed=false;
+    const browser=window.WorkerInviteBrowser;
     let language=localStorage.getItem('workerPortalLanguage')||'he';
     function text(key){return(window.WorkerPortalI18n[language]||window.WorkerPortalI18n.he)[key]||window.WorkerPortalI18n.he[key]||key;}
-    function applyInviteLanguage(value){language=['he','en','th'].includes(value)?value:'he';document.documentElement.lang=language;document.documentElement.dir=language==='he'?'rtl':'ltr';document.getElementById('inviteLanguage').value=language;localStorage.setItem('workerPortalLanguage',language);for(const el of document.querySelectorAll('[data-invite-i18n]'))el.textContent=text(el.dataset.inviteI18n);document.getElementById('installInstructions').textContent=invitationData?.portal_available?text('installFromPortal'):text('installAndroid')+' '+text('installIos');if(invitationData){document.getElementById('title').textContent=text(activated?'activatedPhone':'inviteTitle');document.getElementById('lead').textContent=text(activated?'activatedLead':'inviteLead');document.getElementById('openActivatedPortal').textContent=text('openMyPortal');}}
+    function showBrowserGuide(){const guide=document.getElementById('browserGuide');guide.hidden=!invitationToken||activated||resumed;if(guide.hidden){document.getElementById('openInChrome').removeAttribute('href');return;}document.getElementById('browserAdvice').textContent=text(browser.embedded(navigator.userAgent)?'embeddedBrowserAdvice':'browserBeforeActivation');const chrome=document.getElementById('openInChrome');chrome.hidden=!/Android/i.test(navigator.userAgent);chrome.href=browser.chromeIntent(browser.activationUrl(location.origin,invitationToken));document.getElementById('activateButton').disabled=browser.embedded(navigator.userAgent);}
+    function applyInviteLanguage(value){language=['he','en','th'].includes(value)?value:'he';document.documentElement.lang=language;document.documentElement.dir=language==='he'?'rtl':'ltr';document.getElementById('inviteLanguage').value=language;localStorage.setItem('workerPortalLanguage',language);for(const el of document.querySelectorAll('[data-invite-i18n]'))el.textContent=text(el.dataset.inviteI18n);document.getElementById('installInstructions').textContent=invitationData?.portal_available?text('installFromPortal'):text('installAndroid')+' '+text('installIos');if(invitationData){document.getElementById('title').textContent=text(activated?'activatedPhone':'inviteTitle');document.getElementById('lead').textContent=text(activated?'activatedLead':'inviteLead');document.getElementById('openActivatedPortal').textContent=text('openMyPortal');}if(resumed){document.getElementById('title').textContent=text('activeBrowserTitle');document.getElementById('lead').textContent=text('activeBrowserLead');document.getElementById('openActivatedPortal').textContent=text('openMyPortal');document.getElementById('installInstructions').textContent=text('installFromPortal');setNotice(text('activeBrowserNotice'));}else if(invitationData&&!activated){setNotice(text('linkExpires')+' '+new Date(invitationData.expires_at).toLocaleTimeString(language==='he'?'he-IL':language==='th'?'th-TH':'en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jerusalem'}));}showBrowserGuide();}
     document.getElementById('inviteLanguage').addEventListener('change',e=>applyInviteLanguage(e.target.value));
     applyInviteLanguage(language);
 
@@ -60,7 +66,7 @@
       el.textContent = message;
       el.className = `notice${error ? ' error' : ''}`;
     }
-    function errorText(code){const keys={invitation_expired:'inviteExpired',invitation_cancelled:'inviteCancelled',invitation_already_used:'inviteUsed',invitation_not_found:'invalidCode',worker_registration_details_required:'invalidCode',worker_device_unavailable:'deviceUnavailable'};return text(keys[code]||'error');}
+    function errorText(code){const keys={invitation_expired:'inviteExpired',invitation_cancelled:'inviteCancelled',invitation_already_used:'usedInOtherBrowser',invitation_not_found:'invalidCode',worker_registration_details_required:'invalidCode',worker_device_unavailable:'deviceUnavailable'};return text(keys[code]||'error');}
     function roleLabel(role) {
       return ({production:'ייצור',warehouse:'מחסן',driver:'נהג',quality:'איכות',maintenance:'תחזוקה'})[role] || role;
     }
@@ -69,8 +75,16 @@
       const isAndroid = /Android/i.test(navigator.userAgent);
       return `${isApple ? 'אייפון' : isAndroid ? 'טלפון Android' : 'מכשיר'} של ${workerName}`;
     }
+    async function resumeExistingPortal(){
+      const worker=await browser.currentPortal(window.fetch.bind(window),localStorage.getItem(DEVICE_KEY));if(!worker)return false;
+      resumed=true;invitationToken='';document.getElementById('registrationForm').hidden=true;document.getElementById('inviteInfo').textContent=worker.worker_name;document.getElementById('inviteInfo').hidden=false;
+      document.getElementById('openActivatedPortal').href='/worker-portal.html';document.getElementById('activationDestinations').hidden=false;document.getElementById('installBox').hidden=false;document.getElementById('installButton').hidden=true;
+      applyInviteLanguage(worker.language||language);return true;
+    }
+    document.getElementById('copyBrowserLink').addEventListener('click',async()=>{if(!invitationToken)return;const feedback=document.getElementById('browserFeedback');feedback.hidden=false;try{await navigator.clipboard.writeText(browser.activationUrl(location.origin,invitationToken));feedback.textContent=text('browserLinkCopied');}catch{feedback.textContent=text('browserCopyFallback');}});
     async function loadInvitation() {
       if (!invitationToken) {
+        if(await resumeExistingPortal())return;
         document.getElementById('title').textContent=text('inviteLinkNeeded');
         setNotice(text('openPersonalLink'),true);
         return;
@@ -88,16 +102,16 @@
         document.getElementById('registrationForm').hidden = false;
         document.getElementById('installBox').hidden = true;
         setNotice(text('linkExpires')+' '+new Date(result.expires_at).toLocaleTimeString(language==='he'?'he-IL':language==='th'?'th-TH':'en-GB',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Jerusalem'}));
-        // The secret should not remain in browser history once the page has read it.
-        history.replaceState(null, '', '/worker-invite.html');
       } catch (error) {
+        if(error.message==='invitation_already_used'&&await resumeExistingPortal())return;
         document.getElementById('title').textContent=text('error');
         setNotice(errorText(error.message), true);
-        invitationToken = '';
+        invitationToken = '';showBrowserGuide();
       }
     }
     async function activateWorker(event) {
       event.preventDefault();
+      if(browser.embedded(navigator.userAgent)){setNotice(text('embeddedBrowserAdvice'),true);return;}
       const button = document.getElementById('activateButton');
       button.disabled = true;
       setNotice(text('saving'));
@@ -123,8 +137,9 @@
         document.getElementById('installButton').hidden=!!invitationData?.portal_available || !installPrompt;
         document.getElementById('openActivatedPortal').href=result.portal_url||'/scan.html?enrolled=1';
         document.getElementById('openActivatedPortal').textContent=result.portal_available?text('openMyPortal'):text('scanCard');
-        document.getElementById('activationDestinations').hidden=false;
+        document.getElementById('activationDestinations').hidden=false;showBrowserGuide();
       } catch (error) {
+        if(error.message==='invitation_already_used'&&await resumeExistingPortal())return;
         setNotice(errorText(error.message), true);
         button.disabled = false;
       }
