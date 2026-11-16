@@ -1187,3 +1187,11 @@ IronBend V2 היא לא “מערכת הזמנות ברזל”.
 - The canonical Steel itemShapeMetrics is called with prior actual weighing fields excluded to retain the order's comparison basis. Missing/ambiguous baseline blocks the affected selection rather than saving a fictitious comparison.
 - Server preview and save share the same selection service. Any changed item/order context invalidates the preview; the user must review the refreshed basis. Safe retries reuse a key and do not add a second observation. A new weighing creates a new historical record.
 - Group observations cannot be counted once per linked order, nor can the measured total be proportionally assigned to individual orders as measured data. History CSV contains one row per weighing; detail retains all selected item quantities and original specification snapshots for later analysis.
+
+
+### תצוגת פורטל עובד לטלפון — 16.11.2026
+
+- worker-portal is a phone-first layout capped at 480px: navy app bars and bottom navigation, orange scan CTA, compact personal card history, help, and gear-only language/account settings. No machine, storage or weighing input is added.
+- The original production card returned by the shared Production endpoint is visible immediately and can be enlarged. The start/complete/load grid shows permitted actions with only the next server-supported transition enabled; the same shared receipts and stock/state logic remain authoritative.
+- Home counter is the existing history API's distinct-card total for the authenticated worker, labelled as scanned cards rather than daily production or a fabricated weight KPI. History weight comes from the existing item total_weight field.
+- Hebrew/English/Thai share the same layout and translated controls. Printed customer/specification content remains the source card. No API, schema, credentials, production history or QR policy is changed by this presentation update.
