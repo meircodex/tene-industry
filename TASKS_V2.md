@@ -5,13 +5,14 @@
 ## סטטוסים
 
 ### הסרת מקטע עדכון סטטוס כפול — 17.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: user identifies the detail-window status-button strip as redundant.
 - ownership/screens: Orders client presentation only.
 - output: remove that strip and its unused handler/styles; retain list status selector, progress display, production correction/undo and all other original order sections/table. Rename tiny ambiguous completed-progress label to הושלם and make labels readable/non-shrinking.
 - DB/API/events: none.
 - DoD: existing status/auth/escaping/detail/undo tests, full suite and deployed source verification.
+- verification: full suite 1,400 passed; final focused status/auth/detail/undo checks 99 passed after the label adjustment. Live c0eb9df / dep-dbuah5mi0phs7398hovg: orders source matched; duplicate section/handler absent, list selector retained, הושלם label present and health 200. No data or backend changes.
 
 
 ### החזרת דף ההזמנה המקורי — 17.11.2026
