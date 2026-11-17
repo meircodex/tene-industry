@@ -28,3 +28,6 @@ Verified: full npm test 1099/1099; subsequent client/governance/auth checks 147/
 - Existing historical records without saved before-images are not fabricated. HZ-2026-131 was inspected read-only: the live audit records 11 completed and 1 in-production item changed to waiting at 10:39 on 17 November. No live order/item/history/stock was edited for this investigation.
 
 The Orders list now expands the existing single detail panel beneath one row. Parking before list replacement preserves handlers/IDs, filters and selection; request generations reject late responses. Secondary status/edit/print/commercial sections are collapsed. Dashboard and New Order density changes share a scoped stylesheet and keep canonical API calculations.
+
+
+Verification: 1,395 tests passed in the final suite, including route authorization/governance, mixed-status requeue preservation, explicit completion-date restoration, stale/replayed return rejection, document cancellation protection, and the correction dialog-to-API contract. An isolated browser requeue/undo round trip retained 3 completed of 8 and 38% progress. Live release `1219b48`, deployment `dep-dbu7l3942hec73bq8tsg`: source/health/auth checks passed and authenticated inline expansion observed without changing production data.
