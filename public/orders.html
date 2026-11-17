@@ -1693,7 +1693,7 @@ async function undoOrderStatus(id){
     if(!p.available)throw new Error(p.reason);
     const reason=await requestCorrectionReason({title:`חזרה ל״${p.target_status}״`,info:'חזרה לשינוי הקודם תוך שמירת דיווחי הייצור.',defaultReason:'ביטול שינוי סטטוס שנבחר בטעות'});
     if(!reason)return;
-    const response=await fetch(`/api/orders/${id}/status-undo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({restore_point_id:p.restore_point_id,fingerprint:p.fingerprint,reason:reason.reason})});
+    const response=await fetch(`/api/orders/${id}/status-undo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({restore_point_id:p.restore_point_id,fingerprint:p.fingerprint,reason:typeof reason==='string'?reason:reason.reason})});
     const result=await response.json();if(!response.ok)throw new Error(result.error||'החזרה נכשלה');
     await fetchOrders();await openDetail(id);
   }catch(error){alert(error.message);}
