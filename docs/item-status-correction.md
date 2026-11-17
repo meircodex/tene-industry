@@ -51,3 +51,14 @@ Column names toggle ascending/descending order while their independent arrow ope
 Pre-release verification: 1,400 tests passed; local sort/filter composition, A4 language dialog, documents/summary and desktop visual review passed using demo data.
 
 Live verification: `ef9f26a` / `dep-dbu8piifngtc73e3c010` is live. Three frontend assets matched source after newline normalization; health returned 200, anonymous orders and undo returned 401. Authenticated read-only order 133 rendered all 17 items at 66px height and 16px text. Weight sorting returned 14 through 352 in numeric order; the direct A4 button opened the existing language dialog. Desktop screenshot `order-unified-style-live.png` confirms bounded columns, readable drawings and all named actions beside metadata in one compact header. No live production record was changed.
+
+
+## One order page, one document route — 17.11.2026
+
+The complete order now retains compact metadata, notes, progress and commercial summary above its original item table. One document selector swaps the table for the existing authenticated server-generated document in the same workspace; the item DOM and its filters/editor state are preserved on return. One A4 language choice remains in the parent toolbar, which delegates Print/PDF/Send to the existing document handlers. The embedded loader hides duplicate export/language controls only on screen, retaining card picking, diameter grouping, certificate options and all physical print dimensions.
+
+Exports remain disabled until a same-origin message from the current frame matches the order, document kind and load nonce. Switching language/document or closing the workspace rejects late messages and removes listeners. Selecting a delivery document retains its existing draft/source confirmation flow; saved originals use note_id, and mere selection does not issue a shipment. No endpoint, permission, calculation or record-writing behavior changed.
+
+The previous nested tools dialog and duplicate A4 language/send paths were removed. The original edit/cutting forms move into the workspace with the same IDs and handlers and return to their original homes before closing/re-rendering; no cloned fields or lost values. Existing status and correction/undo actions remain available in the same page.
+
+Pre-release: 1,397 tests passed. Local flow checks covered both A4 languages, card picking 8/8→0/8→8/8, return to eight original rows, inline edit/cancel with one customer field, status controls and safe draft-certificate selection. Desktop preview uses demo data.

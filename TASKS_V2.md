@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### דף הזמנה אחד ללא מסלולים כפולים — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: user explicitly requests one compact order page retaining all data and existing design, without nested tools dialogs or repeated language choices.
+- ownership/screens: Orders frontend workspace and existing print loader embedding; no route, DB, stock or production writes.
+- output: always-visible compact metadata/status/commercial summary, one document selector/language/export toolbar, existing server-generated print views within the same order, inline edit/send/cutting panels and saved document access.
+- DB/API/events: none; existing authorization, certificate issuance safeguards and export handlers remain authoritative.
+- DoD: document URL/readiness validation and safe lifecycle tests; sorting/filter/editor/print/auth regressions; full suite; local complete-flow visual inspection and live read-only verification.
+- pre-release: 1,397 tests passed, including replacement of obsolete duplicate-language/send-flow tests with single-workspace URL/readiness/lifecycle/export delegation coverage. Local browser verified A4 he/th, no second language picker, card selection 8→0→8, same-page return, inline edit/cancel with unique IDs, status controls and draft certificate choice with exports locked before selection. Desktop preview confirmed compact visible metadata/status/commercial summary and 66px item rows. No production records changed.
+
+
 ### עיצוב אחיד לפרטי הזמנה ופעולות גלויות — 17.11.2026
 - status: done
 - owner: codex

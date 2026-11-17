@@ -40,11 +40,12 @@ test('numeric canonical metrics sort in both directions, preserve ties and keep 
  assert.deepEqual(table.sort(entries,{key:'line',direction:'desc'}).map(e=>e.id),[3,2,1]);
  assert.equal((table.render(entries).match(/data-detail-sort=/g)||[]).length,9);
 });
-test('order print and document actions remain explicitly named and reuse existing handlers',()=>{
+test('order data and document controls are present in one workspace without nested tool/language dialogs',()=>{
  const fs=require('node:fs'),html=fs.readFileSync(require('node:path').join(__dirname,'../public/orders.html'),'utf8');
- assert.match(html,/class="detail-head-action detail-action-label" href="\/order-print.html\?id=\$\{o.id\}&kind=print-cards"[^>]*>כרטיסיות ייצור/);
- assert.match(html,/onclick="openA4PrintDialog\(\$\{o.id\}\)"[^>]*>גיליון הזמנה/);
- assert.match(html,/openDetailTools\('documents'\)/);
- assert.match(html,/openDetailTools\('print'\)/);
- assert.match(html,/data-detail-tools="documents"/);
+ assert.match(html,/data-document-kind/);assert.match(html,/data-document-language/);
+ assert.match(html,/return header\+hero/);assert.match(html,/commercialSummaryHtml\(o\)/);
+ assert.match(html,/data-order-items/);assert.match(html,/data-order-document/);
+ assert.doesNotMatch(html,/function openDetailTools|detailToolsDialog|function openA4PrintDialog|chooseA4DocumentLanguage/);
+ assert.match(html,/mountDetailTool\('orderEditOverlay'\)/);
+ assert.match(html,/parkAllDetailTools\(\);window.IronBendOrderDocumentView.reset\(\)/);
 });

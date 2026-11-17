@@ -17,6 +17,7 @@
 <script src="/status-contracts-client.js"></script>
 <script src="/order-workspace.js?v=20261113-workflow"></script>
 <script src="/orders-detail-table.js?v=2"></script>
+<script src="/orders-document-view.js?v=1"></script>
 <script src="/order-batch-actions.js?v=1"></script>
 <script src="/order-list-sorting.js?v=1"></script>
 <script src="/straight-stock-inventory.js?v=1"></script>
@@ -316,27 +317,6 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 #certificateCancelDialog{width:min(560px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid var(--border);border-radius:16px;padding:22px;color:var(--text);font-family:inherit;}
 #certificateCancelDialog::backdrop{background:rgba(2,26,72,.55);}#certificateCancelDialog pre{font:inherit;white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;}
 .print-btn.cutting{background:linear-gradient(135deg,#0f766e,#115e59) !important;cursor:pointer;width:100%;}
-.send-file-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1px solid #b9c9dd;border-radius:12px;background:#fff;color:#294764;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;transition:background .16s ease,border-color .16s ease;}
-.send-file-btn:hover{background:#eef5fb;border-color:#7294b6;}
-.send-file-overlay{position:fixed;inset:0;background:rgba(2,26,72,.55);z-index:740;display:none;padding:18px;backdrop-filter:blur(3px);}
-.send-file-overlay.show{display:flex;}
-.send-file-panel{background:#fff;border:1px solid var(--border);border-radius:16px;width:min(560px,100%);margin:auto;box-shadow:0 24px 80px rgba(2,26,72,.3);overflow:hidden;}
-.send-file-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f8fafc;}
-.send-file-title{font-size:18px;font-weight:900;color:var(--text);}
-.send-file-body{padding:16px;display:grid;gap:14px;}
-.send-file-document{border:1px solid #d7e4f1;border-radius:12px;background:#f4f8fc;padding:11px 12px;color:#294764;font-weight:900;}
-.send-file-document small{display:block;margin-top:3px;color:var(--muted);font-size:12px;font-weight:700;}
-.send-file-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.send-file-field{display:flex;flex-direction:column;gap:5px;}
-.send-file-field label{font-size:11px;font-weight:900;color:var(--dim);}
-.send-file-field input{border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-family:inherit;font-size:14px;color:var(--text);background:#fff;direction:ltr;text-align:left;}
-.send-file-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.send-file-action{border:1px solid #cdd9e6;border-radius:11px;background:#fff;color:#1a3856;padding:11px 10px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer;text-align:right;}
-.send-file-action:hover{background:#eef5fb;border-color:#7294b6;}
-.send-file-action.pdf{background:linear-gradient(135deg,#c9621a,#e07b39);border-color:#c9621a;color:#fff;}
-.send-file-hint{border-top:1px solid var(--border);padding-top:11px;color:var(--muted);font-size:12px;line-height:1.5;}
-.send-file-status{min-height:18px;color:#1a7a42;font-size:12px;font-weight:800;}
-
 .straight-stock-overlay{position:fixed;inset:0;background:rgba(2,26,72,.62);z-index:820;display:none;padding:18px;backdrop-filter:blur(4px)}
 .straight-stock-overlay.show{display:flex}
 .straight-stock-panel{width:min(1180px,100%);height:min(900px,100%);margin:auto;background:#fff;border:1px solid var(--border);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 90px rgba(2,26,72,.34)}
@@ -400,7 +380,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .m-card-batch{display:flex;align-items:center;gap:8px;}
 </style>
 <link rel="stylesheet" href="/dense-workspace.css?v=20261117">
-<link rel="stylesheet" href="/orders-detail-table.css?v=2">
+<link rel="stylesheet" href="/orders-detail-table.css?v=3">
 </head>
 <body data-page="orders">
 
@@ -562,33 +542,6 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   </form>
 </div>
 
-<div class="send-file-overlay" id="sendFileOverlay" onclick="closeSendFile(event)">
-  <section class="send-file-panel" aria-labelledby="sendFileTitle">
-    <div class="send-file-head">
-      <div>
-        <div class="send-file-title" id="sendFileTitle">שליחת קובץ PDF</div>
-        <div class="detail-customer" id="sendFileOrderMeta"></div>
-      </div>
-      <button type="button" class="detail-close" onclick="closeSendFilePanel()">✕</button>
-    </div>
-    <div class="send-file-body">
-      <div class="send-file-document" id="sendFileDocument"></div>
-      <div class="send-file-grid">
-        <div class="send-file-field"><label for="sendFilePhone">וואטסאפ / טלפון נמען</label><input id="sendFilePhone" type="tel" autocomplete="tel" placeholder="0500000000"></div>
-        <div class="send-file-field"><label for="sendFileEmail">אימייל נמען</label><input id="sendFileEmail" type="email" autocomplete="email" placeholder="name@example.com"></div>
-      </div>
-      <div class="send-file-actions">
-        <button type="button" class="send-file-action pdf" onclick="openPdfForSending()">📄 פתח שמירה כ‑PDF</button>
-        <button type="button" class="send-file-action" onclick="openWhatsAppForSending()">📎 שלח PDF ב‑WhatsApp</button>
-        <button type="button" class="send-file-action" onclick="openEmailForSending()">✉️ פתח מייל</button>
-        <button type="button" class="send-file-action" onclick="copyDocumentName()">📋 העתק שם קובץ</button>
-      </div>
-      <div class="send-file-status" id="sendFileStatus" aria-live="polite"></div>
-      <div class="send-file-hint">במכשיר נייד תיפתח אפשרות שיתוף עם הקובץ המצורף. במחשב Chrome הקובץ יורד אוטומטית; לאחר מכן צרף/י אותו בשיחת WhatsApp.</div>
-    </div>
-  </section>
-</div>
-
 <div class="edit-overlay" id="correctionReasonOverlay" onclick="closeCorrectionReason(event)">
   <form class="edit-panel" onsubmit="submitCorrectionReason(event)">
     <div class="edit-head"><div class="edit-title" id="correctionReasonTitle">סיבת תיקון לאחר תחילת ייצור</div><button type="button" class="detail-close" onclick="cancelCorrectionReason()">✕</button></div>
@@ -650,7 +603,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 <dialog id="certificateCancelDialog" aria-labelledby="certificateCancelTitle" oncancel="event.preventDefault();resolveCertificateCancellation(false)"><h2 id="certificateCancelTitle">אישור ביטול תעודה לצורך תיקון</h2><pre id="certificateCancelDetails"></pre><div class="actions"><button type="button" class="btn-sm danger" onclick="resolveCertificateCancellation(true)">בטל תעודה ושחרר לתיקון</button><button type="button" class="btn-sm" autofocus onclick="resolveCertificateCancellation(false)">חזור ללא ביטול</button></div></dialog>
 <dialog id="orderPurgeDialog"><form id="orderPurgeForm"><h2>מחיקת הזמנה לצמיתות</h2><p id="orderPurgeTitle"></p><p>פעולה בלתי הפיכה. ההזמנה ופריטיה יימחקו; תיעוד הפעולה יישמר. לא ניתן למחוק הזמנות עם היסטוריית ייצור, אספקה, מלאי או חיוב מקושרת.</p><label>סיסמת / קוד הכניסה של מנהל המערכת<input id="orderPurgePassword" type="password" autocomplete="off" maxlength="128" required></label><label>הקלד את מספר ההזמנה לאישור נוסף<input id="orderPurgeConfirmation" autocomplete="off" required></label><div class="actions"><button class="btn-sm danger" type="submit">אני מאשר מחיקה לצמיתות</button><button class="btn-sm" type="button" onclick="closeOrderPurge()">בטל</button></div></form></dialog>
 <script>
-let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', orderBucket = new URLSearchParams(location.search).get('bucket') || 'active', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, currentSendFile = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
+let allOrders = [], allQuotes = [], activeStatus = new URLSearchParams(location.search).get('status') || '', viewMode = new URLSearchParams(location.search).get('view') === 'quotes' ? 'quotes' : 'orders', orderBucket = new URLSearchParams(location.search).get('bucket') || 'active', ws, _wsDelay = 1000, currentDetailOrder = null, orderEditOrder = null, correctionReasonResolve = null, addChoiceOrderId = null, ocrAddItems = [], currentCancellation = null, currentHistoricalReconciliation = null, straightStockEntries = [], straightStockPolicyByDiameter = {};
 let orderShapeEditor = null, pendingShapeEdit = null;
 let ordersFetchGeneration=0, pendingOrderPurge=null;
 const PRINT_DOCUMENTS = Object.freeze({
@@ -1675,6 +1628,7 @@ async function openDetail(id,options={}) {
     document.getElementById('detailCustomer').textContent=o.customer_name||'';
     resetPrintCardSelection(o.id);
     document.getElementById('detailPanel').classList.add('has-visible-table');
+    parkAllDetailTools();window.IronBendOrderDocumentView.reset();
     document.getElementById('detailBody').innerHTML=buildDetailHTML(o,pkgs);
     if(Number(o.portal_order)===1)loadPortalSourceDocuments(o.id);
     if(inline)attachInlineDetail();else document.getElementById('detailOverlay').classList.add('show');
@@ -1682,6 +1636,7 @@ async function openDetail(id,options={}) {
       if(epoch!==detailRequestEpoch)return;
       renderDetailShapes();syncPrintCardSelection();
       window.IronBendOrderDetailTable.mount(document.getElementById('detailBody'),currentDetailTableEntries,o.id);
+      window.IronBendOrderDocumentView.mount(document.getElementById('detailBody'),o.id);
     });
     history.replaceState(null,'',`?id=${id}`);
   }catch(error){if(epoch===detailRequestEpoch){closeDetailPanel();alert(error.message);}}
@@ -1743,7 +1698,7 @@ function closeOrderEdit(event) {
 }
 
 function closeOrderEditPanel() {
-  document.getElementById('orderEditOverlay').classList.remove('show');
+  parkDetailTool('orderEditOverlay');
   orderEditOrder = null;
 }
 
@@ -1851,42 +1806,6 @@ function printSelectedCards(orderId) {
   closePrintDialog('productionCardPrintDialog');
 }
 
-function openA4PrintDialog(orderId, mode = 'print') {
-  closePrintDialog('a4PrintDialog');
-  const actionMode = mode === 'send' ? 'send' : 'print';
-  const dialog = document.createElement('div');
-  dialog.id = 'a4PrintDialog';
-  dialog.setAttribute('role', 'dialog');
-  dialog.setAttribute('aria-modal', 'true');
-  dialog.style.cssText = 'position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,34,27,.48);';
-  dialog.innerHTML = `<div style="width:min(430px,100%);box-sizing:border-box;padding:22px;border-radius:16px;background:#fff;box-shadow:0 22px 70px rgba(0,0,0,.24);direction:rtl;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
-      <div><h2 style="margin:0;color:#183d2b;font-size:22px;">${actionMode === 'send' ? 'שליחת גיליון הזמנה' : 'הדפסת גיליון הזמנה'}</h2><p style="margin:6px 0 0;color:#587060;font-size:13px;">${actionMode === 'send' ? 'בחר שפה למסמך שיישמר כ‑PDF ולשליחה.' : 'בחר שפה לפני פתיחת ההדפסה.'}</p></div>
-      <button type="button" onclick="closePrintDialog('a4PrintDialog')" aria-label="סגור" style="border:0;background:transparent;color:#587060;font-size:26px;line-height:1;cursor:pointer;">&times;</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px;">
-      <button type="button" onclick="chooseA4DocumentLanguage(${orderId}, 'he', '${actionMode}')" style="padding:16px 12px;border:1px solid #9eb4a5;border-radius:10px;background:#fff;color:#183d2b;cursor:pointer;font-weight:700;">עברית</button>
-      <button type="button" onclick="chooseA4DocumentLanguage(${orderId}, 'th', '${actionMode}')" style="padding:16px 12px;border:0;border-radius:10px;background:#16753e;color:#fff;cursor:pointer;font-weight:700;">ไทย · תאילנדית</button>
-    </div>
-  </div>`;
-  document.body.appendChild(dialog);
-}
-
-function chooseA4DocumentLanguage(orderId, language, mode) {
-  if (mode === 'send') {
-    closePrintDialog('a4PrintDialog');
-    openSendFile(null, orderId, language === 'th' ? 'print-a4-th' : 'print-a4');
-    return;
-  }
-  printA4Document(orderId, language);
-}
-
-function printA4Document(orderId, language) {
-  const languageParam = language === 'th' ? '&lang=th' : '';
-  window.open(`/order-print.html?id=${orderId}&kind=print-a4${languageParam}`, '_blank', 'noopener');
-  closePrintDialog('a4PrintDialog');
-}
-
 function printDocumentUrl(orderId, documentKey, options = {}) {
   const documentInfo = PRINT_DOCUMENTS[documentKey];
   if (!documentInfo) return '';
@@ -1915,120 +1834,6 @@ function printDocumentUrl(orderId, documentKey, options = {}) {
   if (options.autoPrint) params.set('auto_print', '1');
   if (options.autoSend) params.set('auto_send', '1');
   return '/order-print.html?' + params.toString();
-}
-
-function orderForDocumentSending(orderId) {
-  if (currentDetailOrder && Number(currentDetailOrder.id) === Number(orderId)) return currentDetailOrder;
-  return allOrders.find(order => Number(order.id) === Number(orderId)) || null;
-}
-
-function closeSendFile(event) {
-  if (event?.target === document.getElementById('sendFileOverlay')) closeSendFilePanel();
-}
-
-function closeSendFilePanel() {
-  document.getElementById('sendFileOverlay').classList.remove('show');
-  currentSendFile = null;
-}
-
-function safeFilePart(value) {
-  return String(value || 'הזמנה').trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-').slice(0, 80) || 'הזמנה';
-}
-
-function sendDocumentFileName() {
-  if (!currentSendFile) return 'order.pdf';
-  return `${safeFilePart(currentSendFile.document.fileLabel)}-${safeFilePart(currentSendFile.order.order_num)}.pdf`;
-}
-
-function setSendFileStatus(message) {
-  document.getElementById('sendFileStatus').textContent = message || '';
-}
-
-function openSendFile(event, orderId, documentKey) {
-  event?.stopPropagation?.();
-  const documentInfo = PRINT_DOCUMENTS[documentKey];
-  const order = orderForDocumentSending(orderId);
-  if (!documentInfo || !order) {
-    alert('לא ניתן להכין מסמך לשליחה כרגע');
-    return;
-  }
-  currentSendFile = { order, document: documentInfo, documentKey };
-  document.getElementById('sendFileDocument').innerHTML = '';
-  const title = document.createElement('div');
-  title.textContent = documentInfo.label;
-  const subtitle = document.createElement('small');
-  subtitle.textContent = `הזמנה ${order.order_num || '—'} · ${order.customer_name || 'ללא לקוח'} · ${sendDocumentFileName()}`;
-  document.getElementById('sendFileDocument').append(title, subtitle);
-  document.getElementById('sendFileOrderMeta').textContent = `הזמנה ${order.order_num || ''}`;
-  document.getElementById('sendFilePhone').value = order.customer_phone || '';
-  document.getElementById('sendFileEmail').value = order.customer_email || '';
-  setSendFileStatus('');
-  document.getElementById('sendFileOverlay').classList.add('show');
-}
-
-function openPdfForSending() {
-  if (!currentSendFile) return;
-  const target = printDocumentUrl(currentSendFile.order.id, currentSendFile.documentKey, { autoPrint: true });
-  window.open(target, '_blank', 'noopener');
-  setSendFileStatus('נפתח מסמך: בחר/י “שמירה כ‑PDF” בחלון ההדפסה, בשם ' + sendDocumentFileName());
-}
-
-function sendFileMessage() {
-  if (!currentSendFile) return '';
-  return `שלום, מצורף קובץ PDF: ${currentSendFile.document.label} עבור הזמנה ${currentSendFile.order.order_num || ''}.`;
-}
-
-function normalizedRecipientPhone() {
-  return String(document.getElementById('sendFilePhone').value || '').replace(/\D/g, '');
-}
-
-function openWhatsAppForSending() {
-  const phone = normalizedRecipientPhone();
-  if (!phone) {
-    setSendFileStatus('יש להזין מספר טלפון לפני פתיחת WhatsApp.');
-    document.getElementById('sendFilePhone').focus();
-    return;
-  }
-  const target = printDocumentUrl(currentSendFile.order.id, currentSendFile.documentKey, { autoSend: true });
-  window.open(target, '_blank', 'noopener');
-  setSendFileStatus('נפתח מסך שיתוף PDF. במובייל בחר/י WhatsApp; במחשב הקובץ יורד ואז יש לצרף אותו לשיחה.');
-}
-
-function openEmailForSending() {
-  const email = String(document.getElementById('sendFileEmail').value || '').trim();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    setSendFileStatus('יש להזין כתובת אימייל תקינה לפני פתיחת מייל.');
-    document.getElementById('sendFileEmail').focus();
-    return;
-  }
-  const subject = currentSendFile ? `${currentSendFile.document.label} – הזמנה ${currentSendFile.order.order_num || ''}` : 'מסמך הזמנה';
-  window.location.href = 'mailto:' + encodeURIComponent(email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(sendFileMessage());
-  setSendFileStatus('חלון המייל נפתח. לאחר שמירת ה‑PDF צרף/י את הקובץ להודעה.');
-}
-
-async function copyDocumentName() {
-  const filename = sendDocumentFileName();
-  try {
-    await navigator.clipboard.writeText(filename);
-    setSendFileStatus('שם הקובץ הועתק: ' + filename);
-  } catch {
-    setSendFileStatus('שם הקובץ: ' + filename);
-  }
-}
-
-let activeItemCorrectionPreview = null;
-function renderItemCorrectionEffect() {
-  const preview = activeItemCorrectionPreview;
-  if (!preview) return;
-  const cancel = document.getElementById('correctionShipmentMode').value === 'cancel_unshipped_certificate';
-  const notes = preview.certificates || [];
-  const ids = notes.map(note => note.id).join(', ');
-  const affected = new Set(notes.flatMap(note => note.affected_items || []).map(item => item.id)).size;
-  document.getElementById('correctionShipmentEffect').textContent = cancel
-    ? `תעודות ${ids} יישמרו כמבוטלות. הכמויות של כל ${affected} הפריטים בתעודות ישתחררו לתעודה חדשה. דיווחי הייצור והמלאי נשמרים.`
-    : notes.length
-      ? `תעודות ${ids} נשארות תקפות. ${preview.documented_qty} יחידות מתועדות במשלוח; החזרה לעבודה לא מאפשרת לשלוח אותן שוב. ${!preview.can_cancel_certificates ? (notes.find(note => note.blocked_reason)?.blocked_reason || 'נדרש אימות היסטוריית התעודה לפני ביטולה.') : ''}`
-      : 'החזרה לשלב שנבחר תשמור את דיווחי הייצור והאספקה הקודמים ביומן.';
 }
 
 function requestCorrectionReason() {
@@ -2106,7 +1911,7 @@ async function openOrderEdit(event, orderId) {
     document.getElementById('orderEditCorrectionField').hidden = !hasStarted;
     document.getElementById('orderEditCorrectionReason').value = '';
     document.getElementById('orderEditMeta').textContent = `הזמנה ${order.order_num || ''}`;
-    document.getElementById('orderEditOverlay').classList.add('show');
+    mountDetailTool('orderEditOverlay');
   } catch (error) {
     alert(error.message || 'פתיחת עריכת ההזמנה נכשלה');
   }
@@ -2279,7 +2084,7 @@ function buildStraightStockEntries(order) {
 function openStraightStockCutting(event, orderId) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
-  openSelectedStraightStockCutting([orderId]).catch(error=>alert(error.message));
+  openSelectedStraightStockCutting([orderId]).then(()=>mountDetailTool('straightStockOverlay')).catch(error=>alert(error.message));
 }
 
 function openSelectedStraightStockCutting(orderIds){return IronBendOrderCutting.open(orderIds);}
@@ -2291,7 +2096,7 @@ function closeStraightStockCutting(event) {
 function closeStraightStockCuttingPanel() {
   IronBendOrderCutting.close();
   document.body.classList.remove('straight-stock-printing');
-  document.getElementById('straightStockOverlay').classList.remove('show');
+  parkDetailTool('straightStockOverlay');
 }
 
 function renderStraightStockItems() {
@@ -3022,7 +2827,7 @@ function issuedDeliveryDocumentsHtml(o, progress) {
     ${notes.map(note => {
       const label = String(note.note_num || '').startsWith('CERT-') ? `תעודה ${Number(note.id)}` : (note.note_num || `תעודה ${Number(note.id)}`);
       const date = /^\d{4}-\d{2}-\d{2}/.test(String(note.issued_at || '')) ? String(note.issued_at).slice(0, 10).split('-').reverse().join('.') : '';
-      return `<div class="issued-delivery-document${note.cancelled_at?' is-cancelled':''}"><a target="_blank" rel="noopener" href="/order-print.html?id=${Number(o.id)}&kind=delivery-certificate&note_id=${Number(note.id)}">${escHtml(label)}${date ? ` · ${escHtml(date)}` : ''}${note.cancelled_at?' · מבוטלת':''} · פתיחה והדפסה</a>
+      return `<div class="issued-delivery-document${note.cancelled_at?' is-cancelled':''}"><a data-saved-document="${Number(note.id)}" href="/order-print.html?id=${Number(o.id)}&kind=delivery-certificate&note_id=${Number(note.id)}">${escHtml(label)}${date ? ` · ${escHtml(date)}` : ''}${note.cancelled_at?' · מבוטלת':''} · פתיחה והדפסה</a>
         ${note.cancelled_at?`<div class="issued-delivery-note">מבוטלת: ${escHtml(note.cancellation_reason)}</div>`:canCancel&&note.can_cancel?`<button type="button" class="btn-sm danger issued-delivery-cancel" onclick="cancelIssuedCertificate(${Number(o.id)},${Number(note.id)})">בטל תעודה לצורך תיקון</button>`:''}
         ${note.replaces_note_ids?.length?`<div class="issued-delivery-note">מחליפה תעודות מבוטלות: ${note.replaces_note_ids.map(Number).join(', ')}</div>`:''}</div>`;
     }).join('') || `<div class="issued-delivery-empty">${progress.shipped_unit_count ? 'יש פריטים שנשלחו, אך לא נמצאה תעודת מקור שמורה. אין לשחזר תעודה מהסטטוס בלבד.' : 'טרם נשמרו תעודות מקור. לאחר הפקת מקור הוא יופיע כאן להדפסה חוזרת.'}</div>`}
@@ -3045,41 +2850,26 @@ let currentDetailTableEntries=[];
 function buildDetailHTML(o, pkgs) {
   const driverNotes = visibleOrderNote(o.driver_notes);
 
-  const hero = `<div class="detail-hero">
-    <div class="hero-card">
-      <div class="hero-title">לקוח / הזמנה</div>
-      <div class="hero-main">${escHtml(o.customer_name ?? '—')}</div>
-      <div style="margin-top:8px"><span class="badge ${sBadgeClass(o.status)}">${escHtml(primaryOrderStatusLabel(o))}</span>${deliveryProgressBadge(o)}</div>
-      <div class="hero-metric">
-        <div class="metric-box"><div class="metric-label">אספקה</div><div class="metric-value">${escHtml(o.delivery_date ?? '—')}</div></div>
-        <div class="metric-box"><div class="metric-label">משקל</div><div class="metric-value" style="color:var(--accent)">${(o.total_weight||0).toFixed(1)} ק"ג</div></div>
-      </div>
-      ${orderHeroInfoHtml(o, driverNotes)}
-      <a class="btn-sm" href="/quality.html?weigh_orders=${Number(o.id)}">⚖ שקילת איכות להזמנה</a>
-    </div>
-    <div class="hero-card">
-      <div class="hero-title">סטטוס הזמנה</div>
-      ${orderStatusPanel(o)}
-    </div>
-  </div>`;
-
-  // ── Print buttons
   const deliveryProgress = o.delivery_progress || { total_item_count: 0, loaded_item_count: 0, remaining_item_count: 0, certificates: [] };
-  const loadedItemCount = deliveryProgress.loaded_item_count;
-  const prints = `<div class="print-btns">
-    <div class="print-action-pair"><a class="print-btn cards" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">&#128424;&#65039; &#1499;&#1512;&#1496;&#1497;&#1505;&#1497;&#1493;&#1514; &#1497;&#1497;&#1510;&#1493;&#1512;</a></div>
-    <div class="print-action-pair"><button type="button" class="print-btn a4" onclick="openA4PrintDialog(${o.id})">📄 גיליון הזמנה</button></div>
-    <div class="print-action-pair"><a class="print-btn delivery" href="/order-print.html?id=${o.id}&kind=delivery-certificate" target="_blank" rel="noopener">📋 תעודת משלוח — ללא תעודה ${deliveryProgress.certificate_remaining_item_count ?? deliveryProgress.remaining_item_count} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
-    <div class="print-action-pair"><button type="button" class="print-btn cutting" onclick="openStraightStockCutting(event,${o.id})">✂️ תוכנית חיתוך ממוטות</button></div>
-    <div class="print-action-pair"><a class="print-btn delivery" ${loadedItemCount ? `href="/order-print.html?id=${o.id}&kind=delivery-certificate&item_status=${encodeURIComponent(ITEM_STATUS.LOADED)}"` : 'aria-disabled="true"'} target="_blank" rel="noopener" style="${loadedItemCount ? '' : 'opacity:.5;pointer-events:none'}">📋 תעודה חלקית — הועמסו ${loadedItemCount} מתוך ${deliveryProgress.total_item_count} פריטים</a></div>
-    ${issuedDeliveryDocumentsHtml(o, deliveryProgress)}
+  const hero = `<div class="order-page-facts">${orderHeroInfoHtml(o,driverNotes)}
+    ${o.customer_phone?`<span>טלפון: <b>${escHtml(o.customer_phone)}</b></span>`:''}
+    ${o.customer_email?`<span>אימייל: <b>${escHtml(o.customer_email)}</b></span>`:''}
+    ${visibleOrderNote(o.general_notes)?`<span>הערות: <b>${escHtml(visibleOrderNote(o.general_notes))}</b></span>`:''}
+  </div><div class="order-page-progress">${orderStatusPanel(o)}</div>`;
+  const prints = `<div class="order-document-toolbar">
+    <button type="button" class="btn-sm" data-document-back hidden>פריטי ההזמנה</button>
+    <label>תצוגה <select data-document-kind aria-label="תצוגת הזמנה ומסמכים"><option value="">פריטי ההזמנה</option><option value="print-cards">כרטיסיות ייצור</option><option value="print-a4">גיליון הזמנה</option><option value="delivery-certificate">תעודת משלוח</option></select></label>
+    <label>שפת גיליון <select data-document-language aria-label="שפת גיליון ההזמנה"><option value="he">עברית</option><option value="th">ไทย</option></select></label>
+    <button type="button" class="btn-sm" data-document-action="print" disabled>הדפס</button>
+    <button type="button" class="btn-sm" data-document-action="download" disabled>הורד PDF</button>
+    <button type="button" class="btn-sm" data-document-action="send" disabled>שלח</button>
+    <button type="button" class="btn-sm" onclick="openStraightStockCutting(event,${o.id})">תוכנית חיתוך</button>
+    <a class="btn-sm" href="/quality.html?weigh_orders=${Number(o.id)}">שקילת איכות</a>
   </div>`;
-
   const hasStartedProduction = orderHasStartedProduction(o);
   const orderActions = `<div class="d-section">
     <div class="d-title">✎ תיקון הזמנה</div>
     <div class="review-actions">
-      <button class="review-btn primary" onclick="openOrderEdit(event, ${o.id})">ערוך פרטי הזמנה</button>
       ${o.status === ORDER_STATUS.CANCELLED ? '' : `<button class="review-btn danger" onclick="openCancellationReview(event, ${o.id})">בטל הזמנה + החלטת תוצרת</button>`}
       <button class="review-btn danger" onclick="deleteOrder(${o.id},${jsAttr(o.order_num)})">העבר לסל המחזור</button>
     </div>
@@ -3198,7 +2988,7 @@ function buildDetailHTML(o, pkgs) {
       });
     });
   });
-  const itemsSec=window.IronBendOrderDetailTable.render(currentDetailTableEntries,`${_totalLines} פריטים · ${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})} ק״ג`);
+  const itemsSec=window.IronBendOrderDetailTable.render(currentDetailTableEntries);
 
   // ── Packages
   let pkgSec = '';
@@ -3220,44 +3010,49 @@ function buildDetailHTML(o, pkgs) {
     pkgSec = `<div class="d-section"><div class="d-title">🏷️ חבילות</div>${pkgRows}</div>`;
   }
 
-  const undo=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)?`<button type="button" class="detail-head-action" onclick="undoOrderStatus(${o.id})" title="חזרה מהשינוי האחרון" aria-label="חזרה מהשינוי האחרון">↶</button>`:'';
-  const note=visibleOrderNote(o.general_notes)||driverNotes;
+  const undo=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)?`<button type="button" class="btn-sm" onclick="undoOrderStatus(${o.id})">חזרה משינוי</button>`:'';
   const header=`<div class="detail-flat-head">
     <strong class="detail-flat-number">${escHtml(o.order_num)}</strong><strong>${escHtml(o.customer_name||'—')}</strong>
     <span class="detail-flat-state">${escHtml(workStatus)}</span>
-    ${o.delivery_address?`<span title="אתר">${escHtml(o.delivery_address)}</span>`:''}
-    ${o.delivery_date?`<span title="אספקה" class="detail-flat-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span>`:''}
-    <span>${urgentLabel(o)}</span>${note?`<span class="detail-flat-note" title="${escHtml(note)}">${escHtml(note)}</span>`:''}
+    <span>${_totalLines} פריטים · ${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})} ק״ג</span>
+    ${o.delivery_date?`<span>אספקה: <span class="detail-flat-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span></span>`:''}
+    <span>${urgentLabel(o)}</span>
     <span class="detail-head-actions">
-      <a class="detail-head-action detail-action-label" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">כרטיסיות ייצור</a>
-      <button type="button" class="detail-head-action detail-action-label" onclick="openA4PrintDialog(${o.id})">גיליון הזמנה</button>
-      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('print')">משלוח וחיתוך</button>
-      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('documents')" title="מסמכים וסיכום" aria-label="מסמכים וסיכום">מסמכים וסיכום</button>
-      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('edit')" title="עריכת הזמנה וסטטוס" aria-label="עריכת הזמנה וסטטוס">עריכה</button>
-      <button type="button" class="detail-head-action" onclick="openAddItem(event, ${o.id})" title="הוסף פריט" aria-label="הוסף פריט">＋</button>
-      ${undo}<button type="button" class="detail-head-action" onclick="closeDetailPanel()" title="סגור" aria-label="סגור פרטי הזמנה">×</button>
+      <button type="button" class="btn-sm" onclick="openOrderEdit(event, ${o.id})">עריכה</button>
+      <button type="button" class="btn-sm" onclick="openAddItem(event, ${o.id})">הוסף פריט</button>
+      <button type="button" class="btn-sm" onclick="toggleOrderStatusActions(this)" aria-expanded="false">סטטוס ופעולות</button>
+      ${undo}<button type="button" class="detail-head-action" onclick="closeDetailPanel()" aria-label="סגור פרטי הזמנה">×</button>
     </span>
   </div>`;
-  return header+itemsSec+
-    `<template data-detail-tools="print">${prints}</template><template data-detail-tools="documents">${hero}${commercialSummaryHtml(o)}${pkgSec}</template><template data-detail-tools="edit">${orderActions}${statusSec}</template>`;
-
+  const hasIssued=deliveryProgress.certificates?.length||deliveryProgress.shipped_unit_count||deliveryProgress.history_needs_review;
+  return header+hero+`<div class="order-page-commercial">${commercialSummaryHtml(o)}</div>`+prints+
+    `<div class="order-page-status-actions" hidden>${statusSec}${orderActions}</div><div id="orderInlineToolHost" hidden></div>`+
+    `<div data-order-items>${itemsSec}${pkgSec}</div><div data-order-document hidden></div>`+
+    (hasIssued?issuedDeliveryDocumentsHtml(o,deliveryProgress):'');
 }
-
-function openDetailTools(kind){
-  const template=document.querySelector(`#detailBody template[data-detail-tools="${kind}"]`);
-  if(!template)return;
-  let dialog=document.getElementById('detailToolsDialog');
-  if(!dialog){dialog=document.createElement('dialog');dialog.id='detailToolsDialog';dialog.className='detail-tools-dialog';document.body.appendChild(dialog);
-    dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('button,a'))dialog.close();});}
-  const title={print:'הדפסה',documents:'מסמכים וסיכום',edit:'עריכת הזמנה וסטטוס'}[kind]||'';
-  dialog.innerHTML=`<div class="detail-tools-heading"><strong>${title}</strong><button type="button" class="detail-head-action" aria-label="סגור">×</button></div>`+template.innerHTML;
-  dialog.showModal();
+function toggleOrderStatusActions(button){
+  const panel=document.querySelector('.order-page-status-actions');if(!panel)return;
+  panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));
+}
+const detailToolHomes=new Map();
+function parkDetailTool(id){
+  const element=document.getElementById(id);if(!element)return;
+  element.classList.remove('show');
+  const home=detailToolHomes.get(id);if(home){home.after(element);home.remove();detailToolHomes.delete(id);}
+  const host=document.getElementById('orderInlineToolHost');if(host)host.hidden=!host.children.length;
+}
+function parkAllDetailTools(){for(const id of [...detailToolHomes.keys()])parkDetailTool(id);}
+function mountDetailTool(id){
+  parkAllDetailTools();const element=document.getElementById(id),host=document.getElementById('orderInlineToolHost');
+  if(!element)return;
+  if(host){const home=document.createComment(id);element.before(home);detailToolHomes.set(id,home);host.appendChild(element);host.hidden=false;}
+  element.classList.add('show');
 }
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }
 function closeDetailPanel() {
   detailRequestEpoch++;
-  document.getElementById('detailToolsDialog')?.close();
+  parkAllDetailTools();window.IronBendOrderDocumentView.reset();
   parkInlineDetail();inlineOrderId=null;currentDetailOrder=null;
   window.IronBendOrderDetailTable.reset();
   document.getElementById('detailOverlay').classList.remove('show');
