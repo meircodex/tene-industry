@@ -186,3 +186,7 @@ The public challenge/connect pair accepts only a deployment-provisioned Ed25519 
 
 ### Reporting worker directory — 16.11.2026
 Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.
+
+
+## Factory station connection — 2026-11-17
+GET /api/machine-integration/station-state: requireAnyRole office/production/maintenance/manager/admin, no anonymous QR or station-credential fallback. /api/worker-portal/machine-feedback/*: approved personal device or portal session + active account + start/complete permission; completion commands require complete. Card token/item/machine assertions and actor-scoped request result reads remain mandatory.

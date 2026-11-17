@@ -1,6 +1,7 @@
 (function(root){
  'use strict';
- const KEY='ib-worker-machine-source-v1',OUTBOX='ib-worker-machine-feedback-outbox-v1';
+ const KEY='ib-worker-machine-source-v1';let OUTBOX='ib-worker-machine-feedback-outbox-v1';
+ let transport=null,apiBase='/api/machine-feedback',enabled=!document.documentElement.hasAttribute('data-personal-worker-portal'),session=0;
  const S={stations:[],current:null,source:null,runId:null,mirror:null,generation:0,busy:false,dialog:null,allRows:false};
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const uuid=()=>root.crypto?.randomUUID?.()||'mif-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
@@ -8,18 +9,22 @@
  const stored=key=>{try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}};
  const save=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{return false;}};
  async function json(url,options={},signal){
+  if(!enabled)throw Error('MACHINE_FEEDBACK_SESSION_REQUIRED');
+  if(transport)return transport(url,{...options,signal:signal||AbortSignal.timeout(4000)});
   const response=await fetch(url,{cache:'no-store',...options,signal:signal||AbortSignal.timeout(4000)}),body=await response.json();
   if(!response.ok)throw Error(body?.error||'MACHINE_FEEDBACK_UNAVAILABLE');return body;
  }
  async function request(context,action,payload,{id=uuid(),timeout=4500}={}){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);
-  const base='/api/machine-feedback',body={requestId:id,sourceId:context.sourceId,itemId:Number(context.itemId),card:context.card,action,payload};
+  const base=apiBase,epoch=session,body={requestId:id,sourceId:context.sourceId,itemId:Number(context.itemId),card:context.card,action,payload};
   try{
    let result=await json(base+'/requests',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)},controller.signal);
    while(result.state==='pending'){
     await new Promise(resolve=>setTimeout(resolve,250));
+    if(epoch!==session)throw Error('MACHINE_FEEDBACK_SESSION_CHANGED');
     result=await json(base+'/requests/'+encodeURIComponent(result.id)+'?card='+encodeURIComponent(context.card),{},controller.signal);
    }
+   if(epoch!==session)throw Error('MACHINE_FEEDBACK_SESSION_CHANGED');
    if(result.state!=='done')throw Error('WORKER_MACHINE_REQUEST_EXPIRED');
    if(result.result?.ok!==true)throw Error(result.result?.error||'MACHINE_FEEDBACK_UNAVAILABLE');
    return result.result.data;
@@ -35,7 +40,7 @@
  }
  function status(message,live=false){const el=document.querySelector('#workerMachineFeedback .mif-status');if(el){el.textContent=message;el.dataset.live=String(live);}}
  function render(){
-  if(!S.stations.length||!S.current)return;const el=host();if(!el)return;
+  const el=host();if(!el)return;el.hidden=!S.current||!S.stations.length;if(el.hidden)return;
   const m=S.mirror,source=S.stations.find(s=>s.sourceId===S.source),expected=m?.expected?.sidesMm||[];
   el.innerHTML='<div class="mif-head"><strong>פרמטרים במכונה</strong><span class="mif-machine-label">'+(source?'מכונה '+esc(source.label):'שיוך אוטומטי')+'</span><span class="mif-status" data-live="false">ממתין לקריאת בקר</span></div>';
   if(!source){status('אין תחנה מקוונת ותואמת לכרטיס · העבודה הרגילה ממשיכה');return;}
@@ -83,24 +88,27 @@
    document.body.append(dialog);dialog.querySelector('#mif-done').onclick=()=>dialog.close('done');dialog.querySelector('#mif-back').onclick=()=>dialog.close('cancel');dialog.showModal();
   });
  }
- async function beforeComplete({itemId,card}){
+ async function beforeComplete({itemId,card,confirm}){
   if(!S.current||S.current.completed||S.current.itemId!==Number(itemId)||S.current.card!==card||!S.source||!S.runId)return null;
   const generation=S.generation,context={...S.current,sourceId:S.source,runId:S.runId};
   try{
    const result=await request(context,'completion.prepare',{runId:context.runId},{timeout:6000});
    if(generation!==S.generation)return {cancelled:true};
    if(result.card!==context.card||result.runId!==context.runId||result.sourceId!==context.sourceId)throw Error('MACHINE_SCOPE_MISMATCH');
-   const choice=result.proposal.requiresParameterConfirmation?await confirmDialog(result.proposal):{cancelled:false,saveRecipe:false};
-   return {...context,...choice,proposalId:result.proposal.id};
+   const needsConfirmation=result.proposal.requiresParameterConfirmation;
+   const choice=needsConfirmation?await(confirm?confirm(result.proposal):confirmDialog(result.proposal)):{cancelled:false,saveRecipe:false};
+   if(generation!==S.generation)return {cancelled:true};
+   return {...context,...choice,confirmed:needsConfirmation,proposalId:result.proposal.id};
   }catch(error){status('אפשר להשלים כרגיל · אין קריאה עדכנית לשמירת מתכון');return {...context,saveRecipe:false,proposalId:null};}
  }
  function outbox(){const items=stored(OUTBOX);return Array.isArray(items)?items:[];}
  let flushing=false;
  async function flush(){
-  if(flushing)return;flushing=true;
+  if(flushing||!enabled)return;flushing=true;const epoch=session,key=OUTBOX;
   try{for(const entry of outbox().slice(0,5)){
+   if(epoch!==session)break;
    try{const result=await request(entry.context,'completion.record',entry.payload,{id:entry.id,timeout:4500});
-    save(OUTBOX,outbox().filter(v=>v.id!==entry.id));
+    if(epoch!==session)break;save(key,outbox().filter(v=>v.id!==entry.id));
     if(S.current?.card===entry.context.card)status(result.approvalSaved?'הכרטיס הושלם · הפרמטרים שאישרת נשמרו':entry.payload.saveRecipe?'הכרטיס הושלם · המתכון לא אושר לשמירה: הקריאה השתנתה או אינה עדכנית':'השלמת הכרטיס תועדה במוניטור');
    }catch{break;}
   }}finally{flushing=false;}
@@ -115,13 +123,16 @@
   const pending=outbox();if(pending.length>=100){status('הכרטיס הושלם · תור משוב המוניטור מלא');return;}pending.push(entry);save(OUTBOX,pending);flush();
  }
  async function refreshStations(){
-  try{const result=await json('/api/machine-feedback/stations');S.stations=Array.isArray(result.items)?result.items:[];if(S.current){const next=chooseSource(S.current);if(next!==S.source){S.generation++;S.source=next;S.runId=null;S.mirror=null;S.current.openRequestId=uuid();}render();tick();}}catch{}
+  if(!enabled)return;const epoch=session;
+  try{const result=await json(apiBase+'/stations');if(epoch!==session)return;S.stations=Array.isArray(result.items)?result.items:[];if(S.current){const next=chooseSource(S.current);if(next!==S.source){S.generation++;S.source=next;S.runId=null;S.mirror=null;S.current.openRequestId=uuid();}render();tick();}}catch{}
  }
  async function initialize(){
   await refreshStations();
   setInterval(()=>{tick();flush();},4000);
   setInterval(()=>{if(!document.hidden)refreshStations();},10000);
  }
- root.IronBendMachineFeedback={onCardOpened,beforeComplete,afterComplete};
+ function reset(){session++;enabled=false;S.generation++;S.dialog?.close('cancel');S.current=null;S.source=null;S.runId=null;S.mirror=null;S.stations=[];const el=document.getElementById('workerMachineFeedback');if(el){el.replaceChildren();el.hidden=true;}}
+ function configure({api,base,userId}){reset();transport=api;apiBase=base;OUTBOX='ib-worker-machine-feedback-outbox-v1-user-'+encodeURIComponent(String(userId));enabled=true;refreshStations();flush();}
+ root.IronBendMachineFeedback={onCardOpened,beforeComplete,afterComplete,configure,reset};
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize,{once:true});else initialize();
 })(window);

@@ -14,7 +14,7 @@ module.exports = function createWorkerMachineFeedbackRouter(deps) {
   const actor = req => req.userId || req.auth?.sub ? 'user:' + (req.userId || req.auth.sub) : req.approvedDevice?.id
     ? 'device:' + req.approvedDevice.id : 'qr:' + createHash('sha256').update(String(req.query.card || req.body?.card || '')).digest('hex');
   router.get('/stations', requireQrPermission('production'), (req, res) => {try{res.set('Cache-Control','no-store');res.json(service.stations({limit:Number(req.query.limit||100),offset:Number(req.query.offset||0)}));}catch(error){res.status(error.status||400).json({error:error.message});}});
-  router.get('/snapshot',stationOrRole(service,requireQrPermission('production')),(req,res)=>{
+  if(deps.includeSnapshot!==false)router.get('/snapshot',stationOrRole(service,requireQrPermission('production')),(req,res)=>{
     try{
       service.authorize(req.query.sourceId,req.headers['x-station-credential']);
       const parsed=parseCard(req.query.card);if(!parsed?.itemId)return res.status(422).json({error:'invalid_worker_card_token'});

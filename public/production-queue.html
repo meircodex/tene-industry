@@ -186,6 +186,7 @@
 <script src="/status-contracts-client.js"></script>
 <script src="/shape-renderer.js?v=6" defer></script>
 <script src="/nav.js" defer></script>
+<link rel="stylesheet" href="/factory-station-status.css?v=20261117">
 </head>
 <body data-page="production-queue">
 
@@ -239,6 +240,7 @@
 
 <!-- CONTENT -->
 <div class="content">
+  <section id="factoryStationStatus" class="factory-station-status" aria-label="חיבור למכונות" aria-live="polite"></section>
   <section class="queue-filters" aria-label="סינון כרטיסיות ייצור">
     <label>קוטר<select id="queueFilterDiameter" onchange="applyQueueFilters()"><option value="">כל הקטרים</option></select></label>
     <label>לקוח<select id="queueFilterCustomer" onchange="applyQueueFilters()"><option value="">כל הלקוחות</option></select></label>
@@ -754,5 +756,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 init();
 </script>
 <script src="/production-i18n.js?v=2" defer></script>
+<script src="/factory-station-status.js?v=20261117"></script>
 </body>
 </html>

@@ -5,6 +5,14 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('factory monitor connection reuses personal worker identity and owns no production mutation',()=>{
+ const portal=fs.readFileSync(path.join(root,'routes/workerPortal.js'),'utf8'),route=fs.readFileSync(path.join(root,'routes/machineStation.js'),'utf8');
+ assert.match(portal,/worker-portal\/machine-feedback/);assert.match(portal,/req\.portalWorker\.permissions/);assert.match(portal,/includeSnapshot:false/);
+ assert.match(route,/station-state',requireAnyRole/);
+ for(const page of ['production-queue.html','machine.html'])assert.match(fs.readFileSync(path.join(root,'public',page),'utf8'),/factory-station-status.js/);
+ assert.match(fs.readFileSync(path.join(root,'public/worker-portal.html'),'utf8'),/worker-machine-feedback.js/);
+});
+
 test('station queue is a scoped read projection of Production and does not own scheduling or manufacturing writes',()=>{
  const route=fs.readFileSync(path.join(root,'routes/machineStation.js'),'utf8'),service=fs.readFileSync(path.join(root,'services/machineIntegration/productionQueue.js'),'utf8');
  assert.match(route,/station-queue',stationAccess/);assert.match(service,/readProductionQueueItems/);assert.match(service,/itemScanCode/);

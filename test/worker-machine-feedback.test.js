@@ -17,6 +17,19 @@ function fixture(t) {
 }
 const input = (overrides={}) => ({requestId:'SYNTHETIC-request',sourceId:'station-6',itemId:9,card:CARD,action:'card.open',payload:{receiptId:1},...overrides});
 
+test('factory state separates station presence from live PLC data and hides reassigned evidence',t=>{
+ const f=fixture(t);f.db.exec("ALTER TABLE items ADD COLUMN machine_id INTEGER;ALTER TABLE items ADD COLUMN machine TEXT;UPDATE items SET machine_id=1,machine='מכונה 6' WHERE id=9");
+ f.service.pending('station-6',f.binding.credential);
+ assert.equal(f.service.stationState({machineId:1}).items[0].controller,'unknown');
+ const data={sourceId:'station-6',machineId:'machine6',runId:'run1',card:CARD,live:true,observedAtUtc:'2026-11-15T10:00:00.000Z',rows:[{slot:1,length:300}],physicalAccuracyKnown:true};
+ f.service.publish('station-6',f.binding.credential,data);
+ const first=f.service.stationState({machineId:1,limit:1});assert.equal(first.total,1);assert.equal(first.items[0].mirror.live,true);assert.equal(first.items[0].mirror.physicalAccuracyKnown,false);assert.ok(!JSON.stringify(first).includes(f.binding.credential));
+ f.advance(6000);assert.equal(f.service.stationState().items[0].controller,'last-reading');assert.equal(f.service.stationState().items[0].online,true);
+ f.advance(5000);assert.equal(f.service.stationState().items[0].online,false);
+ f.db.prepare("UPDATE items SET machine_id=2,machine='תלת מימד' WHERE id=9").run();assert.equal(f.service.stationState({machineId:1}).items[0].mirror,null);
+ assert.throws(()=>f.service.stationState({machineId:0}),/INVALID_STATION_MACHINE/);
+});
+
 test('the real factory QR policy keeps open scanning open and still denies unapproved devices in secure mode',async t=>{
  const f=fixture(t),express=require('express'),app=express();app.use(express.json());let accessMode='open';
  const qr=require('../services/qrAccess').createQrAccessService({db:f.db,settingsService:{get:()=>accessMode},deviceEnrollment:{statusForRequest:()=>null}});
