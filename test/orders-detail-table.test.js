@@ -31,21 +31,17 @@ test('untrusted names, source numbers, statuses and warnings remain text in head
  assert.doesNotMatch(html,/<script|<img|title=""/);assert.match(html,/&lt;img/);assert.match(html,/&lt;script/);
 });
 
-test('numeric canonical metrics sort in both directions, preserve ties and keep missing values last',()=>{
- const data=[{id:1,values:{length:'100 ס״מ'},sortValues:{length:1000}},{id:2,values:{length:'20 ס״מ'},sortValues:{length:200}},{id:3,values:{length:'20 ס״מ'},sortValues:{length:200}},{id:4,values:{length:'—'}}];
- const before=JSON.stringify(data);
- assert.deepEqual(table.sort(data,{key:'length',direction:'asc'}).map(e=>e.id),[2,3,1,4]);
- assert.deepEqual(table.sort(data,{key:'length',direction:'desc'}).map(e=>e.id),[1,2,3,4]);
- assert.equal(JSON.stringify(data),before);
- assert.deepEqual(table.sort(entries,{key:'line',direction:'desc'}).map(e=>e.id),[3,2,1]);
- assert.equal((table.render(entries).match(/data-detail-sort=/g)||[]).length,9);
+test('dimension labels reach 11 screen pixels at the thumbnail scale without shrinking larger labels',()=>{
+ const font=table.shapeLabelFontSize(600,240,136,48,18);
+ assert.equal(font,55);assert.equal(font*Math.min(136/600,48/240),11);
+ assert.equal(table.shapeLabelFontSize(600,240,136,48,72),72);
+ assert.equal(table.shapeLabelFontSize(600,240,0,48,18),null);
+ assert.equal(table.shapeLabelFontSize(0,240,136,48,18),null);
 });
-test('order data and document controls are present in one workspace without nested tool/language dialogs',()=>{
- const fs=require('node:fs'),html=fs.readFileSync(require('node:path').join(__dirname,'../public/orders.html'),'utf8');
- assert.match(html,/data-document-kind/);assert.match(html,/data-document-language/);
- assert.match(html,/return header\+hero/);assert.match(html,/commercialSummaryHtml\(o\)/);
- assert.match(html,/data-order-items/);assert.match(html,/data-order-document/);
- assert.doesNotMatch(html,/function openDetailTools|detailToolsDialog|function openA4PrintDialog|chooseA4DocumentLanguage/);
- assert.match(html,/mountDetailTool\('orderEditOverlay'\)/);
- assert.match(html,/parkAllDetailTools\(\);window.IronBendOrderDocumentView.reset\(\)/);
+test('original order sections and safe undo remain, with only the approved item table replacing the old item cards list',()=>{
+ const html=require('node:fs').readFileSync(require('node:path').join(__dirname,'../public/orders.html'),'utf8');
+ assert.match(html,/return hero \+ prints \+ commercialSummaryHtml\(o\) \+ orderActions \+ statusSec \+ itemsSec \+ pkgSec/);
+ assert.match(html,/id="detailStatusUndo"/);assert.match(html,/async function undoOrderStatus/);
+ assert.doesNotMatch(html,/orders-document-view|detailToolsDialog|order-detail-fold|order-document-toolbar/);
+ assert.match(html,/IronBendOrderDetailTable.mount/);
 });

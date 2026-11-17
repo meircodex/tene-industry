@@ -47,14 +47,17 @@ test('untrusted document and order labels are escaped', () => {
   assert.doesNotMatch(output,/<script>/);
 });
 
-test('one document toolbar preserves saved certificate access and all scripts parse', () => {
- const body = html.slice(end);
- const prints = body.match(/const prints = (`[\s\S]*?`);/)[1];
- assert.match(prints,/data-document-kind/);assert.match(prints,/value="print-cards"/);
- assert.match(prints,/value="print-a4"/);assert.match(prints,/value="delivery-certificate"/);
- assert.match(body,/issuedDeliveryDocumentsHtml\(o,deliveryProgress\)/);
- assert.match(body,/orderHeroInfoHtml\(o,driverNotes\)/);
- for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
+test('issued history occupies sixth print-grid cell and order information is inside top hero', () => {
+  const body = html.slice(end);
+  const prints = body.match(/const prints = (`[\s\S]*?`);/)[1];
+  assert.equal((prints.match(/class="print-action-pair"/g)||[]).length,5);
+  assert.match(prints,/issuedDeliveryDocumentsHtml\(o, deliveryProgress\)/);
+  assert.match(prints,/📄 גיליון הזמנה/);
+  assert.doesNotMatch(prints,/הדפסת A4/);
+  assert.ok(body.indexOf('orderHeroInfoHtml(o, driverNotes)') < body.indexOf('const prints'));
+  assert.doesNotMatch(body,/hero \+ prints \+ info/);
+  // All inline scripts must still parse after editing nested template literals.
+  for (const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 });
 
 test('cancel action requests a reason, guards double clicks and submits a fresh preview fingerprint',async()=>{

@@ -64,3 +64,12 @@ The previous nested tools dialog and duplicate A4 language/send paths were remov
 Pre-release: 1,397 tests passed. Local flow checks covered both A4 languages, card picking 8/8→0/8→8/8, return to eight original rows, inline edit/cancel with one customer field, status controls and safe draft-certificate selection. Desktop preview uses demo data.
 
 Live release `190a9f4` / `dep-dbu982vf3r2c73de4j10` verified: orders, styles, document-view module and print loader matched source; health 200 and anonymous orders/undo 401. Read-only HZ-2026-133 showed all 17 rows and visible facts/work summary. Both A4 languages loaded within the same order URL, with one parent language choice and no child language button. Returning to items removed the frame and restored all rows; ten status actions remained accessible. Desktop evidence: `order-single-page-live.png`. No production records, stock or scan data changed.
+
+
+## Restored original order window with approved table — 17.11.2026
+
+At the user's request, the original order header and section structure are restored: customer/order hero and progress, original document buttons, commercial summary, correction controls, status controls and item section. Only the approved fixed-width item table and its 66px rows replace the previous item-card list; expanding an item still exposes its original editor/history/status controls. The Add to Order button and audited manager undo remain available. List and direct-link entry both open the normal order modal, without nested section folds or the abandoned embedded-document toolbar/module.
+
+The print loader and legacy document paths are restored; no print geometry, production, stock, scanning, authentication or correction/undo services changed. Scoped dimension sizing affects only text inside the on-screen table SVGs, deriving the label font from the SVG viewBox scale for an 11px minimum without shrinking already-larger text. Shapes and canonical metrics are unchanged. Zero-sized/hidden SVGs are skipped, resize recalculates the text size and event listeners are cleaned up.
+
+Pre-release: 1,400 tests passed. Local demo verified the original section order, eight table rows and retained undo, and dimension labels measured ~11.17px on screen. Native wide-window review was stopped by browser URL detection; it is not claimed as completed.

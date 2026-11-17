@@ -7,6 +7,23 @@
   const columns=[['line','פריט'],['name','שם פריט'],['shape','צורה'],['diameter','קוטר'],['length','אורך ס״מ'],['quantity','כמות'],['weight','משקל ק״ג'],['production','ייצור'],['status','מצב']];
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const keyValue=(entry,key)=>String(entry.values[key]??'—');
+  const originalLabelFonts=new WeakMap();
+  function shapeLabelFontSize(viewWidth,viewHeight,width,height,original){
+    if(![viewWidth,viewHeight,width,height,original].every(value=>Number.isFinite(value)&&value>0))return null;
+    const scale=Math.min(width/viewWidth,height/viewHeight);
+    return Math.max(original,11/scale);
+  }
+  function sizeShapeLabels(root){
+    root.querySelectorAll('.detail-line-preview svg').forEach(svg=>{
+      const box=svg.viewBox?.baseVal,rect=svg.getBoundingClientRect();
+      if(!box||!rect.width||!rect.height)return;
+      svg.querySelectorAll('text').forEach(label=>{
+        if(!originalLabelFonts.has(label))originalLabelFonts.set(label,parseFloat(root.ownerDocument.defaultView.getComputedStyle(label).fontSize));
+        const font=shapeLabelFontSize(box.width,box.height,rect.width,rect.height,originalLabelFonts.get(label));
+        if(font)label.style.setProperty('font-size',font+'px','important');
+      });
+    });
+  }
   function project(entries,filters={}){
     return entries.filter(entry=>columns.every(([key])=>!Array.isArray(filters[key])||!filters[key].length||filters[key].includes(keyValue(entry,key))));
   }
@@ -63,6 +80,7 @@
       });
       const count=root.querySelector('[data-detail-visible-count]');if(count)count.textContent=`${visible.length} מתוך ${entries.length} פריטים`;
       const clear=root.querySelector('[data-detail-clear-all]');if(clear)clear.hidden=!Object.values(filters).some(v=>v.length);
+      sizeShapeLabels(root);
     };
     const outside=event=>{if(menu&&!menu.contains(event.target)&&!anchor?.contains(event.target))closeMenu();};
     const keydown=event=>{if(event.key==='Escape'&&menu){event.preventDefault();event.stopPropagation();const button=anchor;closeMenu();button?.focus();}};
@@ -90,9 +108,9 @@
       closeMenu();expanded=expanded===row.dataset.detailMain?null:row.dataset.detailMain;apply();
     };
     root.addEventListener('click',click);root.ownerDocument.addEventListener('click',outside);root.ownerDocument.addEventListener('keydown',keydown,true);
-    const view=root.ownerDocument.defaultView;view.addEventListener('resize',closeMenu);
-    cleanup=()=>{root.removeEventListener('click',click);root.ownerDocument.removeEventListener('click',outside);root.ownerDocument.removeEventListener('keydown',keydown,true);view.removeEventListener('resize',closeMenu);};
+    const view=root.ownerDocument.defaultView,resize=()=>{closeMenu();sizeShapeLabels(root);};view.addEventListener('resize',resize);
+    cleanup=()=>{root.removeEventListener('click',click);root.ownerDocument.removeEventListener('click',outside);root.ownerDocument.removeEventListener('keydown',keydown,true);view.removeEventListener('resize',resize);};
     apply();
   }
-  return {columns,escape,project,sort,options,render,mount,reset};
+  return {columns,escape,project,sort,options,render,mount,reset,shapeLabelFontSize};
 });

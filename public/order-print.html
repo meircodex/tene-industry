@@ -120,18 +120,9 @@
     // loaded.  Scripts inserted by document.write at that point are parsed
     // into the new document but are not reliably executed by Chromium.  Clone
     // them in source order so QR/PDF libraries and the export API all run.
-    const embedded=params.get('workspace_embed')==='1'&&window.parent!==window;
-    if(embedded){
-      const style=document.createElement('style');
-      style.textContent='@media screen{.toolbar>button,.toolbar>a,.toolbar>span:not(.pc-pick-bar),.no-print>button,.no-print>span{display:none!important}body{margin:8px!important}.page{margin-inline:auto!important}}';
-      document.head.appendChild(style);
-    }
     const scripts = Array.from(document.scripts);
     function activateScript(index) {
-      if (index >= scripts.length) {
-        if(embedded)window.parent.postMessage({type:'ironbend-order-document-ready',id,kind,nonce:params.get('workspace_nonce')},location.origin);
-        return;
-      }
+      if (index >= scripts.length) return;
       const original = scripts[index];
       const script = document.createElement('script');
       Array.from(original.attributes).forEach(attribute => script.setAttribute(attribute.name, attribute.value));

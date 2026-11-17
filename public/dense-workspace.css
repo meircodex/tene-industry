@@ -14,23 +14,6 @@ body[data-page=orders] .orders-table .order-status-select{width:145px;min-height
 body[data-page=orders] .order-production-percent{font-size:12px;padding:2px 5px;margin:0 4px}
 .row-expand{border:0;background:transparent;color:#1d5681;font-family:inherit;font-size:22px;font-weight:700;min-width:32px;min-height:32px;cursor:pointer}
 .row-expand[aria-expanded=true]{transform:rotate(180deg)}
-body[data-page=orders] .inline-order-host>td{padding:0 10px 10px;background:#f4f8fc}
-body[data-page=orders] .inline-order-host .detail-panel{width:100%;max-height:none;overflow:visible;transform:none;opacity:1;border-radius:10px;box-shadow:none;border:1px solid #cbdbea}
-body[data-page=orders] .detail-header{padding:8px 12px}
-body[data-page=orders] .detail-order-num{font-size:18px}
-body[data-page=orders] .detail-body{padding:10px}
-body[data-page=orders] .d-section{margin-bottom:8px;padding:10px}
-body[data-page=orders] .inline-order-host .detail-header{position:static}
-body[data-page=orders] .inline-order-host .item-row{grid-template-columns:120px minmax(0,1fr) auto;gap:8px;padding:8px;margin-bottom:6px}
-body[data-page=orders] .inline-order-host .item-visual{height:85px;min-height:85px}
-body[data-page=orders] .inline-order-host .item-main{gap:5px}
-body[data-page=orders] .inline-order-host .item-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
-body[data-page=orders] .inline-order-host .item-kpi{padding:4px}
-body[data-page=orders] .inline-order-host .item-diameter{font-size:19px}
-body[data-page=orders] .inline-order-host .raw-data{display:none}
-body[data-page=orders] .print-btns{margin:0;gap:6px}
-body[data-page=orders] .print-btn{min-height:34px;padding:8px;font-size:13px}
-body[data-page=orders] .commercial-summary-hint,body[data-page=orders] .d-section>.detail-customer{display:none}
 body[data-page=dashboard] .dashboard-page{gap:10px;padding:12px}
 body[data-page=dashboard] .daily-header{padding:10px 14px}
 body[data-page=dashboard] .daily-title h1{font-size:23px}
@@ -66,10 +49,6 @@ body[data-page=new] .ib-order-lines .line-shape-sketch,body[data-page=new] .ib-o
  body[data-page=orders] .m-card .m-card-meta{gap:6px;font-size:12px;margin:5px 0 0}
  body[data-page=orders] .m-card .order-status-select{max-width:130px;min-height:38px;font-size:12px}
  body[data-page=orders] .m-card>.row-expand{position:absolute;bottom:0;left:5px;min-height:40px;min-width:40px}
- body[data-page=orders] .inline-order-host{margin-bottom:6px}
- body[data-page=orders] .inline-order-host .item-row{grid-template-columns:85px minmax(0,1fr)}
- body[data-page=orders] .inline-order-host .item-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
- body[data-page=orders] .inline-order-host .item-row>div:last-child{grid-column:1 / -1}
  body[data-page=new] .ib-order-lines .order-line-row{height:auto!important;min-height:90px!important}
  body[data-page=dashboard] .production-progress-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
 }

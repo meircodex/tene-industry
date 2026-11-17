@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### החזרת דף ההזמנה המקורי — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: user rejects the redesigned fragmented/flattened detail and explicitly requests the original order page before the visual changes.
+- ownership/screens: Orders detail presentation only. Restore original 9baed97 section structure and legacy document actions, retaining only the user-approved item table proportions with larger on-screen shape dimension text, retain current backend and audited status correction/undo client.
+- output: original complete order page with visible hero/info, print buttons, commercial summary, status/actions and approved item table with expandable original item cards; one normal order modal from every list entry; remove abandoned embedded-document/header UI.
+- DB/API/events: none. No business, stock, scanning, authentication or printing geometry changes.
+- DoD: original section order and header, table/shape-label regression checks, retained correction/undo tests, original printing/filter tests, full suite, local preview and live read-only verification.
+- pre-release: 1,400 tests passed. Local authenticated demo confirmed original hero → print buttons → commercial summary → correction → status → approved table, eight item rows, visible modal and retained undo. SVG dimension labels measured approximately 11.17 on-screen pixels at the existing thumbnail size. Native wide-window verification was interrupted by browser URL detection; no production data was modified.
+
+
 ### דף הזמנה אחד ללא מסלולים כפולים — 17.11.2026
 - status: done
 - owner: codex
