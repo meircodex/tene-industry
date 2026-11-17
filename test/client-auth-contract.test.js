@@ -676,7 +676,7 @@ test('orders screen uses shared status transition contract', () => {
   assert.match(orders, /src="\/auth-client\.js"/);
   assert.match(orders, /\/status-contracts-client\.js/);
   assert.match(orders, /allowedOrderTransitions\(o\.status\)/);
-  assert.match(orders, /setStatusAndClose/);
+  assert.match(orders, /changeListOrderStatus/);
   assert.match(orders, /נדרשת התחברות מחדש כדי לאשר הזמנה/);
   assert.match(orders, /אין למשתמש הנוכחי הרשאה לאשר הזמנה/);
   assert.doesNotMatch(orders, /ok=>\{if\(ok\)closeDetailPanel/);
@@ -719,10 +719,10 @@ test('orders screen status actions keep JavaScript arguments safe inside HTML at
   assert.match(orders, /return escHtml\(jsArg\(value\)\)/);
   assert.match(orders, /changeListOrderStatus\(event,\$\{o\.id\}\)/);
   assert.match(orders, /option value="\$\{escHtml\(value\)\}"/);
-  assert.match(orders, /setStatusAndClose\(\$\{o\.id\},\$\{jsAttr\(s\)\}\)/);
+  assert.match(orders, /else await setStatus\(id,next,order.status\)/);
   assert.match(orders, /printQR\(\$\{jsAttr\(p\.package_code\)\},\$\{jsAttr\(p\.order_num\)\}/);
   assert.doesNotMatch(orders, /setStatus\(\$\{o\.id\},\$\{jsArg\(status\)\}\)/);
-  assert.doesNotMatch(orders, /setStatusAndClose\(\$\{o\.id\},\$\{jsArg\(s\)\}\)/);
+  assert.doesNotMatch(orders, /const statusSec\s*=/);
 });
 
 test('orders detail does not present one straight segment as a spiral and shows weight checks', () => {

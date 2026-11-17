@@ -169,7 +169,8 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .order-status-current.is-cancelled{background:#fef2f2;border-color:#fecaca;}.order-status-current.is-cancelled strong{color:#991b1b;}
 .order-status-breakdown{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px;}
 .order-status-metric{min-width:0;background:#f7f9fc;border:1px solid #e1e8f0;border-radius:10px;padding:7px 8px;}
-.order-status-metric-head{display:flex;justify-content:space-between;gap:6px;align-items:baseline;font-size:10px;font-weight:800;color:#526070;}
+.order-status-metric-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;align-items:baseline;font-size:13px;line-height:1.4;font-weight:800;color:#526070;}
+.order-status-metric-head>span{flex-shrink:0;white-space:nowrap}
 .order-status-metric-head b{color:#1a2533;font-size:12px;white-space:nowrap;}.order-status-metric i{display:block;height:4px;border-radius:999px;background:#dbe3ee;margin-top:6px;overflow:hidden;}
 .order-status-metric i::after{content:'';display:block;width:var(--status-pct);height:100%;border-radius:inherit;background:#7599bd;}.order-status-metric.production i::after{background:#d97706;}.order-status-metric.done i::after{background:#2466a4;}.order-status-metric.supplied i::after{background:#1f8a50;}
 .d-section{background:#fff;border:1px solid rgba(2,26,72,0.09);border-radius:16px;padding:16px;
@@ -196,11 +197,6 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .info-label{font-size:10px;font-weight:700;color:var(--dim);margin-bottom:3px;}
 .info-value{font-size:14px;font-weight:700;}
-.status-actions{display:flex;gap:6px;flex-wrap:wrap;}
-.status-btn{padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,0.02);
-  color:var(--dim);font-family:'Heebo',sans-serif;font-size:12px;font-weight:600;
-  cursor:pointer;transition:all .15s;min-height:40px;-webkit-tap-highlight-color:transparent;}
-.status-btn:hover,.status-btn.cur{border-color:var(--accent);color:var(--accent);background:rgba(224,123,57,0.08);}
 .item-row{display:grid;grid-template-columns:230px 1fr auto;gap:14px;padding:14px;border:1px solid rgba(2,26,72,0.08);border-radius:14px;
   margin-bottom:10px;background:#fbfcfe;align-items:stretch;}
 .item-row:last-child{border-bottom:none;}
@@ -866,7 +862,7 @@ function orderStatusPanel(o) {
   const stages = [
     { key: 'waiting', label: 'ממתין' },
     { key: 'production', label: 'בייצור' },
-    { key: 'done', label: 'בוצע' },
+    { key: 'done', label: 'הושלם' },
     { key: 'supplied', label: 'סופק' },
   ];
   const cumulative = o.delivery_progress?.stage_counts;
@@ -3059,19 +3055,6 @@ function buildDetailHTML(o, pkgs) {
     <div class="detail-customer" style="margin-top:8px">${hasStartedProduction ? 'החל ייצור בכרטיסייה אחת או יותר: תיקון פרטי ההזמנה דורש הרשאת ניהול וסיבת תיקון. כרטיסייה שכבר החלה ייצור אינה ניתנת למחיקה.' : 'אפשר לערוך או למחוק לפני תחילת ייצור.'}</div>
   </div>`;
 
-  // ── Status
-  const workStatus = primaryOrderStatusLabel(o);
-  const statuses = [workStatus, ...allowedOrderTransitions(o.status)]
-    .filter((status, index, list) => status && status !== ORDER_STATUS.CANCELLED && list.indexOf(status) === index);
-  const statusSec = `<div class="d-section">
-    <div class="d-title">🔁 עדכון סטטוס</div>
-    <div class="status-actions">
-      ${statuses.map(s => `<button class="status-btn${workStatus===s?' cur':''}"
-        ${workStatus===s||!canSelectOrderStatus(o,s)?'disabled':''}
-        onclick="setStatusAndClose(${o.id},${jsAttr(s)})">${escHtml(s)}</button>`).join('')}
-    </div>
-  </div>`;
-
   // ── Items
   let _itemLine = 0;
   (o.pallets||[]).forEach(p => (p.items||[]).forEach(it => { _itemLine += 1; it._lineNo = _itemLine; }));
@@ -3193,7 +3176,7 @@ function buildDetailHTML(o, pkgs) {
     pkgSec = `<div class="d-section"><div class="d-title">🏷️ חבילות</div>${pkgRows}</div>`;
   }
 
-  return hero + prints + commercialSummaryHtml(o) + orderActions + statusSec + itemsSec + pkgSec;
+  return hero + prints + commercialSummaryHtml(o) + orderActions + itemsSec + pkgSec;
 }
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }
@@ -3203,11 +3186,6 @@ function closeDetailPanel() {
   window.IronBendOrderDetailTable.reset();
   document.getElementById('detailOverlay').classList.remove('show');
   history.replaceState(null, '', '/orders.html');
-}
-
-async function setStatusAndClose(id, status) {
-  const ok = await setStatus(id, status);
-  if (ok) closeDetailPanel();
 }
 
 function sourceOriginalHtml(row) {

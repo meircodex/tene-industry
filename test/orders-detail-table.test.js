@@ -40,7 +40,7 @@ test('dimension labels reach 11 screen pixels at the thumbnail scale without shr
 });
 test('original order sections and safe undo remain, with only the approved item table replacing the old item cards list',()=>{
  const html=require('node:fs').readFileSync(require('node:path').join(__dirname,'../public/orders.html'),'utf8');
- assert.match(html,/return hero \+ prints \+ commercialSummaryHtml\(o\) \+ orderActions \+ statusSec \+ itemsSec \+ pkgSec/);
+ assert.match(html,/return hero \+ prints \+ commercialSummaryHtml\(o\) \+ orderActions \+ itemsSec \+ pkgSec/);
  assert.match(html,/id="detailStatusUndo"/);assert.match(html,/async function undoOrderStatus/);
  assert.doesNotMatch(html,/orders-document-view|detailToolsDialog|order-detail-fold|order-document-toolbar/);
  assert.match(html,/IronBendOrderDetailTable.mount/);
