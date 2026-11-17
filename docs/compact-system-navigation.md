@@ -11,3 +11,5 @@ Approved preview: compact-system-menu.html, refined to remove fleet/driver and h
 - Scope: public/nav.js and obsolete admin quick links. No server route, database, access grant, production or stock change. No desktop/browser automation per prior user instruction.
 
 Validation: 155 focused shell/auth/governance checks, five behavior tests for hierarchy/permissions/rendering and final rebased full suite 1,391 passed. QR/UI contract now checks the approved Settings entry rather than the former bottom-bar scanner slot; scan authorization, protocol handling and loading certificate checks remain. No browser/phone visual verification was performed.
+
+Live verification: 0c87139 / dep-dbu0f2cipgvc73abq0rg. Changed nav/admin assets matched source with HTTP 200; health 200; anonymous access/me and orders 401, reports and warehouse HTML 200, QR mode open unchanged. No production data mutations or browser/phone visual verification.
