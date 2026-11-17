@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/dashboard.css">
+<link rel="stylesheet" href="/dense-workspace.css?v=20261117">
 </head>
 <body data-page="dashboard">
 <script src="/safe-dom.js"></script>
@@ -124,21 +125,21 @@
         <div class="panel-body" id="stockShortagesPanel"><div class="muted-state">מלאי ייבדק מול הזמנות פתוחות</div></div>
       </section>
 
-      <section class="panel">
+      <details class="panel"><summary>כרטיסיות ייצור</summary>
         <div class="section-head"><div><h2>כרטיסיות ייצור</h2><p>סיכום קטן, לא מסך מלא</p></div><button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="queue">פירוט</button></div>
         <div class="panel-body" id="productionCardsSummary"><div class="muted-state">טוען...</div></div>
-      </section>
+      </details>
 
-      <section class="panel">
+      <details class="panel"><summary>מכונות</summary>
         <div class="section-head"><div><h2>מכונות</h2><p>סטטוס תומך בלבד</p></div></div>
         <div class="panel-body">
           <div class="machine-strip" id="machinesCompactStrip"></div>
           <div class="compact-row with-space"><span>מחוברות</span><strong id="machinesOnlineCount">0/0</strong></div>
           <a class="action-link" href="/machine.html">פתח מסך מכונות</a>
         </div>
-      </section>
+      </details>
 
-      <section class="panel">
+      <details class="panel"><summary>סיכום תפעולי</summary>
         <div class="section-head"><div><h2>סיכום תפעולי</h2><p>מדדים משניים</p></div></div>
         <div class="panel-body compact-list">
           <div class="compact-row"><span>בייצור כעת <button class="inline-detail-btn" type="button" data-dashboard-drilldown="in_production">פירוט</button></span><strong id="kpiInProd">—</strong></div>
@@ -147,7 +148,7 @@
           <div class="compact-row"><span>פחת היום <button class="inline-detail-btn" type="button" data-dashboard-drilldown="waste_today">פירוט</button></span><strong id="kpiWaste">—</strong></div>
           <div class="compact-row"><span>משקל ייצור היום <button class="inline-detail-btn" type="button" data-dashboard-drilldown="produced_today">פירוט</button></span><strong id="qsWeight">—</strong></div>
         </div>
-      </section>
+      </details>
     </aside>
   </div>
 

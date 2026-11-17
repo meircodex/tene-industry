@@ -1,0 +1,82 @@
+/* Compact daily views; secondary information opens in place. */
+body[data-page=orders] .orders-table.has-batch-selection{min-width:820px;table-layout:fixed}
+body[data-page=orders] .orders-table.has-batch-selection th{width:auto;font-size:14px;padding:8px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(1){width:38px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(2){width:150px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(4){width:110px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(5){width:90px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(6){width:95px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(7){width:215px}
+body[data-page=orders] .orders-table.has-batch-selection th:nth-child(8){width:55px}
+body[data-page=orders] .orders-table td{padding:6px 8px;font-size:15px}
+body[data-page=orders] .orders-table .order-num,body[data-page=orders] .orders-table .weight-tag{font-size:15px}
+body[data-page=orders] .orders-table .order-status-select{width:145px;min-height:34px;font-size:13px;padding:5px}
+body[data-page=orders] .order-production-percent{font-size:12px;padding:2px 5px;margin:0 4px}
+.row-expand{border:0;background:transparent;color:#1d5681;font-family:inherit;font-size:22px;font-weight:700;min-width:32px;min-height:32px;cursor:pointer}
+.row-expand[aria-expanded=true]{transform:rotate(180deg)}
+body[data-page=orders] .inline-order-host>td{padding:0 10px 10px;background:#f4f8fc}
+body[data-page=orders] .inline-order-host .detail-panel{width:100%;max-height:none;overflow:visible;transform:none;opacity:1;border-radius:10px;box-shadow:none;border:1px solid #cbdbea}
+body[data-page=orders] .detail-header{padding:8px 12px}
+body[data-page=orders] .detail-order-num{font-size:18px}
+body[data-page=orders] .detail-body{padding:10px}
+body[data-page=orders] .d-section{margin-bottom:8px;padding:10px}
+.order-inline-summary{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;padding:2px 4px 10px;color:#18334f;font-size:14px}
+.order-inline-summary .btn-sm{margin-inline-start:auto}
+.order-detail-fold{border:1px solid #dde5ee;border-radius:8px;margin:0 0 6px;background:#fff}
+.order-detail-fold>summary{padding:9px 12px;cursor:pointer;font-weight:700;color:#234765;font-size:14px}
+.order-detail-fold>div{padding:5px 8px}
+body[data-page=orders] .inline-order-host .detail-header{position:static}
+body[data-page=orders] .inline-order-host .item-row{grid-template-columns:120px minmax(0,1fr) auto;gap:8px;padding:8px;margin-bottom:6px}
+body[data-page=orders] .inline-order-host .item-visual{height:85px;min-height:85px}
+body[data-page=orders] .inline-order-host .item-main{gap:5px}
+body[data-page=orders] .inline-order-host .item-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+body[data-page=orders] .inline-order-host .item-kpi{padding:4px}
+body[data-page=orders] .inline-order-host .item-diameter{font-size:19px}
+body[data-page=orders] .inline-order-host .raw-data{display:none}
+body[data-page=orders] .print-btns{margin:0;gap:6px}
+body[data-page=orders] .print-btn{min-height:34px;padding:8px;font-size:13px}
+body[data-page=orders] .commercial-summary-hint,body[data-page=orders] .d-section>.detail-customer{display:none}
+body[data-page=dashboard] .dashboard-page{gap:10px;padding:12px}
+body[data-page=dashboard] .daily-header{padding:10px 14px}
+body[data-page=dashboard] .daily-title h1{font-size:23px}
+body[data-page=dashboard] .kpi-tile{min-height:0;padding:10px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:3px 8px}
+body[data-page=dashboard] .kpi-value{font-size:25px;grid-column:2;grid-row:1 / 3}
+body[data-page=dashboard] .kpi-sub{font-size:11px}
+body[data-page=dashboard] .kpi-tile .dashboard-detail-btn{grid-column:1 / -1;justify-self:start;padding:3px 7px;font-size:11px}
+body[data-page=dashboard] .command-layout,body[data-page=dashboard] .main-column,body[data-page=dashboard] .side-column{gap:10px}
+body[data-page=dashboard] .section-head{padding:10px 12px;margin:0}
+body[data-page=dashboard] .section-head h2{font-size:17px}
+body[data-page=dashboard] .section-head p{display:none}
+body[data-page=dashboard] .production-progress-main{padding:0 12px;gap:7px}
+body[data-page=dashboard] .production-progress-main strong{font-size:32px}
+body[data-page=dashboard] .production-progress-meta{margin-top:6px;gap:6px}
+body[data-page=dashboard] .meta-chip{padding:6px}
+body[data-page=dashboard] .data-table td,body[data-page=dashboard] .data-table th{padding:7px 9px;font-size:13px}
+body[data-page=dashboard] .muted-state{padding:12px;font-size:13px}
+body[data-page=dashboard] details.panel>summary{cursor:pointer;padding:11px 12px;font-size:16px;font-weight:800;color:#18334f}
+body[data-page=new] .main{gap:10px!important;padding:12px!important}
+body[data-page=new] .order-pro-header{padding:9px 12px!important;gap:8px!important}
+body[data-page=new] .order-pro-context{gap:6px!important}
+body[data-page=new] .context-chip{min-height:48px!important;padding:7px 10px!important}
+body[data-page=new] .items-header,body[data-page=new] .items-commandbar{padding:8px 10px!important}
+body[data-page=new] .items-header p{display:none!important}
+body[data-page=new] .ib-order-lines{margin:7px!important}
+body[data-page=new] .ib-order-lines .order-line-row{height:66px!important}
+body[data-page=new] .ib-order-lines .line-shape-sketch,body[data-page=new] .ib-order-lines .line-shape svg{height:60px!important}
+@media(min-width:901px){body[data-page=new] .ib-order-lines .order-lines-body{max-height:calc(100vh - 260px)!important}}
+@media(max-width:640px){
+ body[data-page=orders] .m-card{padding:9px 10px!important;margin-bottom:5px!important;position:relative}
+ body[data-page=orders] .m-card-top{gap:7px;margin:0}
+ body[data-page=orders] .m-card .m-card-num,body[data-page=orders] .m-card .m-card-customer{font-size:15px}
+ body[data-page=orders] .m-card .m-card-meta{gap:6px;font-size:12px;margin:5px 0 0}
+ body[data-page=orders] .m-card .order-status-select{max-width:130px;min-height:38px;font-size:12px}
+ body[data-page=orders] .m-card>.row-expand{position:absolute;bottom:0;left:5px;min-height:40px;min-width:40px}
+ body[data-page=orders] .inline-order-host{margin-bottom:6px}
+ body[data-page=orders] .inline-order-host .item-row{grid-template-columns:85px minmax(0,1fr)}
+ body[data-page=orders] .inline-order-host .item-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body[data-page=orders] .inline-order-host .item-row>div:last-child{grid-column:1 / -1}
+ .order-inline-summary{gap:6px 12px}
+ body[data-page=new] .ib-order-lines .order-line-row{height:auto!important;min-height:90px!important}
+ body[data-page=dashboard] .production-progress-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(pointer:coarse){.row-expand{min-height:44px;min-width:44px}}

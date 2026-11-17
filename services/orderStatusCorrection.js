@@ -3,6 +3,7 @@
 const { ORDER_STATUS: O, ITEM_STATUS: I, normalizeOrderStatus, isValidOrderStatus } = require('../status-contracts');
 const { deliverySelectionFingerprint, buildDeliveryCertificateProgress } = require('./deliveryCertificateProgress');
 const { cancellationPreview, cancelCertificate } = require('./deliveryCertificateCancellation');
+const { preserveProductionState } = require('./productionStatusPreservation');
 const { cancelActiveLoadingForCorrection } = require('./loadingStatusCorrection');
 
 const ITEM_STAGES = [I.WAITING, I.IN_PRODUCTION, I.DONE, I.LOADED, I.SENT, I.DELIVERED];
@@ -18,7 +19,7 @@ function fail(message, status = 409) { throw Object.assign(new Error(message), {
 
 function scanHistory(db,orderId) {
   return db.prepare(`SELECT COUNT(DISTINCT item_id) AS scanned_item_count,COUNT(*) AS scan_count,MAX(scanned_at) AS last_scan_at FROM (
-    SELECT item_id,datetime(occurred_at) scanned_at FROM worker_card_activity WHERE order_id=? AND action='opened'
+    SELECT item_id,datetime(occurred_at) scanned_at FROM worker_card_activity WHERE order_id=? AND action IN ('opened','status_changed','updated')
     UNION ALL SELECT sl.item_id,datetime(sl.scanned_at) FROM scan_log sl JOIN items i ON i.id=sl.item_id JOIN pallets p ON p.id=i.pallet_id
       WHERE p.order_id=? AND sl.action='start')`).get(orderId,orderId);
 }
@@ -52,10 +53,12 @@ function orderStatusCorrectionPreview(db, orderId, status) {
     } catch (error) { return { id: note.id, note_num: note.note_num, can_cancel: false, blocked_reason: error.message, affected_items: [] }; }
   });
   const returningToQueue = from === O.IN_PRODUCTION && target === O.PRODUCTION_QUEUE;
-  const queueTransfer = returningToQueue && sessions.length === 0 && items.every(item=>item.cancelled_at || item.status===I.CANCELLED || [I.WAITING,I.IN_PRODUCTION].includes(item.status));
+  const queueTransfer = returningToQueue && sessions.length === 0;
   const scan = returningToQueue ? scanHistory(db,order.id) : null;
+  const recordedWork=items.filter(item=>item.started_at||item.completed_at||Number(item.produced_qty)>0||ITEM_STAGES.indexOf(item.status)>=2).length;
+  if(scan)scan.recorded_work_item_count=recordedWork;
   const result = { order_id: order.id, current_status: from, target_status: target,
-    queue_transfer: queueTransfer, scan_warning: scan && scan.scanned_item_count>0 ? scan : null,
+    queue_transfer: queueTransfer, scan_warning: scan && (scan.scanned_item_count>0||recordedWork>0) ? scan : null,
     requires_correction: !queueTransfer && (RANK[target] < RANK[from] || affected.length > 0 || cancelLoading.length > 0),
     affected_items: queueTransfer ? [] : affected, target_item_status: queueTransfer ? null : targetItem || null,
     cancelled_loading_session_ids: cancelLoading.map(session => session.id),
@@ -86,6 +89,7 @@ function applyOrderStatusCorrection(db, preview, { fingerprint, reason, mode = '
   }
   const order = db.prepare('SELECT order_num FROM orders WHERE id=?').get(fresh.order_id);
   for (const item of fresh.affected_items) {
+    preserveProductionState(db,item.id,{targetStatus:item.status,reason:explanation,userId,userName,orderNum:order.order_num});
     db.prepare('UPDATE items SET status=?,completed_at=CASE WHEN ? IN (?,?) THEN NULL ELSE completed_at END WHERE id=?')
       .run(item.status, item.status, I.WAITING, I.IN_PRODUCTION, item.id);
     db.prepare(`INSERT INTO audit_log(entity_type,entity_id,entity_ref,action,field_name,old_value,new_value,notes,user_id,user_name)

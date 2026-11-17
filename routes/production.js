@@ -1,3 +1,4 @@
+const { preserveProductionState } = require('../services/productionStatusPreservation');
 const router = require('express').Router();
 const createProductionMachinesRouter = require('./productionMachines');
 const createWorkerMachineFeedbackRouter = require('./workerMachineFeedback');
@@ -469,6 +470,7 @@ module.exports = function createProductionRouter(deps) {
     const pendingApproval = [ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL].includes(statusContracts.normalizeOrderStatus(item.order_status));
     if (status === ITEM_STATUS.IN_PRODUCTION && (pendingApproval || (!backwards && !previouslyReopened && !isProductionGateOpen(item)))) return sendProductionGateError(res, item);
     portalSupplement(req,item,status);
+    if(backwards)preserveProductionState(db,item.id,{targetStatus:status,reason:'תיקון סטטוס בסריקת כרטיס',userId:req.userId,userName:req.auth?.display_name||req.qrAccess?.actor_name,orderNum:item.order_num});
     const updates = { status };
     if (status === ITEM_STATUS.IN_PRODUCTION && !item.started_at) updates.started_at = new Date().toISOString();
     if (status === ITEM_STATUS.DONE) updates.completed_at = new Date().toISOString();
@@ -735,6 +737,7 @@ module.exports = function createProductionRouter(deps) {
           fingerprint: req.body.correction_fingerprint, reason: correctionReason, role: req.userRole || req.auth?.role,
           userId: req.auth?.sub, userName: req.auth?.display_name });
       }
+      if(backwards)preserveProductionState(db,item.id,{targetStatus:status,reason:correctionReason,userId:req.auth?.sub,userName:req.auth?.display_name,orderNum:item.order_num});
       db.prepare(`UPDATE items SET status=?,started_at=?,completed_at=?,produced_qty=? WHERE id=?`).run(
         status, afterStage >= 1 ? (item.started_at || now) : item.started_at,
         completed ? (item.completed_at || now) : (backwards ? null : item.completed_at),

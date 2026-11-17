@@ -4,6 +4,18 @@
 
 ## סטטוסים
 
+### הזמנות צפופות ושמירת דיווחי ייצור בהחזרה לתור — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: approved dense Orders/Dashboard/New Order preview with same-row expansion; reported accidental production-to-waiting transition hid production data, confirmed HZ-2026-131. Read-only live audit shows 11 completed items and one in-production item changed to waiting at 10:39 on 17 November.
+- ownership: UI presentation reusing the existing order detail panel/calculations; Orders queue placement only; Production preserves immutable pre-correction state in existing audit history. No speculative production recovery, historical status rewrite, stock adjustment or scan fabrication.
+- output: compact list and inline single active order workspace, grouped documents and collapsed secondary detail; compact dashboard and intake/new order; preserve sorting, batch/priority/status editing, print/shape handlers and existing server validations.
+- data protection: production-to-queue changes order scheduling without downgrading completed items or erasing completion times; work-evidence acknowledgment and stale-preview guards; append pre-change item snapshots for remaining explicit backward corrections.
+- DB/API/events: GET/POST /api/orders/:id/status-undo (manager/admin), validation/reason, exact current-state and new-scan guard, audited reversible status facts; no new tables. Snapshots use existing audit_log, owned Production restoration helper. Existing role, fingerprint, correction/certificate/stock rules retained. Incident recovery requires exact item/order evidence, not inferred ID.
+- verification (pre-release): 99 focused auth/governance/timing checks passed; full final suite 1,393 passed. Isolated browser verified same-row mobile expansion, item filters and drawings, list filtering with one preserved detail panel, close/reopen, Dashboard disclosures and New Order controls. No live mutations.
+- DoD: regression for partially completed order requeue and report/history/stock invariance, snapshot rollback/auth tests; inline DOM lifecycle/race and UI contracts; focused/full tests, docs, deploy/live HTTP. Authenticated live incident inspection was explicitly approved read-only; no incident repair or production test records. Local UI uses an isolated demo database.
+
+
 ### תפריט מערכת מצומצם — 17.11.2026
 - status: done
 - owner: codex

@@ -399,6 +399,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .orders-table .batch-select-cell{width:34px;padding:8px;}
 .m-card-batch{display:flex;align-items:center;gap:8px;}
 </style>
+<link rel="stylesheet" href="/dense-workspace.css?v=20261117">
 </head>
 <body data-page="orders">
 
@@ -440,7 +441,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
           </tr>
         </thead>
         <tbody id="ordersBody">
-          <tr><td colspan="9" style="text-align:center;padding:24px;color:var(--dim)">טוען...</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">טוען...</td></tr>
         </tbody>
       </table>
     </div>
@@ -748,6 +749,7 @@ async function fetchOrders() {
 let orderListSort=null;
 function sortOrdersBy(key){orderListSort=IronBendOrderSorting.toggle(orderListSort,key);applyFilter();}
 function applyFilter() {
+  parkInlineDetail();
   const q = (document.getElementById('searchBox').value || '').toLowerCase();
   if (viewMode === 'quotes') {
     window.IronBendOrderBatch.sync([],[],viewMode+'|'+orderBucket);
@@ -759,6 +761,7 @@ function applyFilter() {
     );
     renderQuoteTable(list);
     renderQuoteCards(list);
+    closeDetailPanel();
     return;
   }
   let list = allOrders;
@@ -773,6 +776,7 @@ function applyFilter() {
   renderTable(list);
   renderCards(list);
   window.IronBendOrderBatch.render();
+  attachInlineDetail();
 }
 
 function renderStatusFilters() {
@@ -963,10 +967,10 @@ function orderProgressBadge(order) {
 }
 
 function renderTable(orders) {
-  setTableHead(['מספר הזמנה', 'לקוח', 'תאריך אספקה', 'דחיפות', 'משקל (ק״ג)', 'סטטוס הזמנה', 'הערות', 'פעולות']);
+  setTableHead(['מספר הזמנה', 'לקוח', 'תאריך אספקה', 'דחיפות', 'משקל (ק״ג)', 'סטטוס הזמנה', 'פרטים']);
   document.querySelector('.orders-table').classList.add('has-batch-selection');
   document.querySelectorAll('#ordersTableHead th').forEach((th,index)=>{
-    const key=IronBendOrderSorting.columns[index];if(!key)return;
+    const key=index<6?IronBendOrderSorting.columns[index]:null;if(!key)return;
     const active=orderListSort?.key===key,direction=active?orderListSort.direction:null,label=th.textContent;
     th.setAttribute('aria-sort',direction==='asc'?'ascending':direction==='desc'?'descending':'none');
     th.innerHTML=`<button type="button" class="order-sort-button" data-sort-key="${key}" onclick="sortOrdersBy('${key}')" aria-label="מיון לפי ${escHtml(label)} — ${direction==='asc'?'לחץ לסדר יורד':'לחץ לסדר עולה'}">${escHtml(label)} <span class="order-sort-direction" aria-hidden="true">${active?(direction==='asc'?'▲':'▼'):'↕'}</span></button>`;
@@ -974,11 +978,11 @@ function renderTable(orders) {
   const selectionHead=document.createElement('th');selectionHead.className='batch-select-cell';selectionHead.innerHTML=IronBendOrderBatch.master();document.querySelector('#ordersTableHead tr').prepend(selectionHead);
   const body = document.getElementById('ordersBody');
   if (!orders.length) {
-    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--dim)">אין הזמנות בלשונית זו</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--dim)">אין הזמנות בלשונית זו</td></tr>';
     return;
   }
   body.innerHTML = orders.map(o => `
-    <tr class="order-row row-${window.IronBendOrderWorkspace.rowTone(o)}" ${orderProgressAttributes(o)} ${o.deleted_at?'':`onclick="openDetail(${o.id})"`}>
+    <tr data-inline-order="${o.id}" class="order-row row-${window.IronBendOrderWorkspace.rowTone(o)}" ${orderProgressAttributes(o)} ${o.deleted_at?'':`onclick="toggleOrderInline(${o.id})"`}>
       <td class="batch-select-cell" onclick="event.stopPropagation()">${IronBendOrderBatch.checkbox(o)}</td>
       <td><span class="order-num">${escHtml(o.order_num)}</span></td>
       <td>${escHtml(o.customer_name ?? '—')}</td>
@@ -986,8 +990,7 @@ function renderTable(orders) {
       <td>${prioritySelect(o)}</td>
       <td class="weight-tag">${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})}</td>
       <td>${orderStatusSelect(o)}${orderProgressBadge(o)}</td>
-      <td><div class="order-notes" title="${escHtml(window.IronBendOrderWorkspace.notes(o).join('\n'))}">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||'—'}</div></td>
-      <td>${actionBtns(o)}</td>
+      <td>${o.deleted_at?actionBtns(o):`<button type="button" class="row-expand" onclick="event.stopPropagation();toggleOrderInline(${o.id})" aria-label="פרטי ${escHtml(o.order_num)}" aria-expanded="false">⌄</button>`}</td>
     </tr>`).join('');
 }
 
@@ -999,7 +1002,7 @@ function renderCards(orders) {
     return;
   }
   wrap.innerHTML = orders.map(o => `
-    <div class="m-card row-${window.IronBendOrderWorkspace.rowTone(o)}" ${orderProgressAttributes(o)} ${o.deleted_at?'':`onclick="openDetail(${o.id})"`}>
+    <div data-inline-order="${o.id}" class="m-card row-${window.IronBendOrderWorkspace.rowTone(o)}" ${orderProgressAttributes(o)} ${o.deleted_at?'':`onclick="toggleOrderInline(${o.id})"`}>
       <div class="m-card-top">
         <div class="m-card-batch" onclick="event.stopPropagation()">${IronBendOrderBatch.checkbox(o)}</div>
         <div>
@@ -1015,10 +1018,7 @@ function renderCards(orders) {
         ${orderProgressBadge(o)}
         <span>${prioritySelect(o)}</span>
       </div>
-      <div class="order-notes">${window.IronBendOrderWorkspace.notes(o).map(escHtml).join('<br>')||''}</div>
-      <div class="m-card-actions">
-        ${actionBtns(o, false, false)}
-      </div>
+      ${o.deleted_at?`<div class="m-card-actions">${actionBtns(o,false,false)}</div>`:`<button type="button" class="row-expand" onclick="event.stopPropagation();toggleOrderInline(${o.id})" aria-label="פרטי ${escHtml(o.order_num)}" aria-expanded="false">⌄</button>`}
   </div>`).join('');
 }
 
@@ -1134,13 +1134,13 @@ async function setStatus(id, status, expectedStatus) {
   if (!previewResponse.ok) throw new Error(preview.user_message || preview.error || 'לא ניתן לבדוק את שינוי הסטטוס');
   let correction = null;
   if (preview.queue_transfer) {
-    const warning=preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'} בהזמנה. דיווחי הייצור והכמויות יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.\n\n`:'';
+    const warning=preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':preview.scan_warning.scanned_item_count>1?'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים':'כבר קיימים דיווחי עבודה'} בהזמנה. סטטוס הפריטים, הכמויות וזמני הייצור יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.\n\n`:'';
     if(!confirm(`${warning}להעביר את ההזמנה לתור ייצור?`))return false;
   } else if (preview.requires_correction) {
     const affectedText = preview.affected_items.length === 1 ? 'פריט אחד יוחזר' : `${preview.affected_items.length} פריטים יוחזרו`;
     const loadingInfo = preview.cancelled_loading_session_ids.length ? ' ההעמסה הפעילה תבוטל ותיפתח מחדש בהמשך; הסריקות נשמרות בהיסטוריה.' : '';
     correction = await requestCorrectionReason({ title: `החזרת ההזמנה ל״${status}״`,
-      info: `${preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'}. סריקה נוספת תחזיר את ההזמנה לבייצור. `:''}${affectedText} ל״${preview.target_item_status || status}״ יחד עם ההזמנה. הכמויות שיוצרו נשמרות.${loadingInfo}`,
+      info: `${preview.scan_warning?`שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':preview.scan_warning.scanned_item_count>1?'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים':'כבר קיימים דיווחי עבודה'}. סריקה נוספת תחזיר את ההזמנה לבייצור. `:''}${affectedText} ל״${preview.target_item_status || status}״ יחד עם ההזמנה. הכמויות שיוצרו נשמרות.${loadingInfo}`,
       defaultReason: 'תיקון סטטוס שנבחר בטעות', itemCorrection: preview });
     if (!correction) return false;
   } else if (!confirm(`לשנות את סטטוס ההזמנה ל״${status}״?${status === ORDER_STATUS.DELIVERED_CONFIRMED ? ' ההזמנה תעבור ללשונית הזמנות שסופקו.' : ''}`)) return false;
@@ -1635,26 +1635,68 @@ async function submitHistoricalReconciliation(event) {
 }
 
 // ── Detail panel ───────────────────────────────────────────────────────
-async function openDetail(id) {
-  const [r, pkgR] = await Promise.all([
-    fetch(`/api/orders/${id}`),
-    fetch(`/api/packages?order_id=${id}`)
-  ]);
-  const o = await r.json();
-  const pkgs = await pkgR.json().catch(() => []);
-  currentDetailOrder = o;
-  document.getElementById('detailOrderNum').textContent = o.order_num;
-  document.getElementById('detailCustomer').textContent = [`הזמנה ${o.order_num}`, o.customer_name].filter(Boolean).join(' · ');
-  resetPrintCardSelection(o.id);
-  document.getElementById('detailBody').innerHTML = buildDetailHTML(o, pkgs);
-  if (Number(o.portal_order) === 1) loadPortalSourceDocuments(o.id);
-  document.getElementById('detailOverlay').classList.add('show');
-  requestAnimationFrame(() => {
-    renderDetailShapes();
-    syncPrintCardSelection();
-    window.IronBendOrderItemFilters.mount(document.getElementById('detailBody'), o);
-  });
-  history.replaceState(null, '', `?id=${id}`);
+let inlineOrderId=null, detailRequestEpoch=0;
+function parkInlineDetail(){
+  const panel=document.getElementById('detailPanel');
+  if(panel?.closest('.inline-order-host'))document.getElementById('detailOverlay').appendChild(panel);
+  document.querySelectorAll('.inline-order-host').forEach(host=>host.remove());
+  document.querySelectorAll('.row-expand[aria-expanded="true"]').forEach(button=>button.setAttribute('aria-expanded','false'));
+}
+function attachInlineDetail(){
+  if(!inlineOrderId)return;
+  const mobile=matchMedia('(max-width:640px)').matches;
+  const row=document.querySelector(`${mobile?'#mobileCards':'#ordersBody'} [data-inline-order="${inlineOrderId}"]`);
+  if(!row){closeDetailPanel();return;}
+  parkInlineDetail();
+  const host=document.createElement(mobile?'div':'tr');host.className='inline-order-host';
+  const mount=mobile?host:document.createElement('td');
+  if(!mobile){mount.colSpan=8;host.appendChild(mount);}
+  row.after(host);mount.appendChild(document.getElementById('detailPanel'));
+  row.querySelector('.row-expand')?.setAttribute('aria-expanded','true');
+  document.getElementById('detailOverlay').classList.remove('show');
+}
+function toggleOrderInline(id){
+  if(Number(inlineOrderId)===Number(id)){closeDetailPanel();return;}
+  openDetail(id,{inline:true});
+}
+window.addEventListener('resize',()=>{if(inlineOrderId)attachInlineDetail();});
+async function openDetail(id,options={}) {
+  const savedFolds=Number(currentDetailOrder?.id)===Number(id)?Array.from(document.querySelectorAll("#detailBody .order-detail-fold")).filter(e=>e.open).map(e=>e.querySelector("summary").textContent):null;
+  const epoch=++detailRequestEpoch;
+  const inline=options.inline||Number(inlineOrderId)===Number(id);
+  if(inline){parkInlineDetail();inlineOrderId=Number(id);if(Number(currentDetailOrder?.id)!==Number(id)){currentDetailOrder=null;document.getElementById('detailBody').textContent='טוען הזמנה…';document.getElementById('detailOrderNum').textContent='';document.getElementById('detailCustomer').textContent='';}}else{parkInlineDetail();inlineOrderId=null;}
+  try {
+    const [r,pkgR]=await Promise.all([fetch(`/api/orders/${id}`),fetch(`/api/packages?order_id=${id}`)]);
+    if(!r.ok)throw new Error('טעינת ההזמנה נכשלה');
+    const o=await r.json(),pkgs=await pkgR.json().catch(()=>[]);
+    if(epoch!==detailRequestEpoch)return;
+    currentDetailOrder=o;
+    document.getElementById('detailOrderNum').textContent=o.order_num;
+    document.getElementById('detailCustomer').textContent=o.customer_name||'';
+    resetPrintCardSelection(o.id);
+    document.getElementById('detailBody').innerHTML=buildDetailHTML(o,pkgs);
+    if(savedFolds)document.querySelectorAll('#detailBody .order-detail-fold').forEach(e=>{e.open=savedFolds.includes(e.querySelector('summary').textContent);});
+    if(Number(o.portal_order)===1)loadPortalSourceDocuments(o.id);
+    if(inline)attachInlineDetail();else document.getElementById('detailOverlay').classList.add('show');
+    requestAnimationFrame(()=>{
+      if(epoch!==detailRequestEpoch)return;
+      renderDetailShapes();syncPrintCardSelection();
+      window.IronBendOrderItemFilters.mount(document.getElementById('detailBody'),o);
+    });
+    history.replaceState(null,'',`?id=${id}`);
+  }catch(error){if(epoch===detailRequestEpoch){closeDetailPanel();alert(error.message);}}
+}
+async function undoOrderStatus(id){
+  try {
+    const r=await fetch(`/api/orders/${id}/status-undo`),p=await r.json();
+    if(!r.ok)throw new Error(p.error||'לא ניתן לבדוק חזרה');
+    if(!p.available)throw new Error(p.reason);
+    const reason=await requestCorrectionReason({title:`חזרה ל״${p.target_status}״`,info:'חזרה לשינוי הקודם תוך שמירת דיווחי הייצור.',defaultReason:'ביטול שינוי סטטוס שנבחר בטעות'});
+    if(!reason)return;
+    const response=await fetch(`/api/orders/${id}/status-undo`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({restore_point_id:p.restore_point_id,fingerprint:p.fingerprint,reason:reason.reason})});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'החזרה נכשלה');
+    await fetchOrders();await openDetail(id);
+  }catch(error){alert(error.message);}
 }
 
 async function loadPortalSourceDocuments(orderId) {
@@ -3186,11 +3228,16 @@ function buildDetailHTML(o, pkgs) {
     pkgSec = `<div class="d-section"><div class="d-title">🏷️ חבילות</div>${pkgRows}</div>`;
   }
 
-  return hero + prints + commercialSummaryHtml(o) + orderActions + statusSec + itemsSec + pkgSec;
+  const fold=(label,body,open=false)=>`<details class="order-detail-fold"${open?' open':''}><summary>${label}</summary><div>${body}</div></details>`;
+  const undo=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)?`<button class="btn-sm" onclick="undoOrderStatus(${o.id})">↶ חזרה מהשינוי האחרון</button>`:'';
+  const summary=`<div class="order-inline-summary">${o.delivery_address?`<span>${escHtml(o.delivery_address)}</span>`:""}${o.driver_notes?`<span>${escHtml(o.driver_notes)}</span>`:""}<b>${_totalLines} פריטים</b><b>${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})} ק״ג</b><span>${escHtml(workStatus)}</span>${undo}</div>`;
+  return summary+fold('פרטי הזמנה',hero)+fold('הדפסה ומסמכים',prints)+fold('סיכום ועיבודים',commercialSummaryHtml(o))+fold('עריכה ותיקון סטטוס',orderActions+statusSec)+fold('פריטים',itemsSec,!inlineOrderId)+pkgSec;
 }
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }
 function closeDetailPanel() {
+  detailRequestEpoch++;
+  parkInlineDetail();inlineOrderId=null;currentDetailOrder=null;
   window.IronBendOrderItemFilters.reset();
   document.getElementById('detailOverlay').classList.remove('show');
   history.replaceState(null, '', '/orders.html');

@@ -206,13 +206,13 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
   };
   const orderPatch = (f, p, mode = 'keep_documents', role = 'manager') => request(`/orders/${f.order}/status`, 'PATCH', {
     status: p.target_status, expected_status: p.current_status, correction_fingerprint: p.fingerprint,
-    correction_reason: 'תיקון הזמנה שנבחרה בטעות', correction_mode: mode,
+    correction_reason: 'תיקון הזמנה שנבחרה בטעות', correction_mode: mode, queue_scan_acknowledged:true,
   }, role);
   await t.test('returning an order to queue warns for scans, preserves work and resumes on the next accepted scan',async()=>{
     const f=await fixture({certificate:false});
     db.prepare("UPDATE items SET status='בייצור',produced_qty=2,completed_at=NULL WHERE id=?").run(f.item);
     let p=await orderPreview(f,'בתור ייצור');
-    assert.equal(p.queue_transfer,true);assert.equal(p.requires_correction,false);assert.equal(p.scan_warning,null);
+    assert.equal(p.queue_transfer,true);assert.equal(p.requires_correction,false);assert.equal(p.scan_warning.recorded_work_item_count,1);
     assert.equal((await orderPatch(f,p)).status,200);
     assert.equal(readItem(f).status,'בייצור');assert.equal(readItem(f).produced_qty,2);
     require('../services/orderProductionStatus').reconcileQueuedProduction(db);
@@ -221,7 +221,7 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
     assert.equal((await phone()).status,200);assert.equal(orderStatus(f),'בייצור');
     await request(`/worker-card?card=${f.item}`);
     p=await orderPreview(f,'בתור ייצור');assert.equal(p.scan_warning.scanned_item_count,1);
-    assert.equal((await orderPatch(f,p)).status,409,'API cannot bypass scan acknowledgment');
+    assert.equal((await request(`/orders/${f.order}/status`,'PATCH',{status:p.target_status,expected_status:p.current_status,correction_fingerprint:p.fingerprint})).status,409,'API cannot bypass scan acknowledgment');
     const body={status:'בתור ייצור',expected_status:'בייצור',correction_fingerprint:p.fingerprint,queue_scan_acknowledged:true};
     await request(`/worker-card?card=${f.item}`);
     assert.equal((await request(`/orders/${f.order}/status`,'PATCH',body)).status,409,'a new scan invalidates the preview');
@@ -230,6 +230,45 @@ test('item rollback reconciles work and explicitly cancels unshipped certificate
     assert.deepEqual(readItem(f),before);assert.equal(orderStatus(f),'בתור ייצור');
     assert.equal((await phone()).status,200);assert.equal(orderStatus(f),'בייצור');
     assert.deepEqual(readItem(f),before);
+  });
+
+  await t.test('mixed completed and waiting work survives queue movement and audited undo with stale protection',async()=>{
+    const f=await fixture({certificate:false,count:3});
+    db.prepare("UPDATE items SET status='הושלם' WHERE id=?").run(f.ids[0]);
+    db.prepare("UPDATE items SET status='ממתין',produced_qty=0,started_at=NULL,completed_at=NULL WHERE id=?").run(f.ids[1]);
+    const before=db.prepare('SELECT * FROM items WHERE order_id=? ORDER BY id').all(f.order);
+    const p=await orderPreview(f,'בתור ייצור');
+    assert.equal(p.queue_transfer,true);assert.deepEqual(p.affected_items,[]);
+    assert.equal((await orderPatch(f,p)).status,200);
+    assert.deepEqual(db.prepare('SELECT * FROM items WHERE order_id=? ORDER BY id').all(f.order),before);
+    const url=`/orders/${f.order}/status-undo`;
+    assert.equal((await request(url)).status,403);
+    let undo=await(await request(url,'GET',undefined,'manager')).json();assert.equal(undo.available,true);
+    const body={...undo,reason:'העברה לתור נבחרה בטעות'};
+    assert.equal((await request(url,'POST',body,'manager')).status,200);assert.equal(orderStatus(f),'בייצור');
+    assert.deepEqual(db.prepare('SELECT * FROM items WHERE order_id=? ORDER BY id').all(f.order),before);
+    assert.equal((await request(url,'POST',body,'manager')).status,409,'cannot replay undo');
+    undo=await(await request(url,'GET',undefined,'manager')).json();assert.equal(undo.available,true);
+    db.prepare("INSERT INTO worker_card_activity(order_id,item_id,action) VALUES(?,?,'opened')").run(f.order,f.item);
+    assert.equal((await request(url,'POST',{...undo,reason:'נסיון לאחר דיווח חדש'},'manager')).status,409);
+    assert.equal(orderStatus(f),'בייצור');
+  });
+
+  await t.test('undo restores completion dates after an explicit correction, and cannot resurrect cancelled documents',async()=>{
+    const f=await fixture({certificate:false});
+    db.prepare("UPDATE orders SET status='הושלם – ממתין לאיסוף' WHERE id=?").run(f.order);
+    db.prepare("UPDATE items SET status='הושלם' WHERE id=?").run(f.item);
+    const before=readItem(f),p=await orderPreview(f,'בייצור');
+    assert.equal((await orderPatch(f,p)).status,200);assert.equal(readItem(f).completed_at,null);
+    const snapshot=db.prepare("SELECT old_value FROM audit_log WHERE entity_type='item' AND entity_id=? AND action='production_state_snapshot' ORDER BY id DESC LIMIT 1").get(f.item);
+    assert.deepEqual(JSON.parse(snapshot.old_value).item,before);
+    const url=`/orders/${f.order}/status-undo`,undo=await(await request(url,'GET',undefined,'manager')).json();
+    assert.equal((await request(url,'POST',{...undo,reason:'החזרה לתיקון שנבחר בטעות'},'manager')).status,200);
+    assert.deepEqual(readItem(f),before);
+    const shipped=await fixture(),sp=await orderPreview(shipped,'בתור ייצור');
+    assert.equal((await orderPatch(shipped,sp,'cancel_unshipped_certificate')).status,200);
+    const blocked=await(await request(`/orders/${shipped.order}/status-undo`,'GET',undefined,'manager')).json();assert.equal(blocked.available,false);
+    assert.match(blocked.reason,/מסמכי/);
   });
 
   await t.test('dashboard queue view preserves the queue source and omits heavy geometry',async()=>{

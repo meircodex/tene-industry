@@ -1,3 +1,4 @@
+const orderStatusUndo = require('../services/orderStatusUndo');
 const router = require('express').Router();
 const {
   assertOrderStatusTransition,
@@ -1048,6 +1049,20 @@ module.exports = function createOrdersRouter(deps) {
     } catch (error) { res.status(error.status || error.statusCode || 400).json({ error: error.message }); }
   });
 
+  router.get('/orders/:id/status-undo', requireAnyRole(['manager', 'admin']), (req,res) => {
+    res.set('Cache-Control','no-store');
+    try { res.json(orderStatusUndo.preview(db,req.params.id)); }
+    catch(error) { res.status(error.status||400).json({error:error.message}); }
+  });
+  router.post('/orders/:id/status-undo', requireAnyRole(['manager', 'admin']), (req,res) => {
+    try {
+      const result=db.transaction(()=>orderStatusUndo.restore(db,req.params.id,req.body,{userId:req.userId,userName:req.auth?.display_name}))();
+      for(const item of result.items)wsBroadcast('item_status',item);
+      wsBroadcast('order_status',{id:Number(req.params.id),status:result.status});
+      res.json({success:true,status:result.status});
+    } catch(error) { res.status(error.status||400).json({error:error.message}); }
+  });
+
   router.patch('/orders/:id/status', requireAnyRole(['office', 'production', 'manager', 'admin']), (req, res) => {
     const { status, userId, userName } = req.body;
     if (!status) return res.status(400).json({ error: 'חסר סטטוס' });
@@ -1075,10 +1090,12 @@ module.exports = function createOrdersRouter(deps) {
         allowed: error.allowed || allowedOrderTransitions(order.status),
       });
     }
+    if (normalizeOrderStatus(order.status) === requestedStatus) return res.json({success:true,unchanged:true});
     const old = order.status;
     const approvedAt = transition.isApproval ? new Date().toISOString() : null;
     let correction = null, requiresCorrection = false;
     try { db.transaction(() => {
+      const beforeStatusChange = orderStatusUndo.capture(db,order.id);
       const preview = orderStatusCorrectionPreview(db, order.id, requestedStatus);
       assertQueueTransfer(preview,req.body);
       requiresCorrection = preview.requires_correction;
@@ -1093,6 +1110,7 @@ module.exports = function createOrdersRouter(deps) {
         'UPDATE orders SET status=?, workspace_version=workspace_version+1, stable_order_id=COALESCE(stable_order_id, order_num), approved_by=CASE WHEN ? THEN ? ELSE approved_by END, approved_at=CASE WHEN ? THEN ? ELSE approved_at END WHERE id=?'
       ).run(requestedStatus, transition.isApproval ? 1 : 0, req.userId || userId || null, transition.isApproval ? 1 : 0, approvedAt, order.id);
       auditLog('order', order.id, order.order_num, 'status_change', 'status', old, requestedStatus, preview.queue_transfer ? `העברה ידנית לתור; דיווחי הכרטיסים נשמרו${preview.scan_warning ? '; התראת סריקות אושרה' : ''}` : req.body.correction_reason || null, req.userId || userId || null, req.auth?.display_name || userName || null);
+      orderStatusUndo.record(db,beforeStatusChange,{userId:req.userId,userName:req.auth?.display_name,reversible:!correction?.cancelled_certificate_ids?.length&&!correction?.cancelled_loading_session_ids?.length});
       if (transition.isApproval) {
         auditLog('order', order.id, order.order_num, 'manager_approval', 'approved_by', null, req.userId || userId || null, null, req.userId || userId || null, req.auth?.display_name || userName || null);
       }

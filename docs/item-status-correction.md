@@ -15,3 +15,16 @@
 - Handoff: based on origin/main f2fdb5d in the existing clean worktree. Do not modify the older dirty ironbend-app checkout. Real orders are not used as test fixtures.
 
 Verified: full npm test 1099/1099; subsequent client/governance/auth checks 147/147. Real browser against an isolated local database: cancel source from the item selector, verify archived void document, return waiting -> in production, refresh and verify persistence. No production order mutations during QA.
+
+
+## 17.11.2026 — queue placement and safe return
+
+- Production → Production Queue is scheduling only when there is no active loading session. It preserves every item row, including completed items, quantities, start/completion times, stock and certificates. Recorded production facts trigger acknowledgment even when there is no opening scan. A new accepted production scan still resumes the order automatically.
+- Explicit backward corrections remain reviewed; Production stores the full before-image in an append-only `production_state_snapshot` audit record before mutating status facts, in the same transaction.
+- Orders owns `GET /api/orders/:id/status-undo` and `POST /api/orders/:id/status-undo`, manager/admin only. POST requires `restore_point_id`, `fingerprint`, and a 3–2000 character `reason`. The point is captured atomically with each real manual order status change. Same-status requests are no-ops.
+- Undo compares the entire current order/item state, current delivery/loading projection, and all worker receipts/scans to the saved after-state. New work, editing, lock, deletion or cancellation prevents blind restoration. The operator can still use the ordinary reviewed correction flow against current facts.
+- Orders restores its prior status/approval metadata; the owned Production helper restores only item status, started_at and completed_at. No geometry, quantity, stock, actual weighing, delivery document or scan event is overwritten. Each return appends `status_restored` and a new return point, allowing a correction of the return itself.
+- A correction that cancels a certificate or loading session is not blindly undone; use the owning document/loading correction flow. No cancelled document is resurrected.
+- Existing historical records without saved before-images are not fabricated. HZ-2026-131 was inspected read-only: the live audit records 11 completed and 1 in-production item changed to waiting at 10:39 on 17 November. No live order/item/history/stock was edited for this investigation.
+
+The Orders list now expands the existing single detail panel beneath one row. Parking before list replacement preserves handlers/IDs, filters and selection; request generations reject late responses. Secondary status/edit/print/commercial sections are collapsed. Dashboard and New Order density changes share a scoped stylesheet and keep canonical API calculations.

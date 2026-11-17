@@ -289,7 +289,7 @@
       try{
         const check=await fetch(`/api/orders/${orderId}/status-correction-preview?status=${encodeURIComponent(next)}`),preview=await check.json();
         if(!check.ok)throw Error(preview.user_message || preview.error||'לא ניתן לבדוק את שינוי הסטטוס');
-        const scanWarning=preview.scan_warning?` שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים'}. דיווחי הייצור והכמויות יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.`:'';
+        const scanWarning=preview.scan_warning?` שים לב: ${preview.scan_warning.scanned_item_count===1?'כבר נסרק כרטיס אחד':preview.scan_warning.scanned_item_count>1?'כבר נסרקו '+preview.scan_warning.scanned_item_count+' כרטיסים':'כבר קיימים דיווחי עבודה'}. דיווחי הייצור והכמויות יישמרו. סריקה נוספת תחזיר את ההזמנה לבייצור.`:'';
         const effect=preview.requires_correction?` ${preview.affected_items.length} פריטים יוחזרו לשלב ${preview.target_item_status||next}. הכמויות ותעודות המשלוח נשמרות.${preview.cancelled_loading_session_ids.length?' ההעמסה הפעילה תבוטל ותישמר בהיסטוריה.':''}`:'';
         if(!confirm(`לשנות את סטטוס ההזמנה ${order.order_num} ל״${next}״?${scanWarning}${effect}`)){select.value=order.order_status;select.disabled=false;return;}
         const r=await fetch(`/api/orders/${orderId}/status`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,expected_status:order.order_status,queue_scan_acknowledged:Boolean(preview.scan_warning),correction_fingerprint:preview.fingerprint,correction_reason:'תיקון סטטוס מתחנת עבודה',correction_mode:'keep_documents'})});
