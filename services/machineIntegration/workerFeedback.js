@@ -17,41 +17,16 @@ class WorkerFeedback {
       CREATE TABLE IF NOT EXISTS mi_station_presence(source_id TEXT PRIMARY KEY,last_seen TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mi_station_current(source_id TEXT PRIMARY KEY,received_at TEXT NOT NULL,body TEXT NOT NULL);`);
   }
-  stations({limit=100,offset=0,machineId=null}={}) {
+  stations({limit=100,offset=0}={}) {
     if(!Number.isInteger(limit)||limit<1||limit>200||!Number.isInteger(offset)||offset<0)fail('INVALID_STATION_PAGE');
-    if(machineId!==null&&(!Number.isSafeInteger(machineId)||machineId<1))fail('INVALID_STATION_MACHINE');
-    return {total:this.db.prepare('SELECT count(*) n FROM mi_station_bindings WHERE active=1 AND (? IS NULL OR central_machine_id=?)').get(machineId,machineId).n,limit,offset,items: this.db.prepare(`SELECT b.source_id,b.logical_machine_id,b.central_machine_id,p.last_seen
-      FROM mi_station_bindings b LEFT JOIN mi_station_presence p ON p.source_id=b.source_id WHERE b.active=1 AND (? IS NULL OR b.central_machine_id=?) ORDER BY b.central_machine_id,b.source_id LIMIT ? OFFSET ?`).all(machineId,machineId,limit,offset).map(row => {
+    return {total:this.db.prepare('SELECT count(*) n FROM mi_station_bindings WHERE active=1').get().n,limit,offset,items: this.db.prepare(`SELECT b.source_id,b.logical_machine_id,b.central_machine_id,p.last_seen
+      FROM mi_station_bindings b LEFT JOIN mi_station_presence p ON p.source_id=b.source_id WHERE b.active=1 ORDER BY b.central_machine_id,b.source_id LIMIT ? OFFSET ?`).all(limit,offset).map(row => {
       const machine = this.db.prepare('SELECT * FROM machines WHERE id=?').get(row.central_machine_id);
       const age = Date.parse(this.now()) - Date.parse(row.last_seen);
       return {sourceId: row.source_id, logicalMachineId: row.logical_machine_id, machineId: row.central_machine_id,
         label: machine?.label || machine?.name || row.logical_machine_id, lastSeenAtUtc: row.last_seen || null,
         online: Number.isFinite(age) && age >= -2000 && age < 10000};
     })};
-  }
-  stationState({limit=100,offset=0,machineId=null}={}) {
-    if(machineId!==null&&(!Number.isSafeInteger(machineId)||machineId<1))fail('INVALID_STATION_MACHINE');
-    const page=this.stations({limit,offset,machineId});
-    // Never expose credentials, actor identities or historic command payloads.
-    const items=page.items.filter(s=>machineId===null||s.machineId===machineId).map(station=>{
-      const cached=this.db.prepare('SELECT received_at,body FROM mi_station_current WHERE source_id=?').get(station.sourceId);
-      let mirror=null;
-      if(cached)try{
-        const data=JSON.parse(cached.body),token=String(data.card||''),id=/^\d+$/.test(token)?token:token.split('|').length>=2&&/^\d+$/.test(token.split('|')[1])?token.split('|')[1]:token.match(/-(\d{1,12})(?:-[A-Z]+[A-Z0-9]*)*(?:-C\d+OF\d+)?$/i)?.[1];
-        const item=id&&this.db.prepare('SELECT * FROM items WHERE id=?').get(Number(id));
-        const binding=this.db.prepare('SELECT * FROM mi_station_bindings WHERE source_id=? AND active=1').get(station.sourceId);
-        if(item&&(Number(item.machine_id)===station.machineId||String(item.machine||'').trim()===station.label)&&data.sourceId===station.sourceId&&data.machineId===station.logicalMachineId){
-          assertCardMachine(this.db,binding,item);
-          const age=Date.parse(this.now())-Date.parse(data.observedAtUtc),receivedAge=Date.parse(this.now())-Date.parse(cached.received_at);
-          mirror={card:data.card,runId:data.runId,receivedAtUtc:cached.received_at,observedAtUtc:data.observedAtUtc||null,
-            live:station.online&&data.live===true&&Number.isFinite(age)&&age>=-2000&&age<=5000&&receivedAge>=-2000&&receivedAge<=5000,
-            mappingQualified:data.mappingQualified===true,physicalAccuracyKnown:false,
-            rows:data.rows,expected:data.expected,special:data.special};
-        }
-      }catch{/* Invalid or reassigned evidence must not appear as this machine's current recipe. */}
-      return {...station,controller:mirror?.live?'live':mirror?'last-reading':'unknown',mirror};
-    });
-    return {...page,items};
   }
   create(actorKey, item, input) {
     if (!text(actorKey) || !Number.isSafeInteger(Number(item?.id))) fail('WORKER_SCOPE_REQUIRED', 403);

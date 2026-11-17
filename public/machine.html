@@ -210,7 +210,6 @@
   }
 </style>
 <link rel="stylesheet" href="/theme.css">
-<link rel="stylesheet" href="/factory-station-status.css?v=20261117">
 </head>
 <body data-page="machine">
 <script src="/auth-client.js"></script>
@@ -246,7 +245,6 @@
     </div>
   </div>
 
-  <section id="factoryStationStatus" class="factory-station-status" aria-label="חיבור למכונות" aria-live="polite"></section>
   <!-- MACHINE VIEW -->
   <div id="machineView">
   <div class="main-grid">
@@ -501,7 +499,6 @@ function updateSelected() {
   if (!selectedMachineId) return;
   const m = machines.find(x=>x.id===selectedMachineId);
   if (!m) return;
-  window.IronBendStationStatus?.selectMachine(m.id);
   const counter = m.counter??0;
   const counterEl = document.getElementById('counterDisplay');
   if (counter!==prevCounter) {
@@ -867,7 +864,6 @@ setInterval(()=>{ if(currentView==='queue'){loadFullQueue();loadTonsToday();} },
 </script>
 <script src="/help.js"></script>
 <script src="/production-i18n.js?v=2" defer></script>
-<script src="/factory-station-status.js?v=20261117"></script>
 </body>
 </html>
 

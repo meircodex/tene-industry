@@ -154,7 +154,3 @@ Stop deployment immediately if any of these appear:
 
 First action in an emergency: run `/api/admin/data-audit`, then back up the
 current DB before attempting any repair.
-
-
-## 2026-11-17 — connect the existing factory UI
-D0, no schema migration: reuse current station JSON/presence, add guarded read projection and personal-worker adapter; no machine assignment, geometry translation, PLC writes or production status changes. Bounded spec and architecture: docs/machine-integration/FACTORY-APP-CONNECTION-20261117.md. Rollback code alone remains schema-compatible; receipts and evidence retain existing owners.

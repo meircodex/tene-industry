@@ -295,7 +295,3 @@ A shared weighing has one actual weight and one signed delta for the entire sele
 
 ### Reporting worker directory — 16.11.2026
 Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.
-
-
-## Factory station connection — 2026-11-17
-GET /api/machine-integration/station-state — office/production/maintenance/manager/admin; limit 1..200, offset, optional central machineId; station heartbeat and scoped current mirror, live downgraded on age or absent heartbeat. GET /api/worker-portal/machine-feedback/stations, POST /api/worker-portal/machine-feedback/requests, GET /api/worker-portal/machine-feedback/requests/:id reuse WorkerFeedback under verified personal portal identity. No station snapshot or device-control endpoint on this prefix.

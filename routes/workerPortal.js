@@ -1,6 +1,6 @@
 'use strict';
 const portal=require('../services/workerPortalAccounts');
-module.exports=function createWorkerPortalRouter({db,requireAnyRole,authService,openCard,updateStatus,wsBroadcast,authorizeCard,parseCard}){
+module.exports=function createWorkerPortalRouter({db,requireAnyRole,authService,openCard,updateStatus,wsBroadcast}){
  const router=require('express').Router();
  const support=require('../services/workerPortalSupport');support.ensureSchema(db);
  const storage=require('../services/warehouseCardStorage');
@@ -14,18 +14,6 @@ module.exports=function createWorkerPortalRouter({db,requireAnyRole,authService,
  router.use('/worker-portal',(req,res,next)=>{try{deviceAccess.authenticate(db,req);next();}catch(e){res.status(e.status||403).json({error:e.message});}});
  const allowed=['production','warehouse','quality','maintenance','kiosk','manager','admin'];
  function identify(req,res,next){try{portal.identify(db,req);res.set('Cache-Control','no-store');next();}catch(e){res.status(e.status||500).json({error:e.message});}}
-
- // Reuse the existing feedback module behind the personal portal's verified
- // worker/device boundary. No anonymous QR mode or controller-control route.
- if(authorizeCard&&parseCard){
-  const productionAccess=()=>[requireAnyRole(allowed),identify,(req,res,next)=>{
-   const permissions=req.portalWorker.permissions;
-   const completion=String(req.body?.action||'').startsWith('completion.');
-   if(!permissions.includes('complete')&&(completion||!permissions.includes('start')))return res.status(403).json({error:'worker_portal_action_forbidden'});
-   next();
-  }];
-  router.use('/worker-portal/machine-feedback',require('./workerMachineFeedback')({db,requireQrPermission:productionAccess,authorizeCard,parseCard,wsBroadcast,includeSnapshot:false}));
- }
 
  router.get('/worker-portal/me',requireAnyRole(allowed),identify,(req,res)=>res.json({worker:req.portalWorker}));
  router.patch('/worker-portal/preferences',requireAnyRole(allowed),identify,(req,res)=>{

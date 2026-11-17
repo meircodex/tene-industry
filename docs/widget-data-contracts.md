@@ -231,7 +231,3 @@ The existing worker parameter panel reads `/api/machine-feedback/stations`. Its 
 
 ### Reporting worker directory — 16.11.2026
 Existing GET /api/reports/production-timing?unified=1&flat=1 now returns the complete configured worker catalog in unified.facets.workers, independent of period activity. Existing office/manager/admin identity gate remains; finance gets an empty directory and no actor keys. Stable typed key/name/active/source/aliases only; participants include actual worker-card and station scan sources. Future receipt details gain a server-derived immutable _actor_identity snapshot. No new endpoint, permissions, DB migration or production/stock changes. See docs/production-fixed-report-table.md.
-
-
-## Factory station connection — 2026-11-17
-Existing production-queue.html and machine.html read paginated station-state. Station online is a heartbeat only; PLC live requires fresh scoped mirror. No fabricated RUN/STOP or counter. Existing worker-portal.html mounts the approved parameter panel below the original card; one existing DONE confirmation adds an unchecked recipe approval when a fresh proposal exists. The optional feedback receives only the accepted business receipt. Retry retains the same production request ID and feedback proposal. Outbox is user-scoped, cleared from the active UI on session reset.

@@ -494,7 +494,7 @@ module.exports = function createProductionRouter(deps) {
   });
   router.get('/worker-card',requireQrPermission('production'),openWorkerCard);
   router.patch('/worker-card/:id/status',requireQrPermission('production'),updateWorkerCardStatus);
-  router.use(require('./workerPortal')({db,requireAnyRole,authService,openCard:openWorkerCard,updateStatus:updateWorkerCardStatus,wsBroadcast,authorizeCard:authorizePublicWorkerCard,parseCard:parseWorkerCardToken}));
+  router.use(require('./workerPortal')({db,requireAnyRole,authService,openCard:openWorkerCard,updateStatus:updateWorkerCardStatus,wsBroadcast}));
 
   router.patch('/worker-card/:id', requireQrPermission('production'), workerCardWrite((req, res) => {
     const forbiddenFields = forbiddenProductionPatchFields(req.body);

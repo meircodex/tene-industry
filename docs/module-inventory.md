@@ -681,7 +681,3 @@ Machine Integration (2026-11-16): `services/machineIntegration/automaticConnecti
 
 
 Reporting worker projection (16.11.2026): read-only consumers declared in routes/reports manifest for worker profiles, portal account links, users, legacy workers, scan_log, worker_card_activity, device enrollments and invitations. Identity writes remain Production receipt snapshots through WorkerCardActivity/WorkerIdentity; no backfill or profile/account mutations.
-
-
-## Factory station connection — 2026-11-17
-Production owns queue/scanner/DONE. Machine Integration adds a read-only station-state projection and feedback in the existing personal worker portal, with verified worker/device identity and start/complete grants. Files: public/factory-station-status.*, public/worker-machine-feedback.*, routes/workerPortal.js, routes/machineStation.js. No business tables or controller writes.

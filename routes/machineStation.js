@@ -13,12 +13,6 @@ module.exports=function createMachineStationRouter(deps){
  const automatic=new AutomaticConnection({db,inbox:service,...(deps.automaticConnection||{})});
  const stationAccess=roles=>stationOrRole(workerFeedback,requireAnyRole(roles));
  const productionQueue=new StationProductionQueue({db});
- router.get('/machine-integration/station-state',requireAnyRole(['office','production','maintenance','manager','admin']),(req,res)=>{
-  try{
-   if(Object.keys(req.query).some(k=>!['limit','offset','machineId'].includes(k)))return res.status(422).json({error:'INVALID_STATION_STATE_FILTER'});
-   res.set('Cache-Control','no-store');res.json(workerFeedback.stationState({limit:Number(req.query.limit||100),offset:Number(req.query.offset||0),machineId:req.query.machineId?Number(req.query.machineId):null}));
-  }catch(error){res.status(error.status||400).json({error:error.message});}
- });
  router.get('/machine-integration/station-queue',stationAccess(['production','maintenance','manager','admin']),(req,res)=>{
   try{if(Object.keys(req.query).some(k=>!['sourceId','limit','offset','q','diameter','status'].includes(k)))return res.status(422).json({error:'INVALID_STATION_QUEUE_FILTER'});
    const binding=workerFeedback.authorize(req.query.sourceId||req.headers['x-station-source'],req.headers['x-station-credential']);

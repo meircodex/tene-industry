@@ -2,9 +2,6 @@
 (()=>{
  const $=id=>document.getElementById(id),esc=v=>window.IronBendSafe.escapeHtml(String(v??''));
  const dictionaries=window.WorkerPortalI18n;
- Object.assign(dictionaries.he,{machineChanges:'שינויי פרמטרים שנקלטו מהמכונה',machineRecipeApprove:'בדקתי מוצר והוא תואם לכרטיס. שמור את הפרמטרים הנוכחיים כמתכון שאישרתי.'});
- Object.assign(dictionaries.en,{machineChanges:'parameter changes captured from the machine',machineRecipeApprove:'I checked the product and it matches this card. Save the current parameters as a recipe I approved.'});
- Object.assign(dictionaries.th,{machineChanges:'การเปลี่ยนแปลงพารามิเตอร์ที่อ่านจากเครื่อง',machineRecipeApprove:'ฉันตรวจสอบชิ้นงานแล้วและตรงตามใบงาน บันทึกพารามิเตอร์ปัจจุบันเป็นสูตรที่ฉันอนุมัติ'});
  const settings=window.createWorkerPortalSettings({document,button:$('settingsButton'),panel:$('settingsPanel'),backdrop:$('settingsBackdrop'),closeButton:$('closeSettings')});
  let lang=localStorage.getItem('workerPortalLanguage')||'he',worker=null,card=null,original=null,cardToken='',view='login',busy=false,opening=false,pending=null,draft={},historyPage=1,historyRows=[],summary=null,documents=[],zones=[],selectedZone='',lastMessage=null,installPrompt=null,faultPending=null,photo=null,photoBusy=false,faultSaving=false,helpTopic='operating',sessionEpoch=0,photoGeneration=0;
  const t=k=>(dictionaries[lang]||dictionaries.he)[k]||dictionaries.he[k]||k;
@@ -24,7 +21,7 @@
  }
  // Choosing the device path is a client routing hint; only the server verifies identity.
  function portalPasswordSession(){try{const token=window.IronBendAuth.accessToken()||'';return JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).portal_only===true;}catch{return false;}}
- async function api(path,options={}){const c=new AbortController(),timeout=setTimeout(()=>c.abort(),20000);try{const device=window.IronBendAuth.deviceCredential(),deviceMode=path.startsWith('/api/worker-portal/')&&!portalPasswordSession(),headers=new Headers(options.headers||{});if(deviceMode&&device)headers.set('X-IronBend-Device',device);const request=deviceMode?window.IronBendAuth.nativeFetch:fetch;const r=await request(path,{cache:'no-store',...options,headers,credentials:'same-origin',signal:options.signal?AbortSignal.any([options.signal,c.signal]):c.signal}),data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||'error'),{key:errorKey(data.error,r.status),status:r.status});if(data.offline)throw Error('offline');return data;}catch(e){if(e.status)throw e;throw Object.assign(Error('offline'),{key:'offline'});}finally{clearTimeout(timeout);}}
+ async function api(path,options={}){const c=new AbortController(),timeout=setTimeout(()=>c.abort(),20000);try{const device=window.IronBendAuth.deviceCredential(),deviceMode=path.startsWith('/api/worker-portal/')&&!portalPasswordSession(),headers=new Headers(options.headers||{});if(deviceMode&&device)headers.set('X-IronBend-Device',device);const request=deviceMode?window.IronBendAuth.nativeFetch:fetch;const r=await request(path,{cache:'no-store',...options,headers,credentials:'same-origin',signal:c.signal}),data=await r.json();if(!r.ok)throw Object.assign(Error(data.error||'error'),{key:errorKey(data.error,r.status),status:r.status});if(data.offline)throw Error('offline');return data;}catch(e){if(e.status)throw e;throw Object.assign(Error('offline'),{key:'offline'});}finally{clearTimeout(timeout);}}
  function applyLanguage(value){
   lang=Object.hasOwn(dictionaries,value)?value:'he';document.documentElement.lang=lang;document.documentElement.dir=lang==='he'?'rtl':'ltr';localStorage.setItem('workerPortalLanguage',lang);$('language').value=lang;
   for(const el of document.querySelectorAll('[data-i18n]'))el.textContent=t(el.dataset.i18n);
@@ -46,8 +43,8 @@
  $('discardYes').addEventListener('click',()=>discardAnswer(true));$('discardNo').addEventListener('click',()=>discardAnswer(false));$('discardDialog').addEventListener('cancel',()=>discardAnswer(false));
  function lockFault(locked){for(const id of['faultDescription','faultPhoto','removePhoto'])$(id).disabled=locked;$('sendFault').disabled=faultSaving||photoBusy;$('sendFault').textContent=t(faultPending&&!faultSaving?'retry':'sendFault');}
  function resetFault(){faultSaving=false;photoGeneration++;photo=null;photoBusy=false;faultPending=null;$('faultForm').reset();$('photoPreview').hidden=true;$('photoPreview').removeAttribute('src');$('removePhoto').hidden=true;$('faultFeedback').textContent='';$('sendFault').disabled=false;lockFault(false);}
- function showActivationNeeded(){sessionEpoch++;window.IronBendMachineFeedback?.reset();resetFault();scanner.stop();worker=null;card=null;original=null;pending=null;draft={};historyRows=[];summary=null;cardToken='';show('login');}
- async function boot(){const epoch=++sessionEpoch;window.IronBendMachineFeedback?.reset();try{const data=await api('/api/worker-portal/me');if(epoch!==sessionEpoch)return;worker=data.worker;resetFault();if(!worker)throw Error('offline');applyLanguage(worker.language);if(worker.permissions.some(p=>p==='start'||p==='complete'))window.IronBendMachineFeedback?.configure({api,base:'/api/worker-portal/machine-feedback',userId:worker.user_id});show('home');message(null);await loadHome();}catch(e){if(epoch!==sessionEpoch)return;show('login');message(e.key||'loginRequired',true);}}
+ function showActivationNeeded(){sessionEpoch++;resetFault();scanner.stop();worker=null;card=null;original=null;pending=null;draft={};historyRows=[];summary=null;cardToken='';show('login');}
+ async function boot(){const epoch=++sessionEpoch;try{const data=await api('/api/worker-portal/me');if(epoch!==sessionEpoch)return;worker=data.worker;resetFault();if(!worker)throw Error('offline');applyLanguage(worker.language);show('home');message(null);await loadHome();}catch(e){if(epoch!==sessionEpoch)return;show('login');message(e.key||'loginRequired',true);}}
  async function loadHome(){await Promise.all([loadHistory(),loadSummary(),loadResources()]);}
  async function loadHistory(){const epoch=sessionEpoch,user=worker?.user_id;try{const data=await api('/api/worker-portal/history?page='+historyPage+'&limit=3');if(epoch!==sessionEpoch||worker?.user_id!==user)return;if(!Array.isArray(data.rows))throw Error('offline');historyRows=data.rows;$('historyPages').hidden=data.total<=3;renderHistory();$('historyPrev').disabled=historyPage<=1;$('historyNext').disabled=historyPage*3>=data.total;$('historyPage').textContent=historyPage+' / '+Math.max(1,Math.ceil(data.total/3));}catch(e){if(epoch===sessionEpoch&&worker?.user_id===user)message(e.key||'error',true);}}
  async function loadSummary(){const epoch=sessionEpoch,user=worker?.user_id;try{const data=await api('/api/worker-portal/summary');if(epoch!==sessionEpoch||worker?.user_id!==user)return;summary=data;renderSummary();}catch(e){if(epoch!==sessionEpoch||worker?.user_id!==user)return;summary=null;renderSummary();message(e.key||'error',true);}}
@@ -56,7 +53,7 @@
  function statusBadge(status,zone){const key=statusKey(status);return`<span class="status-badge ${zone?'stored':esc(key)}">${esc(zone?t('inStorage')+' '+zone:t(key))}</span>`;}
  function renderHistory(){$('history').innerHTML=historyRows.length?historyRows.map((r,i)=>`<button type="button" class="history-card" data-history="${i}"><strong class="history-id"><bdi>#${Number(r.item_id)}</bdi></strong><span class="history-client"><strong>${esc(r.customer_name||'')}</strong><small><bdi>${esc(r.order_num||'')}</bdi></small></span>${statusBadge(r.status,r.zone&&['הושלם','ממתין לאיסוף'].includes(r.status)?r.zone:null)}<strong class="history-weight">${fmt(r.total_weight,0)} ${esc(t('kg'))}</strong></button>`).join(''):`<p class="muted">${esc(t('noHistory'))}</p>`;}
  const normalizedCode=window.WorkerCardCode.normalize;
- async function openCard(raw){if(opening||busy||!worker)return;const token=normalizedCode(raw);if(!token){message('invalidCode',true);return;}if(!await mayLeave())return;opening=true;const epoch=sessionEpoch,user=worker.user_id;scanner.stop();message('loading');try{const data=await api('/api/worker-portal/card?original=1&card='+encodeURIComponent(token));if(epoch!==sessionEpoch||worker?.user_id!==user)return;if(!data.items?.[0]||!data.scan_receipt?.id)throw Error('offline');card=data.items[0];original=data.original_card;cardToken=token;pending=null;draft={};show('card');renderCard();message(null);if(worker.permissions.some(p=>p==='start'||p==='complete'))window.IronBendMachineFeedback?.onCardOpened({item:card,card:token,receipt:data.scan_receipt}).catch(()=>{});}catch(e){if(epoch===sessionEpoch&&worker?.user_id===user)message(e.key||'error',true);}finally{opening=false;}}
+ async function openCard(raw){if(opening||busy||!worker)return;const token=normalizedCode(raw);if(!token){message('invalidCode',true);return;}if(!await mayLeave())return;opening=true;const epoch=sessionEpoch,user=worker.user_id;scanner.stop();message('loading');try{const data=await api('/api/worker-portal/card?original=1&card='+encodeURIComponent(token));if(epoch!==sessionEpoch||worker?.user_id!==user)return;if(!data.items?.[0]||!data.scan_receipt?.id)throw Error('offline');card=data.items[0];original=data.original_card;cardToken=token;pending=null;draft={};show('card');renderCard();message(null);}catch(e){if(epoch===sessionEpoch&&worker?.user_id===user)message(e.key||'error',true);}finally{opening=false;}}
  function renderCard(){
   $('cardNumber').textContent=t('card')+' #'+card.id;$('cardOrder').textContent=card.order_num||'';$('cardCustomer').textContent=card.customer_name||'';
   $('cardStatus').textContent=t(statusKey(card.status));$('cardStatus').className='status-badge '+statusKey(card.status);
@@ -77,28 +74,19 @@
  function isTerminal(){return['בוטל','סופק','נשלח','הועמס'].includes(card.status);}
  function formatDate(value){const v=String(value);return new Intl.DateTimeFormat(locale(),{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',timeZone:'Asia/Jerusalem'}).format(new Date(v.includes('T')?v:v.replace(' ','T')+'Z'));}
  let confirmPending=null;
- function confirmStatus(text,proposal=null){$('statusConfirmText').textContent=text;$('machineRecipeChoice').hidden=!proposal;$('machineRecipeApprove').checked=false;$('machineRecipeSummary').textContent=proposal?String(proposal.changes?.length||0)+' '+t('machineChanges'):'';$('statusConfirm').showModal();return new Promise(resolve=>{confirmPending=resolve;});}
+ function confirmStatus(text){$('statusConfirmText').textContent=text;$('statusConfirm').showModal();return new Promise(resolve=>{confirmPending=resolve;});}
  function resolveConfirm(value){$('statusConfirm').close();confirmPending?.(value);confirmPending=null;}
  $('statusConfirmYes').addEventListener('click',()=>resolveConfirm(true));$('statusConfirmNo').addEventListener('click',()=>resolveConfirm(false));$('statusConfirm').addEventListener('cancel',()=>resolveConfirm(false));
  async function saveStatus(retry=false){
   if(busy||!card||isPartial())return;
   if(!retry){if(!Object.keys(draft).length)return;const w=draft.actual_weight_kg;if(w!==undefined&&(!Number.isFinite(w)||w<=0||w>1000000)){message('invalidWeight',true);$('actualWeight').setAttribute('aria-invalid','true');return;}
-   let feedback=null;
-   if(draft.status==='הושלם'){
-    busy=true;renderCard();const epoch=sessionEpoch,itemId=card.id,token=cardToken;
-    try{
-     const text=t('completeConfirm')+' '+fmt(card.quantity)+' '+t('units');
-     feedback=await window.IronBendMachineFeedback?.beforeComplete({itemId,card:token,confirm:async proposal=>({cancelled:!await confirmStatus(text,proposal),saveRecipe:$('machineRecipeApprove').checked})});
-     if(epoch!==sessionEpoch||card?.id!==itemId||cardToken!==token||feedback?.cancelled)return;
-     if(!feedback?.confirmed&&!await confirmStatus(text))return;
-    }finally{busy=false;if(card)renderCard();}
-   }
+   if(draft.status==='הושלם'&&!await confirmStatus(t('completeConfirm')+' '+fmt(card.quantity)+' '+t('units')))return;
    if(draft.status==='הועמס'&&!await confirmStatus(t('loadConfirm')))return;
-   pending={id:card.id,feedback,body:{status:draft.status||card.status,card:cardToken,expected_status:card.status,request_id:requestId(),...draft}};
+   pending={id:card.id,body:{status:draft.status||card.status,card:cardToken,expected_status:card.status,request_id:requestId(),...draft}};
   }
   const operation=pending;if(!operation)return;busy=true;renderCard();message('saving');
-  try{const data=await api('/api/worker-portal/card/'+operation.id+'/status',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(operation.body)});if(data.ok!==true||!data.receipt?.id||!data.item)throw Error('offline');card=data.item;card.last_saved_at=data.receipt.occurred_at;pending=null;draft={};message('saved');loadSummary();if(operation.body.status==='הושלם')try{window.IronBendMachineFeedback?.afterComplete({context:operation.feedback,receipt:data.receipt,itemId:operation.id,card:operation.body.card});}catch{/* Optional feedback cannot undo the accepted production receipt. */}}
-  catch(e){if(e.key!=='offline'&&!(e.status>=500))pending=null;message(e.key||'offline',true);if(e.status===409){try{const latest=await api('/api/worker-portal/card?original=1&card='+encodeURIComponent(cardToken));if(latest.items?.[0]){card=latest.items[0];original=latest.original_card;draft={};}}catch{}}if(e.status===401){showActivationNeeded();message('session',true);}}
+  try{const data=await api('/api/worker-portal/card/'+operation.id+'/status',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(operation.body)});if(data.ok!==true||!data.receipt?.id||!data.item)throw Error('offline');card=data.item;card.last_saved_at=data.receipt.occurred_at;pending=null;draft={};message('saved');loadSummary();}
+  catch(e){if(e.key!=='offline')pending=null;message(e.key||'offline',true);if(e.status===409){try{const latest=await api('/api/worker-portal/card?original=1&card='+encodeURIComponent(cardToken));if(latest.items?.[0]){card=latest.items[0];original=latest.original_card;draft={};}}catch{}}if(e.status===401){showActivationNeeded();message('session',true);}}
   finally{busy=false;if(card)renderCard();}
  }
  async function openHome(){if(!await mayLeave())return;show('home');message(null);await loadHome();}
