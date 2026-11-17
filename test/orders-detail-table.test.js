@@ -30,3 +30,21 @@ test('untrusted names, source numbers, statuses and warnings remain text in head
  const html=table.render([item],'<script>summary</script>');
  assert.doesNotMatch(html,/<script|<img|title=""/);assert.match(html,/&lt;img/);assert.match(html,/&lt;script/);
 });
+
+test('numeric canonical metrics sort in both directions, preserve ties and keep missing values last',()=>{
+ const data=[{id:1,values:{length:'100 ס״מ'},sortValues:{length:1000}},{id:2,values:{length:'20 ס״מ'},sortValues:{length:200}},{id:3,values:{length:'20 ס״מ'},sortValues:{length:200}},{id:4,values:{length:'—'}}];
+ const before=JSON.stringify(data);
+ assert.deepEqual(table.sort(data,{key:'length',direction:'asc'}).map(e=>e.id),[2,3,1,4]);
+ assert.deepEqual(table.sort(data,{key:'length',direction:'desc'}).map(e=>e.id),[1,2,3,4]);
+ assert.equal(JSON.stringify(data),before);
+ assert.deepEqual(table.sort(entries,{key:'line',direction:'desc'}).map(e=>e.id),[3,2,1]);
+ assert.equal((table.render(entries).match(/data-detail-sort=/g)||[]).length,9);
+});
+test('order print and document actions remain explicitly named and reuse existing handlers',()=>{
+ const fs=require('node:fs'),html=fs.readFileSync(require('node:path').join(__dirname,'../public/orders.html'),'utf8');
+ assert.match(html,/class="detail-head-action detail-action-label" href="\/order-print.html\?id=\$\{o.id\}&kind=print-cards"[^>]*>כרטיסיות ייצור/);
+ assert.match(html,/onclick="openA4PrintDialog\(\$\{o.id\}\)"[^>]*>גיליון הזמנה/);
+ assert.match(html,/openDetailTools\('documents'\)/);
+ assert.match(html,/openDetailTools\('print'\)/);
+ assert.match(html,/data-detail-tools="documents"/);
+});

@@ -16,7 +16,7 @@
 <script src="/display-units.js?v=4"></script>
 <script src="/status-contracts-client.js"></script>
 <script src="/order-workspace.js?v=20261113-workflow"></script>
-<script src="/orders-detail-table.js?v=1"></script>
+<script src="/orders-detail-table.js?v=2"></script>
 <script src="/order-batch-actions.js?v=1"></script>
 <script src="/order-list-sorting.js?v=1"></script>
 <script src="/straight-stock-inventory.js?v=1"></script>
@@ -400,7 +400,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .m-card-batch{display:flex;align-items:center;gap:8px;}
 </style>
 <link rel="stylesheet" href="/dense-workspace.css?v=20261117">
-<link rel="stylesheet" href="/orders-detail-table.css?v=1">
+<link rel="stylesheet" href="/orders-detail-table.css?v=2">
 </head>
 <body data-page="orders">
 
@@ -3190,6 +3190,7 @@ function buildDetailHTML(o, pkgs) {
         visualHtml:visualHtml.replace(/ onclick="[^"]*"/g,''),
         percent:qty>0?Math.round(Math.min(1,produced/qty)*100):0,tone:ic,
         warning:[review?'נדרשת בדיקת פריט':'',openUWarning,shapeMismatch&&!isReviewApproved(item)?'יש אי התאמה בשם הצורה':'',displayNote].filter(Boolean).join(' · '),
+        sortValues:{diameter:Number(item.diameter),length,quantity:qty,weight,production:qty>0?produced/qty:0},
         values:{line:sourceItemNumber||String(item._lineNo),name:elementName||shapeLabel(item.shape_name,sides,item),
           shape:shapeLabel(item.shape_name,sides,item),diameter:'Ø'+item.diameter,
           length:IronBendDisplayUnits.formatLengthCmFromMm(length),quantity:String(qty),
@@ -3228,9 +3229,11 @@ function buildDetailHTML(o, pkgs) {
     ${o.delivery_date?`<span title="אספקה" class="detail-flat-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span>`:''}
     <span>${urgentLabel(o)}</span>${note?`<span class="detail-flat-note" title="${escHtml(note)}">${escHtml(note)}</span>`:''}
     <span class="detail-head-actions">
-      <button type="button" class="detail-head-action" onclick="openDetailTools('print')" title="הדפסה" aria-label="הדפסה">🖨</button>
-      <button type="button" class="detail-head-action" onclick="openDetailTools('documents')" title="מסמכים וסיכום" aria-label="מסמכים וסיכום">▤</button>
-      <button type="button" class="detail-head-action" onclick="openDetailTools('edit')" title="עריכת הזמנה וסטטוס" aria-label="עריכת הזמנה וסטטוס">✎</button>
+      <a class="detail-head-action detail-action-label" href="/order-print.html?id=${o.id}&kind=print-cards" target="_blank" rel="noopener">כרטיסיות ייצור</a>
+      <button type="button" class="detail-head-action detail-action-label" onclick="openA4PrintDialog(${o.id})">גיליון הזמנה</button>
+      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('print')">משלוח וחיתוך</button>
+      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('documents')" title="מסמכים וסיכום" aria-label="מסמכים וסיכום">מסמכים וסיכום</button>
+      <button type="button" class="detail-head-action detail-action-label" onclick="openDetailTools('edit')" title="עריכת הזמנה וסטטוס" aria-label="עריכת הזמנה וסטטוס">עריכה</button>
       <button type="button" class="detail-head-action" onclick="openAddItem(event, ${o.id})" title="הוסף פריט" aria-label="הוסף פריט">＋</button>
       ${undo}<button type="button" class="detail-head-action" onclick="closeDetailPanel()" title="סגור" aria-label="סגור פרטי הזמנה">×</button>
     </span>

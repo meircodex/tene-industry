@@ -40,3 +40,12 @@ The approved follow-up replaces accordion navigation with one visible item table
 `public/orders-detail-table.js` owns client filtering and expansion only. The existing Orders builder supplies canonical metrics and server shape SVGs, with unchanged detailed editors/status/cancellation/history/printing handlers inside the one selected expanded row. Filter popovers are outside the scrolling table to avoid clipping, and close on outside click, Escape and resize. Rebinding removes listeners; close resets the view and same-order refresh retains the selected filters/row. Printing/documents/edit dialogs use the existing actions. No route, permission, inventory or production write changed.
 
 Verified live release `80e874d` / `dep-dbu896om7kps73b9nosg`: full suite 1,398 passed. Frontend asset parity and health/auth checks passed. Read-only live order 131 rendered all 23 items with nine filter headings; selecting Ø14 showed 9 and clearing restored all 23. The compact header measured 42.8px and item rows 46px. Existing correction/undo APIs and production data were not changed.
+
+
+## Unified order styling and explicit actions — 17.11.2026
+
+User clarified that the order window is welcome; the correction preserves both existing modal and inline entry paths. The detail window is bounded to 1140px, the name column no longer absorbs empty space, and 66px item rows show 16px text and larger canonical drawings. Existing cards, A4, shipment/cutting, documents/summary and editing actions remain available with visible text labels.
+
+Column names toggle ascending/descending order while their independent arrow opens the existing checkbox filter. Numeric sorting uses raw canonical metrics supplied by the existing item builder; it does not parse displayed rounded weights or unit strings. Sorting moves each main/expanded row pair together, preserves selected filters and editor nodes, retains stable ties and puts missing values last. No production, stock, scan or document data was changed.
+
+Pre-release verification: 1,400 tests passed; local sort/filter composition, A4 language dialog, documents/summary and desktop visual review passed using demo data.

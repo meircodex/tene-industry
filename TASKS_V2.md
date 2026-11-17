@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### עיצוב אחיד לפרטי הזמנה ופעולות גלויות — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: user clarified order modal is welcome; requests compact coherent styling, readable rows, compact right-aligned columns, sort on heading name/filter on arrow, explicit print/document actions.
+- ownership/screens: Orders frontend only; reuse existing metrics, SVGs, editors, print and document handlers.
+- output: preserve existing modal and inline opening; visible named print actions; larger rows and separate sorting/filtering.
+- DB/API/events: none. No changes to existing inventory, scans, history or production records.
+- DoD: regression tests for preserved actions and numeric sorting, full suite, local visual verification and live read-only verification.
+- verification: 1,400 tests passed. Local browser verified descending numeric line order, independent checkbox filtering, clear/Escape, direct A4 language dialog and full documents/summary. Desktop visual review used exported real demo DOM with current styles: bounded name column, 66px rows, readable drawings and named actions. Production deployment pending.
+
+
 ### פריטי הזמנה גלויים וסינון בכותרות — 17.11.2026
 - status: done
 - owner: codex

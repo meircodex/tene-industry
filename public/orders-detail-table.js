@@ -10,9 +10,22 @@
   function project(entries,filters={}){
     return entries.filter(entry=>columns.every(([key])=>!Array.isArray(filters[key])||!filters[key].length||filters[key].includes(keyValue(entry,key))));
   }
+  const collator=new Intl.Collator('he',{numeric:true,sensitivity:'base'});
+  function sort(entries,state){
+    if(!state)return [...entries];
+    const key=state.key,direction=state.direction==='desc'?-1:1;
+    return entries.map((entry,index)=>({entry,index})).sort((a,b)=>{
+      const value=e=>e.sortValues?.[key]??e.values[key];
+      const av=value(a.entry),bv=value(b.entry);
+      const missing=v=>v==null||v===''||v==='—'||typeof v==='number'&&!Number.isFinite(v);
+      if(missing(av)||missing(bv))return Number(missing(av))-Number(missing(bv))||a.index-b.index;
+      const compared=typeof av==='number'&&typeof bv==='number'?av-bv:collator.compare(String(av),String(bv));
+      return direction*compared||a.index-b.index;
+    }).map(row=>row.entry);
+  }
   function options(entries,key){return [...new Set(entries.map(e=>keyValue(e,key)))];}
   function render(entries,summary=''){
-    const headings=columns.map(([key,label])=>`<th scope="col"><button type="button" data-detail-filter="${key}" aria-label="סינון לפי ${label}" aria-haspopup="dialog" aria-expanded="false">${label}<span aria-hidden="true">⌄</span></button></th>`).join('');
+    const headings=columns.map(([key,label])=>`<th scope="col" data-detail-heading="${key}" aria-sort="none"><div class="detail-column-heading"><button type="button" data-detail-sort="${key}">${label}<span data-sort-indicator aria-hidden="true"></span></button><button type="button" data-detail-filter="${key}" aria-label="סינון לפי ${label}" aria-haspopup="dialog" aria-expanded="false">⌄</button></div></th>`).join('');
     const rows=entries.map(e=>`<tr class="detail-table-row" data-detail-main="${Number(e.id)}" style="--item-production-fill:${Math.max(0,Math.min(100,Number(e.percent)||0))}%">
       <td><button type="button" class="detail-line-toggle" data-detail-toggle="${Number(e.id)}" aria-expanded="false" aria-controls="detail-expanded-${Number(e.id)}" aria-label="פרטי פריט ${escape(e.values.line)}"><span aria-hidden="true">‹</span>${escape(e.values.line)}</button></td>
       <td>${escape(e.values.name)}${e.warning?` <span class="detail-table-warning" title="${escape(e.warning)}" aria-label="${escape(e.warning)}">⚠</span>`:''}</td>
@@ -23,15 +36,23 @@
       </tr><tr class="detail-expanded-row" id="detail-expanded-${Number(e.id)}" data-detail-expanded="${Number(e.id)}" hidden><td colspan="9">${e.cardHtml}</td></tr>`).join('');
     return `<div class="detail-visible-table"><table aria-label="פריטי ההזמנה"><thead><tr>${headings}</tr></thead><tbody>${rows||'<tr><td colspan="9">אין פריטים בהזמנה</td></tr>'}</tbody></table></div><div class="detail-table-footer"><strong>${escape(summary)}</strong><span data-detail-visible-count aria-live="polite"></span><button type="button" class="btn-sm" data-detail-clear-all hidden>נקה סינון</button></div>`;
   }
-  let orderId=null,filters={},expanded=null,cleanup=null,menu=null,anchor=null;
+  let orderId=null,sortState=null,filters={},expanded=null,cleanup=null,menu=null,anchor=null;
   function closeMenu(){if(anchor)anchor.setAttribute('aria-expanded','false');menu?.remove();menu=null;anchor=null;}
-  function reset(){cleanup?.();cleanup=null;closeMenu();orderId=null;filters={};expanded=null;}
+  function reset(){cleanup?.();cleanup=null;closeMenu();orderId=null;sortState=null;filters={};expanded=null;}
   function mount(root,entries,id){
     cleanup?.();cleanup=null;closeMenu();
-    if(Number(orderId)!==Number(id)){filters={};expanded=null;}
+    if(Number(orderId)!==Number(id)){filters={};expanded=null;sortState=null;}
     orderId=Number(id);
     const apply=()=>{
       const visible=project(entries,filters),ids=new Set(visible.map(e=>String(e.id)));
+      const mainRows=new Map(Array.from(root.querySelectorAll('[data-detail-main]'),row=>[row.dataset.detailMain,row]));
+      const expandedRows=new Map(Array.from(root.querySelectorAll('[data-detail-expanded]'),row=>[row.dataset.detailExpanded,row]));
+      sort(entries,sortState).forEach(entry=>{const row=mainRows.get(String(entry.id));if(row){const body=row.parentNode;body.appendChild(row);const detail=expandedRows.get(String(entry.id));if(detail)body.appendChild(detail);}});
+      root.querySelectorAll('[data-detail-heading]').forEach(th=>{
+        const active=sortState?.key===th.dataset.detailHeading;
+        th.setAttribute('aria-sort',active?(sortState.direction==='asc'?'ascending':'descending'):'none');
+        th.querySelector('[data-sort-indicator]').textContent=active?(sortState.direction==='asc'?'↑':'↓'):'';
+      });
       root.querySelectorAll('[data-detail-main]').forEach(row=>{
         const show=ids.has(row.dataset.detailMain);row.hidden=!show;
         const button=row.querySelector('[data-detail-toggle]');button?.setAttribute('aria-expanded',String(show&&expanded===row.dataset.detailMain));
@@ -46,6 +67,8 @@
     const outside=event=>{if(menu&&!menu.contains(event.target)&&!anchor?.contains(event.target))closeMenu();};
     const keydown=event=>{if(event.key==='Escape'&&menu){event.preventDefault();event.stopPropagation();const button=anchor;closeMenu();button?.focus();}};
     const click=event=>{
+      const sortButton=event.target.closest('[data-detail-sort]');
+      if(sortButton){const key=sortButton.dataset.detailSort;sortState={key,direction:sortState?.key===key&&sortState.direction==='asc'?'desc':'asc'};closeMenu();apply();return;}
       const head=event.target.closest('[data-detail-filter]');
       if(head){
         if(anchor===head){closeMenu();return;}
@@ -71,5 +94,5 @@
     cleanup=()=>{root.removeEventListener('click',click);root.ownerDocument.removeEventListener('click',outside);root.ownerDocument.removeEventListener('keydown',keydown,true);view.removeEventListener('resize',closeMenu);};
     apply();
   }
-  return {columns,escape,project,options,render,mount,reset};
+  return {columns,escape,project,sort,options,render,mount,reset};
 });

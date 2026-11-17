@@ -1,40 +1,48 @@
 /* The approved order workspace: metadata once, visible lines, detail on demand. */
-body[data-page=orders] #detailPanel.has-visible-table{width:min(1240px,calc(100vw - 32px));border-radius:10px}
+body[data-page=orders] #detailPanel.has-visible-table{width:min(1140px,calc(100vw - 32px));border-radius:10px}
 body[data-page=orders] #detailPanel.has-visible-table>.detail-header{display:none}
 body[data-page=orders] #detailPanel.has-visible-table #detailBody{padding:0}
 body[data-page=orders] .inline-order-host #detailPanel.has-visible-table{width:100%}
-.detail-flat-head{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;padding:6px 10px;border-bottom:1px solid #dce5ed;color:#23415e;font-size:13px;background:#fff}
+.detail-flat-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:8px 12px;border-bottom:1px solid #dce5ed;color:#23415e;font-size:15px;background:#f3f7fb}
 .detail-flat-head>strong,.detail-flat-head>span{white-space:nowrap}
-.detail-flat-number{font-size:16px;color:#c65c13;direction:ltr}
-.detail-flat-state{padding:2px 6px;background:#edf3f8;border-radius:5px;font-size:12px}
+.detail-flat-number{font-size:18px;color:#c65c13;direction:ltr}
+.detail-flat-state{padding:2px 6px;background:#edf3f8;border-radius:5px;font-size:14px}
 .detail-flat-date{direction:ltr}
-.detail-flat-note{max-width:210px;text-overflow:ellipsis;overflow:hidden;font-size:12px}
-.detail-head-actions{display:inline-flex;align-items:center;gap:2px;margin-inline-start:auto}
+.detail-flat-note{max-width:190px;text-overflow:ellipsis;overflow:hidden;font-size:14px}
+.detail-head-actions{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap;margin-inline-start:auto}
 .detail-head-action{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:5px;background:transparent;color:#345672;font:20px Arial,sans-serif;cursor:pointer;text-decoration:none}
 .detail-head-action:hover{background:#eaf1f8}
+.detail-action-label{width:auto;height:34px;padding:0 10px;border:1px solid #cfdce8;border-radius:7px;background:#fff;color:#294d70;font:600 14px Heebo,Arial,sans-serif;white-space:nowrap}
+.detail-action-label:first-child{background:#fff2e5;border-color:#edb785;color:#b95512}
 .detail-visible-table{overflow-x:auto}
-body[data-page=orders] #detailBody .detail-visible-table table{width:100%;min-width:850px;border-collapse:collapse;table-layout:fixed;color:#18334f}
-body[data-page=orders] #detailBody .detail-visible-table th{background:#f3f7fb;border-bottom:1px solid #dce5ed;padding:0!important;font-size:12px;text-align:right}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(1){width:58px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(2){width:auto}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(3){width:124px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(4){width:64px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(5){width:100px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(6){width:70px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(7){width:98px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(8){width:92px}
-body[data-page=orders] #detailBody .detail-visible-table th:nth-child(9){width:95px}
-body[data-page=orders] #detailBody .detail-visible-table td{height:46px;padding:5px 8px!important;font-size:14px;border-bottom:1px solid #dce5ed;vertical-align:middle;background:transparent}
-.detail-visible-table [data-detail-filter]{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%;min-height:34px;padding:7px 8px;border:0;background:transparent;color:#526c84;font:inherit;cursor:pointer;white-space:nowrap}
+body[data-page=orders] #detailBody .detail-visible-table table{width:1060px;max-width:100%;min-width:1060px;margin-inline-start:0;margin-inline-end:auto;border-collapse:collapse;table-layout:fixed;color:#18334f}
+body[data-page=orders] #detailBody .detail-visible-table th{background:#f3f7fb;border-bottom:1px solid #dce5ed;padding:0!important;font-size:14px;text-align:right}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(1){width:62px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(2){width:178px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(3){width:148px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(4){width:74px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(5){width:116px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(6){width:80px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(7){width:105px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(8){width:100px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(9){width:105px}
+body[data-page=orders] #detailBody .detail-visible-table td{height:66px;box-sizing:border-box;padding:8px 10px!important;font-size:16px;border-bottom:1px solid #dce5ed;vertical-align:middle;background:transparent}
+.detail-column-heading{display:flex;align-items:center;min-height:44px}
+.detail-visible-table [data-detail-sort],.detail-visible-table [data-detail-filter]{display:flex;align-items:center;justify-content:center;gap:3px;min-height:44px;padding:6px 3px;border:0;background:transparent;color:#526c84;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.detail-visible-table [data-detail-sort]{flex:1;justify-content:flex-start;padding-inline-start:10px}
+.detail-visible-table [data-detail-filter]{width:26px;flex:none}
+.detail-visible-table [data-detail-sort]:hover,.detail-visible-table [data-detail-filter]:hover{background:#e5edf5}
+.detail-visible-table th[aria-sort=ascending] [data-detail-sort],.detail-visible-table th[aria-sort=descending] [data-detail-sort]{color:#b95512}
 .detail-visible-table [data-detail-filter].has-filter{color:#c65c13;font-weight:800;background:#fff0df}
-.detail-table-row{cursor:pointer;background:linear-gradient(to left,#e8f5ec 0 var(--item-production-fill),#fff var(--item-production-fill) 100%)}
+.detail-table-row{cursor:pointer;background:linear-gradient(to left,#dcefe1 0 var(--item-production-fill),#f7f9fb var(--item-production-fill) 100%)}
 .detail-table-row:hover{box-shadow:inset -3px 0 #d2762b}
-.detail-line-toggle{display:flex;align-items:center;gap:5px;min-width:35px;min-height:30px;border:0;background:transparent;font:700 13px Arial,sans-serif;color:#244762;cursor:pointer}
+.detail-line-toggle{display:flex;align-items:center;gap:5px;min-width:35px;min-height:30px;border:0;background:transparent;font:700 16px Arial,sans-serif;color:#244762;cursor:pointer}
 .detail-line-toggle>span{font-size:21px}
 .detail-line-toggle[aria-expanded=true]>span{transform:rotate(-90deg)}
-body[data-page=orders] #detailBody .detail-line-preview .item-visual{width:112px!important;height:35px!important;min-height:35px!important;padding:1px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+body[data-page=orders] #detailBody .detail-line-preview .item-visual{width:136px!important;height:48px!important;min-height:48px!important;padding:1px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
 .detail-table-number{font-variant-numeric:tabular-nums;white-space:nowrap}
-.detail-table-status{display:inline-block;font-size:12px;border-radius:5px;padding:3px 6px;background:#f2f4f7;white-space:nowrap}
+.detail-table-row td:nth-child(7){font-weight:700}
+.detail-table-status{display:inline-block;font-size:14px;border-radius:5px;padding:3px 6px;background:#f2f4f7;white-space:nowrap}
 .detail-table-status.is-done{background:#dff0e6;color:#237248}.detail-table-status.is-prod{background:#e7f1ff;color:#265a86}.detail-table-status.is-wait{background:#fff3cf;color:#8c6014}
 .detail-table-warning{color:#a76500}
 body[data-page=orders] #detailBody .detail-visible-table .detail-expanded-row>td{height:auto;padding:8px!important;background:#f3f7fb}
