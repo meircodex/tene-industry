@@ -20,11 +20,6 @@ body[data-page=orders] .detail-header{padding:8px 12px}
 body[data-page=orders] .detail-order-num{font-size:18px}
 body[data-page=orders] .detail-body{padding:10px}
 body[data-page=orders] .d-section{margin-bottom:8px;padding:10px}
-.order-inline-summary{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;padding:2px 4px 10px;color:#18334f;font-size:14px}
-.order-inline-summary .btn-sm{margin-inline-start:auto}
-.order-detail-fold{border:1px solid #dde5ee;border-radius:8px;margin:0 0 6px;background:#fff}
-.order-detail-fold>summary{padding:9px 12px;cursor:pointer;font-weight:700;color:#234765;font-size:14px}
-.order-detail-fold>div{padding:5px 8px}
 body[data-page=orders] .inline-order-host .detail-header{position:static}
 body[data-page=orders] .inline-order-host .item-row{grid-template-columns:120px minmax(0,1fr) auto;gap:8px;padding:8px;margin-bottom:6px}
 body[data-page=orders] .inline-order-host .item-visual{height:85px;min-height:85px}
@@ -75,7 +70,6 @@ body[data-page=new] .ib-order-lines .line-shape-sketch,body[data-page=new] .ib-o
  body[data-page=orders] .inline-order-host .item-row{grid-template-columns:85px minmax(0,1fr)}
  body[data-page=orders] .inline-order-host .item-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
  body[data-page=orders] .inline-order-host .item-row>div:last-child{grid-column:1 / -1}
- .order-inline-summary{gap:6px 12px}
  body[data-page=new] .ib-order-lines .order-line-row{height:auto!important;min-height:90px!important}
  body[data-page=dashboard] .production-progress-meta{grid-template-columns:repeat(3,minmax(0,1fr))}
 }

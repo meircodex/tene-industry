@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### פריטי הזמנה גלויים וסינון בכותרות — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: approved preview with one order metadata/action row, visible 46px item rows and checkbox filters in all nine column headings; expand only the chosen item.
+- ownership: Orders client presentation only; reuse canonical item metrics/SVGs, existing detail/editor/status/print/undo handlers and server permissions. No new business calculations or production writes.
+- output/screens: orders.html inline and modal details; one compact header, always-visible item table, intersecting multi-value column filters, preserved individual item detail/actions and print selection.
+- DB/API/events: none; preserve production snapshots, status correction, inventory and history behavior.
+- DoD: filter composition, safe text, DOM lifecycle/filter/expanded-row preservation and rendering checks; existing order/shape/printing/undo tests, full suite, live deployment and read-only verification.
+
+- verification (pre-release): full final suite 1,398 passed. Isolated browser verified all rows visible, status plus item-number intersection, Escape, row expansion, canonical thumbnails, print menu → existing A4 language dialog, close/reopen inline with one panel and reset filters. Observed floating-help overlap on the narrow-screen header was corrected; no production records used for tests.
+
 ### הזמנות צפופות ושמירת דיווחי ייצור בהחזרה לתור — 17.11.2026
 - status: done
 - owner: codex

@@ -16,7 +16,7 @@
 <script src="/display-units.js?v=4"></script>
 <script src="/status-contracts-client.js"></script>
 <script src="/order-workspace.js?v=20261113-workflow"></script>
-<script src="/order-item-filters.js?v=1"></script>
+<script src="/orders-detail-table.js?v=1"></script>
 <script src="/order-batch-actions.js?v=1"></script>
 <script src="/order-list-sorting.js?v=1"></script>
 <script src="/straight-stock-inventory.js?v=1"></script>
@@ -400,6 +400,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .m-card-batch{display:flex;align-items:center;gap:8px;}
 </style>
 <link rel="stylesheet" href="/dense-workspace.css?v=20261117">
+<link rel="stylesheet" href="/orders-detail-table.css?v=1">
 </head>
 <body data-page="orders">
 
@@ -1661,7 +1662,6 @@ function toggleOrderInline(id){
 }
 window.addEventListener('resize',()=>{if(inlineOrderId)attachInlineDetail();});
 async function openDetail(id,options={}) {
-  const savedFolds=Number(currentDetailOrder?.id)===Number(id)?Array.from(document.querySelectorAll("#detailBody .order-detail-fold")).filter(e=>e.open).map(e=>e.querySelector("summary").textContent):null;
   const epoch=++detailRequestEpoch;
   const inline=options.inline||Number(inlineOrderId)===Number(id);
   if(inline){parkInlineDetail();inlineOrderId=Number(id);if(Number(currentDetailOrder?.id)!==Number(id)){currentDetailOrder=null;document.getElementById('detailBody').textContent='טוען הזמנה…';document.getElementById('detailOrderNum').textContent='';document.getElementById('detailCustomer').textContent='';}}else{parkInlineDetail();inlineOrderId=null;}
@@ -1674,14 +1674,14 @@ async function openDetail(id,options={}) {
     document.getElementById('detailOrderNum').textContent=o.order_num;
     document.getElementById('detailCustomer').textContent=o.customer_name||'';
     resetPrintCardSelection(o.id);
+    document.getElementById('detailPanel').classList.add('has-visible-table');
     document.getElementById('detailBody').innerHTML=buildDetailHTML(o,pkgs);
-    if(savedFolds)document.querySelectorAll('#detailBody .order-detail-fold').forEach(e=>{e.open=savedFolds.includes(e.querySelector('summary').textContent);});
     if(Number(o.portal_order)===1)loadPortalSourceDocuments(o.id);
     if(inline)attachInlineDetail();else document.getElementById('detailOverlay').classList.add('show');
     requestAnimationFrame(()=>{
       if(epoch!==detailRequestEpoch)return;
       renderDetailShapes();syncPrintCardSelection();
-      window.IronBendOrderItemFilters.mount(document.getElementById('detailBody'),o);
+      window.IronBendOrderDetailTable.mount(document.getElementById('detailBody'),currentDetailTableEntries,o.id);
     });
     history.replaceState(null,'',`?id=${id}`);
   }catch(error){if(epoch===detailRequestEpoch){closeDetailPanel();alert(error.message);}}
@@ -3041,6 +3041,7 @@ function orderHeroInfoHtml(o, driverNotes) {
   </div></div>`;
 }
 
+let currentDetailTableEntries=[];
 function buildDetailHTML(o, pkgs) {
   const driverNotes = visibleOrderNote(o.driver_notes);
 
@@ -3102,11 +3103,9 @@ function buildDetailHTML(o, pkgs) {
   let _itemLine = 0;
   (o.pallets||[]).forEach(p => (p.items||[]).forEach(it => { _itemLine += 1; it._lineNo = _itemLine; }));
   const _totalLines = _itemLine;
-  const palletsHtml = (o.pallets||[]).map((p, pi) => {
-    const done = (p.items||[]).filter(i => i.status==='הושלם').length;
-    const pct  = p.items?.length ? Math.round(done / p.items.length * 100) : 0;
-    const totalW = (p.items||[]).reduce((s,i) => s + itemWeight(i), 0);
-    const items = (p.items||[]).map(item => {
+  currentDetailTableEntries=[];
+  (o.pallets||[]).forEach((p,pi)=>{
+    (p.items||[]).forEach(item=>{
       const itemStarted = itemHasStartedProduction(item);
       const ic = item.status==='הושלם' ? 'is-done' : item.status==='בייצור' ? 'is-prod' : 'is-wait';
       const qty = item.quantity||0;
@@ -3141,7 +3140,7 @@ function buildDetailHTML(o, pkgs) {
           data-angles="${encodeURIComponent(JSON.stringify(angles))}"
           onclick="openItemEdit(event, ${o.id}, ${item.id})"
           title="ערוך צורה"></div>`;
-      return `<div class="item-row" id="order-item-${item.id}" data-print-card-item-id="${item.id}">
+      const cardHtml=`<div class="item-row" id="order-item-${item.id}" data-print-card-item-id="${item.id}">
         ${visualHtml}
         <div class="item-main">
           <div class="item-head">
@@ -3187,26 +3186,18 @@ function buildDetailHTML(o, pkgs) {
         <span class="item-status ${ic}">${escHtml(item.status)}</span>
         ${pileAssembly}
       </div>`;
-    }).join('');
-    return `<div data-order-pallet style="margin-bottom:12px">
-      <div style="font-weight:800;font-size:13px;color:var(--text);margin-bottom:6px">📦 משטח ${pi+1} — ${totalW.toFixed(0)} ק"ג | ${pct}%</div>
-      <div class="prog-bar" style="margin-bottom:8px"><div class="prog-fill" style="width:${pct}%"></div></div>
-      ${items||'<div style="color:var(--muted);font-size:12px;padding:4px 0">אין פריטים</div>'}
-    </div>`;
-  }).join('');
-
-  const itemsSec = `<div class="d-section">
-    <div class="d-title" style="justify-content:space-between"><span>📦 פריטים לייצור</span><button class="review-btn primary" onclick="openAddItem(event, ${o.id})">➕ הוסף להזמנה</button></div>
-    <div class="detail-item-filters" role="group" aria-label="סינון פריטי ההזמנה">
-      <label>קוטר<select id="detailItemDiameterFilter" aria-label="סינון לפי קוטר"></select></label>
-      <label>מצב ייצור / סטטוס<select id="detailItemStatusFilter" aria-label="סינון לפי סטטוס"></select></label>
-      <button type="button" class="review-btn" id="detailItemFilterReset">נקה סינון</button>
-      <div id="detailItemProductionSummary" class="detail-item-summary" aria-live="polite"></div>
-      <div id="detailItemFilterCount" class="detail-item-filter-count" aria-live="polite"></div>
-    </div>
-    <div id="detailItemFilterEmpty" class="detail-item-empty" hidden>אין פריטים שמתאימים לסינון שנבחר.</div>
-    ${palletsHtml||'<div style="color:var(--muted);font-size:13px">אין פריטים</div>'}
-  </div>`;
+      currentDetailTableEntries.push({id:item.id,cardHtml,
+        visualHtml:visualHtml.replace(/ onclick="[^"]*"/g,''),
+        percent:qty>0?Math.round(Math.min(1,produced/qty)*100):0,tone:ic,
+        warning:[review?'נדרשת בדיקת פריט':'',openUWarning,shapeMismatch&&!isReviewApproved(item)?'יש אי התאמה בשם הצורה':'',displayNote].filter(Boolean).join(' · '),
+        values:{line:sourceItemNumber||String(item._lineNo),name:elementName||shapeLabel(item.shape_name,sides,item),
+          shape:shapeLabel(item.shape_name,sides,item),diameter:'Ø'+item.diameter,
+          length:IronBendDisplayUnits.formatLengthCmFromMm(length),quantity:String(qty),
+          weight:weight.toFixed(orderShapeSnapshot(item)?.family==='mesh'?2:0),production:produced+'/'+qty,status:item.status}
+      });
+    });
+  });
+  const itemsSec=window.IronBendOrderDetailTable.render(currentDetailTableEntries,`${_totalLines} פריטים · ${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})} ק״ג`);
 
   // ── Packages
   let pkgSec = '';
@@ -3228,17 +3219,44 @@ function buildDetailHTML(o, pkgs) {
     pkgSec = `<div class="d-section"><div class="d-title">🏷️ חבילות</div>${pkgRows}</div>`;
   }
 
-  const fold=(label,body,open=false)=>`<details class="order-detail-fold"${open?' open':''}><summary>${label}</summary><div>${body}</div></details>`;
-  const undo=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)?`<button class="btn-sm" onclick="undoOrderStatus(${o.id})">↶ חזרה מהשינוי האחרון</button>`:'';
-  const summary=`<div class="order-inline-summary">${o.delivery_address?`<span>${escHtml(o.delivery_address)}</span>`:""}${o.driver_notes?`<span>${escHtml(o.driver_notes)}</span>`:""}<b>${_totalLines} פריטים</b><b>${Number(o.total_weight||0).toLocaleString('he-IL',{maximumFractionDigits:0})} ק״ג</b><span>${escHtml(workStatus)}</span>${undo}</div>`;
-  return summary+fold('פרטי הזמנה',hero)+fold('הדפסה ומסמכים',prints)+fold('סיכום ועיבודים',commercialSummaryHtml(o))+fold('עריכה ותיקון סטטוס',orderActions+statusSec)+fold('פריטים',itemsSec,!inlineOrderId)+pkgSec;
+  const undo=['manager','admin'].includes(window.IronBendAuth?.currentUser()?.role)?`<button type="button" class="detail-head-action" onclick="undoOrderStatus(${o.id})" title="חזרה מהשינוי האחרון" aria-label="חזרה מהשינוי האחרון">↶</button>`:'';
+  const note=visibleOrderNote(o.general_notes)||driverNotes;
+  const header=`<div class="detail-flat-head">
+    <strong class="detail-flat-number">${escHtml(o.order_num)}</strong><strong>${escHtml(o.customer_name||'—')}</strong>
+    <span class="detail-flat-state">${escHtml(workStatus)}</span>
+    ${o.delivery_address?`<span title="אתר">${escHtml(o.delivery_address)}</span>`:''}
+    ${o.delivery_date?`<span title="אספקה" class="detail-flat-date">${escHtml(window.IronBendOrderWorkspace.deliveryDate(o.delivery_date))}</span>`:''}
+    <span>${urgentLabel(o)}</span>${note?`<span class="detail-flat-note" title="${escHtml(note)}">${escHtml(note)}</span>`:''}
+    <span class="detail-head-actions">
+      <button type="button" class="detail-head-action" onclick="openDetailTools('print')" title="הדפסה" aria-label="הדפסה">🖨</button>
+      <button type="button" class="detail-head-action" onclick="openDetailTools('documents')" title="מסמכים וסיכום" aria-label="מסמכים וסיכום">▤</button>
+      <button type="button" class="detail-head-action" onclick="openDetailTools('edit')" title="עריכת הזמנה וסטטוס" aria-label="עריכת הזמנה וסטטוס">✎</button>
+      <button type="button" class="detail-head-action" onclick="openAddItem(event, ${o.id})" title="הוסף פריט" aria-label="הוסף פריט">＋</button>
+      ${undo}<button type="button" class="detail-head-action" onclick="closeDetailPanel()" title="סגור" aria-label="סגור פרטי הזמנה">×</button>
+    </span>
+  </div>`;
+  return header+itemsSec+
+    `<template data-detail-tools="print">${prints}</template><template data-detail-tools="documents">${hero}${commercialSummaryHtml(o)}${pkgSec}</template><template data-detail-tools="edit">${orderActions}${statusSec}</template>`;
+
+}
+
+function openDetailTools(kind){
+  const template=document.querySelector(`#detailBody template[data-detail-tools="${kind}"]`);
+  if(!template)return;
+  let dialog=document.getElementById('detailToolsDialog');
+  if(!dialog){dialog=document.createElement('dialog');dialog.id='detailToolsDialog';dialog.className='detail-tools-dialog';document.body.appendChild(dialog);
+    dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('button,a'))dialog.close();});}
+  const title={print:'הדפסה',documents:'מסמכים וסיכום',edit:'עריכת הזמנה וסטטוס'}[kind]||'';
+  dialog.innerHTML=`<div class="detail-tools-heading"><strong>${title}</strong><button type="button" class="detail-head-action" aria-label="סגור">×</button></div>`+template.innerHTML;
+  dialog.showModal();
 }
 
 function closeDetail(e) { if (e.target===document.getElementById('detailOverlay')) closeDetailPanel(); }
 function closeDetailPanel() {
   detailRequestEpoch++;
+  document.getElementById('detailToolsDialog')?.close();
   parkInlineDetail();inlineOrderId=null;currentDetailOrder=null;
-  window.IronBendOrderItemFilters.reset();
+  window.IronBendOrderDetailTable.reset();
   document.getElementById('detailOverlay').classList.remove('show');
   history.replaceState(null, '', '/orders.html');
 }

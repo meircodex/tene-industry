@@ -31,3 +31,10 @@ The Orders list now expands the existing single detail panel beneath one row. Pa
 
 
 Verification: 1,395 tests passed in the final suite, including route authorization/governance, mixed-status requeue preservation, explicit completion-date restoration, stale/replayed return rejection, document cancellation protection, and the correction dialog-to-API contract. An isolated browser requeue/undo round trip retained 3 completed of 8 and 38% progress. Live release `1219b48`, deployment `dep-dbu7l3942hec73bq8tsg`: source/health/auth checks passed and authenticated inline expansion observed without changing production data.
+
+
+## Visible order table — 17.11.2026
+
+The approved follow-up replaces accordion navigation with one visible item table in both inline and modal order details. Order identity, delivery/priority/note and existing actions share a compact header. Every table heading has a multi-value checkbox filter; alternatives within one heading are ORed and headings intersect. Filters preserve whole-order totals and do not alter print scope or any API data.
+
+`public/orders-detail-table.js` owns client filtering and expansion only. The existing Orders builder supplies canonical metrics and server shape SVGs, with unchanged detailed editors/status/cancellation/history/printing handlers inside the one selected expanded row. Filter popovers are outside the scrolling table to avoid clipping, and close on outside click, Escape and resize. Rebinding removes listeners; close resets the view and same-order refresh retains the selected filters/row. Printing/documents/edit dialogs use the existing actions. No route, permission, inventory or production write changed.

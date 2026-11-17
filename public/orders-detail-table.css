@@ -1,0 +1,56 @@
+/* The approved order workspace: metadata once, visible lines, detail on demand. */
+body[data-page=orders] #detailPanel.has-visible-table{width:min(1240px,calc(100vw - 32px));border-radius:10px}
+body[data-page=orders] #detailPanel.has-visible-table>.detail-header{display:none}
+body[data-page=orders] #detailPanel.has-visible-table #detailBody{padding:0}
+body[data-page=orders] .inline-order-host #detailPanel.has-visible-table{width:100%}
+.detail-flat-head{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;padding:6px 10px;border-bottom:1px solid #dce5ed;color:#23415e;font-size:13px;background:#fff}
+.detail-flat-head>strong,.detail-flat-head>span{white-space:nowrap}
+.detail-flat-number{font-size:16px;color:#c65c13;direction:ltr}
+.detail-flat-state{padding:2px 6px;background:#edf3f8;border-radius:5px;font-size:12px}
+.detail-flat-date{direction:ltr}
+.detail-flat-note{max-width:210px;text-overflow:ellipsis;overflow:hidden;font-size:12px}
+.detail-head-actions{display:inline-flex;align-items:center;gap:2px;margin-inline-start:auto}
+.detail-head-action{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:0;border-radius:5px;background:transparent;color:#345672;font:20px Arial,sans-serif;cursor:pointer;text-decoration:none}
+.detail-head-action:hover{background:#eaf1f8}
+.detail-visible-table{overflow-x:auto}
+body[data-page=orders] #detailBody .detail-visible-table table{width:100%;min-width:850px;border-collapse:collapse;table-layout:fixed;color:#18334f}
+body[data-page=orders] #detailBody .detail-visible-table th{background:#f3f7fb;border-bottom:1px solid #dce5ed;padding:0!important;font-size:12px;text-align:right}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(1){width:58px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(2){width:auto}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(3){width:124px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(4){width:64px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(5){width:100px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(6){width:70px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(7){width:98px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(8){width:92px}
+body[data-page=orders] #detailBody .detail-visible-table th:nth-child(9){width:95px}
+body[data-page=orders] #detailBody .detail-visible-table td{height:46px;padding:5px 8px!important;font-size:14px;border-bottom:1px solid #dce5ed;vertical-align:middle;background:transparent}
+.detail-visible-table [data-detail-filter]{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%;min-height:34px;padding:7px 8px;border:0;background:transparent;color:#526c84;font:inherit;cursor:pointer;white-space:nowrap}
+.detail-visible-table [data-detail-filter].has-filter{color:#c65c13;font-weight:800;background:#fff0df}
+.detail-table-row{cursor:pointer;background:linear-gradient(to left,#e8f5ec 0 var(--item-production-fill),#fff var(--item-production-fill) 100%)}
+.detail-table-row:hover{box-shadow:inset -3px 0 #d2762b}
+.detail-line-toggle{display:flex;align-items:center;gap:5px;min-width:35px;min-height:30px;border:0;background:transparent;font:700 13px Arial,sans-serif;color:#244762;cursor:pointer}
+.detail-line-toggle>span{font-size:21px}
+.detail-line-toggle[aria-expanded=true]>span{transform:rotate(-90deg)}
+body[data-page=orders] #detailBody .detail-line-preview .item-visual{width:112px!important;height:35px!important;min-height:35px!important;padding:1px!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.detail-table-number{font-variant-numeric:tabular-nums;white-space:nowrap}
+.detail-table-status{display:inline-block;font-size:12px;border-radius:5px;padding:3px 6px;background:#f2f4f7;white-space:nowrap}
+.detail-table-status.is-done{background:#dff0e6;color:#237248}.detail-table-status.is-prod{background:#e7f1ff;color:#265a86}.detail-table-status.is-wait{background:#fff3cf;color:#8c6014}
+.detail-table-warning{color:#a76500}
+body[data-page=orders] #detailBody .detail-visible-table .detail-expanded-row>td{height:auto;padding:8px!important;background:#f3f7fb}
+.detail-expanded-row .item-row{margin:0}
+body[data-page=orders] #detailBody [data-detail-main][hidden],body[data-page=orders] #detailBody [data-detail-expanded][hidden],body[data-page=orders] [data-detail-clear-all][hidden]{display:none!important}
+/* The floating help control otherwise covers the leftmost filter on narrow screens. */
+body[data-page=orders]:has(#detailOverlay.show) #help-btn,body[data-page=orders]:has(.inline-order-host #detailPanel) #help-btn{display:none!important}
+.detail-table-footer{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px;padding:6px 10px;background:#f3f7fb;color:#526c84;font-size:12px}
+.detail-table-footer strong{color:#23415e}.detail-table-footer [data-detail-visible-count]{margin-inline-start:auto}
+.detail-column-popover{position:fixed;z-index:1800;direction:rtl;min-width:200px;max-width:220px;max-height:min(300px,calc(100vh - 16px));overflow:auto;border:1px solid #bdcddb;border-radius:7px;padding:6px;background:#fff;color:#18334f;box-shadow:0 5px 18px #1233;font:13px Heebo,Arial,sans-serif}
+.detail-column-popover label{display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;overflow-wrap:anywhere}
+.detail-column-popover input{accent-color:#c65c13}
+.detail-filter-clear{width:100%;padding:6px;border:0;border-bottom:1px solid #dce5ed;background:#fff;color:#526c84;text-align:right;font:inherit;cursor:pointer}
+.detail-tools-dialog{width:min(820px,calc(100vw - 24px));max-height:85vh;margin:auto;padding:12px;border:1px solid #bdcddb;border-radius:10px;color:#18334f;background:#fff;font-family:Heebo,Arial,sans-serif;overflow:auto}
+.detail-tools-dialog::backdrop{background:#102b4659}
+.detail-tools-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.detail-tools-dialog .print-btns{gap:6px;margin:0}.detail-tools-dialog .print-btn{font-size:13px;padding:10px}.detail-tools-dialog .d-section{padding:10px;margin-bottom:8px}
+@media(max-width:640px){.detail-flat-head{gap:5px 9px;padding:6px 8px}.detail-flat-note{max-width:150px}.detail-flat-number{font-size:15px}.detail-head-actions{gap:0}body[data-page=orders] #detailPanel.has-visible-table{width:calc(100vw - 12px)}}
+@media(pointer:coarse){.detail-head-action,.detail-line-toggle,.detail-visible-table [data-detail-filter]{min-width:40px;min-height:44px}.detail-column-popover label,.detail-filter-clear{min-height:44px}}
