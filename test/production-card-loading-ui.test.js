@@ -37,7 +37,7 @@ test('public QR opens customer registration while the in-app scanner server-auth
   assert.match(scannerPage, /\/api\/qr-access\/scan/);
   assert.match(scannerPage, /location\.href=result\.target/);
   assert.match(navigation, /href:'\/scan\.html'/);
-  assert.match(navigation, /BOTTOM_IDS = \['dashboard', 'scanner'/);
+  assert.match(navigation, /SETTINGS_IDS = \[[^\]]*'scanner'/);
   assert.match(customerScanPage, /href="\/customer\.html\?source=qr"/);
   assert.match(customerScanPage, /הרשמה או כניסה לפורטל/);
   assert.match(customerScanPage, /אינה מציגה מספר הזמנה, כרטיס עבודה או נתוני ייצור/);

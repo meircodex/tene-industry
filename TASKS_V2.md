@@ -4,6 +4,17 @@
 
 ## סטטוסים
 
+### תפריט מערכת מצומצם — 17.11.2026
+- status: in_progress
+- owner: codex
+- input: approved compact sidebar preview; remove fleet/driver and holdings navigation, hide War Room shortcut, group secondary/configuration screens; retain warehouse/delivery certificates.
+- ownership: shared app shell/navigation and redundant admin quick links only. No module, route, historical data, worker portal or production process deletion.
+- output/screens: prominent new-order action; dashboard/orders/production/inventory/procurement/customers/reports at root; customer projects nested, finance/pricing/profitability and remaining operations in More; machines/stations/production/support/admin in Settings. Desktop and mobile use the same role/license-filtered tree.
+- DB/API/events: none. Preserve current-page role guards and existing API permissions; intersect async license and access results so refresh order cannot restore hidden links.
+- DoD: role/license/group reachability and exclusion tests, refreshed mobile menu handlers, accessibility and active location, source/permission/governance/full tests; deploy and read-only live verification. No browser inputs per user's prior request.
+- verification: 155 focused shell/auth/governance checks passed; full final suite 1,391 passed after rebasing onto the concurrent station-boundary update. Earlier source contract expected the former scanner bottom shortcut; updated to the approved Settings location while keeping QR authorization/worker flows tested. Deployment pending.
+
+
 ### מקור עובדים אחיד בדוחות — 16.11.2026
 - status: done
 - owner: codex

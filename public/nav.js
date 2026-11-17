@@ -57,7 +57,7 @@
     { group:'ניהול', href:'/admin.html', icon:'⚙️', label:'ניהול מערכת', id:'admin' },
   ];
 
-  const BOTTOM_IDS = ['dashboard', 'scanner', 'orders', 'new', 'admin'];
+  const BOTTOM_IDS = ['dashboard', 'orders', 'production-queue', 'inventory'];
   const LINK_MODULES = {
     orders: 'orders',
     new: 'orders',
@@ -79,9 +79,40 @@
     reports: 'reports',
     finance: 'finance',
     pricing: 'finance',
+    profitability: 'finance',
     projects: 'companies',
     holdings: 'companies',
   };
+  // One navigation policy for desktop, mobile and subsequent access refreshes.
+  const PRIMARY_IDS = ['new','dashboard','orders','production-queue','inventory','procurement','customers','reports'];
+  const REMOVED_NAV_IDS = new Set(['delivery-admin','driver','holdings','warroom']);
+  const SETTINGS_IDS = ['machine','kiosk','production-setup','scanner','worker-visual','support','bugs','admin'];
+  function buildNavigation(links) {
+    const remaining=new Map(links.filter(l=>!REMOVED_NAV_IDS.has(l.id)).map(l=>[l.id,l]));
+    const take=id=>{const link=remaining.get(id);remaining.delete(id);return link?{key:id,link,children:[]}:null;};
+    const roots=PRIMARY_IDS.map(take).filter(Boolean);
+    const customers=roots.find(n=>n.key==='customers'),projects=take('projects');
+    if(customers&&projects)customers.children.push(projects);
+    const settings=SETTINGS_IDS.map(take).filter(Boolean);
+    const finance=take('finance'),financeChildren=['profitability','pricing'].map(take).filter(Boolean);
+    const more=[...remaining.values()].map(link=>({key:link.id,link,children:[]}));
+    if(projects&&!customers)more.push(projects);
+    if(finance){finance.children=financeChildren;more.push(finance);}
+    else if(financeChildren.length)more.push({key:'finance-tools',label:'כספים',icon:'💰',children:financeChildren});
+    if(more.length)roots.push({key:'more',label:'עוד',icon:'⋯',children:more});
+    if(settings.length)roots.push({key:'settings',label:'הגדרות',icon:'⚙️',children:settings});
+    return roots;
+  }
+  const navExpansion=new Map();
+  let licensedModules=null,roleScreens=null;
+  function permittedLink(link) {
+    const moduleKey=LINK_MODULES[link.id],enabled=licensedModules;
+    if(enabled&&moduleKey&&!enabled.has(moduleKey))return false;
+    if(!roleScreens)return true;
+    if(link.id==='dashboard'||link.id==='scanner')return true;
+    const screenMap={new:'new-order',pricing:'finance',profitability:'finance'};
+    return roleScreens.has(link.id)||roleScreens.has(screenMap[link.id]);
+  }
   let visibleLinks = LINKS.slice();
   const path = location.pathname.replace(/^\//, '') || 'dashboard.html';
   const activeId = (LINKS.find(l => l.href.replace('/', '') === path) || {}).id || '';
@@ -249,27 +280,35 @@
       #ib-bottom { display:grid; }
       body { padding-bottom:64px !important; }
     }
+
+    /* Compact hierarchy; secondary screens stay behind role-filtered controls. */
+    .ib-nav-row{display:flex;align-items:center;min-width:0}.ib-nav-row>a{flex:1;min-width:0}
+    .ib-nav-toggle{font:inherit;cursor:pointer;border:0;background:transparent;color:inherit;text-align:start}
+    .ib-nav-row>.ib-nav-toggle:not(.ib-nav-caret){width:100%}.ib-nav-chevron{margin-inline-start:auto;font-size:15px}
+    .ib-nav-caret{flex:none;min-width:28px;min-height:36px;padding:4px;border-radius:6px;color:#718397}
+    .ib-nav-children{padding-inline-start:12px;margin:2px 0 5px}.ib-nav-children a{font-size:12px;min-height:34px;padding:7px 8px}.ib-nav-children[hidden]{display:none}
+    .ib-nav-toggle:focus-visible{outline:2px solid #de8c44;outline-offset:2px}.ib-new-order{background:#c9621a!important;color:white!important;justify-content:center;margin-bottom:7px}
+    #ib-bottom{grid-template-columns:none;grid-auto-columns:1fr;grid-auto-flow:column}#ib-bottom button{border:0;background:transparent;padding:0}
+    @media(min-width:1024px){#ib-links{gap:2px}.ib-nav-toggle.ib-link,.ib-nav-caret{color:rgba(255,255,255,.82)}.ib-nav-children{border-inline-start:1px solid #ffffff25}.ib-nav-row .ib-link{padding-inline-end:4px}.ib-link{min-height:36px;padding:7px 8px}}
+    @media(max-width:1023px){#ib-links{display:none}#ib-hamburger{display:flex;align-items:center}}
+    @media(pointer:coarse){.ib-nav-caret,.ib-nav-toggle,.ib-nav-children a{min-height:44px}.ib-nav-caret{min-width:44px}}
   `;
 
   function escapeAttr(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
   }
 
-  function renderNavLinks(linkClass, groupClass) {
-    let currentGroup = '';
-    return visibleLinks.map(l => {
-      const heading = l.group !== currentGroup
-        ? (currentGroup = l.group, '<div class="'+groupClass+'">'+escapeAttr(l.group)+'</div>')
-        : '';
-      const isDrawer = linkClass === 'ib-dl';
-      const iconClass = isDrawer ? 'ib-dl-icon' : 'ib-link-icon';
-      const labelClass = isDrawer ? 'ib-dl-label' : 'ib-link-label';
-      return heading +
-        '<a href="'+escapeAttr(l.href)+'" class="'+linkClass+' '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'">' +
-          '<span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(l.icon)+'</span>' +
-          '<span class="'+labelClass+'">'+escapeAttr(l.label)+'</span>' +
-        '</a>';
-    }).join('');
+  function renderNavLinks(linkClass) {
+    const drawer=linkClass==='ib-dl',iconClass=drawer?'ib-dl-icon':'ib-link-icon',labelClass=drawer?'ib-dl-label':'ib-link-label';
+    const includesActive=node=>node.link?.id===activeId||node.children.some(includesActive);
+    const anchor=node=>'<a href="'+escapeAttr(node.link.href)+'" class="'+linkClass+' '+ia(node.link.id)+(node.key==='new'?' ib-new-order':'')+'" title="'+escapeAttr(node.link.label)+'" aria-label="'+escapeAttr(node.link.label)+'"'+(node.link.id===activeId?' aria-current="page"':'')+'><span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.link.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.link.label)+'</span></a>';
+    const render=node=>{
+      if(!node.children.length)return anchor(node);
+      const open=navExpansion.has(node.key)?navExpansion.get(node.key):includesActive(node),id=linkClass+'-'+node.key+'-children';
+      const button='<button type="button" class="ib-nav-toggle '+(node.link?'ib-nav-caret':linkClass)+'" data-nav-group="'+escapeAttr(node.key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"'+(node.link?' aria-label="אפשרויות '+escapeAttr(node.link.label)+'"':'')+'>'+(node.link?'':('<span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.label)+'</span>'))+'<span class="ib-nav-chevron" aria-hidden="true">'+(open?'⌃':'⌄')+'</span></button>';
+      return '<div class="ib-nav-branch '+(includesActive(node)?'ib-nav-current':'')+'"><div class="ib-nav-row">'+(node.link?anchor(node):'')+button+'</div><div id="'+id+'" class="ib-nav-children"'+(open?'':' hidden')+'>'+node.children.map(render).join('')+'</div></div>';
+    };
+    return buildNavigation(visibleLinks).map(render).join('');
   }
 
   const styleEl = document.createElement('style');
@@ -277,19 +316,14 @@
   document.head.appendChild(styleEl);
 
   function renderBottomLinks() {
-    return visibleLinks
-      .filter(l => BOTTOM_IDS.includes(l.id))
-      .map(l =>
-        '<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'">' +
-          '<span class="ib-bn-icon" aria-hidden="true">'+escapeAttr(l.icon)+'</span>' +
-          '<span class="ib-bn-label">'+escapeAttr(l.label)+'</span>' +
-        '</a>'
-      ).join('');
+    return BOTTOM_IDS.map(id=>visibleLinks.find(l=>l.id===id)).filter(Boolean)
+      .map(l=>'<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'"><span class="ib-bn-icon" aria-hidden="true">'+escapeAttr(l.icon)+'</span><span class="ib-bn-label">'+escapeAttr(l.label)+'</span></a>').join('')+
+      '<button type="button" class="ib-bn ib-open-menu" aria-label="תפריט"><span class="ib-bn-icon" aria-hidden="true">☰</span><span class="ib-bn-label">עוד</span></button>';
   }
 
   function renderShellLinks() {
-    const links = renderNavLinks('ib-link', 'ib-group-label');
-    const drawerLinks = renderNavLinks('ib-dl', 'ib-drawer-group');
+    const links = renderNavLinks('ib-link');
+    const drawerLinks = renderNavLinks('ib-dl');
     const topLinks = document.getElementById('ib-links');
     const drawerLinksEl = document.getElementById('ib-drawer-links');
     const bottom = document.getElementById('ib-bottom');
@@ -298,14 +332,16 @@
     if (bottom) bottom.innerHTML = renderBottomLinks();
   }
 
-  function applyLicensedModules(data) {
-    if (!data || !data.restricted || !Array.isArray(data.modules)) return;
-    const enabled = new Set(data.modules);
-    visibleLinks = LINKS.filter(link => {
-      const moduleKey = LINK_MODULES[link.id];
-      return !moduleKey || enabled.has(moduleKey);
-    });
+  function rebuildVisibleLinks() {
+    visibleLinks = LINKS.filter(permittedLink);
     renderShellLinks();
+  }
+  function applyLicensedModules(data) {
+    if(!data)return;
+    if(!data.restricted){licensedModules=null;rebuildVisibleLinks();return;}
+    if(!Array.isArray(data.modules))return;
+    licensedModules=new Set(data.modules);
+    rebuildVisibleLinks();
   }
 
   async function refreshLicensedModules() {
@@ -367,27 +403,8 @@
         location.replace('/dashboard.html');
         return;
       }
-      // Map screen IDs back to nav link IDs (some overlap, some differ)
-      visibleLinks = LINKS.filter(link => {
-        // Dashboard and the authenticated in-app scanner are universal shell
-        // actions; the destination workflow still enforces its own role.
-        if (link.id === 'dashboard' || link.id === 'scanner') return true;
-        // Direct match
-        if (visibleIds.has(link.id)) return true;
-        // Map nav id → screen id
-        const screenMap = {
-          'new': 'new-order',
-          'production-queue': 'production-queue',
-          'worker-visual': 'worker-visual',
-          'machine': 'machine',
-          'kiosk': 'kiosk',
-          'production-setup': 'production-setup',
-          'delivery-admin': 'delivery-admin',
-        };
-        const mapped = screenMap[link.id];
-        return mapped ? visibleIds.has(mapped) : false;
-      });
-      renderShellLinks();
+      roleScreens=visibleIds;
+      rebuildVisibleLinks();
     } catch {}
   }
 
@@ -395,7 +412,7 @@
   topnav.id = 'ib-topnav';
   topnav.innerHTML =
     '<a href="/dashboard.html" id="ib-logo" title="דשבורד" aria-label="דשבורד"><img id="ib-logo-icon" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
-    '<div id="ib-links">' + renderNavLinks('ib-link', 'ib-group-label') + '</div>' +
+    '<div id="ib-links">' + renderNavLinks('ib-link') + '</div>' +
     '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">🔍</button>' +
     '<button id="ib-hamburger" aria-label="תפריט">☰</button>';
 
@@ -409,7 +426,7 @@
       '<a href="/dashboard.html" title="דשבורד" aria-label="דשבורד"><img id="ib-drawer-logo" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
       '<button id="ib-drawer-close" aria-label="סגור">✕</button>' +
     '</div>' +
-    '<div id="ib-drawer-links">' + renderNavLinks('ib-dl', 'ib-drawer-group') + '</div>';
+    '<div id="ib-drawer-links">' + renderNavLinks('ib-dl') + '</div>';
 
   const bottomNav = document.createElement('nav');
   bottomNav.id = 'ib-bottom';
@@ -588,7 +605,21 @@
     document.getElementById('ib-drawer-close')?.addEventListener('click', closeDrawer);
     document.getElementById('ib-search-btn')?.addEventListener('click', openSearch);
     overlay.addEventListener('click', closeDrawer);
-    drawer.querySelectorAll('.ib-dl').forEach(a => a.addEventListener('click', closeDrawer));
+    drawer.addEventListener('click',e=>{if(e.target.closest('a.ib-dl'))closeDrawer();});
+    bottomNav.addEventListener('click',e=>{if(e.target.closest('.ib-open-menu'))openDrawer();});
+    function toggleGroup(e,scope){
+      const button=e.target.closest('[data-nav-group]');if(!button)return;e.stopPropagation();
+      const key=button.dataset.navGroup;navExpansion.set(key,button.getAttribute('aria-expanded')!=='true');
+      renderShellLinks();scope.querySelector('[data-nav-group="'+key+'"]')?.focus();
+    }
+    topnav.addEventListener('click',e=>toggleGroup(e,topnav));
+    drawer.addEventListener('click',e=>toggleGroup(e,drawer));
+    function collapseGroups(){
+      const expanded=document.querySelectorAll('[data-nav-group][aria-expanded="true"]');
+      if(!expanded.length)return;for(const button of expanded)navExpansion.set(button.dataset.navGroup,false);renderShellLinks();
+    }
+    document.addEventListener('click',e=>{if(!topnav.contains(e.target)&&!drawer.contains(e.target)&&!bottomNav.contains(e.target))collapseGroups();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')collapseGroups();});
     searchOverlay.addEventListener('click', e => { if (e.target === searchOverlay) closeSearch(); });
 
     const input = document.getElementById('ib-search-input');
