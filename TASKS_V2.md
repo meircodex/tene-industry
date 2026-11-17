@@ -5,7 +5,7 @@
 ## סטטוסים
 
 ### פריטי הזמנה גלויים וסינון בכותרות — 17.11.2026
-- status: in_progress
+- status: done
 - owner: codex
 - input: approved preview with one order metadata/action row, visible 46px item rows and checkbox filters in all nine column headings; expand only the chosen item.
 - ownership: Orders client presentation only; reuse canonical item metrics/SVGs, existing detail/editor/status/print/undo handlers and server permissions. No new business calculations or production writes.
@@ -14,6 +14,7 @@
 - DoD: filter composition, safe text, DOM lifecycle/filter/expanded-row preservation and rendering checks; existing order/shape/printing/undo tests, full suite, live deployment and read-only verification.
 
 - verification (pre-release): full final suite 1,398 passed. Isolated browser verified all rows visible, status plus item-number intersection, Escape, row expansion, canonical thumbnails, print menu → existing A4 language dialog, close/reopen inline with one panel and reset filters. Observed floating-help overlap on the narrow-screen header was corrected; no production records used for tests.
+- live: 80e874d / dep-dbu896om7kps73b9nosg. Four changed frontend assets returned 200 and matched source after newline normalization; health 200, anonymous orders/undo 401. Authenticated read-only live HZ-2026-131 showed 23/23 rows, nine filter headers, 46px item rows and a 42.8px single header. Ø14 selected 9/23; clearing restored 23/23. Screenshot order-visible-table-live.jpg. No live writes or historical changes.
 
 ### הזמנות צפופות ושמירת דיווחי ייצור בהחזרה לתור — 17.11.2026
 - status: done
