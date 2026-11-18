@@ -4,6 +4,16 @@
 
 ## סטטוסים
 
+### אמינות שמירת שקילת איכות ובדיקת הנתיב למסד הנתונים — 18.11.2026
+- status: in_progress
+- owner: codex
+- input: valid 3608kg weighing for two orders shows a disabled/unresponsive save button; user requests full selection-to-database/history audit.
+- ownership: Quality weighing client state and tests of existing Quality service/HTTP/database contracts.
+- output: authenticated permission readiness, exception-safe save preparation, compatible idempotency keys, explicit save feedback and preserved retry/duplicate protection.
+- DB/API/events: no new endpoints/schema or permission grants; existing immutable snapshots, transaction/audit/event/idempotency remain authoritative. Test records only in isolated databases.
+- DoD: reproduce stuck-busy/stale-role cases; exercise original client through preview/save/history against real isolated SQLite, auth HTTP tests, file reopen, duplicate/conflict/rollback checks and full suite; deploy/verify frontend assets.
+
+
 ### הסרת מקטע עדכון סטטוס כפול — 17.11.2026
 - status: done
 - owner: codex
