@@ -1,4 +1,4 @@
-const router = require('express').Router();
+const { Router } = require('express');
 const {
   buildInvoiceExportPayload,
   buildDeliveryNoteExportPayload,
@@ -74,6 +74,7 @@ function sendStatusCode(result) {
   return 200;
 }
 module.exports = function createPriorityExportRouter(deps) {
+  const router = Router();
   const db = required('db', deps.db);
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
   const PRIORITY_ENABLED = Boolean(deps.PRIORITY_ENABLED);
