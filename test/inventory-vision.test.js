@@ -151,6 +151,7 @@ test('scan-label resolves the supplier and leaves unread fields empty', async t 
   configureVision(true, stubKey);
   const supplierName = 'פלדה למלאי';
   const supplierId = db.prepare('INSERT INTO suppliers (name) VALUES (?)').run(supplierName).lastInsertRowid;
+  let recognizedName = supplierName;
   const model = stubModel(t, body => {
     assert.equal(body.text.format.name, 'label_scan');
     assert.deepEqual(body.input[0].content[1], {
@@ -158,17 +159,22 @@ test('scan-label resolves the supplier and leaves unread fields empty', async t 
     });
     return modelResponse({
       diameter: 12, lot_number: 'HEAT-12', weight_kg: null, grade: null, material_type: null,
-      certificate_num: null, supplier_name: supplierName, notes: null, confidence: 0.85,
+      certificate_num: null, supplier_name: recognizedName, notes: null, confidence: 0.85,
     });
   });
-  const result = await client()(label, 200, { file: uploadImage });
-  assert.equal(model.mock.callCount(), 1);
+  const post = client();
+  const result = await post(label, 200, { file: uploadImage });
   assert.equal(result.aiUsed, true);
   assert.equal(result.confidence, 0.85);
   assert.deepEqual(result.data, {
     diameter: 12, lot_number: 'HEAT-12', weight_kg: null, grade: 'B500B', material_type: 'coil',
     certificate_num: null, supplier_name: supplierName, supplier_id: supplierId, notes: null,
   });
+  recognizedName = 'ספק ללא התאמה';
+  const unmatched = await post(label, 200, { file: uploadImage });
+  assert.equal(unmatched.data.supplier_name, recognizedName);
+  assert.equal(unmatched.data.supplier_id, null);
+  assert.equal(model.mock.callCount(), 2);
 });
 
 test('bending-shape recognition forwards the PDF and recalculates length from segments', async t => {
