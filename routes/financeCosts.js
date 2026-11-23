@@ -250,8 +250,9 @@ router.post('/orders/:id/costs/recalculate', requireAnyRole(['finance', 'manager
 router.patch('/orders/:id/costs/lock', requireRole('manager'), (req, res) => {
   const { lock, reason } = req.body;
   const user = req.headers['x-user'] || 'מנהל';
-  db.prepare(`UPDATE order_costs SET locked=?,locked_by=?,locked_at=datetime('now'),notes=? WHERE order_id=?`)
+  const update = db.prepare(`UPDATE order_costs SET locked=?,locked_by=?,locked_at=datetime('now'),notes=? WHERE order_id=?`)
     .run(lock ? 1 : 0, lock ? user : null, reason || '', req.params.id);
+  if (!update.changes) return res.status(404).json({ error: 'לא נמצאו עלויות להזמנה' });
   db.prepare('INSERT INTO financial_events (event_type,entity_type,entity_id,description,created_by) VALUES (?,?,?,?,?)')
     .run(lock ? 'cost_locked' : 'cost_unlocked', 'order', Number(req.params.id), reason || '', user);
   res.json({ success: true, locked: !!lock });
@@ -269,6 +270,8 @@ router.patch('/orders/:id/costs/billing', requireAnyRole(['finance', 'manager', 
   const orderId = Number(req.params.id);
   const order = db.prepare('SELECT id, order_num FROM orders WHERE id=?').get(orderId);
   if (!order) return res.status(404).json({ error: 'הזמנה לא נמצאה' });
+  const costs = db.prepare('SELECT locked FROM order_costs WHERE order_id=?').get(orderId);
+  if (costs?.locked) return res.status(403).json({ error: 'עלויות נעולות – נדרש מנהל לביטול הנעילה' });
 
   const { billed_amount, billed_date, priority_invoice_ref, billing_notes } = req.body;
   if (billed_amount === undefined || billed_amount === null) {
@@ -387,14 +390,15 @@ router.get('/profitability/by-customer', requireAnyRole(['finance', 'manager', '
 // GET /api/steel-prices — list current steel prices
 router.get('/steel-prices', requireAnyRole(['finance', 'manager', 'admin']), (req, res) => {
   const rows = db.prepare(`
-    SELECT h1.*
+    SELECT h1.id, NULLIF(h1.diameter, 0) AS diameter, h1.price_per_ton, h1.supplier_id,
+      h1.effective_date, h1.notes, h1.created_by, h1.created_at
     FROM steel_price_history h1
     WHERE h1.id = (
       SELECT h2.id FROM steel_price_history h2
-      WHERE h2.diameter = h1.diameter OR (h2.diameter IS NULL AND h1.diameter IS NULL)
+      WHERE NULLIF(h2.diameter, 0) IS NULLIF(h1.diameter, 0)
       ORDER BY h2.effective_date DESC, h2.id DESC LIMIT 1
     )
-    ORDER BY h1.diameter ASC NULLS LAST
+    ORDER BY diameter ASC NULLS LAST
   `).all();
   res.json(rows);
 });
@@ -402,12 +406,16 @@ router.get('/steel-prices', requireAnyRole(['finance', 'manager', 'admin']), (re
 // POST /api/steel-prices — add new steel price
 router.post('/steel-prices', requireAnyRole(['finance', 'manager', 'admin']), (req, res) => {
   const { diameter, price_per_ton, effective_date, notes } = req.body;
-  if (!price_per_ton || price_per_ton <= 0) return res.status(400).json({ error: 'מחיר לא תקין' });
+  const price = Number(price_per_ton);
+  if (!Number.isFinite(price) || price <= 0) return res.status(400).json({ error: 'מחיר לא תקין' });
+  // The history schema requires a diameter. Store the general price as zero.
+  const storedDiameter = diameter == null || diameter === '' ? 0 : Number(diameter);
+  if (!Number.isFinite(storedDiameter) || storedDiameter < 0) return res.status(400).json({ error: 'קוטר לא תקין' });
   const user = req.auth?.sub || null;
   const result = db.prepare(`
     INSERT INTO steel_price_history (diameter, price_per_ton, effective_date, notes, created_by)
     VALUES (?, ?, ?, ?, ?)
-  `).run(diameter || null, Number(price_per_ton), effective_date || new Date().toISOString().slice(0,10), notes || '', user);
+  `).run(storedDiameter, price, effective_date || new Date().toISOString().slice(0,10), notes || '', user);
   res.json({ id: result.lastInsertRowid, success: true });
 });
 
