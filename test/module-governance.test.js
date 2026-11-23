@@ -1307,8 +1307,8 @@ test('remaining utility API routes are split out of the server monolith', () => 
   assert.ok(search.includes("router.get('/search'"));
 
   assert.match(bvbs, /module[.]exports = function createBvbsRouter/);
-  assert.match(bvbs, /function parseBVBSLine/);
-  assert.match(bvbs, /function parseBVBS/);
+  assert.match(bvbs, /industry\.parseBatchFile\(content\)/);
+  assert.doesNotMatch(bvbs, /function parseBVBS/);
   assert.ok(bvbs.includes("router.post('/bvbs/parse'"));
   assert.ok(bvbs.includes("router.post('/bvbs/create-order'"));
 
