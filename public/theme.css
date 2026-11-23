@@ -576,6 +576,36 @@ th, td { overflow-wrap: anywhere; }
   }
 }
 
+#help-btn { display: none !important; }
+#uiTunerRoot { position: static !important; top: auto !important; left: auto !important; width: 0; height: 0; overflow: visible; }
+#uiTunerRoot .ut-fab { display: none !important; }
+#uiTunerRoot .ut-panel.open {
+  position: fixed !important;
+  top: 72px !important;
+  inset-inline-start: 16px !important;
+  z-index: 420;
+}
+.ib-icon { width: 16px; height: 16px; display: block; flex: none; }
+.order-draft-notice {
+  flex: 1 0 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ib-copper-line);
+  border-radius: var(--ib-radius-md);
+  background: var(--ib-copper-soft);
+  color: var(--ib-copper-ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: normal;
+}
+@media (max-width: 768px) {
+  html, body { overflow-x: clip; }
+  #ib-bottom .ib-bn, #ib-drawer .ib-dl, #ib-search-btn, #ib-hamburger {
+    min-height: 44px;
+  }
+}
+
 @media (pointer: coarse) {
   .btn, .btn-sm, .filter-btn, .new-order-btn, .btn-primary, .primary,
   .btn-login, .tab-btn, .submit-btn, .ib-bn, .ib-dl {

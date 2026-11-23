@@ -733,6 +733,7 @@ async function fetchOrders() {
     if (!response.ok) throw new Error(`${viewMode} ${response.status}`);
     const data=await response.json();
     if(generation!==ordersFetchGeneration)return;
+    if (!Array.isArray(data)) throw new Error('invalid_orders');
     if (viewMode === 'quotes') allQuotes = data;
     else allOrders = data;
   } catch (error) {
