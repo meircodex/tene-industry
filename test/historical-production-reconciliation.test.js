@@ -198,12 +198,14 @@ test('production summary reads corrected effective production rather than the im
     server = await new Promise(resolve => {
       const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
     });
-    const day = new Date().toISOString().slice(0, 10);
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/reports/summary?from=${day}&to=${day}`);
+    const { completed_at: completedAt } = db.prepare('SELECT completed_at FROM items WHERE id=?').get(itemId);
+    const utcDay = completedAt.slice(0, 10);
+    const factoryDay = productionActuals.israelDay(`${completedAt.replace(' ', 'T')}Z`);
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/reports/summary?from=${utcDay}&to=${factoryDay}`);
     assert.equal(response.status, 200);
     const summary = await response.json();
     assert.equal(summary.machineEfficiency.find(row => row.machine === 'Legacy-machine').total_units, 40);
-    assert.equal(summary.production[0].actual_weight_kg, 80, 'the production-weight series also uses the effective 40/100 physical ratio');
+    assert.equal(summary.production.find(row => row.date === factoryDay).actual_weight_kg, 80, 'the production-weight series also uses the effective 40/100 physical ratio');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     db.close();
