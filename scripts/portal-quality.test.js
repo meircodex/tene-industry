@@ -214,11 +214,13 @@ test('approval immediately updates home and physical weight agrees across the po
   await page.goBack();
   await page.locator('#screenHome').waitFor();
   const orderList = page.locator('#ordersList');
-  const card = orderList.getByRole('button', { name: new RegExp(`${orderNum}.*ממתינה לאישורך`) });
+  const pendingLabel = `פתיחת הזמנה ${orderNum} — ממתינה לאישורך`;
+  const card = orderList.getByRole('button', { name: pendingLabel, exact: true });
+  assert.equal(await card.getAttribute('aria-label'), pendingLabel);
   const bounds = await card.boundingBox();
   assert(bounds && bounds.y + Math.min(60, bounds.height) < 750, JSON.stringify(bounds));
   assert.match(await card.innerText(), /ממתינה לאישורך/);
-  assert.match(await card.innerText(), /22\.20/);
+  assert.match(await card.locator('..').innerText(), /22\.20/);
   await page.setViewportSize({ width: 1280, height: 900 });
   const home = await page.locator('#screenHome').boundingBox();
   assert(home && Math.abs(home.x - (1280 - home.x - home.width)) <= 1, JSON.stringify(home));
@@ -234,7 +236,7 @@ test('approval immediately updates home and physical weight agrees across the po
   await page.getByText('פרטי ההזמנה אושרו ונשלחו לבדיקה', { exact: true }).waitFor();
   await page.goBack();
   await page.locator('#screenHome').waitFor();
-  await orderList.getByRole('button', { name: new RegExp(`${orderNum}.*נשלחה לבדיקה`) }).waitFor();
+  await orderList.getByRole('button', { name: `פתיחת הזמנה ${orderNum} — נשלחה לבדיקה`, exact: true }).waitFor();
   assert.equal(await card.count(), 0);
 
   const html = await request(`orders/${orderId}/print`);
