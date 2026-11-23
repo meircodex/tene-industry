@@ -1,5 +1,33 @@
 // IronBend shared navigation shell.
 (function () {
+  const VISUAL_THEMES = ['command', 'blueprint'];
+  function readVisualTheme() {
+    const requested = new URLSearchParams(location.search).get('theme');
+    if (requested === 'logo') {
+      try { localStorage.removeItem('ib-visual-theme'); } catch {}
+      return '';
+    }
+    if (VISUAL_THEMES.includes(requested)) {
+      try { localStorage.setItem('ib-visual-theme', requested); } catch {}
+      return requested;
+    }
+    try { return localStorage.getItem('ib-visual-theme') || ''; } catch { return ''; }
+  }
+  function applyVisualTheme(name) {
+    const theme = VISUAL_THEMES.includes(name) ? name : '';
+    if (theme) document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    try {
+      if (theme) localStorage.setItem('ib-visual-theme', theme);
+      else localStorage.removeItem('ib-visual-theme');
+    } catch {}
+    document.querySelectorAll('[data-set-theme]').forEach(button => {
+      button.setAttribute('aria-pressed', button.getAttribute('data-set-theme') === theme ? 'true' : 'false');
+    });
+  }
+  applyVisualTheme(readVisualTheme());
+  window.IronBendVisualTheme = { apply: applyVisualTheme, current: () => document.documentElement.dataset.theme || '' };
+
   if (!window.IronBendAuth && !document.querySelector('script[src="/auth-client.js"]')) {
     const authScript = document.createElement('script');
     authScript.src = '/auth-client.js';
@@ -455,7 +483,7 @@
   topnav.innerHTML =
     '<a href="/dashboard.html" id="ib-logo" title="לוח בקרה" aria-label="לוח בקרה"><img id="ib-logo-icon" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
     '<div id="ib-links">' + renderNavLinks('ib-link') + '</div>' +
-    '<div id="ib-tools"><button type="button" class="ib-link" id="ib-help-open">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-link" id="ib-tuner-open">'+iconSvg('display')+'<span>תצוגה</span></button></div>' +
+    '<div id="ib-tools"><button type="button" class="ib-link" id="ib-theme-command" data-set-theme="command"><span>פיקוד</span></button><button type="button" class="ib-link" id="ib-theme-blueprint" data-set-theme="blueprint"><span>שרטוט</span></button><button type="button" class="ib-link" id="ib-help-open">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-link" id="ib-tuner-open">'+iconSvg('display')+'<span>תצוגה</span></button></div>' +
     '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">חיפוש</button>' +
     '<button id="ib-hamburger" aria-label="תפריט">☰</button>';
 
@@ -470,7 +498,7 @@
       '<button id="ib-drawer-close" aria-label="סגור">✕</button>' +
     '</div>' +
     '<div id="ib-drawer-links">' + renderNavLinks('ib-dl') + '</div>' +
-    '<div id="ib-drawer-tools"><button type="button" class="ib-dl" id="ib-drawer-help">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-dl" id="ib-drawer-tuner">'+iconSvg('display')+'<span>תצוגה</span></button></div>';
+    '<div id="ib-drawer-tools"><button type="button" class="ib-dl" data-set-theme="command"><span>פיקוד</span></button><button type="button" class="ib-dl" data-set-theme="blueprint"><span>שרטוט</span></button><button type="button" class="ib-dl" id="ib-drawer-help">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-dl" id="ib-drawer-tuner">'+iconSvg('display')+'<span>תצוגה</span></button></div>';
 
   const bottomNav = document.createElement('nav');
   bottomNav.id = 'ib-bottom';
@@ -658,11 +686,37 @@
     document.getElementById('ib-drawer-help')?.addEventListener('click', () => { closeDrawer(); openHelp(); });
     document.getElementById('ib-tuner-open')?.addEventListener('click', openTuner);
     document.getElementById('ib-drawer-tuner')?.addEventListener('click', () => { closeDrawer(); openTuner(); });
+    document.addEventListener('click', event => {
+      const button = event.target.closest('[data-set-theme]');
+      if (!button) return;
+      applyVisualTheme(button.getAttribute('data-set-theme'));
+    });
+    for (const file of ['/theme-command.css', '/theme-blueprint.css']) {
+      if (document.querySelector('link[href="' + file + '"]')) continue;
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = file;
+      document.head.appendChild(link);
+    }
+    function markSkeletons(root) {
+      if (!document.documentElement.dataset.theme) return;
+      (root || document).querySelectorAll('body *').forEach(el => {
+        if (el.children.length) return;
+        const text = (el.textContent || '').trim();
+        if (text === 'טוען...' || text.startsWith('טוען ')) el.classList.add('ib-skeleton');
+      });
+    }
+    markSkeletons(document);
+    new MutationObserver(() => markSkeletons(document)).observe(document.body, { childList: true, subtree: true });
+    applyVisualTheme(document.documentElement.dataset.theme || '');
     setTimeout(() => {
       document.querySelectorAll('body *').forEach(el => {
         if (el.children.length) return;
         const text = (el.textContent || '').trim();
-        if (text === 'טוען...' || text.startsWith('טוען ')) el.textContent = 'לא ניתן לטעון נתונים';
+        if (text === 'טוען...' || text.startsWith('טוען ')) {
+          el.classList.remove('ib-skeleton');
+          el.textContent = 'לא ניתן לטעון נתונים';
+        }
       });
     }, 12000);
     overlay.addEventListener('click', closeDrawer);

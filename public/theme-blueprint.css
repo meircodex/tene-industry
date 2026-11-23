@@ -1,0 +1,275 @@
+/* Direction B — Blueprint. Light engineering sheet from the Tene drawing. */
+html[data-theme="blueprint"] {
+  --bp-paper: #F7F5F0;
+  --bp-ink: #1A2637;
+  --bp-line: rgba(32, 63, 96, 0.28);
+  --bp-line-soft: rgba(32, 63, 96, 0.12);
+  --bp-orange: #A85C2B;
+  --bp-mark: #E07B39;
+  --bp-green: #44633C;
+  --bp-blue: #395974;
+  color-scheme: light;
+}
+html[data-theme="blueprint"] body {
+  background-color: var(--bp-paper) !important;
+  background-image:
+    linear-gradient(to right, var(--bp-line-soft) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--bp-line-soft) 1px, transparent 1px) !important;
+  background-size: 24px 24px !important;
+  color: var(--bp-ink) !important;
+  min-height: 100vh !important;
+}
+html[data-theme="blueprint"] :is(.kpi-value, .order-num, .weight-val, .weight-tag, td, .production-progress-main strong, .meta-chip strong) {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1;
+}
+html[data-theme="blueprint"] .kpi-value,
+html[data-theme="blueprint"] .production-progress-main strong {
+  font-size: 34px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em;
+  color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] :is(.kpi-card, .kpi-tile, .card, .panel, .orders-wrap, .table-card, .machine-card, [class*="-card"], .daily-header) {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="blueprint"] :is(thead, th, .section-head, .table-header) {
+  background: transparent !important;
+  color: var(--bp-blue) !important;
+  border-bottom: 1px solid var(--bp-line) !important;
+  font-weight: 700 !important;
+}
+html[data-theme="blueprint"] thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #F7F5F0 !important;
+}
+html[data-theme="blueprint"] td { border-color: var(--bp-line-soft) !important; color: var(--bp-ink) !important; }
+html[data-theme="blueprint"] tr:hover td { background: rgba(32, 63, 96, 0.04) !important; }
+html[data-theme="blueprint"] .queue-shape,
+html[data-theme="blueprint"] .line-shape,
+html[data-theme="blueprint"] .item-shape-preview,
+html[data-theme="blueprint"] .ib-shape-cell,
+html[data-theme="blueprint"] .shape-preview {
+  background:
+    linear-gradient(to right, rgba(32,63,96,.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(32,63,96,.08) 1px, transparent 1px),
+    #fff !important;
+  background-size: 8px 8px, 8px 8px, auto !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+}
+html[data-theme="blueprint"] :is(.btn-primary, .primary, .new-order-btn, .submit-btn, .btn-login, button.primary) {
+  background: var(--bp-ink) !important;
+  color: #F7F5F0 !important;
+  border: 1px solid var(--bp-ink) !important;
+  border-radius: 0 !important;
+}
+html[data-theme="blueprint"] .ib-new-order {
+  background: var(--bp-ink) !important;
+  color: #F7F5F0 !important;
+  box-shadow: inset -3px 0 0 var(--bp-mark) !important;
+}
+html[data-theme="blueprint"] :is(button, .btn, .btn-sm, .filter-btn, .tab-btn) {
+  border-radius: 0 !important;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+html[data-theme="blueprint"] .filter-btn.active,
+html[data-theme="blueprint"] .tab-btn.active {
+  background: transparent !important;
+  color: var(--bp-orange) !important;
+  box-shadow: inset 0 -2px 0 var(--bp-mark) !important;
+  border-color: var(--bp-line) !important;
+}
+html[data-theme="blueprint"] :is(input, select, textarea, .search-box) {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] :focus-visible {
+  outline: 1px solid var(--bp-mark) !important;
+  outline-offset: 3px;
+}
+html[data-theme="blueprint"] #ib-topnav {
+  background: #F7F5F0 !important;
+  border-left: 1px solid var(--bp-line) !important;
+}
+html[data-theme="blueprint"] #ib-topnav .ib-link { color: var(--bp-blue) !important; }
+html[data-theme="blueprint"] #ib-topnav .ib-link.ib-active {
+  background: transparent !important;
+  color: var(--bp-ink) !important;
+  box-shadow: inset -2px 0 0 var(--bp-mark) !important;
+}
+html[data-theme="blueprint"] .daily-progress-track { height: 2px !important; background: var(--bp-line-soft) !important; border-radius: 0 !important; }
+html[data-theme="blueprint"] .daily-progress-fill,
+html[data-theme="blueprint"] .item-progress-fill {
+  background: var(--bp-mark) !important;
+  border-radius: 0 !important;
+  transition: width 180ms linear;
+}
+html[data-theme="blueprint"] :is(.status-badge, .badge, .s-prod, .s-done, .s-pend, .s-ship, .s-risk) {
+  border-radius: 0 !important;
+  border: 1px solid var(--bp-line) !important;
+  background: transparent !important;
+}
+html[data-theme="blueprint"] .s-prod { color: var(--bp-orange) !important; }
+html[data-theme="blueprint"] .s-done { color: var(--bp-green) !important; }
+html[data-theme="blueprint"] .s-ship, html[data-theme="blueprint"] .s-pend { color: var(--bp-blue) !important; }
+html[data-theme="blueprint"] .s-risk { color: #8E2F2A !important; }
+html[data-theme="blueprint"] .ib-skeleton {
+  color: transparent !important;
+  background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(32,63,96,.08) 4px, rgba(32,63,96,.08) 5px) !important;
+  min-height: 12px;
+}
+html[data-theme="blueprint"] :is(.empty-state, .muted-state) {
+  border: 1px dashed var(--bp-line);
+  padding: 28px 16px;
+  background: transparent !important;
+}
+html[data-theme="blueprint"] #ib-search-box {
+  background: #F7F5F0;
+  border: 1px solid var(--bp-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="blueprint"] *,
+  html[data-theme="blueprint"] *::before,
+  html[data-theme="blueprint"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+html[data-theme="blueprint"] body[data-page="new"] .main.order-min-page {
+  background: transparent !important;
+}
+html[data-theme="blueprint"] body[data-page="new"] :is(
+  .order-min-header, .context-chip, .order-min-items, .items-header, .items-commandbar,
+  .order-lines-table, .order-lines-head, .order-line-row, .order-line-add-row,
+  .inspector-edit-shell, .summary-bar, #liveInventoryPanel, .wizard-summary-block,
+  .order-notes, .notes-card
+) {
+  background: rgba(255,255,255,.9) !important;
+  color: var(--bp-ink) !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="blueprint"] body[data-page="new"] .order-lines-body > .order-line-row:nth-of-type(even) {
+  background: rgba(247,245,240,.96) !important;
+}
+html[data-theme="blueprint"] body[data-page="new"] :is(.line-element, .line-qty, .line-diameter-select) {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] body[data-page="new"] :is(.primary-add-shape, button[type="submit"]) {
+  background: var(--bp-ink) !important;
+  color: #F7F5F0 !important;
+  border-color: var(--bp-ink) !important;
+  border-radius: 0 !important;
+  box-shadow: inset -3px 0 0 var(--bp-mark) !important;
+}
+
+html[data-theme="blueprint"] :is(.shift-bar, .shift-stat, .queue-filters, .machine-col, .machine-col-header, .queue-item, .modal) {
+  background: rgba(255,255,255,.9) !important;
+  color: var(--bp-ink) !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="blueprint"] .machine-col-header { background: transparent !important; }
+html[data-theme="blueprint"] .queue-item.active-item {
+  background: rgba(255,255,255,.94) !important;
+  border-color: var(--bp-ink) !important;
+  box-shadow: inset 0 -2px 0 var(--bp-mark) !important;
+}
+html[data-theme="blueprint"] .machine-badge {
+  background: transparent !important;
+  color: var(--bp-ink) !important;
+  border: 1px solid var(--bp-ink) !important;
+  border-radius: 0 !important;
+}
+html[data-theme="blueprint"] .queue-shape {
+  background:
+    linear-gradient(to right, rgba(32,63,96,.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(32,63,96,.16) 1px, transparent 1px),
+    #fff !important;
+  background-size: 8px 8px, 8px 8px, auto !important;
+  border-radius: 0 !important;
+}
+
+html[data-theme="blueprint"] #seModal { background: var(--bp-paper) !important; }
+html[data-theme="blueprint"] #seModal .se-head {
+  background: #F7F5F0 !important;
+  border-bottom: 1px solid var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] #seModal .se-head h2,
+html[data-theme="blueprint"] #seModal .se-step-indicator,
+html[data-theme="blueprint"] #seModal .se-back-btn { color: var(--bp-ink) !important; }
+html[data-theme="blueprint"] #sePageEdit,
+html[data-theme="blueprint"] #sePageEdit .se-preview-panel,
+html[data-theme="blueprint"] #seModal .se-canvas-topbar {
+  background-color: #F7F5F0 !important;
+  background-image:
+    linear-gradient(to right, rgba(32,63,96,.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(32,63,96,.1) 1px, transparent 1px) !important;
+  background-size: 24px 24px !important;
+}
+html[data-theme="blueprint"] #sePageEdit .se-family-panel,
+html[data-theme="blueprint"] #sePageEdit .se-data-panel,
+html[data-theme="blueprint"] #seModal .se-data-panel-head,
+html[data-theme="blueprint"] #seModal .se-table-wrap,
+html[data-theme="blueprint"] #seModal .se-foot {
+  background: rgba(255,255,255,.88) !important;
+  border-color: var(--bp-line) !important;
+  color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] #sePageEdit .se-family-card {
+  background: transparent !important;
+  color: var(--bp-ink) !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="blueprint"] #sePageEdit .se-family-card.active {
+  border-color: var(--bp-ink) !important;
+  color: var(--bp-ink) !important;
+  box-shadow: inset -3px 0 0 var(--bp-mark) !important;
+}
+html[data-theme="blueprint"] #seModal .se-svg-wrap {
+  background: #fff !important;
+  border: 1px solid var(--bp-line) !important;
+}
+html[data-theme="blueprint"] #seModal .se-data-panel-head:before { content: none !important; }
+html[data-theme="blueprint"] #seModal .se-stat-value { font-variant-numeric: tabular-nums; color: var(--bp-ink) !important; }
+
+html[data-theme="blueprint"] body[data-page=orders] .orders-table tr[class*="row-"] { background: rgba(255,255,255,.92) !important; }
+html[data-theme="blueprint"] .orders-table .order-row > td {
+  background: rgba(255,255,255,.94) !important;
+  color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] .orders-table .order-row.row-production > td:first-child { box-shadow: inset -3px 0 0 var(--bp-mark); }
+html[data-theme="blueprint"] .orders-table .order-row.row-approved > td:first-child { box-shadow: inset -3px 0 0 var(--bp-blue); }
+html[data-theme="blueprint"] .orders-table .order-row.row-waiting > td:first-child { box-shadow: inset -3px 0 0 #8E2F2A; }
+html[data-theme="blueprint"] .orders-table .order-row[data-production-percent] {
+  background: linear-gradient(to left, rgba(224,123,57,.45) 0 var(--production-progress), rgba(255,255,255,.94) var(--production-progress) 100%) !important;
+}
+html[data-theme="blueprint"] .orders-table .order-row[data-production-percent] > td { background: transparent !important; }
+html[data-theme="blueprint"] body[data-page="new"] :is(.stat, .notes-section, .section, .order-draft-notice) {
+  background: rgba(255,255,255,.9) !important;
+  border: 1px solid var(--bp-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--bp-ink) !important;
+}
