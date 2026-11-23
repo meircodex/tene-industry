@@ -149,7 +149,7 @@
       white-space:nowrap; flex-shrink:0;
     }
     .ib-link:hover { background:rgba(0,0,0,.05); color:#1a2533; }
-    .ib-link.ib-active { background:rgba(201,98,26,.10); color:#c9621a; box-shadow:inset 0 -2px 0 #c9621a; }
+    .ib-link.ib-active { background:#F8EDE4; color:#8A3E0C; box-shadow:inset -3px 0 0 #C45C12; }
     .ib-link-icon, .ib-dl-icon, .ib-bn-icon,
     .ib-link-label, .ib-dl-label, .ib-bn-label { pointer-events:none; }
     .ib-link-icon, .ib-dl-icon, .ib-bn-icon { flex-shrink:0; }
@@ -158,7 +158,7 @@
       border-radius:8px; line-height:1;
     }
     #ib-hamburger { display:none; padding:6px; font-size:22px; margin-right:auto; }
-    #ib-search-btn { padding:7px 10px; font-size:17px; }
+    #ib-search-btn { padding:7px 10px; font-size:12px; font-weight:800; font-family:Heebo,Arial,sans-serif; }
     #ib-hamburger:hover, #ib-search-btn:hover, #ib-drawer-close:hover { background:rgba(0,0,0,.06); }
     #ib-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:400; }
     #ib-overlay.open { display:block; }
@@ -199,7 +199,7 @@
     }
     .ib-bn-icon { font-size:20px; line-height:1; }
     .ib-bn:hover { color:#526070; }
-    .ib-bn.ib-active { color:#c9621a; }
+    .ib-bn.ib-active { color:#8A3E0C; }
     #ib-toast {
       position:fixed; bottom:72px; left:50%; transform:translateX(-50%);
       padding:10px 22px; border-radius:10px; font-family:Heebo,Arial,sans-serif;
@@ -209,7 +209,7 @@
     #ib-search-bar {
       position:fixed; inset:0; z-index:900; display:none;
       align-items:flex-start; justify-content:center; padding-top:76px;
-      background:rgba(2,12,28,.42); font-family:Heebo,Arial,sans-serif;
+      background:rgba(26,35,48,.46); font-family:Heebo,Arial,sans-serif;
     }
     #ib-search-box { width:min(620px,92vw); background:#fff; border-radius:14px; box-shadow:0 24px 80px rgba(0,0,0,.24); overflow:hidden; }
     #ib-search-input { width:100%; border:0; border-bottom:1px solid #e2e8f0; padding:16px 18px; font:inherit; outline:0; }
@@ -234,9 +234,9 @@
     }
     .ib-window-back-btn {
       pointer-events:auto;
-      border:1px solid rgba(2,26,72,.14);
+      border:1px solid #D7DEE6;
       background:#fff;
-      color:#c9621a;
+      color:#8A3E0C;
       border-radius:999px;
       min-height:36px;
       padding:7px 13px;
@@ -246,7 +246,7 @@
       cursor:pointer;
       box-shadow:0 6px 18px rgba(2,26,72,.10);
     }
-    .ib-window-back-btn:hover { border-color:#c9621a; background:#fff7ef; }
+    .ib-window-back-btn:hover { border-color:#C45C12; background:#F8EDE4; }
     @media(max-width:768px) {
       #ib-logo-icon { width:132px; height:auto; }
       #ib-links { display:none; }
@@ -257,22 +257,22 @@
       #ib-topnav {
         inset:0 0 0 auto; width:156px; height:100vh; padding:16px 10px;
         flex-direction:column; align-items:stretch; gap:14px;
-        background:linear-gradient(180deg,#071c3b 0%,#021A48 58%,#00112f 100%);
-        border-bottom:0; border-left:1px solid rgba(255,255,255,.10);
-        box-shadow:-8px 0 32px rgba(2,26,72,.20);
+        background:#F7F8FA;
+        border-bottom:0; border-left:1px solid #D7DEE6;
+        box-shadow:none;
       }
-      #ib-logo { margin:0 0 8px; padding:4px 0 12px; border-bottom:1px solid rgba(255,255,255,.12); }
-      #ib-logo-icon { width:118px; height:auto; filter:drop-shadow(0 8px 18px rgba(0,0,0,.28)); }
+      #ib-logo { margin:0 0 8px; padding:4px 0 12px; border-bottom:1px solid #D7DEE6; }
+      #ib-logo-icon { width:118px; height:auto; }
       #ib-links { display:flex; flex-direction:column; gap:4px; overflow-x:hidden; overflow-y:auto; padding:0 2px 10px; }
       .ib-group-label { display:block; }
       .ib-link {
         min-height:40px; padding:8px 10px; border-radius:10px;
-        color:rgba(255,255,255,.82); font-size:12px; font-weight:800;
+        color:#3E4C5A; font-size:12px; font-weight:800;
       }
-      .ib-link:hover { background:rgba(255,255,255,.10); color:#fff; }
+      .ib-link:hover { background:#EEF1F4; color:#1A2330; }
       .ib-link.ib-active {
-        background:linear-gradient(135deg,rgba(223,80,0,.96),rgba(240,138,36,.88));
-        color:#fff; box-shadow:0 10px 24px rgba(223,80,0,.25);
+        background:#F8EDE4;
+        color:#8A3E0C; box-shadow:inset -3px 0 0 #C45C12;
       }
       #ib-hamburger { display:none; }
     }
@@ -287,9 +287,10 @@
     .ib-nav-row>.ib-nav-toggle:not(.ib-nav-caret){width:100%}.ib-nav-chevron{margin-inline-start:auto;font-size:15px}
     .ib-nav-caret{flex:none;min-width:28px;min-height:36px;padding:4px;border-radius:6px;color:#718397}
     .ib-nav-children{padding-inline-start:12px;margin:2px 0 5px}.ib-nav-children a{font-size:12px;min-height:34px;padding:7px 8px}.ib-nav-children[hidden]{display:none}
-    .ib-nav-toggle:focus-visible{outline:2px solid #de8c44;outline-offset:2px}.ib-new-order{background:#c9621a!important;color:white!important;justify-content:center;margin-bottom:7px}
+    .ib-nav-toggle:focus-visible{outline:2px solid #C45C12;outline-offset:2px}.ib-new-order{background:#C45C12!important;color:white!important;justify-content:center;margin-bottom:7px}
     #ib-bottom{grid-template-columns:none;grid-auto-columns:1fr;grid-auto-flow:column}#ib-bottom button{border:0;background:transparent;padding:0}
-    @media(min-width:1024px){#ib-links{gap:2px}.ib-nav-toggle.ib-link,.ib-nav-caret{color:rgba(255,255,255,.82)}.ib-nav-children{border-inline-start:1px solid #ffffff25}.ib-nav-row .ib-link{padding-inline-end:4px}.ib-link{min-height:36px;padding:7px 8px}}
+    .ib-mark::before{content:attr(data-letter)}
+    @media(min-width:1024px){#ib-links{gap:2px}.ib-nav-toggle.ib-link,.ib-nav-caret{color:#3E4C5A}.ib-nav-children{border-inline-start:1px solid #D7DEE6}.ib-nav-row .ib-link{padding-inline-end:4px}.ib-link{min-height:36px;padding:7px 8px}}
     @media(max-width:1023px){#ib-links{display:none}#ib-hamburger{display:flex;align-items:center}}
     @media(pointer:coarse){.ib-nav-caret,.ib-nav-toggle,.ib-nav-children a{min-height:44px}.ib-nav-caret{min-width:44px}}
   `;
@@ -298,14 +299,24 @@
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
   }
 
+  const MARKS = {
+    dashboard:'דש', orders:'הז', new:'חד', intake:'קל', customers:'לק',
+    'production-queue':'תו', 'worker-visual':'אס', machine:'מכ', kiosk:'תח',
+    'production-setup':'יי', warehouse:'מס', inventory:'מל', procurement:'רכ',
+    quality:'אי', maintenance:'תז', support:'תמ', bugs:'תק', reports:'דו',
+    finance:'כס', profitability:'רו', pricing:'מח', projects:'פר', admin:'נה',
+    scanner:'סר', more:'עוד', settings:'הג'
+  };
+
   function renderNavLinks(linkClass) {
     const drawer=linkClass==='ib-dl',iconClass=drawer?'ib-dl-icon':'ib-link-icon',labelClass=drawer?'ib-dl-label':'ib-link-label';
     const includesActive=node=>node.link?.id===activeId||node.children.some(includesActive);
-    const anchor=node=>'<a href="'+escapeAttr(node.link.href)+'" class="'+linkClass+' '+ia(node.link.id)+(node.key==='new'?' ib-new-order':'')+'" title="'+escapeAttr(node.link.label)+'" aria-label="'+escapeAttr(node.link.label)+'"'+(node.link.id===activeId?' aria-current="page"':'')+'><span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.link.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.link.label)+'</span></a>';
+    const mark=id=>'<span class="'+iconClass+' ib-mark" data-mark="'+escapeAttr(id)+'" data-letter="'+escapeAttr(MARKS[id]||'')+'" aria-hidden="true"></span>';
+    const anchor=node=>'<a href="'+escapeAttr(node.link.href)+'" class="'+linkClass+' '+ia(node.link.id)+(node.key==='new'?' ib-new-order':'')+'" title="'+escapeAttr(node.link.label)+'" aria-label="'+escapeAttr(node.link.label)+'"'+(node.link.id===activeId?' aria-current="page"':'')+'>'+mark(node.link.id)+'<span class="'+labelClass+'">'+escapeAttr(node.link.label)+'</span></a>';
     const render=node=>{
       if(!node.children.length)return anchor(node);
       const open=navExpansion.has(node.key)?navExpansion.get(node.key):includesActive(node),id=linkClass+'-'+node.key+'-children';
-      const button='<button type="button" class="ib-nav-toggle '+(node.link?'ib-nav-caret':linkClass)+'" data-nav-group="'+escapeAttr(node.key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"'+(node.link?' aria-label="אפשרויות '+escapeAttr(node.link.label)+'"':'')+'>'+(node.link?'':('<span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.label)+'</span>'))+'<span class="ib-nav-chevron" aria-hidden="true">'+(open?'⌃':'⌄')+'</span></button>';
+      const button='<button type="button" class="ib-nav-toggle '+(node.link?'ib-nav-caret':linkClass)+'" data-nav-group="'+escapeAttr(node.key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"'+(node.link?' aria-label="אפשרויות '+escapeAttr(node.link.label)+'"':'')+'>'+(node.link?'':(mark(node.key)+'<span class="'+labelClass+'">'+escapeAttr(node.label)+'</span>'))+'<span class="ib-nav-chevron" aria-hidden="true">'+(open?'⌃':'⌄')+'</span></button>';
       return '<div class="ib-nav-branch '+(includesActive(node)?'ib-nav-current':'')+'"><div class="ib-nav-row">'+(node.link?anchor(node):'')+button+'</div><div id="'+id+'" class="ib-nav-children"'+(open?'':' hidden')+'>'+node.children.map(render).join('')+'</div></div>';
     };
     return buildNavigation(visibleLinks).map(render).join('');
@@ -317,7 +328,7 @@
 
   function renderBottomLinks() {
     return BOTTOM_IDS.map(id=>visibleLinks.find(l=>l.id===id)).filter(Boolean)
-      .map(l=>'<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'"><span class="ib-bn-icon" aria-hidden="true">'+escapeAttr(l.icon)+'</span><span class="ib-bn-label">'+escapeAttr(l.label)+'</span></a>').join('')+
+      .map(l=>'<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'"><span class="ib-bn-icon ib-mark" data-mark="'+escapeAttr(l.id)+'" data-letter="'+escapeAttr(MARKS[l.id]||'')+'" aria-hidden="true"></span><span class="ib-bn-label">'+escapeAttr(l.label)+'</span></a>').join('')+
       '<button type="button" class="ib-bn ib-open-menu" aria-label="תפריט"><span class="ib-bn-icon" aria-hidden="true">☰</span><span class="ib-bn-label">עוד</span></button>';
   }
 
@@ -413,7 +424,7 @@
   topnav.innerHTML =
     '<a href="/dashboard.html" id="ib-logo" title="דשבורד" aria-label="דשבורד"><img id="ib-logo-icon" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
     '<div id="ib-links">' + renderNavLinks('ib-link') + '</div>' +
-    '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">🔍</button>' +
+    '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">חיפוש</button>' +
     '<button id="ib-hamburger" aria-label="תפריט">☰</button>';
 
   const overlay = document.createElement('div');
@@ -439,7 +450,7 @@
   searchOverlay.id = 'ib-search-bar';
   searchOverlay.innerHTML =
     '<div id="ib-search-box">' +
-      '<input id="ib-search-input" type="text" placeholder="🔍  חיפוש הזמנה, לקוח, חבילה..." autocomplete="off">' +
+      '<input id="ib-search-input" type="text" placeholder="חיפוש הזמנה, לקוח או חבילה" autocomplete="off">' +
       '<div id="ib-search-results"><div class="ib-sr-empty">הקלד לפחות 2 תווים לחיפוש</div></div>' +
     '</div>';
 

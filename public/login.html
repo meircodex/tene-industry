@@ -5,13 +5,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>כניסה – IronBend</title>
-<meta name="theme-color" content="#c9621a">
+<meta name="theme-color" content="#1A2330">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --accent:#c9621a; --accent-light:#e07b39;
+  --accent:#C45C12; --accent-light:#A34C0C;
   --text:#1a2533; --text-dim:#526070; --text-muted:#8fa0b0;
   --border:rgba(0,0,0,0.09); --success:#1a7a42; --danger:#b83227;
   --warning:#a86b00; --info:#1560a8;
@@ -19,7 +19,7 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 body{
   font-family:'Heebo',sans-serif;
-  background:linear-gradient(135deg,#1a2533 0%,#2d3e52 50%,#1a2533 100%);
+  background:#F3F5F7;
   color:var(--text);
   direction:rtl;
   min-height:100vh;
@@ -30,20 +30,10 @@ body{
   padding:20px;
 }
 
-/* background texture */
-body::before{
-  content:'';
-  position:fixed;
-  inset:0;
-  background:
-    radial-gradient(ellipse at 20% 80%, rgba(201,98,26,0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(21,96,168,0.10) 0%, transparent 50%);
-  pointer-events:none;
-}
-
 .login-card{
   background:#ffffff;
-  border-radius:20px;
+  border-radius:12px;
+  border:1px solid #D7DEE6;
   padding:40px 36px;
   width:100%;
   max-width:420px;
@@ -95,7 +85,7 @@ body::before{
   width:220px;
   max-width:80%;
   height:auto;
-  filter:drop-shadow(0 6px 16px rgba(2,26,72,0.12));
+  filter:none;
 }
 .logo-sub{
   font-size:12px;
@@ -274,21 +264,16 @@ select{appearance:none;cursor:pointer;}
 .btn-login{
   width:100%;
   padding:14px;
-  background:linear-gradient(135deg,var(--accent-light),var(--accent));
+  background:var(--accent);
   color:#fff;
   border:none;
-  border-radius:12px;
+  border-radius:6px;
   font-family:'Heebo',sans-serif;
   font-size:16px;
   font-weight:800;
   cursor:pointer;
-  transition:all 0.2s;
-  box-shadow:0 4px 16px rgba(201,98,26,0.35);
 }
-.btn-login:hover{
-  transform:translateY(-1px);
-  box-shadow:0 6px 20px rgba(201,98,26,0.45);
-}
+.btn-login:hover{background:var(--accent-light);}
 .btn-login:active{transform:scale(0.99);}
 
 .footer-note{
@@ -323,7 +308,7 @@ select{appearance:none;cursor:pointer;}
   <!-- TABS -->
   <div class="tabs">
     <button class="tab active" id="tabReg" onclick="switchTab('regular')">כניסה רגילה</button>
-    <button class="tab" id="tabPin" onclick="switchTab('pin')">⚡ PIN מהיר</button>
+    <button class="tab" id="tabPin" onclick="switchTab('pin')">PIN מהיר</button>
   </div>
 
   <!-- TAB: REGULAR LOGIN -->
