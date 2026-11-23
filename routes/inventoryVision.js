@@ -104,6 +104,8 @@ Do not invent unreadable numbers.`;
 
   router.post('/inventory/scan-label', requireAnyRole(['warehouse', 'office', 'manager', 'admin']), imageAnalysisLimiter, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'נדרשת תמונה' });
+    const mime = req.file.mimetype || 'image/jpeg';
+    if (!mime.startsWith('image/')) return res.status(400).json({ error: 'נתמכות תמונות בלבד' });
     if (getSetting('INTAKE_AI_ENABLED') !== 'true') {
       // AI מושבת — מחזיר טופס ריק לעובד למלא ידנית
       return res.json({ success: true, aiUsed: false, data: { diameter: null, lot_number: null, weight_kg: null, grade: 'B500B', material_type: 'coil', certificate_num: null, notes: null } });
@@ -113,7 +115,6 @@ Do not invent unreadable numbers.`;
       return res.json({ success: true, aiUsed: false, data: { diameter: null, lot_number: null, weight_kg: null, grade: 'B500B', material_type: 'coil', certificate_num: null, notes: null } });
     }
 
-    const mime     = req.file.mimetype || 'image/jpeg';
     const fileData = req.file.buffer.toString('base64');
     const schema   = {
       type: 'object',
