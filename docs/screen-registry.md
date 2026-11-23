@@ -74,6 +74,7 @@ Status values:
 
 | Screen | Module Owner | Status | Auth Mode | Notes |
 | --- | --- | --- | --- | --- |
+| `/tene` | Platform Core | external | public | Hebrew factory landing with links to the customer portal and registration. Also served at `/` on configured marketing hosts. |
 | `customer.html` | Portals | external partial | portal token / phone currently | Active customer portal; ownership tests cover order detail/approval. Phone bootstrap still needs OTP/token lifecycle hardening. |
 | `portal.html` | Portals | deprecated | no internal API lookup | Deprecated until rebuilt on a scoped public endpoint or removed. |
 | `supplier.html` | Portals | frozen | supplier portal TBD | Demo supplier data removed; frozen until supplier auth and external purchase-order contract are defined. |
