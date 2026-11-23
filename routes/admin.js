@@ -2,6 +2,21 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const router = require('express').Router();
 
+const SECRET_MASK = '••••••••';
+const SECRET_SETTING_KEYS = new Set([
+  'WHATSAPP_TOKEN', 'WHATSAPP_VERIFY_TOKEN', 'EMAIL_IMAP_PASS', 'PRIORITY_PASS',
+  'MAVEN_API_TOKEN', 'OPENAI_API_KEY', 'GOOGLE_VISION_API_KEY',
+]);
+const ADMIN_SETTING_KEYS = new Set([
+  ...SECRET_SETTING_KEYS,
+  'WHATSAPP_PHONE_ID', 'WHATSAPP_NOTIFY_PHONE',
+  'EMAIL_IMAP_HOST', 'EMAIL_IMAP_PORT', 'EMAIL_IMAP_USER',
+  'PRIORITY_BASE_URL', 'PRIORITY_USER', 'PRIORITY_COMPANY',
+  'MAVEN_API_URL', 'OPENAI_MODEL', 'INTAKE_AI_ENABLED',
+  'MODULE_MACHINES', 'MODULE_WHATSAPP', 'MODULE_EMAIL', 'MODULE_OCR',
+  'MODULE_PRIORITY', 'MODULE_MAVEN', 'MODULE_AI', 'MODULE_ALERTS',
+]);
+
 function required(name, value) {
   if (!value) throw new Error(`routes/admin missing dependency: ${name}`);
   return value;
@@ -78,53 +93,43 @@ module.exports = function createAdminRouter(deps) {
   }
 
   router.get('/settings', requireRole('admin'), (req, res) => {
-    const rows = db().prepare('SELECT key, value FROM settings').all();
-    const map = {};
-    rows.forEach(r => { map[r.key] = r.value; });
-    const keys = [
-      'WHATSAPP_TOKEN','WHATSAPP_PHONE_ID','WHATSAPP_VERIFY_TOKEN','WHATSAPP_NOTIFY_PHONE',
-      'EMAIL_IMAP_HOST','EMAIL_IMAP_PORT','EMAIL_IMAP_USER','EMAIL_IMAP_PASS',
-      'PRIORITY_BASE_URL','PRIORITY_USER','PRIORITY_PASS','PRIORITY_COMPANY',
-      'MAVEN_API_URL','MAVEN_API_TOKEN',
-      'OPENAI_API_KEY','OPENAI_MODEL','INTAKE_AI_ENABLED',
-      'GOOGLE_VISION_API_KEY',
-      'MODULE_MACHINES','MODULE_WHATSAPP','MODULE_EMAIL','MODULE_OCR',
-      'MODULE_PRIORITY','MODULE_MAVEN','MODULE_AI','MODULE_ALERTS',
-    ];
     const result = {};
-    keys.forEach(k => {
-      if (k === 'OPENAI_API_KEY') {
-        result[k] = getOpenAiApiKey() ? '••••••••' : '';
-      } else {
-        result[k] = map[k] ?? process.env[k] ?? '';
-      }
-    });
+    for (const key of ADMIN_SETTING_KEYS) {
+      const value = key === 'OPENAI_API_KEY' ? getOpenAiApiKey() : getSetting(key);
+      result[key] = SECRET_SETTING_KEYS.has(key) ? (value ? SECRET_MASK : '') : value ?? '';
+    }
     res.json(result);
   });
 
   router.post('/settings', requireRole('admin'), (req, res) => {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ error: 'יש לשלוח אובייקט הגדרות' });
+    }
+    const changes = Object.entries(req.body).filter(([key, value]) =>
+      !(SECRET_SETTING_KEYS.has(key) && value === SECRET_MASK)
+    );
+    const getVendorOnly = db().prepare(
+      "SELECT vendor_only FROM setting_definitions WHERE key=?"
+    );
+    const blocked = changes.filter(([key]) => getVendorOnly.get(key)?.vendor_only === 1)
+      .map(([key]) => key);
+    if (blocked.length > 0) {
+      return res.status(403).json({ error: 'אין הרשאה לשנות פרמטרים אלה', blocked });
+    }
+    if (changes.some(([key]) => !ADMIN_SETTING_KEYS.has(key))) {
+      return res.status(400).json({ error: 'הבקשה מכילה הגדרות לא מוכרות' });
+    }
     const upsert = db().prepare(
       `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`
     );
-    // Block vendor_only keys — customer admin must not write license/API secrets
-    const getVendorOnly = db().prepare(
-      "SELECT vendor_only FROM setting_definitions WHERE key=?"
-    );
-    const blocked = Object.keys(req.body).filter(k => {
-      const def = getVendorOnly.get(k);
-      return def && def.vendor_only === 1;
-    });
-    if (blocked.length > 0) {
-      return res.status(403).json({ error: 'אין הרשאה לשנות פרמטרים אלה', blocked });
-    }
-    const save = db().transaction(entries => {
-      for (const [k, v] of Object.entries(entries)) {
-        upsert.run(k, v ?? '');
+    const save = db().transaction(() => {
+      for (const [key, value] of changes) {
+        upsert.run(key, value ?? '');
       }
     });
-    save(req.body);
-    res.json({ success: true, saved: Object.keys(req.body).length });
+    save();
+    res.json({ success: true, saved: changes.length });
   });
 
   router.post('/settings/test/:service', requireRole('admin'), async (req, res) => {
