@@ -33,7 +33,7 @@ function createScheduler(deps) {
     return task;
   }
 
-  schedule('*/5 * * * *', () => {
+  function runOrderAlerts() {
     const urgentMinutes = settingsService.getNum('URGENT_ORDER_WAIT_MINUTES', 30);
     const pendingMinutes = settingsService.getNum('PENDING_APPROVAL_WAIT_MINUTES', 15);
     const urgentDays = urgentMinutes / 1440;
@@ -54,9 +54,9 @@ function createScheduler(deps) {
         AND NOT EXISTS (SELECT 1 FROM alerts a WHERE a.order_id=o.id AND a.type='pending_approval' AND a.resolved=0)
     `).all(pendingDays);
     pendingLong.forEach(o => createAlert('pending_approval', 'info', `הזמנה ${o.order_num} ממתינה לאישור מעל ${pendingMinutes} דקות`, { orderId: o.id }));
-  });
+  }
 
-  schedule('* * * * *', async () => {
+  async function runEmailPoll() {
     const host = getSetting('EMAIL_IMAP_HOST');
     if (!host) return;
     try {
@@ -74,9 +74,9 @@ function createScheduler(deps) {
     } catch (err) {
       console.error('[Email cron]', err.message);
     }
-  });
+  }
 
-  schedule('0 2 * * *', async () => {
+  async function runNightlyBackup() {
     try {
       const stamp = new Date().toISOString().slice(0, 10);
       const dest = path.join(backupDir, `ironbend-${stamp}.db`);
@@ -93,13 +93,17 @@ function createScheduler(deps) {
     } catch (err) {
       console.error('[Backup]', err.message);
     }
-  });
+  }
+
+  schedule('*/5 * * * *', runOrderAlerts);
+  schedule('* * * * *', runEmailPoll);
+  schedule('0 2 * * *', runNightlyBackup);
 
   function stop() {
     for (const task of tasks) task.stop?.();
   }
 
-  return { backupDir, backupService, stop };
+  return { backupDir, backupService, runOrderAlerts, runEmailPoll, runNightlyBackup, stop };
 }
 
 module.exports = { createScheduler };
