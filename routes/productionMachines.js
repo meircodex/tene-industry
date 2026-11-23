@@ -36,7 +36,7 @@ module.exports = function createProductionMachinesRouter(deps) {
   });
 
   // Create new machine
-  router.post('/machines', requireAnyRole(['manager']), (req, res) => {
+  router.post('/machines', requireRole('manager'), (req, res) => {
     const {
       name, label, conn_mode, tcp_host, tcp_port, rtu_port, baud_rate, parity, stop_bits, slave_id,
       min_diameter, max_diameter,
@@ -58,7 +58,7 @@ module.exports = function createProductionMachinesRouter(deps) {
   });
 
   // Delete machine
-  router.delete('/machines/:id', requireAnyRole(['manager']), (req, res) => {
+  router.delete('/machines/:id', requireRole('manager'), (req, res) => {
     const result = db.prepare('DELETE FROM machines WHERE id=? AND retired_at IS NULL').run(req.params.id);
     if (!result.changes) return res.status(404).json({ error: 'המכונה אינה פעילה במערכת' });
     res.json({ success: true });

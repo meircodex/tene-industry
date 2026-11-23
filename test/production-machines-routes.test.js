@@ -75,14 +75,14 @@ test('נתיבי מכונות ייצור', async t => {
   await t.test('הרשאות לכל נתיב', async () => {
     const stateRoles = ['production', 'maintenance', 'manager', 'admin'];
     const stationRoles = ['production', 'kiosk', 'manager', 'admin'];
-    const configRoles = ['manager', 'admin'];
+    const managementRoles = ['manager', 'admin'];
     const routes = [
       ['GET', '/machines', [...stateRoles, 'kiosk', 'office'], 200],
-      ['POST', '/machines', ['manager'], 400, {}],
-      ['DELETE', '/machines/0', ['manager'], 404],
+      ['POST', '/machines', managementRoles, 400, {}],
+      ['DELETE', '/machines/0', managementRoles, 404],
       ['POST', machineUrl + '/send-params', stationRoles, 200, {}],
-      ['POST', machineUrl + '/assign', ['production', ...configRoles], 404, { itemId: 0 }],
-      ['PATCH', machineUrl + '/config', configRoles, 400, { conn_mode: 'http' }],
+      ['POST', machineUrl + '/assign', ['production', ...managementRoles], 404, { itemId: 0 }],
+      ['PATCH', machineUrl + '/config', managementRoles, 400, { conn_mode: 'http' }],
       ['POST', machineUrl + '/complete', stationRoles, 400, { producedQty: 10 }],
       ['PATCH', machineUrl + '/state', stateRoles, 400, {}],
       ['GET', machineUrl + '/state-log', stateRoles, 200],
@@ -100,21 +100,21 @@ test('נתיבי מכונות ייצור', async t => {
     assert.deepEqual(machine(), before);
   });
 
-  await t.test('רק מנהל יכול להוסיף ולמחוק מכונה', async () => {
+  await t.test('מנהל ומנהל מערכת יכולים להוסיף ולמחוק מכונה', async () => {
     const { error } = await expectResponse('POST', '/machines', 'manager', 400, { name: '  ' });
     assert.equal(error, 'שם מכונה נדרש');
 
     const body = { name: ' ' + machineSix + ' ', conn_mode: 'disabled' };
-    const inserted = await expectResponse('POST', '/machines', 'manager', 200, body);
-    assert.equal(inserted.success, true);
     const find = db.prepare('SELECT name, label, conn_mode FROM machines WHERE id = ?');
-    assert.deepEqual(find.get(inserted.id), { name: machineSix, label: machineSix, conn_mode: 'disabled' });
+    for (const role of ['manager', 'admin']) {
+      const inserted = await expectResponse('POST', '/machines', role, 200, body);
+      assert.equal(inserted.success, true);
+      assert.deepEqual(find.get(inserted.id), { name: machineSix, label: machineSix, conn_mode: 'disabled' });
 
-    const url = '/machines/' + inserted.id;
-    await expectResponse('DELETE', url, 'admin', 403);
-    assert.ok(find.get(inserted.id));
-    assert.deepEqual(await expectResponse('DELETE', url, 'manager', 200), { success: true });
-    assert.equal(find.get(inserted.id), undefined);
+      const url = '/machines/' + inserted.id;
+      assert.deepEqual(await expectResponse('DELETE', url, role, 200), { success: true });
+      assert.equal(find.get(inserted.id), undefined);
+    }
   });
 
   await t.test('שליחת פרמטרים מחזירה את תוצאת Modbus', async () => {
