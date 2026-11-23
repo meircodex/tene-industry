@@ -1,4 +1,4 @@
-const router = require('express').Router();
+const { Router } = require('express');
 const {
   findSourceIdentityDuplicate,
   sourceIdentityConflictPayload,
@@ -17,6 +17,7 @@ function required(name, value) {
 }
 
 module.exports = function createIntakeReviewRouter(deps) {
+  const router = Router();
   const db = required('db', deps.db);
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
   const wsBroadcast = required('wsBroadcast', deps.wsBroadcast);
@@ -28,7 +29,8 @@ module.exports = function createIntakeReviewRouter(deps) {
 
   function parseStoredIntake(row) {
     try {
-      return JSON.parse(row.parsed_data || '{}');
+      const parsed = JSON.parse(row.parsed_data || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
     } catch {
       return {};
     }
@@ -228,11 +230,17 @@ module.exports = function createIntakeReviewRouter(deps) {
     return 'pending';
   }
 
+  function findReviewedOrderItem(item, index, orderItems) {
+    return item?.item_id
+      ? orderItems.find(candidate => Number(candidate.id) === Number(item.item_id))
+      : orderItems[index];
+  }
+
   function applyOrderItemReviewState(parsed, orderItems) {
     const next = parsedOverride({}, parsed);
     const parsedItems = next.items.length ? next.items : orderItems.map(orderItemToParsedItem);
     next.items = parsedItems.map((item, index) => {
-      const orderItem = orderItems[index];
+      const orderItem = findReviewedOrderItem(item, index, orderItems);
       if (!orderItem) return item;
       const reviewStatus = normalizeReviewStatus(orderItem.review_status);
       const operatorStatus = reviewStatus === 'approved' ? 'accepted' : reviewStatus === 'missing' ? 'missing' : 'review';
@@ -345,9 +353,7 @@ module.exports = function createIntakeReviewRouter(deps) {
     try {
       const saveReview = db.transaction(() => {
         (parsed.items || []).forEach((item, index) => {
-          const orderItem = item?.item_id
-            ? orderItems.find(candidate => Number(candidate.id) === Number(item.item_id))
-            : orderItems[index];
+          const orderItem = findReviewedOrderItem(item, index, orderItems);
           if (!orderItem) return;
           const status = normalizeReviewStatus(item.operator_review_status || item.review_status || item.manual_review_status);
           const reviewedAt = item.operator_reviewed_at || new Date().toISOString();
@@ -395,13 +401,17 @@ module.exports = function createIntakeReviewRouter(deps) {
     }
   });
   router.post('/intake/:id/reject', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-    const r = db.prepare('UPDATE intake_log SET status=? WHERE id=?').run('rejected', req.params.id);
-    if (!r.changes) return res.status(404).json({ error: 'לא נמצא' });
+    const row = db.prepare('SELECT status,order_id FROM intake_log WHERE id=?').get(req.params.id);
+    if (!row) return res.status(404).json({ error: 'לא נמצא' });
+    if (row.order_id || row.status === 'approved') {
+      return res.status(409).json({ error: 'לא ניתן לדחות קליטה שכבר אושרה' });
+    }
+    db.prepare('UPDATE intake_log SET status=? WHERE id=?').run('rejected', req.params.id);
     res.json({ success: true });
   });
 
   router.post('/intake/parse-text', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-    const { text, source } = req.body;
+    const { text, source } = req.body || {};
     const identity = sourceIdentityFromRequest(req, source || 'manual');
     const duplicate = findSourceIdentityDuplicate(db, 'intake_log', identity);
     if (duplicate) return res.status(409).json(sourceIdentityConflictPayload('intake', duplicate));

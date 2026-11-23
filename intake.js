@@ -61,7 +61,7 @@ function parseOCRText(text) {
     // Pattern: diameter length quantity (all on one line)
     /(?:Ø|ø|קוטר\s*)?(\d{1,2})\s*(?:מ"מ|mm)?\s*[×x\*]\s*(\d{3,6})\s*(?:מ"מ|mm|מ'|m)?\s*[×x\*]\s*(\d+)/gi,
     // Pattern: number number number (might be diam/length/qty)
-    /^(\d{1,2})\s+(\d{3,6})\s+(\d+)/gm,
+    /^[ \t]*(\d{1,2})[ \t]+(\d{3,6})[ \t]+(\d+)/gm,
   ];
 
   for (const pattern of itemPatterns) {
