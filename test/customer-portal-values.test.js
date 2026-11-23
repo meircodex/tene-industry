@@ -96,11 +96,15 @@ test('quote and submission use identical item bodies and clear state for the nex
   await client.run('calcQuote()');
   assert.match(client.element('priceBreakdown').innerHTML, /5%/);
   assert.match(client.element('priceBreakdown').innerHTML, /93\.24/);
+  const homeCalls = [];
+  client.context.showHome = async (...args) => { homeCalls.push(args); };
   await client.run('submitOrder()');
   assert.deepEqual(sent[0].body.items, sent[1].body.items);
-  client.run('showHome = async () => {};');
-  await client.timers.find(timer => timer.delay === 1200).fn();
+  assert.ok(sent[1].body.idempotency_key);
+  assert.equal(homeCalls.length, 1);
+  assert.equal(homeCalls[0][1].replace, true);
   assert.equal(client.json('orderItems.length'), 0);
+  assert.equal(client.run('portalDraftIdempotencyKey'), null);
   assert.equal(client.element('submitOrderBtn').disabled, false);
 });
 
@@ -167,7 +171,8 @@ test('HTTP quote -> submission -> database -> detail -> print preserve the real 
       assert.equal(requote.billingPrice, quote.billingPrice, 'reopening the editor must not change units or values');
       near(portalShapeDraftToOrderItem(reopenedPayload).totalLengthMm, portalShapeDraftToOrderItem(payload).totalLengthMm);
     }
-    const result = await post('/api/c/order', { items: [payload], siteId, idempotency_key: 'values-' + scenario.name, deliveryDate: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' }).format(), deliveryTime: '10:30', deliveryAddress: 'כתובת בדיקה', notes: 'הערת הזמנה' });
+    const deliveryDate = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' }).format();
+    const result = await post('/api/c/order', { items: [payload], siteId, idempotency_key: 'values-' + scenario.name, deliveryDate, deliveryTime: '10:30', deliveryAddress: 'כתובת בדיקה', notes: 'הערת הזמנה' });
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(result.orderId);
     const item = db.prepare('SELECT * FROM items WHERE order_id=?').get(result.orderId);
     const expected = portalShapeDraftToOrderItem(payload);
@@ -186,7 +191,7 @@ test('HTTP quote -> submission -> database -> detail -> print preserve the real 
     near(client.json('portalItemShapeMetrics(orderItems[0])').totalWeightKg, expected.totalWeight, 0.005);
     near(quote.totalWeight, order.total_weight, 0.005);
     assert.equal(order.site_id, siteId);
-    assert.equal(order.delivery_date, '2026-10-01');
+    assert.equal(order.delivery_date, deliveryDate);
     assert.equal(order.delivery_time, '10:30');
     assert.equal(order.delivery_address, 'כתובת בדיקה');
     const snapshot = JSON.parse(item.shape_snapshot_json);

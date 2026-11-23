@@ -54,7 +54,7 @@ async function isolatedPortal(t) {
 
 async function browserPage(t, width = 390) {
   const browser = await chromium.launch({
-    executablePath: process.env.PORTAL_CHROMIUM || '/usr/bin/chromium',
+    ...(process.env.PORTAL_CHROMIUM ? { executablePath: process.env.PORTAL_CHROMIUM } : {}),
     args: ['--no-sandbox'],
   });
   t.after(() => browser.close());
@@ -213,11 +213,16 @@ test('approval immediately updates home and physical weight agrees across the po
   assert.match(await page.locator('#priceBreakdown').innerText(), /22\.20/);
   await page.goBack();
   await page.locator('#screenHome').waitFor();
-  const card = page.locator('#ordersList .order-card').filter({ hasText: orderNum });
+  const orderList = page.locator('#ordersList');
+  const card = orderList.getByRole('button', { name: new RegExp(`${orderNum}.*ממתינה לאישורך`) });
   const bounds = await card.boundingBox();
   assert(bounds && bounds.y + Math.min(60, bounds.height) < 750, JSON.stringify(bounds));
   assert.match(await card.innerText(), /ממתינה לאישורך/);
   assert.match(await card.innerText(), /22\.20/);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const home = await page.locator('#screenHome').boundingBox();
+  assert(home && Math.abs(home.x - (1280 - home.x - home.width)) <= 1, JSON.stringify(home));
+  await page.setViewportSize({ width: 390, height: 844 });
   await assertAccessible(page, 'home');
   await card.click();
   const approve = page.getByRole('button', { name: 'אשר פרטים ושלח לבדיקה' });
@@ -229,8 +234,8 @@ test('approval immediately updates home and physical weight agrees across the po
   await page.getByText('פרטי ההזמנה אושרו ונשלחו לבדיקה', { exact: true }).waitFor();
   await page.goBack();
   await page.locator('#screenHome').waitFor();
-  assert.match(await card.innerText(), /נשלחה לבדיקה/);
-  assert.doesNotMatch(await card.innerText(), /ממתינה לאישורך/);
+  await orderList.getByRole('button', { name: new RegExp(`${orderNum}.*נשלחה לבדיקה`) }).waitFor();
+  assert.equal(await card.count(), 0);
 
   const html = await request(`orders/${orderId}/print`);
   assert.match(html.data, /22\.20/);
