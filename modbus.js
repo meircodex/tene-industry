@@ -34,7 +34,9 @@ class ModbusService {
     this.state     = {};   // machineId → { counter, status, connected, lastSeen, ... }
     this.listeners = [];
     this.polling   = false;
-    this._retryTimers = {};
+    this._pollTimer = null;
+    this._pollGeneration = 0;
+    this._retryTimers = new Map();
 
     // Init state from hardcoded defaults; DB will override at startPolling
     for (const m of MACHINES_CONFIG) {
@@ -91,8 +93,23 @@ class ModbusService {
     this.listeners.forEach(fn => fn(machineId, data));
   }
 
+  _scheduleReconnect(machineId) {
+    if (!this.polling || this._retryTimers.has(machineId)) return;
+    const generation = this._pollGeneration;
+    const timer = setTimeout(async () => {
+      const cfg = this._getConfigs().find(machine => machine.id === machineId);
+      const failed = !this.clients[machineId]?.isOpen
+        && (await this.connectMachine(cfg)) === false;
+      if (generation !== this._pollGeneration) return;
+      this._retryTimers.delete(machineId);
+      if (failed) this._scheduleReconnect(machineId);
+    }, CONNECT_RETRY_MS);
+    this._retryTimers.set(machineId, timer);
+  }
+
   async connectMachine(cfg) {
     if(!cfg||!['tcp','rtu'].includes(cfg.mode)||(cfg.mode==='tcp'&&!cfg.host)||(cfg.mode==='rtu'&&!cfg.serialPort))return;
+    const generation = this._pollGeneration;
     const client = new ModbusRTU();
     try {
       if (cfg.mode === 'tcp') {
@@ -103,6 +120,10 @@ class ModbusService {
           parity: cfg.parity ?? 'none', stopBits: cfg.stopBits ?? 1,
         });
       }
+      if (generation !== this._pollGeneration) {
+        try { client.close(); } catch (_) {}
+        return;
+      }
       client.setID(cfg.unitId);
       client.setTimeout(2000);
       this.clients[cfg.id] = client;
@@ -110,26 +131,39 @@ class ModbusService {
       const addr = cfg.mode === 'tcp' ? `${cfg.host}:${cfg.port ?? 502}` : cfg.serialPort;
       console.log(`[Modbus] מחובר: ${cfg.name} (${addr})`);
     } catch (err) {
+      try { client.close(); } catch (_) {}
+      if (generation !== this._pollGeneration) return;
       console.warn(`[Modbus] לא ניתן להתחבר ל-${cfg.name}: ${err.message}`);
       this.state[cfg.id].connected = false;
+      this._scheduleReconnect(cfg.id);
+      return false;
     }
   }
 
   async pollMachine(cfg) {
     const client = this.clients[cfg.id];
     if (!client || !client.isOpen) {
+      if (this._retryTimers.has(cfg.id)) return;
       if (this.state[cfg.id].connected) {
         this.state[cfg.id].connected = false;
         this.state[cfg.id].status = 'לא מחובר';
         this._broadcast(cfg.id);
       }
-      await this.connectMachine(cfg);
+      if (client && this.polling) {
+        delete this.clients[cfg.id];
+        try { client.close(); } catch (_) {}
+        this._scheduleReconnect(cfg.id);
+      } else {
+        await this.connectMachine(cfg);
+      }
       return;
     }
 
     try {
       const counterData = await client.readHoldingRegisters(REG.COUNTER, 1);
+      if (this.clients[cfg.id] !== client) return;
       const statusData  = await client.readHoldingRegisters(REG.ERROR, 1);
+      if (this.clients[cfg.id] !== client) return;
       const counter     = counterData.data[0];
       const errorCode   = statusData.data[0];
       const statusCode  = errorCode > 0 ? 3 : 2; // 3=error, 2=running (simplified)
@@ -145,6 +179,7 @@ class ModbusService {
 
       if (changed) this._broadcast(cfg.id);
     } catch (err) {
+      if (this.clients[cfg.id] !== client) return;
       if (this.state[cfg.id].connected) {
         this.state[cfg.id].connected = false;
         this.state[cfg.id].status = 'שגיאת תקשורת';
@@ -200,6 +235,7 @@ class ModbusService {
   async startPolling(intervalMs = 5000) {
     if (this.polling) return;
     this.polling = true;
+    const generation = this._pollGeneration;
     const configs = this._getConfigs();
     // Init state for all machines from DB
     for (const m of configs) {
@@ -213,13 +249,15 @@ class ModbusService {
     }
     for (const cfg of configs) {
       await this.connectMachine(cfg);
+      if (generation !== this._pollGeneration) return;
     }
     const tick = async () => {
-      if (!this.polling) return;
+      this._pollTimer = null;
       for (const cfg of this._getConfigs()) {
         await this.pollMachine(cfg);
+        if (generation !== this._pollGeneration) return;
       }
-      setTimeout(tick, intervalMs);
+      this._pollTimer = setTimeout(tick, intervalMs);
     };
     tick();
     console.log(`[Modbus] סקירה החלה (כל ${intervalMs / 1000} שניות)`);
@@ -227,7 +265,16 @@ class ModbusService {
 
   stopPolling() {
     this.polling = false;
-    Object.values(this.clients).forEach(c => { try { c.close(); } catch (_) {} });
+    this._pollGeneration++;
+    if (this._pollTimer !== null) clearTimeout(this._pollTimer);
+    this._pollTimer = null;
+    for (const timer of this._retryTimers.values()) clearTimeout(timer);
+    this._retryTimers.clear();
+    for (const [id, client] of Object.entries(this.clients)) {
+      try { client.close(); } catch (_) {}
+      this.state[id].connected = false;
+      this.state[id].status = 'לא מחובר';
+    }
     this.clients = {};
     console.log('[Modbus] סקירה הופסקה');
   }
