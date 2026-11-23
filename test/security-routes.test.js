@@ -1701,6 +1701,10 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
 
   await t.test('warehouse delivery and inventory routes require logistics roles', async () => {
     const emptyBody = JSON.stringify({});
+    const vehicleId = db.prepare('INSERT INTO vehicles (vehicle_desc) VALUES (?)').run('רכב בדיקה').lastInsertRowid;
+    const driverId = db.prepare('INSERT INTO drivers (name, vehicle_id) VALUES (?, ?)').run('נהג בדיקה', vehicleId).lastInsertRowid;
+    const vehicle = `/api/vehicles/${vehicleId}`;
+    const driver = `/api/drivers/${driverId}`;
 
     assert.equal((await request('/api/drivers')).status, 401);
     assert.equal((await request('/api/drivers', { headers: authHeaders(production) })).status, 403);
@@ -1715,23 +1719,23 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal((await request('/api/vehicles', { headers: authHeaders(office) })).status, 200);
     assert.equal((await request('/api/vehicles', { method: 'POST', headers: authHeaders(production), body: emptyBody })).status, 403);
     assert.equal((await request('/api/vehicles', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 400);
-    assert.equal((await request('/api/vehicles/1/events')).status, 401);
-    assert.equal((await request('/api/vehicles/1/events', { headers: authHeaders(production) })).status, 403);
-    assert.equal((await request('/api/vehicles/1/events', { headers: authHeaders(office) })).status, 200);
-    assert.equal((await request('/api/vehicles/1/events', { method: 'POST', headers: authHeaders(production), body: emptyBody })).status, 403);
-    assert.equal((await request('/api/vehicles/1/events', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 400);
-    assert.equal((await request('/api/vehicles/1/documents')).status, 401);
-    assert.equal((await request('/api/vehicles/1/documents', { headers: authHeaders(production) })).status, 403);
-    assert.equal((await request('/api/vehicles/1/documents', { headers: authHeaders(office) })).status, 200);
+    assert.equal((await request(vehicle + '/events')).status, 401);
+    assert.equal((await request(vehicle + '/events', { headers: authHeaders(production) })).status, 403);
+    assert.equal((await request(vehicle + '/events', { headers: authHeaders(office) })).status, 200);
+    assert.equal((await request(vehicle + '/events', { method: 'POST', headers: authHeaders(production), body: emptyBody })).status, 403);
+    assert.equal((await request(vehicle + '/events', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 400);
+    assert.equal((await request(vehicle + '/documents')).status, 401);
+    assert.equal((await request(vehicle + '/documents', { headers: authHeaders(production) })).status, 403);
+    assert.equal((await request(vehicle + '/documents', { headers: authHeaders(office) })).status, 200);
 
-    assert.equal((await request('/api/drivers/1/location', { method: 'PATCH', headers: authHeaders(production), body: emptyBody })).status, 403);
-    assert.equal((await request('/api/drivers/1/location', { method: 'PATCH', headers: authHeaders(office), body: emptyBody })).status, 200);
+    assert.equal((await request(driver + '/location', { method: 'PATCH', headers: authHeaders(production), body: emptyBody })).status, 403);
+    assert.equal((await request(driver + '/location', { method: 'PATCH', headers: authHeaders(office), body: emptyBody })).status, 400);
 
-    assert.equal((await request('/api/drivers/1/vehicle-events')).status, 401);
-    assert.equal((await request('/api/drivers/1/vehicle-events', { headers: authHeaders(production) })).status, 403);
-    assert.equal((await request('/api/drivers/1/vehicle-events', { headers: authHeaders(office) })).status, 200);
-    assert.equal((await request('/api/drivers/1/vehicle-events', { method: 'POST', headers: authHeaders(production), body: emptyBody })).status, 403);
-    assert.equal((await request('/api/drivers/1/vehicle-events', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 400);
+    assert.equal((await request(driver + '/vehicle-events')).status, 401);
+    assert.equal((await request(driver + '/vehicle-events', { headers: authHeaders(production) })).status, 403);
+    assert.equal((await request(driver + '/vehicle-events', { headers: authHeaders(office) })).status, 200);
+    assert.equal((await request(driver + '/vehicle-events', { method: 'POST', headers: authHeaders(production), body: emptyBody })).status, 403);
+    assert.equal((await request(driver + '/vehicle-events', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 400);
 
     assert.equal((await request('/api/deliveries')).status, 401);
     assert.equal((await request('/api/deliveries', { headers: authHeaders(production) })).status, 403);

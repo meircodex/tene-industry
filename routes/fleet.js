@@ -1,5 +1,25 @@
-const router = require('express').Router();
+const { Router } = require('express');
+const multer = require('multer');
 const fleetService = require('../services/fleet');
+
+const documentSizeLimit = 5 * 1024 * 1024;
+const documentSignatures = new Map([
+  ['application/pdf', Buffer.from('%PDF-')],
+  ['image/jpeg', Buffer.from('ffd8ff', 'hex')],
+  ['image/png', Buffer.from('89504e470d0a1a0a', 'hex')],
+]);
+const uploadDocument = multer({
+  storage: multer.memoryStorage(),
+  // Multer signals the limit when the file reaches it, so allow one extra byte.
+  limits: { fileSize: documentSizeLimit + 1, files: 1, fields: 4 },
+}).single('file');
+
+function driverPhone(value) {
+  if (typeof value !== 'string') return null;
+  const phone = value.replace(/[\s()-]/g, '');
+  if (!/^\+?\d{7,15}$/.test(phone)) return null;
+  return phone.replace(/^(?:\+|00)?972(?=[1-9]\d{7,8}$)/, '0');
+}
 
 function required(name, value) {
   if (!value) throw new Error(`routes/fleet missing dependency: ${name}`);
@@ -7,11 +27,30 @@ function required(name, value) {
 }
 
 module.exports = function createFleetRouter(deps) {
+  const router = Router();
   const db = required('db', deps.db);
   const requireAnyRole = required('requireAnyRole', deps.requireAnyRole);
   const wsBroadcast = required('wsBroadcast', deps.wsBroadcast);
   const auditLog = required('auditLog', deps.auditLog);
-  const upload = required('upload', deps.upload);
+
+function requireVehicle(req, res, next) {
+  if (!db.prepare('SELECT id FROM vehicles WHERE id=?').get(req.params.id)) {
+    return res.status(404).json({ error: 'הרכב לא נמצא.' });
+  }
+  next();
+}
+
+function ownsDriverRecord(userId, driver) {
+  // Accounts and fleet records have independent IDs. Both phones are managed by staff.
+  const account = db.prepare("SELECT phone FROM users WHERE id=? AND role='driver' AND active=1").get(userId);
+  const phone = driverPhone(account?.phone);
+  if (!phone || !driver.active || driverPhone(driver.phone) !== phone) return false;
+
+  const accounts = db.prepare("SELECT phone FROM users WHERE role='driver' AND active=1 AND phone IS NOT NULL").all();
+  const drivers = db.prepare('SELECT phone FROM drivers WHERE active=1 AND phone IS NOT NULL').all();
+  return accounts.filter(row => driverPhone(row.phone) === phone).length === 1 &&
+    drivers.filter(row => driverPhone(row.phone) === phone).length === 1;
+}
 
 // ── DRIVERS ───────────────────────────────────────────────────────
 function vehiclePortfolioRows(all = false) {
@@ -94,8 +133,9 @@ router.post('/vehicles', requireAnyRole(['office', 'manager', 'admin']), (req, r
 });
 
 router.patch('/vehicles/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-  const v = fleetService.vehicleInput(req.body);
-  db.prepare(`UPDATE vehicles SET
+  const body = req.body || {};
+  const v = fleetService.vehicleInput(body);
+  const result = db.prepare(`UPDATE vehicles SET
     vehicle_desc=COALESCE(@vehicle_desc,vehicle_desc),
     license_plate=COALESCE(@license_plate,license_plate),
     vehicle_make=COALESCE(@vehicle_make,vehicle_make),
@@ -110,21 +150,22 @@ router.patch('/vehicles/:id', requireAnyRole(['office', 'manager', 'admin']), (r
     active=COALESCE(@active,active),
     notes=COALESCE(@notes,notes)
     WHERE id=@id`).run({ ...v, id: req.params.id });
-  if (Object.prototype.hasOwnProperty.call(req.body, 'assigned_driver_id')) {
+  if (!result.changes) return res.status(404).json({ error: 'הרכב לא נמצא.' });
+  if (Object.prototype.hasOwnProperty.call(body, 'assigned_driver_id')) {
     db.prepare('UPDATE drivers SET vehicle_id=NULL WHERE vehicle_id=?').run(req.params.id);
-    if (req.body.assigned_driver_id) db.prepare('UPDATE drivers SET vehicle_id=? WHERE id=?').run(req.params.id, req.body.assigned_driver_id);
+    if (body.assigned_driver_id) db.prepare('UPDATE drivers SET vehicle_id=? WHERE id=?').run(req.params.id, body.assigned_driver_id);
   }
   auditLog('vehicle', req.params.id, null, 'update', null, null, null, v.notes, req.auth?.sub || null, req.auth?.display_name || null);
   wsBroadcast('vehicle_updated', { id: Number(req.params.id), action: 'update' });
   res.json({ success: true });
 });
 
-router.get('/vehicles/:id/events', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
+router.get('/vehicles/:id/events', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), requireVehicle, (req, res) => {
   res.json(db.prepare('SELECT * FROM vehicle_events WHERE vehicle_id=? ORDER BY event_date DESC, id DESC LIMIT 200').all(req.params.id));
 });
 
-router.post('/vehicles/:id/events', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-  const { event_type, event_date, odometer_km, amount, vendor, reference, notes } = req.body;
+router.post('/vehicles/:id/events', requireAnyRole(['office', 'manager', 'admin']), requireVehicle, (req, res) => {
+  const { event_type, event_date, odometer_km, amount, vendor, reference, notes } = req.body || {};
   if (!event_type || !event_date) return res.status(400).json({ error: 'event_type and event_date are required' });
   const driver = db.prepare('SELECT id FROM drivers WHERE vehicle_id=? AND active=1 ORDER BY id LIMIT 1').get(req.params.id);
   const r = db.prepare(`
@@ -137,15 +178,29 @@ router.post('/vehicles/:id/events', requireAnyRole(['office', 'manager', 'admin'
   res.json({ success: true, id: r.lastInsertRowid });
 });
 
-router.get('/vehicles/:id/documents', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
+router.get('/vehicles/:id/documents', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), requireVehicle, (req, res) => {
   res.json(db.prepare('SELECT id,vehicle_id,document_type,title,file_name,mime_type,expiry_date,notes,created_at FROM vehicle_documents WHERE vehicle_id=? ORDER BY created_at DESC, id DESC').all(req.params.id));
 });
 
-router.post('/vehicles/:id/documents', requireAnyRole(['office', 'manager', 'admin']), upload.single('file'), (req, res) => {
-  const { document_type, title, expiry_date, notes } = req.body;
+router.post('/vehicles/:id/documents', requireAnyRole(['office', 'manager', 'admin']), requireVehicle, (req, res, next) => {
+  uploadDocument(req, res, error => {
+    if (error?.code === 'LIMIT_FILE_SIZE' || req.file?.size > documentSizeLimit) {
+      return res.status(413).json({ error: 'גודל הקובץ המרבי הוא 5 מ״ב.' });
+    }
+    if (error instanceof multer.MulterError) {
+      return res.status(400).json({ error: 'פרטי מסמך הרכב אינם תקינים. ניתן לצרף קובץ אחד.' });
+    }
+    next(error);
+  });
+}, (req, res) => {
+  const { document_type, title, expiry_date, notes } = req.body || {};
   if (!document_type) return res.status(400).json({ error: 'document_type is required' });
-  const vehicle = db.prepare('SELECT id FROM vehicles WHERE id=?').get(req.params.id);
-  if (!vehicle) return res.status(404).json({ error: 'vehicle not found' });
+  if (req.file) {
+    const signature = documentSignatures.get(req.file.mimetype);
+    if (!signature || !req.file.buffer.subarray(0, signature.length).equals(signature)) {
+      return res.status(415).json({ error: 'אפשר לצרף רק קובצי PDF, JPEG או PNG.' });
+    }
+  }
   const dataUrl = req.file ? `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}` : null;
   const r = db.prepare(`
     INSERT INTO vehicle_documents (vehicle_id,document_type,title,file_name,mime_type,data_url,expiry_date,notes,uploaded_by)
@@ -168,44 +223,56 @@ router.post('/drivers', requireAnyRole(['office', 'manager', 'admin']), (req, re
 });
 
 router.patch('/drivers/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-  const { name, phone, vehicle_id, license_expiry, notes, active } = req.body;
-  db.prepare(`UPDATE drivers SET
+  const { name, phone, vehicle_id, license_expiry, notes, active } = req.body || {};
+  const result = db.prepare(`UPDATE drivers SET
     name=COALESCE(?,name), phone=COALESCE(?,phone), vehicle_id=COALESCE(?,vehicle_id),
     license_expiry=COALESCE(?,license_expiry), notes=COALESCE(?,notes), active=COALESCE(?,active)
     WHERE id=?`)
     .run(name||null, phone||null, vehicle_id??null, license_expiry||null, notes||null, active??null, req.params.id);
+  if (!result.changes) return res.status(404).json({ error: 'הנהג לא נמצא.' });
   res.json({ success: true });
 });
 
 router.delete('/drivers/:id', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-  db.prepare('UPDATE drivers SET active=0 WHERE id=?').run(req.params.id);
+  const result = db.prepare('UPDATE drivers SET active=0 WHERE id=?').run(req.params.id);
+  if (!result.changes) return res.status(404).json({ error: 'הנהג לא נמצא.' });
   res.json({ success: true });
 });
 
 router.get('/drivers/:id/vehicle-events', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
   const driver = db.prepare('SELECT vehicle_id FROM drivers WHERE id=?').get(req.params.id);
-  if (driver?.vehicle_id) return res.json(db.prepare('SELECT * FROM vehicle_events WHERE vehicle_id=? ORDER BY event_date DESC, id DESC LIMIT 200').all(driver.vehicle_id));
+  if (!driver) return res.status(404).json({ error: 'הנהג לא נמצא.' });
+  if (driver.vehicle_id) return res.json(db.prepare('SELECT * FROM vehicle_events WHERE vehicle_id=? ORDER BY event_date DESC, id DESC LIMIT 200').all(driver.vehicle_id));
   res.json(db.prepare('SELECT * FROM vehicle_events WHERE driver_id=? ORDER BY event_date DESC, id DESC LIMIT 200').all(req.params.id));
 });
 
 router.post('/drivers/:id/vehicle-events', requireAnyRole(['office', 'manager', 'admin']), (req, res) => {
-  const { event_type, event_date, odometer_km, amount, vendor, reference, notes } = req.body;
-  if (!event_type || !event_date) return res.status(400).json({ error: 'event_type and event_date are required' });
   const driver = db.prepare('SELECT vehicle_id FROM drivers WHERE id=?').get(req.params.id);
+  if (!driver) return res.status(404).json({ error: 'הנהג לא נמצא.' });
+  const { event_type, event_date, odometer_km, amount, vendor, reference, notes } = req.body || {};
+  if (!event_type || !event_date) return res.status(400).json({ error: 'event_type and event_date are required' });
   const r = db.prepare(`
     INSERT INTO vehicle_events (driver_id,vehicle_id,event_type,event_date,odometer_km,amount,vendor,reference,notes)
     VALUES (?,?,?,?,?,?,?,?,?)
-  `).run(req.params.id, driver?.vehicle_id || null, event_type, event_date, odometer_km||null, amount||0, vendor||null, reference||null, notes||null);
+  `).run(req.params.id, driver.vehicle_id || null, event_type, event_date, odometer_km||null, amount||0, vendor||null, reference||null, notes||null);
   if (odometer_km) db.prepare('UPDATE drivers SET odometer_km=? WHERE id=?').run(odometer_km, req.params.id);
-  if (odometer_km && driver?.vehicle_id) db.prepare('UPDATE vehicles SET odometer_km=? WHERE id=?').run(odometer_km, driver.vehicle_id);
+  if (odometer_km && driver.vehicle_id) db.prepare('UPDATE vehicles SET odometer_km=? WHERE id=?').run(odometer_km, driver.vehicle_id);
   auditLog('vehicle', req.params.id, null, 'vehicle_event', event_type, null, amount||0, notes||null, req.auth?.sub || null, req.auth?.display_name || null);
   res.json({ success: true, id: r.lastInsertRowid });
 });
 router.patch('/drivers/:id/location', requireAnyRole(['driver', 'office', 'manager', 'admin']), (req, res) => {
-  const { lat, lng } = req.body;
+  const driver = db.prepare('SELECT id, phone, active FROM drivers WHERE id=?').get(req.params.id);
+  if (!driver) return res.status(404).json({ error: 'הנהג לא נמצא.' });
+  if (req.auth.role === 'driver' && !ownsDriverRecord(req.auth.sub ?? null, driver)) {
+    return res.status(403).json({ error: 'אפשר לעדכן רק את המיקום של הנהג המשויך לחשבון שלך.' });
+  }
+  const { lat, lng } = req.body || {};
+  if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+    return res.status(400).json({ error: 'יש להזין קו רוחב בין ‎-90 ל־90 וקו אורך בין ‎-180 ל־180.' });
+  }
   db.prepare('UPDATE drivers SET current_lat=?,current_lng=?,last_location_update=? WHERE id=?')
-    .run(lat, lng, new Date().toISOString(), req.params.id);
-  wsBroadcast('driver_location', { driverId: Number(req.params.id), lat, lng });
+    .run(lat, lng, new Date().toISOString(), driver.id);
+  wsBroadcast('driver_location', { driverId: driver.id, lat, lng });
   res.json({ success: true });
 });
 
