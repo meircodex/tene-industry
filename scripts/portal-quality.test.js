@@ -221,7 +221,14 @@ test('approval immediately updates home and physical weight agrees across the po
   assert(bounds && bounds.y + Math.min(60, bounds.height) < 750, JSON.stringify(bounds));
   assert.match(await card.innerText(), /ממתינה לאישורך/);
   assert.match(await card.locator('..').innerText(), /22\.20/);
-  await page.setViewportSize({ width: 1280, height: 900 });
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    const style = await card.evaluate(button => {
+      const { borderWidth, boxShadow } = getComputedStyle(button);
+      return { borderWidth, boxShadow };
+    });
+    assert.deepEqual(style, { borderWidth: '0px', boxShadow: 'none' }, `${viewport.width}px order card button`);
+  }
   const home = await page.locator('#screenHome').boundingBox();
   assert(home && Math.abs(home.x - (1280 - home.x - home.width)) <= 1, JSON.stringify(home));
   await page.setViewportSize({ width: 390, height: 844 });
