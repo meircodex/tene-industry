@@ -111,7 +111,7 @@
       background: #1A2330;
       color: #fff; padding: 16px 18px;
       display: flex; align-items: center; justify-content: space-between;
-      border-bottom: 3px solid #C45C12;
+      border-bottom: 3px solid #A85C2B;
     }
     #help-head-title { font-size: 15px; font-weight: 800; }
     #help-close {

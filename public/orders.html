@@ -330,7 +330,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .send-file-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .send-file-action{border:1px solid #cdd9e6;border-radius:11px;background:#fff;color:#1a3856;padding:11px 10px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer;text-align:right;}
 .send-file-action:hover{background:#eef5fb;border-color:#7294b6;}
-.send-file-action.pdf{background:#C45C12;border-color:#C45C12;color:#fff;}
+.send-file-action.pdf{background:#A85C2B;border-color:#A85C2B;color:#fff;}
 .send-file-hint{border-top:1px solid var(--border);padding-top:11px;color:var(--muted);font-size:12px;line-height:1.5;}
 .send-file-status{min-height:18px;color:#1a7a42;font-size:12px;font-weight:800;}
 
@@ -2604,7 +2604,7 @@ function renderDetailShapes() {
 
 function buildSpiralSvg(diameter, turns) {
   return `<svg viewBox="0 0 220 130" aria-label="spiral" style="width:100%;height:100%">
-    <circle cx="110" cy="62" r="42" stroke="#C45C12" stroke-width="6" fill="none"/>
+    <circle cx="110" cy="62" r="42" stroke="#A85C2B" stroke-width="6" fill="none"/>
     <circle cx="110" cy="62" r="30" stroke="#ef8a42" stroke-width="4" fill="none" opacity=".75"/>
     <circle cx="110" cy="62" r="18" stroke="#f3b074" stroke-width="4" fill="none" opacity=".7"/>
     <text x="110" y="118" text-anchor="middle" font-size="11" fill="#1f2937">קוטר ${escHtml(IronBendDisplayUnits.formatLengthCmFromMm(diameter))} · N=${escHtml(turns)}</text>
