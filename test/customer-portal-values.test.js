@@ -167,7 +167,7 @@ test('HTTP quote -> submission -> database -> detail -> print preserve the real 
       assert.equal(requote.billingPrice, quote.billingPrice, 'reopening the editor must not change units or values');
       near(portalShapeDraftToOrderItem(reopenedPayload).totalLengthMm, portalShapeDraftToOrderItem(payload).totalLengthMm);
     }
-    const result = await post('/api/c/order', { items: [payload], siteId, deliveryDate: '2026-10-01', deliveryTime: '10:30', deliveryAddress: 'כתובת בדיקה', notes: 'הערת הזמנה' });
+    const result = await post('/api/c/order', { items: [payload], siteId, idempotency_key: 'values-' + scenario.name, deliveryDate: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' }).format(), deliveryTime: '10:30', deliveryAddress: 'כתובת בדיקה', notes: 'הערת הזמנה' });
     const order = db.prepare('SELECT * FROM orders WHERE id=?').get(result.orderId);
     const item = db.prepare('SELECT * FROM items WHERE order_id=?').get(result.orderId);
     const expected = portalShapeDraftToOrderItem(payload);

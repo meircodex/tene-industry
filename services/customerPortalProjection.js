@@ -1,4 +1,5 @@
 ﻿'use strict';
+const { withoutPlaceholderDate } = require('./customerPortalDates');
 
 const { customerStatusFromOrder, CUSTOMER_STATUS } = require('./customerPortalStatus');
 
@@ -47,6 +48,7 @@ function projectPortalOrder(order = {}, ctx = {}) {
   const canSeePrice = canViewPrices(ctx);
   const siteName = firstText(order.siteName, order.site_name);
   const orderNum = firstText(order.orderNum, order.order_num);
+  const deliveryDate = withoutPlaceholderDate(order.deliveryDate || order.delivery_date);
   const projected = {
     id: order.id,
     orderNum,
@@ -62,8 +64,8 @@ function projectPortalOrder(order = {}, ctx = {}) {
     site_name: siteName,
     siteId: numberOrNull(order.siteId ?? order.site_id),
     site_id: numberOrNull(order.site_id ?? order.siteId),
-    deliveryDate: order.deliveryDate || order.delivery_date || null,
-    delivery_date: order.delivery_date || order.deliveryDate || null,
+    deliveryDate,
+    delivery_date: deliveryDate,
     deliveryWindow: order.deliveryWindow || order.delivery_time || null,
     delivery_time: order.delivery_time || order.deliveryWindow || null,
     totalWeightKg,
@@ -149,7 +151,7 @@ function projectPortalOrderDetail(order = {}, itemsOrPallets = [], documents = [
     approvals: [],
     delivery: {
       address: order.delivery_address || null,
-      date: order.delivery_date || null,
+      date: withoutPlaceholderDate(order.deliveryDate || order.delivery_date),
       window: order.delivery_time || null,
     },
   };

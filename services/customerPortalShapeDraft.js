@@ -1,7 +1,7 @@
 ﻿'use strict';
 
 const crypto = require('crypto');
-const { VALID_DIAMETERS, rebarKgPerMeter } = require('../constants');
+const { VALID_DIAMETERS } = require('../constants');
 const {
   calculateMesh,
   buildBarsShapeContract,
@@ -532,8 +532,7 @@ function buildPortalShapeDraft(input = {}, ctx = {}) {
   }
   const elementName = cleanText(input.elementName ?? input.structElement ?? input.struct_element ?? input.shapeName, shapeTypeLabel(normalized.shapeType));
   const note = cleanText(input.note ?? input.noteForCustomer, '');
-  const totalLengthMm = normalized.sides.reduce((sum, length) => sum + length, 0);
-  const weightPerUnit = (totalLengthMm / 1000) * rebarKgPerMeter(normalized.diameter);
+  const { unitLengthMm: totalLengthMm, unitWeightKg: weightPerUnit } = buildBarsShapeContract(normalized).calculated;
   const totalWeight = weightPerUnit * normalized.quantity;
   const bendCount = normalized.angles.filter(angle => Number.isFinite(Number(angle)) && Math.abs(Number(angle) - 180) > 0.001).length;
   const segments = segmentsFromSides(normalized.sides, normalized.angles);

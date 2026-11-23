@@ -110,6 +110,7 @@ const PUBLIC_OR_SCOPED_API_ROUTES = new Set([
   'POST /api/c/auth/verify',
   'GET /api/c/me',
   'GET /api/c/shapes',
+  'GET /api/c/shape-definitions',
   'GET /api/c/price-list',
   'POST /api/c/quote',
   'POST /api/c/order',
