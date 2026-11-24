@@ -76,9 +76,20 @@ router.get('/customers/:id/ledger', requireAnyRole(['finance', 'manager', 'admin
 
 // PATCH /api/customers/:id/credit
 router.patch('/customers/:id/credit', requireAnyRole(['finance', 'manager', 'admin']), (req, res) => {
-  const { credit_limit, payment_terms, notes } = req.body;
-  db.prepare(`INSERT OR REPLACE INTO customer_credit (customer_id,credit_limit,payment_terms,notes,updated_at)
-    VALUES (?,?,?,?,datetime('now'))`).run(req.params.id, credit_limit, payment_terms || 30, notes || '');
+  const { credit_limit, payment_terms, notes } = req.body ?? {};
+  if (!Number.isFinite(credit_limit) || credit_limit < 0) {
+    return res.status(400).json({ error: 'מסגרת האשראי חייבת להיות מספר שאינו שלילי' });
+  }
+  const result = db.prepare(`
+    INSERT INTO customer_credit (customer_id,credit_limit,payment_terms,notes,updated_at)
+    SELECT id,?,?,?,datetime('now') FROM customers WHERE id=?
+    ON CONFLICT(customer_id) DO UPDATE SET
+      credit_limit=excluded.credit_limit,
+      payment_terms=excluded.payment_terms,
+      notes=excluded.notes,
+      updated_at=excluded.updated_at
+  `).run(credit_limit, payment_terms || 30, notes || '', req.params.id);
+  if (!result.changes) return res.status(404).json({ error: 'לקוח לא נמצא' });
   res.json({ success: true });
 });
 
