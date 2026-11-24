@@ -46,7 +46,7 @@ module.exports = function createLogisticsRouter(deps) {
     res.json({ id: r.lastInsertRowid });
   });
 
-  // Driver departs — BUG-33: State Machine — only from status 'ממתין'
+  // Driver departs from either pending status.
   router.post('/deliveries/:id/depart', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
     const delivery = db.prepare('SELECT status FROM deliveries WHERE id=?').get(req.params.id);
     if (!delivery) return res.status(404).json({ error: 'משלוח לא נמצא' });
@@ -72,7 +72,7 @@ module.exports = function createLogisticsRouter(deps) {
     if (delivery.status !== 'יצא') {
       return res.status(409).json({ error: `לא ניתן לאשר ממצב: ${delivery.status}. נדרש מצב: יצא` });
     }
-    const { signatureData, photoUrl, notes, lat, lng } = req.body;
+    const { signatureData, photoUrl, notes, lat, lng } = req.body ?? {};
     db.prepare(`UPDATE deliveries SET status='סופק',delivered_at=?,signature_data=?,photo_url=?,notes=?,delivery_lat=?,delivery_lng=? WHERE id=?`)
       .run(new Date().toISOString(), signatureData, photoUrl, notes, lat, lng, req.params.id);
     const del = db.prepare('SELECT order_id FROM deliveries WHERE id=?').get(req.params.id);
@@ -89,7 +89,7 @@ module.exports = function createLogisticsRouter(deps) {
     res.json({ success: true });
   });
 
-  // Driver reports problem — BUG-33: only allowed while in transit, not after confirmed
+  // Driver can report a problem until the delivery is confirmed.
   router.post('/deliveries/:id/problem', requireAnyRole(['driver', 'warehouse', 'office', 'manager', 'admin']), (req, res) => {
     const delivery = db.prepare('SELECT status FROM deliveries WHERE id=?').get(req.params.id);
     if (!delivery) return res.status(404).json({ error: 'משלוח לא נמצא' });
