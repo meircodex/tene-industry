@@ -75,16 +75,30 @@ function violationText(theme, name, results) {
   })).join('\n');
 }
 
-test('theme contrast meets WCAG AA on the main screens', { timeout: 180000 }, async () => {
+function chromiumOptions() {
+  const options = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
+  if (process.env.PLAYWRIGHT_CHROMIUM_PATH) options.executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH;
+  return options;
+}
+
+function stopServer(server) {
+  if (!server) return Promise.resolve();
+  if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
+  return new Promise(resolve => server.close(resolve));
+}
+
+test('theme contrast meets WCAG AA on the main screens', { timeout: 180000 }, async (t) => {
   const server = await startServer();
-  const { port } = server.address();
-  const browser = await chromium.launch({
-    executablePath: '/usr/local/bin/google-chrome',
-    headless: true,
-    args: ['--no-sandbox', '--disable-dev-shm-usage'],
-  });
+  let browser;
   const failures = [];
   try {
+    try {
+      browser = await chromium.launch(chromiumOptions());
+    } catch (error) {
+      t.skip(`Chromium is not available for the contrast check (${error.message}). Set PLAYWRIGHT_CHROMIUM_PATH to a Chrome or Chromium binary.`);
+      return;
+    }
+    const { port } = server.address();
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await context.addInitScript(() => {
       localStorage.setItem('ib_access_token', 'design-preview');
@@ -101,8 +115,8 @@ test('theme contrast meets WCAG AA on the main screens', { timeout: 180000 }, as
       }
     }
   } finally {
-    await browser.close();
-    await new Promise(resolve => server.close(resolve));
+    if (browser) await browser.close();
+    await stopServer(server);
   }
   assert.equal(failures.length, 0, failures.join('\n\n'));
 });
