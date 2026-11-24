@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>פיקוד</title>
+<link rel="stylesheet" href="../public/theme-command.css">
+<style>
+@font-face{font-family:Heebo;src:url("../public/fonts/heebo-hebrew-700.woff2") format("woff2");font-weight:700;unicode-range:U+0590-05FF}
+body{margin:0;min-height:900px;width:1440px;padding:36px;background:#101820;color:#E7EEF3;font-family:Heebo,Arial,sans-serif}
+h1{margin:0 0 18px;font-size:28px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.sw{width:140px;height:88px;border:1px solid #2A3E52;padding:8px;display:flex;flex-direction:column;justify-content:flex-end;font-size:12px;font-weight:700}
+b{font-variant-numeric:tabular-nums}
+button{min-height:36px;border-radius:2px;border:1px solid #2A3E52;background:#172433;color:#E7EEF3;padding:8px 14px;font:inherit;font-weight:700}
+.primary{background:#E07B39;color:#1A120C;border-color:#E07B39}
+.chip{border-radius:999px;padding:3px 8px;font-size:12px;font-weight:700}
+img{width:220px;background:#fff;padding:6px}
+.kpi{font-size:56px;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin:18px 0}
+</style>
+</head>
+<body data-theme="command">
+<img src="../public/brand/tene-pdf-logo.jpg" alt="טנא">
+<h1>פיקוד</h1>
+<p class="kpi">18.4 <small style="font-size:18px">טון</small></p>
+<div class="row">
+  <div class="sw" style="background:#101820"><b dir="ltr">#101820</b>בסיס</div>
+  <div class="sw" style="background:#203F60"><b dir="ltr">#203F60</b>מילה</div>
+  <div class="sw" style="background:#E07B39;color:#1A120C"><b dir="ltr">#E07B39</b>אות חיה</div>
+  <div class="sw" style="background:#7FB872;color:#102014"><b dir="ltr">#7FB872</b>תקין</div>
+  <div class="sw" style="background:#7EA4C2;color:#101820"><b dir="ltr">#7EA4C2</b>מידע</div>
+</div>
+<div class="row" style="margin-top:18px">
+  <button class="primary" type="button">שמור הזמנה</button>
+  <button type="button">ביטול</button>
+  <span class="chip" style="background:rgba(127,184,114,.16);color:#7FB872">בייצור</span>
+  <span class="chip" style="background:rgba(224,123,57,.16);color:#F6C7A4">ממתין</span>
+  <span class="chip" style="background:rgba(126,164,194,.16);color:#7EA4C2">בתור</span>
+</div>
+</body>
+</html>

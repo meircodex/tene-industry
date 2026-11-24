@@ -33,35 +33,35 @@
   </header>
 
   <section class="kpi-strip" aria-label="מדדי יום">
-    <article class="kpi-tile">
-      <div class="kpi-label">צפי יציאה היום</div>
-      <div class="kpi-value" id="kpiOrdersToday">—</div>
-      <div class="kpi-sub" id="todayDeliveryWeight">טוען...</div>
-      <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="deliveries_today">פירוט</button>
-    </article>
-    <article class="kpi-tile is-good">
+    <article class="kpi-tile" id="kpiProducedTile">
       <div class="kpi-label">יוצר בפועל</div>
       <div class="kpi-value" id="kpiTonsToday">—</div>
       <div class="kpi-sub" id="kpiWeightToday">טוען...</div>
       <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="produced_today">פירוט כרטיסים</button>
-    </article>
-    <article class="kpi-tile is-warn">
-      <div class="kpi-label">ממתינות לאישור</div>
-      <div class="kpi-value" id="kpiPending">—</div>
-      <div class="kpi-sub">דורשות החלטה</div>
-      <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="pending_approval">פירוט הזמנות</button>
-    </article>
-    <article class="kpi-tile is-danger">
-      <div class="kpi-label">חסרות מלאי</div>
-      <div class="kpi-value" id="stockShortageKpi">—</div>
-      <div class="kpi-sub">קטרים רלוונטיים</div>
-      <a class="dashboard-detail-btn" href="#stockShortagesPanel">ראה קטרים</a>
     </article>
     <article class="kpi-tile">
       <div class="kpi-label">לאספקה היום</div>
       <div class="kpi-value" id="deliveriesTodayKpi">—</div>
       <div class="kpi-sub" id="deliveriesTodaySub">הזמנות</div>
       <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="deliveries_today">פירוט הזמנות</button>
+    </article>
+    <article class="kpi-tile" id="kpiPendingTile">
+      <div class="kpi-label">ממתינות לאישור</div>
+      <div class="kpi-value" id="kpiPending">—</div>
+      <div class="kpi-sub">דורשות החלטה</div>
+      <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="pending_approval">פירוט הזמנות</button>
+    </article>
+    <article class="kpi-tile" id="kpiShortageTile">
+      <div class="kpi-label">חסרות מלאי</div>
+      <div class="kpi-value" id="stockShortageKpi">—</div>
+      <div class="kpi-sub">קטרים רלוונטיים</div>
+      <a class="dashboard-detail-btn" href="#stockShortagesPanel">ראה קטרים</a>
+    </article>
+    <article class="kpi-tile">
+      <div class="kpi-label">צפי יציאה היום</div>
+      <div class="kpi-value" id="kpiOrdersToday">—</div>
+      <div class="kpi-sub" id="todayDeliveryWeight">טוען...</div>
+      <button class="dashboard-detail-btn" type="button" data-dashboard-drilldown="deliveries_today">פירוט</button>
     </article>
   </section>
 
@@ -91,14 +91,6 @@
 
       <section class="panel">
         <div class="section-head">
-          <div><h2>דורש טיפול עכשיו</h2><p>חריגות שמונעות יציאה או ייצור</p></div>
-          <span class="count-pill" id="actionCountPill">0</span>
-        </div>
-        <div class="action-list" id="actionCenterList"><div class="muted-state">טוען פעולות נדרשות...</div></div>
-      </section>
-
-      <section class="panel">
-        <div class="section-head">
           <div><h2>אספקות היום</h2><p>הזמנות שאמורות לצאת היום</p></div>
           <span class="count-pill" id="todayDeliveriesCount">0</span>
         </div>
@@ -108,6 +100,14 @@
             <tbody id="todayDeliveriesBody"><tr><td colspan="6" class="muted-state">טוען...</td></tr></tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div><h2>דורש טיפול עכשיו</h2><p>חריגות שמונעות יציאה או ייצור</p></div>
+          <span class="count-pill" id="actionCountPill">0</span>
+        </div>
+        <div class="action-list" id="actionCenterList"><div class="muted-state">טוען פעולות נדרשות...</div></div>
       </section>
 
       <section class="panel">

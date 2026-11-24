@@ -344,7 +344,7 @@
         </div>
         <div class="queue-list" id="queueList"></div>
         <div style="margin-top:10px">
-          <button class="action-btn start" id="assignBtn" onclick="assignSelected()" disabled>הקצה למכונה ←</button>
+          <button class="action-btn start" id="assignBtn" onclick="assignSelected()" disabled>הקצה למכונה</button>
         </div>
       </div>
     </div>
@@ -768,7 +768,7 @@ function renderQItem(item) {
         ?`<button class="qa qa-start" onclick="qStartItem(${item.id},event)">▶ התחל</button>`
         :`<button class="qa qa-done" onclick="qDoneItem(${item.id},event)">✅ הושלם</button>`
       }
-      <button class="qa qa-waste" onclick="qOpenWaste(${item.id},'${item.order_num}',event)">📊 פחת</button>
+      <button class="qa qa-waste" onclick="qOpenWaste(${item.id},'${item.order_num}',event)">פחת</button>
     </div>
   </div>`;
 }

@@ -1,7 +1,8 @@
-:root{--navy:#062e49;--orange:#ff6500;--ink:#102f43;--muted:#74818c;--line:#e0e7eb;--bg:#fff}
+/* אותם טוקנים כמו theme.css. מעטפת הטלפון נשארת כאן ולא יורשת את פס המשרד. */
+:root{--navy:#1A2330;--orange:#A85C2B;--ink:#1A2330;--muted:#5C6B7A;--line:#D7DEE6;--bg:#fff}
 *{box-sizing:border-box}
 html{min-height:100%;background:#e6eef3}
-body{max-width:480px;min-height:100dvh;margin:0 auto;background:#fff;color:var(--ink);font:16px/1.45 Arial,Tahoma,sans-serif;position:relative}
+body{max-width:480px;min-height:100dvh;margin:0 auto;background:#fff;color:var(--ink);font:16px/1.45 Heebo,Arial,sans-serif;position:relative}
 button,input,select{font:inherit}
 button{cursor:pointer;touch-action:manipulation}
 button:disabled{cursor:default;opacity:.4}

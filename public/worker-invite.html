@@ -4,7 +4,7 @@
 <script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
-  <meta name="theme-color" content="#021A48">
+  <meta name="theme-color" content="#1A2330">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="טנא עובדים">
   <link rel="manifest" href="/worker-portal-manifest.json">
@@ -15,13 +15,13 @@
   <script src="/worker-invite-browser.js"></script>
   <title>הפעלת אפליקציית עובדים – טנא תעשיות</title>
   <style>
-    :root{--navy:#021a48;--orange:#c9621a;--line:#cedbe6;--soft:#f1f6f9;--danger:#aa3227;--success:#14613e}
-    *{box-sizing:border-box} body{margin:0;min-height:100vh;padding:18px;background:linear-gradient(150deg,#e9f2f7,#fdf7f2);font-family:Heebo,Arial,sans-serif;color:#142b3b}
-    main{width:min(560px,100%);margin:0 auto;padding:clamp(8px,4vw,35px) 0}.card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:clamp(20px,5vw,34px);box-shadow:0 20px 60px #021a4819}
+    :root{--navy:#1A2330;--orange:#A85C2B;--line:#D7DEE6;--soft:#F3F5F7;--danger:#B42318;--success:#1F7A45}
+    *{box-sizing:border-box} body{margin:0;min-height:100vh;padding:18px;background:#F3F5F7;font-family:Heebo,Arial,sans-serif;color:#1A2330}
+    main{width:min(560px,100%);margin:0 auto;padding:clamp(8px,4vw,35px) 0}.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:clamp(20px,5vw,34px)}
     .brand{display:flex;align-items:center;gap:10px;font-weight:900;color:var(--navy);margin-bottom:24px}.brand b{display:grid;place-items:center;width:39px;height:39px;border-radius:12px;background:var(--navy);color:#fff;font-size:20px}
     h1{margin:0 0 8px;font-size:clamp(25px,6vw,34px);line-height:1.2}.lead{margin:0;color:#506b7b;line-height:1.55;font-weight:700}.info{margin:20px 0;padding:13px 15px;border-radius:13px;background:#eef5fc;color:#224e70;line-height:1.5;font-weight:700}.info strong{color:var(--navy)}
     form{display:grid;gap:14px;margin-top:22px}label{font-size:13px;color:#415c6d;font-weight:900;display:grid;gap:6px}input{width:100%;min-height:51px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font:inherit;color:#142b3b;background:#fff}input:focus{outline:3px solid #c9621a22;border-color:var(--orange)}input[readonly]{background:#f5f8fa;color:#506b7b}
-    button{min-height:53px;border:0;border-radius:12px;background:var(--orange);color:#fff;font:inherit;font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 8px 20px #c9621a35}button:disabled{opacity:.6;cursor:wait}.notice{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#edf7f1;color:var(--success);font-weight:800;line-height:1.5}.notice.error{background:#fff0ee;color:var(--danger)}.install{margin-top:20px;border-top:1px solid var(--line);padding-top:18px;color:#4e6879;font-size:13px;line-height:1.55}.install button{min-height:auto;box-shadow:none;padding:8px 12px;font-size:13px;background:var(--navy);margin-top:8px}.small{font-size:12px;color:#647b8a;line-height:1.55;margin:18px 0 0}
+    button{min-height:48px;border:0;border-radius:6px;background:var(--orange);color:#fff;font:inherit;font-size:17px;font-weight:800;cursor:pointer}button:disabled{opacity:.6;cursor:wait}.notice{margin:16px 0 0;padding:12px 14px;border-radius:12px;background:#edf7f1;color:var(--success);font-weight:800;line-height:1.5}.notice.error{background:#fff0ee;color:var(--danger)}.install{margin-top:20px;border-top:1px solid var(--line);padding-top:18px;color:#4e6879;font-size:13px;line-height:1.55}.install button{min-height:auto;box-shadow:none;padding:8px 12px;font-size:13px;background:var(--navy);margin-top:8px}.small{font-size:12px;color:#647b8a;line-height:1.55;margin:18px 0 0}
     [hidden]{display:none!important}
     .browser-guide{margin-top:18px;padding:14px;border:1px solid #dbe5ec;background:#f3f7fb;border-radius:12px;font-size:14px;line-height:1.6}.browser-guide p{margin:6px 0 12px}.browser-actions{display:flex;flex-wrap:wrap;gap:8px}.browser-actions a,.browser-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 12px;font:inherit;font-weight:800;border-radius:9px;text-decoration:none;box-shadow:none}.browser-actions a{background:var(--navy);color:white}.browser-actions button{color:var(--navy);background:white;border:1px solid var(--line)}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}

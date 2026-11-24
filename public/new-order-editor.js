@@ -419,11 +419,30 @@
     };
   }
 
+  function ensureDraftNotice() {
+    let notice = document.getElementById('orderDraftNotice');
+    if (notice) return notice;
+    const header = document.querySelector('body[data-page="new"] .order-pro-header, body[data-page="new"] .order-min-header');
+    if (!header) return null;
+    notice = document.createElement('p');
+    notice.id = 'orderDraftNotice';
+    notice.className = 'order-draft-notice';
+    notice.hidden = true;
+    header.appendChild(notice);
+    return notice;
+  }
+
   function setDraftStatus(text) {
     const label = document.getElementById('draftStateLabel');
-    if (label) label.textContent = text;
     const mini = document.getElementById('orderDraftAutosaveState');
-    if (mini) mini.textContent = text;
+    const notice = ensureDraftNotice();
+    const message = String(text || '');
+    if (mini) { mini.hidden = true; mini.textContent = ''; }
+    if (label) label.textContent = '';
+    if (notice) {
+      notice.hidden = !message;
+      notice.textContent = message;
+    }
   }
 
   function updateDraftsButton() {

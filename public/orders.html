@@ -65,7 +65,7 @@ body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);}
   direction:rtl;min-height:40px;}
 .search-box:focus{outline:none;border-color:var(--accent);}
 .new-order-btn{padding:8px 16px;border-radius:8px;
-  background:linear-gradient(135deg,var(--accent),var(--accent-light));
+  background:var(--accent);
   border:none;color:#fff;font-family:'Heebo',sans-serif;font-size:13px;font-weight:700;
   cursor:pointer;text-decoration:none;min-height:40px;display:inline-flex;
   align-items:center;gap:5px;white-space:nowrap;flex-shrink:0;}
@@ -133,7 +133,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   opacity:0;pointer-events:none;transition:opacity .18s;backdrop-filter:blur(5px);}
 .detail-overlay.show{opacity:1;pointer-events:all;}
 .detail-panel{width:min(1040px,calc(100vw - 44px));max-height:calc(100vh - 104px);overflow-y:auto;
-  background:linear-gradient(180deg,#fff 0%,#f8fafc 100%);border:1px solid rgba(2,26,72,0.12);
+  background:#fff;border:1px solid #D7DEE6;
   border-radius:22px;transform:translateY(12px) scale(.985);transition:transform .18s;
   box-shadow:0 24px 80px rgba(2,26,72,0.26);}
 .detail-overlay.show .detail-panel{transform:translateY(0) scale(1);}
@@ -203,8 +203,8 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .item-visual{background:#fff;border:1px solid rgba(2,26,72,0.08);border-radius:12px;min-height:150px;height:150px;
   display:flex;align-items:center;justify-content:center;overflow:hidden;padding:6px;}
 .item-visual svg{width:100%!important;height:100%!important;display:block;overflow:visible;}
-.pile-cage-detail-visual{border:2px solid #102a43;background:linear-gradient(135deg,#f8fbff,#fff)!important;}
-.pile-cage-badge{font-size:12px;font-weight:950;letter-spacing:1px;color:#102a43;border:2px solid #102a43;border-radius:999px;padding:3px 8px;background:#fff;white-space:nowrap;}
+.pile-cage-detail-visual{border:2px solid #1A2330;background:#fff!important;}
+.pile-cage-badge{font-size:12px;font-weight:950;letter-spacing:1px;color:#1A2330;border:2px solid #1A2330;border-radius:999px;padding:3px 8px;background:#fff;white-space:nowrap;}
 .pile-assembly{grid-column:1/-1;border-top:1px solid rgba(2,26,72,.10);padding-top:14px;margin-top:2px;}
 .pile-assembly-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
 .pile-assembly-title{font-size:15px;font-weight:900;color:var(--text);}
@@ -270,7 +270,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .edit-note{grid-column:1/-1;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:9px 10px;font-size:12px;line-height:1.45;color:#9a3412}
 .edit-wide{grid-column:1/-1}
 .edit-actions{padding:14px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-start;background:#fff}
-.edit-save{background:linear-gradient(135deg,var(--accent),var(--accent-light));color:#fff;border:0;border-radius:10px;padding:10px 18px;font-family:inherit;font-weight:900;cursor:pointer}
+.edit-save{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:10px 18px;font-family:inherit;font-weight:900;cursor:pointer}
 .edit-cancel{background:#fff;color:var(--dim);border:1px solid var(--border);border-radius:10px;padding:10px 18px;font-family:inherit;font-weight:900;cursor:pointer}
 .cancellation-overlay{position:fixed;inset:0;background:rgba(2,26,72,.58);z-index:780;display:none;padding:18px;backdrop-filter:blur(4px)}
 .cancellation-overlay.show{display:flex}.cancellation-panel{width:min(1080px,100%);max-height:min(850px,100%);margin:auto;background:#fff;border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 80px rgba(2,26,72,.32)}
@@ -302,9 +302,9 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
   justify-content:center;text-decoration:none;border-radius:12px;font-size:14px;font-weight:800;font-family:inherit;color:#fff;
   border:1px solid transparent;box-shadow:0 8px 22px rgba(2,26,72,0.12);transition:transform .16s ease,box-shadow .16s ease;}
 .print-btn:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(2,26,72,0.16);}
-.print-btn.cards{background:linear-gradient(135deg,#021A48,#17356f) !important;}
-.print-btn.a4{background:linear-gradient(135deg,#1a7a42,#0f5a2f) !important;}
-.print-btn.delivery{background:linear-gradient(135deg,#6d217d,#481652) !important;}
+.print-btn.cards{background:#1A2330 !important;}
+.print-btn.a4{background:#1F7A45 !important;}
+.print-btn.delivery{background:#6D217D !important;}
 .issued-delivery-documents{min-width:0;display:grid;gap:7px;padding:10px 12px;border:1px solid #d8b9e2;border-radius:12px;background:#faf4fc;}
 .issued-delivery-title{font-size:14px;font-weight:900;color:#481652;}
 .issued-delivery-documents a{display:block;padding:9px 11px;border:1px solid #d8b9e2;border-radius:9px;background:#fff;color:#481652;font-size:14px;font-weight:800;text-decoration:none;overflow-wrap:anywhere;}
@@ -312,7 +312,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .issued-delivery-document.is-cancelled{opacity:.7;border:1px dashed #b42318;padding:6px;border-radius:9px;}.issued-delivery-cancel{margin-top:5px;}.issued-delivery-note{font-size:12px;color:#b42318;overflow-wrap:anywhere;}
 #certificateCancelDialog{width:min(560px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid var(--border);border-radius:16px;padding:22px;color:var(--text);font-family:inherit;}
 #certificateCancelDialog::backdrop{background:rgba(2,26,72,.55);}#certificateCancelDialog pre{font:inherit;white-space:pre-wrap;line-height:1.6;overflow-wrap:anywhere;}
-.print-btn.cutting{background:linear-gradient(135deg,#0f766e,#115e59) !important;cursor:pointer;width:100%;}
+.print-btn.cutting{background:#0F766E !important;cursor:pointer;width:100%;}
 .send-file-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1px solid #b9c9dd;border-radius:12px;background:#fff;color:#294764;font-family:inherit;font-size:13px;font-weight:900;cursor:pointer;white-space:nowrap;transition:background .16s ease,border-color .16s ease;}
 .send-file-btn:hover{background:#eef5fb;border-color:#7294b6;}
 .send-file-overlay{position:fixed;inset:0;background:rgba(2,26,72,.55);z-index:740;display:none;padding:18px;backdrop-filter:blur(3px);}
@@ -330,7 +330,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
 .send-file-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .send-file-action{border:1px solid #cdd9e6;border-radius:11px;background:#fff;color:#1a3856;padding:11px 10px;font-family:inherit;font-weight:900;font-size:13px;cursor:pointer;text-align:right;}
 .send-file-action:hover{background:#eef5fb;border-color:#7294b6;}
-.send-file-action.pdf{background:linear-gradient(135deg,#c9621a,#e07b39);border-color:#c9621a;color:#fff;}
+.send-file-action.pdf{background:#A85C2B;border-color:#A85C2B;color:#fff;}
 .send-file-hint{border-top:1px solid var(--border);padding-top:11px;color:var(--muted);font-size:12px;line-height:1.5;}
 .send-file-status{min-height:18px;color:#1a7a42;font-size:12px;font-weight:800;}
 
@@ -414,7 +414,7 @@ tr:hover td{background:rgba(0,0,0,0.015);cursor:pointer;}
     <button type="button" class="filter-btn" id="ordersViewBtn" onclick="setOrdersView('orders')">הזמנות</button>
     <span id="statusFilterButtons" style="display:contents"></span>
     <div class="search-wrap">
-      <input class="search-box" id="searchBox" placeholder="🔍 חיפוש..." oninput="applyFilter()">
+      <input class="search-box" id="searchBox" placeholder="חיפוש" oninput="applyFilter()">
     </div>
     <a href="/index.html" class="new-order-btn">➕ חדשה</a>
     <a href="/order-operations.html" class="new-order-btn">📑 קליטה / משלוח מאוחד</a>
@@ -733,6 +733,7 @@ async function fetchOrders() {
     if (!response.ok) throw new Error(`${viewMode} ${response.status}`);
     const data=await response.json();
     if(generation!==ordersFetchGeneration)return;
+    if (!Array.isArray(data)) throw new Error('invalid_orders');
     if (viewMode === 'quotes') allQuotes = data;
     else allOrders = data;
   } catch (error) {
@@ -2603,7 +2604,7 @@ function renderDetailShapes() {
 
 function buildSpiralSvg(diameter, turns) {
   return `<svg viewBox="0 0 220 130" aria-label="spiral" style="width:100%;height:100%">
-    <circle cx="110" cy="62" r="42" stroke="#DF5000" stroke-width="6" fill="none"/>
+    <circle cx="110" cy="62" r="42" stroke="#A85C2B" stroke-width="6" fill="none"/>
     <circle cx="110" cy="62" r="30" stroke="#ef8a42" stroke-width="4" fill="none" opacity=".75"/>
     <circle cx="110" cy="62" r="18" stroke="#f3b074" stroke-width="4" fill="none" opacity=".7"/>
     <text x="110" y="118" text-anchor="middle" font-size="11" fill="#1f2937">קוטר ${escHtml(IronBendDisplayUnits.formatLengthCmFromMm(diameter))} · N=${escHtml(turns)}</text>

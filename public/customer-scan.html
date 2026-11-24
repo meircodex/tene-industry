@@ -4,37 +4,36 @@
 <script src="/user-messages.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#021a48">
+  <meta name="theme-color" content="#1A2330">
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
   <title>פורטל הלקוחות של טנא תעשיות</title>
   <style>
-    :root{--navy:#021a48;--navy-2:#0b3568;--orange:#df702d;--orange-dark:#bd5316;--ink:#17253d;--muted:#5d6b7d;--line:#dce3ec;--soft:#f2f5f9;--white:#fff;--green:#19714a}
+    :root{--navy:#1A2330;--navy-2:#3E4C5A;--orange:#A85C2B;--orange-dark:#8B4C23;--ink:#1A2330;--muted:#5C6B7A;--line:#D7DEE6;--soft:#F3F5F7;--white:#fff;--green:#1F7A45}
     *{box-sizing:border-box}
     [hidden]{display:none!important}
-    body{margin:0;min-height:100vh;background:linear-gradient(155deg,#eef3f8 0%,#fff 48%,#fff4eb 100%);color:var(--ink);font-family:Heebo,"Segoe UI",Arial,sans-serif}
-    .top{height:8px;background:linear-gradient(90deg,var(--navy),var(--orange))}
+    body{margin:0;min-height:100vh;background:#F3F5F7;color:var(--ink);font-family:Heebo,"Segoe UI",Arial,sans-serif}
+    .top{height:4px;background:var(--orange)}
     main{width:min(920px,100%);margin:0 auto;padding:clamp(20px,5vw,52px) clamp(16px,4vw,32px) 40px}
-    .logo{width:min(270px,72vw);height:auto;display:block;margin:0 auto 26px;filter:drop-shadow(0 8px 18px #021a4814)}
-    .hero{overflow:hidden;position:relative;background:#fff;border:1px solid #dfe5ed;border-radius:28px;box-shadow:0 24px 70px #021a4817;padding:clamp(25px,6vw,54px);text-align:center}
-    .hero::before{content:"";position:absolute;inset:-130px auto auto -110px;width:270px;height:270px;border-radius:50%;background:#f9decf;opacity:.72}
+    .logo{width:min(270px,72vw);height:auto;display:block;margin:0 auto 26px}
+    .hero{overflow:hidden;position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:none;padding:clamp(25px,6vw,48px);text-align:center}
     .eyebrow{display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;padding:7px 12px;border-radius:999px;background:#eaf7f1;color:var(--green);font-size:13px;font-weight:900}
     .eyebrow::before{content:"";width:8px;height:8px;border-radius:50%;background:#27a26e}
     h1{position:relative;margin:0;font-size:clamp(29px,6vw,50px);line-height:1.08;color:var(--navy);letter-spacing:-.02em}
     .lead{position:relative;max-width:650px;margin:17px auto 0;color:var(--muted);font-size:clamp(16px,2.6vw,19px);line-height:1.7;font-weight:650}
     .actions{position:relative;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:28px}
-    .cta{display:inline-flex;align-items:center;justify-content:center;min-height:56px;padding:14px 25px;border-radius:14px;background:var(--orange);color:#fff;text-decoration:none;font-size:17px;font-weight:900;box-shadow:0 12px 25px #df702d3d;transition:transform .16s,background .16s}
-    .cta:hover{background:var(--orange-dark);transform:translateY(-1px)}
+    .cta{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 22px;border-radius:6px;background:var(--orange);color:#fff;text-decoration:none;font-size:17px;font-weight:800}
+    .cta:hover{background:var(--orange-dark)}
     .cta:focus-visible{outline:4px solid #f6bd99;outline-offset:3px}
     button.cta{border:0;font-family:inherit;cursor:pointer}
-    .scan-status{position:relative;background:#fff;border:1px solid var(--line);border-radius:22px;padding:32px 22px;text-align:center;box-shadow:0 24px 70px #021a4817}
+    .scan-status{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:32px 22px;text-align:center}
     .scan-status h1{font-size:clamp(25px,6vw,36px)}
     .scan-status p{color:var(--muted);font-size:18px;line-height:1.65;margin:18px 0}
     .scan-status[data-state="error"]{border-color:#c64035}
     .work-card-routing .customer-content{display:none}
     .trust{position:relative;margin:25px auto 0;padding-top:18px;border-top:1px solid var(--line);max-width:620px;color:#526579;font-size:13px;line-height:1.6}
     .features{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-top:18px}
-    .feature{background:#ffffffc7;border:1px solid var(--line);border-radius:17px;padding:18px;backdrop-filter:blur(8px)}
+    .feature{background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px}
     .feature strong{display:block;color:var(--navy);font-size:15px;margin-bottom:5px}
     .feature span{color:var(--muted);font-size:13px;line-height:1.55}
     footer{text-align:center;color:#7a8797;font-size:12px;margin-top:24px}

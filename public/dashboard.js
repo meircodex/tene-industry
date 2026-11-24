@@ -94,10 +94,25 @@ function renderLoadedDashboard() {
   applyDataContractBadges();
   if(dashboardError)dashboardLoadError(dashboardError);
 }
+function replaceIfLoading(id, message) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = (el.textContent || '').trim();
+  if (!text.startsWith('טוען')) return;
+  if (el.tagName === 'TBODY') el.innerHTML = '<tr><td colspan="8" class="muted-state">' + message + '</td></tr>';
+  else el.textContent = message;
+}
 function dashboardLoadError(error) {
   dashboardError=error;
   setText('overallStatusBadge',error.status===401?'נדרשת התחברות מחדש':'לא ניתן לעדכן נתונים');
   if(!dashData)setText('productionPlanSubtitle','הנתונים עדיין לא נטענו. יש לרענן או להתחבר מחדש.');
+  replaceIfLoading('todayDeliveriesBody', 'נתוני האספקות לא נטענו');
+  replaceIfLoading('prodQueueBody', 'תור הייצור לא נטען');
+  replaceIfLoading('actionCenterList', 'לא ניתן לטעון את הפעולות הנדרשות');
+  replaceIfLoading('stockShortagesPanel', 'נתוני המלאי לא נטענו');
+  replaceIfLoading('todayDeliveryWeight', 'לא נטען');
+  replaceIfLoading('kpiWeightToday', 'לא נטען');
+  document.querySelectorAll('#kpiProducedTile, #kpiPendingTile, #kpiShortageTile').forEach(tile => tile.classList.remove('is-good', 'is-warn', 'is-danger'));
 }
 function fetchDashboard() {
   if(dashboardLoadPromise)return dashboardLoadPromise;
@@ -134,6 +149,12 @@ function renderKPIs(d) {
 
   setText('todayDeliveryWeight', !deliveriesLoaded ? 'טוען אספקות…' : deliveryWeight > 0 ? formatKg(deliveryWeight) + ' לצאת' : 'אין צפי משקל');
   setText('stockShortageKpi', forecastLoaded ? shortageCount : '—');
+  const producedTile = document.getElementById('kpiProducedTile');
+  const pendingTile = document.getElementById('kpiPendingTile');
+  const shortageTile = document.getElementById('kpiShortageTile');
+  [producedTile, pendingTile, shortageTile].forEach(tile => tile?.classList.remove('is-good', 'is-warn', 'is-danger'));
+  if (Number(d.pending) > 0) pendingTile?.classList.add('is-warn');
+  if (forecastLoaded && shortageCount > 0) shortageTile?.classList.add('is-danger');
   setText('deliveriesTodayKpi', deliveriesLoaded ? todayDeliveries.length : '—');
   setText('deliveriesTodaySub', deliveryWeight > 0 ? formatTons(deliveryWeight / 1000) + ' טון' : 'הזמנות');
 }

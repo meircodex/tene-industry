@@ -1,0 +1,310 @@
+/* Direction A — Command. Dark ops console from the Tene wordmark. */
+html[data-theme="command"] {
+  --cmd-bg: #101820;
+  --cmd-bg-2: #172433;
+  --cmd-line: #2A3E52;
+  --cmd-ink: #E7EEF3;
+  --cmd-dim: #9BB0C2;
+  --cmd-orange: #E07B39;
+  --cmd-orange-ink: #F6C7A4;
+  --cmd-green: #7FB872;
+  --cmd-blue: #7EA4C2;
+  --cmd-red: #E07A72;
+  color-scheme: dark;
+}
+html[data-theme="command"] body {
+  background: var(--cmd-bg) !important;
+  color: var(--cmd-ink) !important;
+  min-height: 100vh !important;
+}
+html[data-theme="command"] .kpi-value,
+html[data-theme="command"] .order-num,
+html[data-theme="command"] .weight-val,
+html[data-theme="command"] .weight-tag,
+html[data-theme="command"] .production-progress-main strong,
+html[data-theme="command"] td,
+html[data-theme="command"] .meta-chip strong {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+html[data-theme="command"] .kpi-value,
+html[data-theme="command"] .production-progress-main strong {
+  font-size: 40px !important;
+  letter-spacing: -0.04em;
+  color: var(--cmd-ink) !important;
+}
+html[data-theme="command"] .kpi-tile.is-warn .kpi-value { color: var(--cmd-orange) !important; }
+html[data-theme="command"] .kpi-tile.is-danger .kpi-value { color: var(--cmd-red) !important; }
+
+html[data-theme="command"] :is(.kpi-card, .kpi-tile, .card, .panel, .orders-wrap, .table-card, .machine-card, [class*="-card"]) {
+  background: var(--cmd-bg-2) !important;
+  color: var(--cmd-ink) !important;
+  border: 1px solid var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] :is(.daily-header, .section-head, .table-header, thead, th) {
+  background: #14202C !important;
+  color: var(--cmd-dim) !important;
+  border-color: var(--cmd-line) !important;
+}
+html[data-theme="command"] thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+html[data-theme="command"] td {
+  color: var(--cmd-ink) !important;
+  border-color: #223244 !important;
+}
+html[data-theme="command"] tr:hover td,
+html[data-theme="command"] .orders-table tbody tr:hover td {
+  background: #1E3042 !important;
+}
+html[data-theme="command"] :is(h1, h2, .page-title, .section-title, .kpi-label, p, .kpi-sub, .muted-state, .empty-state) {
+  color: var(--cmd-ink);
+}
+html[data-theme="command"] :is(.kpi-label, .kpi-sub, .section-head p, .muted-state, .empty-state) {
+  color: var(--cmd-dim) !important;
+}
+html[data-theme="command"] .daily-progress-track { background: #243446 !important; height: 6px !important; }
+html[data-theme="command"] .daily-progress-fill,
+html[data-theme="command"] .item-progress-fill {
+  background: var(--cmd-orange) !important;
+  transition: width 180ms linear;
+}
+html[data-theme="command"] .item-progress { background: #243446 !important; height: 6px !important; }
+
+html[data-theme="command"] :is(.btn-primary, .primary, .new-order-btn, .submit-btn, .btn-login, button.primary, .ib-new-order) {
+  background: var(--cmd-orange) !important;
+  color: #1A120C !important;
+  border-color: var(--cmd-orange) !important;
+  border-radius: 2px !important;
+}
+html[data-theme="command"] :is(button, .btn, .btn-sm, .filter-btn, input, select, textarea) {
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+html[data-theme="command"] :is(input, select, textarea, .search-box) {
+  background: #0E1620 !important;
+  color: var(--cmd-ink) !important;
+  border: 1px solid var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] :focus-visible {
+  outline: 2px solid var(--cmd-orange) !important;
+  outline-offset: 2px;
+}
+html[data-theme="command"] #ib-topnav {
+  background: #0C141D !important;
+  border-left: 1px solid var(--cmd-line) !important;
+}
+html[data-theme="command"] #ib-topnav .ib-link.ib-active {
+  box-shadow: inset -3px 0 0 var(--cmd-orange) !important;
+  color: #fff !important;
+}
+html[data-theme="command"] #ib-search-bar { background: rgba(8, 12, 18, 0.72); }
+html[data-theme="command"] #ib-search-box {
+  background: #121C28;
+  border: 1px solid var(--cmd-line);
+  border-radius: 2px;
+  box-shadow: none;
+}
+html[data-theme="command"] #ib-search-input { color: var(--cmd-ink); border-bottom-color: var(--cmd-line); }
+html[data-theme="command"] .ib-sr-item { color: var(--cmd-ink); }
+html[data-theme="command"] .ib-sr-item:hover { background: #1E3042; }
+html[data-theme="command"] :is(.status-badge, .status-pill, .badge, .s-prod, .s-done, .s-pend, .s-ship, .s-risk) {
+  border-radius: 999px !important;
+  border: 1px solid transparent;
+}
+html[data-theme="command"] .s-prod, html[data-theme="command"] .status-pill.is-ok { background: rgba(127, 184, 114, 0.16) !important; color: var(--cmd-green) !important; }
+html[data-theme="command"] .s-pend { background: rgba(224, 123, 57, 0.16) !important; color: var(--cmd-orange-ink) !important; }
+html[data-theme="command"] .s-ship { background: rgba(126, 164, 194, 0.16) !important; color: var(--cmd-blue) !important; }
+html[data-theme="command"] .s-risk, html[data-theme="command"] .s-done { background: rgba(224, 122, 114, 0.14) !important; color: var(--cmd-red) !important; }
+html[data-theme="command"] .s-done { background: rgba(127, 184, 114, 0.16) !important; color: var(--cmd-green) !important; }
+html[data-theme="command"] .ib-skeleton {
+  color: transparent !important;
+  background: linear-gradient(90deg, #1A2836 25%, #24384A 50%, #1A2836 75%) !important;
+  background-size: 800px 100% !important;
+  animation: ib-skeleton 1.2s linear infinite;
+  border-radius: 2px;
+  min-height: 12px;
+}
+html[data-theme="command"] .empty-state,
+html[data-theme="command"] .muted-state {
+  border: 1px dashed var(--cmd-line);
+  border-radius: 2px;
+  padding: 22px 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="command"] *,
+  html[data-theme="command"] *::before,
+  html[data-theme="command"] *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@keyframes ib-skeleton {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* Page sheets that ship their own !important colors. Visual only. */
+html[data-theme="command"] body[data-page="new"] .main.order-min-page {
+  background: var(--cmd-bg) !important;
+}
+html[data-theme="command"] body[data-page="new"] :is(
+  .order-min-header, .context-chip, .order-min-items, .items-header, .items-commandbar,
+  .order-lines-table, .order-lines-head, .order-line-row, .order-line-add-row,
+  .inspector-edit-shell, .summary-bar, #liveInventoryPanel, .wizard-summary-block,
+  .order-notes, .notes-card, .order-drafts-popover, .order-draft-row
+) {
+  background: var(--cmd-bg-2) !important;
+  color: var(--cmd-ink) !important;
+  border-color: var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] body[data-page="new"] .order-lines-body > .order-line-row:nth-of-type(even) {
+  background: #14202C !important;
+}
+html[data-theme="command"] body[data-page="new"] :is(.line-element, .line-qty, .line-diameter-select, .order-line-row > .line-qty) {
+  background: #0E1620 !important;
+  color: var(--cmd-ink) !important;
+  border-color: var(--cmd-line) !important;
+  border-radius: 2px !important;
+}
+html[data-theme="command"] body[data-page="new"] .line-shape,
+html[data-theme="command"] .queue-shape {
+  background:
+    linear-gradient(to right, rgba(26,38,55,.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26,38,55,.16) 1px, transparent 1px),
+    #F4F7FA !important;
+  background-size: 8px 8px, 8px 8px, auto !important;
+  border-radius: 2px !important;
+}
+html[data-theme="command"] body[data-page="new"] :is(.primary-add-shape, .order-save, #saveOrderBtn, button[type="submit"]) {
+  background: var(--cmd-orange) !important;
+  color: #1A120C !important;
+  border-color: var(--cmd-orange) !important;
+  box-shadow: none !important;
+  border-radius: 2px !important;
+}
+
+html[data-theme="command"] :is(.shift-bar, .shift-stat, .page-header, .queue-filters, .machine-col, .machine-col-header, .queue-item, .item-detail, .modal) {
+  background: var(--cmd-bg-2) !important;
+  color: var(--cmd-ink) !important;
+  border-color: var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] .machine-col-header { background: #14202C !important; }
+html[data-theme="command"] .queue-item.active-item {
+  background: #172433 !important;
+  border-color: var(--cmd-green) !important;
+  box-shadow: inset 0 -2px 0 var(--cmd-orange) !important;
+}
+html[data-theme="command"] .machine-badge {
+  background: transparent !important;
+  color: var(--cmd-orange) !important;
+  border: 1px solid var(--cmd-orange) !important;
+  border-radius: 2px !important;
+}
+html[data-theme="command"] .queue-filters select,
+html[data-theme="command"] .shift-stat .value {
+  color: var(--cmd-ink) !important;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme="command"] .item-actions,
+html[data-theme="command"] .orders-table tbody tr td:last-child {
+  opacity: 1;
+}
+html[data-theme="command"] tr:hover .item-actions button,
+html[data-theme="command"] .queue-item:hover .item-btn {
+  border-color: var(--cmd-orange) !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-theme="command"] .queue-item .item-actions { opacity: 0.72; }
+  html[data-theme="command"] .queue-item:hover .item-actions,
+  html[data-theme="command"] .queue-item:focus-within .item-actions { opacity: 1; }
+}
+
+html[data-theme="command"] #seModal { background: #101820 !important; color: var(--cmd-ink) !important; }
+html[data-theme="command"] #seModal .se-head { background: #0C141D !important; border-bottom: 2px solid var(--cmd-orange) !important; }
+html[data-theme="command"] #sePageEdit,
+html[data-theme="command"] #sePageEdit .se-preview-panel,
+html[data-theme="command"] #seModal .se-canvas-topbar { background: #101820 !important; }
+html[data-theme="command"] #sePageEdit .se-family-panel,
+html[data-theme="command"] #sePageEdit .se-data-panel,
+html[data-theme="command"] #seModal .se-data-panel-head,
+html[data-theme="command"] #seModal .se-table-wrap,
+html[data-theme="command"] #seModal .se-mode-note,
+html[data-theme="command"] #seModal .se-foot {
+  background: #172433 !important;
+  color: var(--cmd-ink) !important;
+  border-color: var(--cmd-line) !important;
+}
+html[data-theme="command"] #sePageEdit .se-family-card {
+  background: #101820 !important;
+  color: var(--cmd-ink) !important;
+  border: 1px solid var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] #sePageEdit .se-family-card.active {
+  border-color: var(--cmd-orange) !important;
+  color: var(--cmd-orange) !important;
+  box-shadow: inset -3px 0 0 var(--cmd-orange) !important;
+}
+html[data-theme="command"] #seModal .se-svg-wrap { background: #F4F7FA !important; }
+html[data-theme="command"] #seModal .se-input,
+html[data-theme="command"] #seModal select {
+  background: #0E1620 !important;
+  color: var(--cmd-ink) !important;
+  border-color: var(--cmd-line) !important;
+}
+html[data-theme="command"] #seModal .se-data-panel-head:before { content: none !important; }
+html[data-theme="command"] #seModal .se-stat-value,
+html[data-theme="command"] #seModal .se-panel-summary-item strong { color: var(--cmd-ink) !important; font-variant-numeric: tabular-nums; }
+
+html[data-theme="command"] { background: var(--cmd-bg) !important; }
+html[data-theme="command"] body[data-page="new"] :is(.context-chip, .order-line-row, .order-lines-head, .summary-bar, .stat, .notes-section, .section, .order-draft-notice),
+html[data-theme="command"] body[data-page="new"] :is(.context-chip, .order-line-row, .order-lines-head, .summary-bar, .stat, .notes-section) :is(span, div, label, strong, small, b, p, td) {
+  color: var(--cmd-ink) !important;
+}
+html[data-theme="command"] body[data-page="new"] :is(.stat, .notes-section, .section, .order-draft-notice) {
+  background: var(--cmd-bg-2) !important;
+  border-color: var(--cmd-line) !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] body[data-page="new"] .order-draft-notice {
+  box-shadow: inset -3px 0 0 var(--cmd-orange) !important;
+}
+html[data-theme="command"] body[data-page="new"] .stat-value,
+html[data-theme="command"] body[data-page="new"] .order-line-row .line-weight,
+html[data-theme="command"] body[data-page="new"] .order-line-row input,
+html[data-theme="command"] body[data-page="new"] .order-line-row select {
+  color: var(--cmd-ink) !important;
+  font-variant-numeric: tabular-nums;
+}
+html[data-theme="command"] body[data-page=orders] .orders-table tr[class*="row-"] { background: #172433 !important; }
+html[data-theme="command"] body[data-page=orders] .orders-table :is(th, td, .weight-tag, .order-num, .order-status-select, .order-priority-select) {
+  color: var(--cmd-ink) !important;
+}
+html[data-theme="command"] body[data-page=orders] .orders-table :is(.order-status-select, .order-priority-select) {
+  background: #0E1620 !important;
+  border-color: var(--cmd-line) !important;
+}
+html[data-theme="command"] .orders-table .order-row > td {
+  background: #172433 !important;
+  color: var(--cmd-ink) !important;
+}
+html[data-theme="command"] .orders-table .order-row.row-production > td:first-child { box-shadow: inset -3px 0 0 var(--cmd-orange); }
+html[data-theme="command"] .orders-table .order-row.row-approved > td:first-child { box-shadow: inset -3px 0 0 var(--cmd-blue); }
+html[data-theme="command"] .orders-table .order-row.row-waiting > td:first-child { box-shadow: inset -3px 0 0 var(--cmd-red); }
+html[data-theme="command"] .orders-table .order-row[data-production-percent] {
+  background: linear-gradient(to left, rgba(224,123,57,.72) 0 var(--production-progress), #172433 var(--production-progress) 100%) !important;
+}
+html[data-theme="command"] .orders-table .order-row[data-production-percent] > td {
+  background: transparent !important;
+  color: var(--cmd-ink) !important;
+}

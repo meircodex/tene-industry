@@ -1,5 +1,33 @@
 // IronBend shared navigation shell.
 (function () {
+  const VISUAL_THEMES = ['command', 'blueprint'];
+  function readVisualTheme() {
+    const requested = new URLSearchParams(location.search).get('theme');
+    if (requested === 'logo') {
+      try { localStorage.removeItem('ib-visual-theme'); } catch {}
+      return '';
+    }
+    if (VISUAL_THEMES.includes(requested)) {
+      try { localStorage.setItem('ib-visual-theme', requested); } catch {}
+      return requested;
+    }
+    try { return localStorage.getItem('ib-visual-theme') || ''; } catch { return ''; }
+  }
+  function applyVisualTheme(name) {
+    const theme = VISUAL_THEMES.includes(name) ? name : '';
+    if (theme) document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+    try {
+      if (theme) localStorage.setItem('ib-visual-theme', theme);
+      else localStorage.removeItem('ib-visual-theme');
+    } catch {}
+    document.querySelectorAll('[data-set-theme]').forEach(button => {
+      button.setAttribute('aria-pressed', button.getAttribute('data-set-theme') === theme ? 'true' : 'false');
+    });
+  }
+  applyVisualTheme(readVisualTheme());
+  window.IronBendVisualTheme = { apply: applyVisualTheme, current: () => document.documentElement.dataset.theme || '' };
+
   if (!window.IronBendAuth && !document.querySelector('script[src="/auth-client.js"]')) {
     const authScript = document.createElement('script');
     authScript.src = '/auth-client.js';
@@ -23,7 +51,7 @@
   }
 
   const LINKS = [
-    { group:'ראשי', href:'/dashboard.html', icon:'📊', label:'דשבורד', id:'dashboard' },
+    { group:'ראשי', href:'/dashboard.html', icon:'📊', label:'לוח בקרה', id:'dashboard' },
     { group:'ראשי', href:'/scan.html', icon:'📷', label:'סריקה', id:'scanner' },
     { group:'ראשי', href:'/orders.html', icon:'📋', label:'הזמנות', id:'orders' },
     { group:'ראשי', href:'/index.html', icon:'➕', label:'הזמנה חדשה', id:'new' },
@@ -149,7 +177,7 @@
       white-space:nowrap; flex-shrink:0;
     }
     .ib-link:hover { background:rgba(0,0,0,.05); color:#1a2533; }
-    .ib-link.ib-active { background:rgba(201,98,26,.10); color:#c9621a; box-shadow:inset 0 -2px 0 #c9621a; }
+    .ib-link.ib-active { background:#F8EFE4; color:#6C3B1B; box-shadow:inset -3px 0 0 #A85C2B; }
     .ib-link-icon, .ib-dl-icon, .ib-bn-icon,
     .ib-link-label, .ib-dl-label, .ib-bn-label { pointer-events:none; }
     .ib-link-icon, .ib-dl-icon, .ib-bn-icon { flex-shrink:0; }
@@ -158,7 +186,7 @@
       border-radius:8px; line-height:1;
     }
     #ib-hamburger { display:none; padding:6px; font-size:22px; margin-right:auto; }
-    #ib-search-btn { padding:7px 10px; font-size:17px; }
+    #ib-search-btn { padding:7px 10px; font-size:12px; font-weight:800; font-family:Heebo,Arial,sans-serif; }
     #ib-hamburger:hover, #ib-search-btn:hover, #ib-drawer-close:hover { background:rgba(0,0,0,.06); }
     #ib-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:400; }
     #ib-overlay.open { display:block; }
@@ -199,7 +227,7 @@
     }
     .ib-bn-icon { font-size:20px; line-height:1; }
     .ib-bn:hover { color:#526070; }
-    .ib-bn.ib-active { color:#c9621a; }
+    .ib-bn.ib-active { color:#6C3B1B; }
     #ib-toast {
       position:fixed; bottom:72px; left:50%; transform:translateX(-50%);
       padding:10px 22px; border-radius:10px; font-family:Heebo,Arial,sans-serif;
@@ -209,7 +237,7 @@
     #ib-search-bar {
       position:fixed; inset:0; z-index:900; display:none;
       align-items:flex-start; justify-content:center; padding-top:76px;
-      background:rgba(2,12,28,.42); font-family:Heebo,Arial,sans-serif;
+      background:rgba(26,35,48,.46); font-family:Heebo,Arial,sans-serif;
     }
     #ib-search-box { width:min(620px,92vw); background:#fff; border-radius:14px; box-shadow:0 24px 80px rgba(0,0,0,.24); overflow:hidden; }
     #ib-search-input { width:100%; border:0; border-bottom:1px solid #e2e8f0; padding:16px 18px; font:inherit; outline:0; }
@@ -234,9 +262,9 @@
     }
     .ib-window-back-btn {
       pointer-events:auto;
-      border:1px solid rgba(2,26,72,.14);
+      border:1px solid #D7DEE6;
       background:#fff;
-      color:#c9621a;
+      color:#6C3B1B;
       border-radius:999px;
       min-height:36px;
       padding:7px 13px;
@@ -246,7 +274,7 @@
       cursor:pointer;
       box-shadow:0 6px 18px rgba(2,26,72,.10);
     }
-    .ib-window-back-btn:hover { border-color:#c9621a; background:#fff7ef; }
+    .ib-window-back-btn:hover { border-color:#A85C2B; background:#F8EFE4; }
     @media(max-width:768px) {
       #ib-logo-icon { width:132px; height:auto; }
       #ib-links { display:none; }
@@ -257,22 +285,22 @@
       #ib-topnav {
         inset:0 0 0 auto; width:156px; height:100vh; padding:16px 10px;
         flex-direction:column; align-items:stretch; gap:14px;
-        background:linear-gradient(180deg,#071c3b 0%,#021A48 58%,#00112f 100%);
-        border-bottom:0; border-left:1px solid rgba(255,255,255,.10);
-        box-shadow:-8px 0 32px rgba(2,26,72,.20);
+        background:#F7F8FA;
+        border-bottom:0; border-left:1px solid #D7DEE6;
+        box-shadow:none;
       }
-      #ib-logo { margin:0 0 8px; padding:4px 0 12px; border-bottom:1px solid rgba(255,255,255,.12); }
-      #ib-logo-icon { width:118px; height:auto; filter:drop-shadow(0 8px 18px rgba(0,0,0,.28)); }
+      #ib-logo { margin:0 0 8px; padding:4px 0 12px; border-bottom:1px solid #D7DEE6; }
+      #ib-logo-icon { width:118px; height:auto; }
       #ib-links { display:flex; flex-direction:column; gap:4px; overflow-x:hidden; overflow-y:auto; padding:0 2px 10px; }
       .ib-group-label { display:block; }
       .ib-link {
         min-height:40px; padding:8px 10px; border-radius:10px;
-        color:rgba(255,255,255,.82); font-size:12px; font-weight:800;
+        color:#3E4C5A; font-size:12px; font-weight:800;
       }
-      .ib-link:hover { background:rgba(255,255,255,.10); color:#fff; }
+      .ib-link:hover { background:#EEF1F4; color:#1A2330; }
       .ib-link.ib-active {
-        background:linear-gradient(135deg,rgba(223,80,0,.96),rgba(240,138,36,.88));
-        color:#fff; box-shadow:0 10px 24px rgba(223,80,0,.25);
+        background:#F8EFE4;
+        color:#6C3B1B; box-shadow:inset -3px 0 0 #A85C2B;
       }
       #ib-hamburger { display:none; }
     }
@@ -287,9 +315,16 @@
     .ib-nav-row>.ib-nav-toggle:not(.ib-nav-caret){width:100%}.ib-nav-chevron{margin-inline-start:auto;font-size:15px}
     .ib-nav-caret{flex:none;min-width:28px;min-height:36px;padding:4px;border-radius:6px;color:#718397}
     .ib-nav-children{padding-inline-start:12px;margin:2px 0 5px}.ib-nav-children a{font-size:12px;min-height:34px;padding:7px 8px}.ib-nav-children[hidden]{display:none}
-    .ib-nav-toggle:focus-visible{outline:2px solid #de8c44;outline-offset:2px}.ib-new-order{background:#c9621a!important;color:white!important;justify-content:center;margin-bottom:7px}
+    .ib-nav-toggle:focus-visible{outline:2px solid #A85C2B;outline-offset:2px}.ib-new-order{background:#A85C2B!important;color:white!important;justify-content:center;margin-bottom:7px}
     #ib-bottom{grid-template-columns:none;grid-auto-columns:1fr;grid-auto-flow:column}#ib-bottom button{border:0;background:transparent;padding:0}
-    @media(min-width:1024px){#ib-links{gap:2px}.ib-nav-toggle.ib-link,.ib-nav-caret{color:rgba(255,255,255,.82)}.ib-nav-children{border-inline-start:1px solid #ffffff25}.ib-nav-row .ib-link{padding-inline-end:4px}.ib-link{min-height:36px;padding:7px 8px}}
+    .ib-icon{width:16px;height:16px;display:block;flex:none}
+    #ib-tools,#ib-drawer-tools{display:flex;flex-direction:column;gap:4px}
+    #ib-tools{margin-top:auto}
+    #ib-drawer-tools{padding:8px;border-top:1px solid #D7DEE6}
+    #ib-drawer-tools .ib-dl{width:100%;border:0;background:transparent;font-family:inherit;text-align:inherit}
+    #ib-tools .ib-link{width:100%;border:0;background:transparent;text-align:inherit;font-family:inherit}
+    @media(max-width:1023px){#ib-topnav #ib-tools{display:none}}
+    @media(min-width:1024px){#ib-links{gap:2px}.ib-nav-toggle.ib-link,.ib-nav-caret{color:#3E4C5A}.ib-nav-children{border-inline-start:1px solid #D7DEE6}.ib-nav-row .ib-link{padding-inline-end:4px}.ib-link{min-height:36px;padding:7px 8px}}
     @media(max-width:1023px){#ib-links{display:none}#ib-hamburger{display:flex;align-items:center}}
     @media(pointer:coarse){.ib-nav-caret,.ib-nav-toggle,.ib-nav-children a{min-height:44px}.ib-nav-caret{min-width:44px}}
   `;
@@ -298,14 +333,49 @@
     return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
   }
 
+  const ICONS = {
+    dashboard:'<rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>',
+    orders:'<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>',
+    new:'<path d="M12 5v14"/><path d="M5 12h14"/>',
+    intake:'<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/>',
+    customers:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'production-queue':'<path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h12"/>',
+    'worker-visual':'<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h4"/>',
+    machine:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2"/><path d="M12 19v2"/><path d="M3 12h2"/><path d="M19 12h2"/><path d="M5.6 5.6l1.4 1.4"/><path d="M17 17l1.4 1.4"/><path d="M18.4 5.6 17 7"/><path d="M7 17l-1.4 1.4"/>',
+    kiosk:'<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/>',
+    'production-setup':'<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><circle cx="8" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="10" cy="17" r="2"/>',
+    warehouse:'<path d="M3 10 12 4l9 6"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+    inventory:'<path d="M3 7h18v12H3z"/><path d="M3 12h18"/><path d="M12 7v12"/>',
+    procurement:'<circle cx="8" cy="19" r="1"/><circle cx="17" cy="19" r="1"/><path d="M3 4h2l2.2 10h11.2l2-7H7"/>',
+    quality:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    maintenance:'<path d="M14.7 6.3a4 4 0 0 0-5.6 5.6L3 18l3 3 6.1-6.1a4 4 0 0 0 5.6-5.6l-2.2 2.2-2.8-2.8z"/>',
+    support:'<path d="M4 12a8 8 0 0 1 16 0"/><path d="M4 12v4a2 2 0 0 0 2 2h1v-6H6a2 2 0 0 0-2 2z"/><path d="M20 12v4a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2z"/>',
+    bugs:'<path d="M8 9h8"/><path d="M9 9V7a3 3 0 0 1 6 0v2"/><path d="M7 13h10"/><path d="M8 13v4a4 4 0 0 0 8 0v-4"/><path d="M5 11l2 1"/><path d="M19 11l-2 1"/><path d="M5 17l2-1"/><path d="M19 17l-2-1"/>',
+    reports:'<path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-7"/><path d="M3 19h18"/>',
+    finance:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>',
+    profitability:'<path d="M4 16l5-5 4 4 7-8"/><path d="M14 7h6v6"/>',
+    pricing:'<path d="M6 4h12v16H6z"/><path d="M9 8h6"/><path d="M9 12h6"/><path d="M9 16h3"/>',
+    projects:'<path d="M4 20V8l8-4 8 4v12"/><path d="M9 20v-6h6v6"/>',
+    admin:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    scanner:'<path d="M4 8V5h3"/><path d="M16 5h3v3"/><path d="M20 16v3h-3"/><path d="M8 20H5v-3"/><path d="M4 12h16"/>',
+    more:'<circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2"/><path d="M12 19v2"/><path d="M3 12h2"/><path d="M19 12h2"/>',
+    help:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1.5 1-1.5 2.2"/><path d="M12 17h.01"/>',
+    display:'<path d="M4 6h16v10H4z"/><path d="M8 20h8"/>'
+  };
+  function iconSvg(id) {
+    return '<svg class="ib-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[id]||ICONS.more)+'</svg>';
+  }
+
   function renderNavLinks(linkClass) {
     const drawer=linkClass==='ib-dl',iconClass=drawer?'ib-dl-icon':'ib-link-icon',labelClass=drawer?'ib-dl-label':'ib-link-label';
     const includesActive=node=>node.link?.id===activeId||node.children.some(includesActive);
-    const anchor=node=>'<a href="'+escapeAttr(node.link.href)+'" class="'+linkClass+' '+ia(node.link.id)+(node.key==='new'?' ib-new-order':'')+'" title="'+escapeAttr(node.link.label)+'" aria-label="'+escapeAttr(node.link.label)+'"'+(node.link.id===activeId?' aria-current="page"':'')+'><span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.link.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.link.label)+'</span></a>';
+    const mark=id=>'<span class="'+iconClass+'" aria-hidden="true">'+iconSvg(id)+'</span>';
+    const anchor=node=>'<a href="'+escapeAttr(node.link.href)+'" class="'+linkClass+' '+ia(node.link.id)+(node.key==='new'?' ib-new-order':'')+'" title="'+escapeAttr(node.link.label)+'" aria-label="'+escapeAttr(node.link.label)+'"'+(node.link.id===activeId?' aria-current="page"':'')+'>'+mark(node.link.id)+'<span class="'+labelClass+'">'+escapeAttr(node.link.label)+'</span></a>';
     const render=node=>{
       if(!node.children.length)return anchor(node);
       const open=navExpansion.has(node.key)?navExpansion.get(node.key):includesActive(node),id=linkClass+'-'+node.key+'-children';
-      const button='<button type="button" class="ib-nav-toggle '+(node.link?'ib-nav-caret':linkClass)+'" data-nav-group="'+escapeAttr(node.key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"'+(node.link?' aria-label="אפשרויות '+escapeAttr(node.link.label)+'"':'')+'>'+(node.link?'':('<span class="'+iconClass+'" aria-hidden="true">'+escapeAttr(node.icon)+'</span><span class="'+labelClass+'">'+escapeAttr(node.label)+'</span>'))+'<span class="ib-nav-chevron" aria-hidden="true">'+(open?'⌃':'⌄')+'</span></button>';
+      const button='<button type="button" class="ib-nav-toggle '+(node.link?'ib-nav-caret':linkClass)+'" data-nav-group="'+escapeAttr(node.key)+'" aria-expanded="'+open+'" aria-controls="'+id+'"'+(node.link?' aria-label="אפשרויות '+escapeAttr(node.link.label)+'"':'')+'>'+(node.link?'':(mark(node.key)+'<span class="'+labelClass+'">'+escapeAttr(node.label)+'</span>'))+'<span class="ib-nav-chevron" aria-hidden="true">'+(open?'⌃':'⌄')+'</span></button>';
       return '<div class="ib-nav-branch '+(includesActive(node)?'ib-nav-current':'')+'"><div class="ib-nav-row">'+(node.link?anchor(node):'')+button+'</div><div id="'+id+'" class="ib-nav-children"'+(open?'':' hidden')+'>'+node.children.map(render).join('')+'</div></div>';
     };
     return buildNavigation(visibleLinks).map(render).join('');
@@ -317,7 +387,7 @@
 
   function renderBottomLinks() {
     return BOTTOM_IDS.map(id=>visibleLinks.find(l=>l.id===id)).filter(Boolean)
-      .map(l=>'<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'"><span class="ib-bn-icon" aria-hidden="true">'+escapeAttr(l.icon)+'</span><span class="ib-bn-label">'+escapeAttr(l.label)+'</span></a>').join('')+
+      .map(l=>'<a href="'+escapeAttr(l.href)+'" class="ib-bn '+ia(l.id)+'" title="'+escapeAttr(l.label)+'" aria-label="'+escapeAttr(l.label)+'"><span class="ib-bn-icon" aria-hidden="true">'+iconSvg(l.id)+'</span><span class="ib-bn-label">'+escapeAttr(l.label)+'</span></a>').join('')+
       '<button type="button" class="ib-bn ib-open-menu" aria-label="תפריט"><span class="ib-bn-icon" aria-hidden="true">☰</span><span class="ib-bn-label">עוד</span></button>';
   }
 
@@ -411,9 +481,10 @@
   const topnav = document.createElement('nav');
   topnav.id = 'ib-topnav';
   topnav.innerHTML =
-    '<a href="/dashboard.html" id="ib-logo" title="דשבורד" aria-label="דשבורד"><img id="ib-logo-icon" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
+    '<a href="/dashboard.html" id="ib-logo" title="לוח בקרה" aria-label="לוח בקרה"><img id="ib-logo-icon" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
     '<div id="ib-links">' + renderNavLinks('ib-link') + '</div>' +
-    '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">🔍</button>' +
+    '<div id="ib-tools"><button type="button" class="ib-link" id="ib-theme-command" data-set-theme="command"><span>פיקוד</span></button><button type="button" class="ib-link" id="ib-theme-blueprint" data-set-theme="blueprint"><span>שרטוט</span></button><button type="button" class="ib-link" id="ib-help-open">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-link" id="ib-tuner-open">'+iconSvg('display')+'<span>תצוגה</span></button></div>' +
+    '<button id="ib-search-btn" title="חיפוש (Ctrl+K)" aria-label="חיפוש">חיפוש</button>' +
     '<button id="ib-hamburger" aria-label="תפריט">☰</button>';
 
   const overlay = document.createElement('div');
@@ -423,10 +494,11 @@
   drawer.id = 'ib-drawer';
   drawer.innerHTML =
     '<div id="ib-drawer-head">' +
-      '<a href="/dashboard.html" title="דשבורד" aria-label="דשבורד"><img id="ib-drawer-logo" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
+      '<a href="/dashboard.html" title="לוח בקרה" aria-label="לוח בקרה"><img id="ib-drawer-logo" data-brand-logo src="/brand/tene-pdf-logo.jpg" alt="לוגו"></a>' +
       '<button id="ib-drawer-close" aria-label="סגור">✕</button>' +
     '</div>' +
-    '<div id="ib-drawer-links">' + renderNavLinks('ib-dl') + '</div>';
+    '<div id="ib-drawer-links">' + renderNavLinks('ib-dl') + '</div>' +
+    '<div id="ib-drawer-tools"><button type="button" class="ib-dl" data-set-theme="command"><span>פיקוד</span></button><button type="button" class="ib-dl" data-set-theme="blueprint"><span>שרטוט</span></button><button type="button" class="ib-dl" id="ib-drawer-help">'+iconSvg('help')+'<span>עזרה</span></button><button type="button" class="ib-dl" id="ib-drawer-tuner">'+iconSvg('display')+'<span>תצוגה</span></button></div>';
 
   const bottomNav = document.createElement('nav');
   bottomNav.id = 'ib-bottom';
@@ -439,7 +511,7 @@
   searchOverlay.id = 'ib-search-bar';
   searchOverlay.innerHTML =
     '<div id="ib-search-box">' +
-      '<input id="ib-search-input" type="text" placeholder="🔍  חיפוש הזמנה, לקוח, חבילה..." autocomplete="off">' +
+      '<input id="ib-search-input" type="text" placeholder="חיפוש הזמנה, לקוח או חבילה" autocomplete="off">' +
       '<div id="ib-search-results"><div class="ib-sr-empty">הקלד לפחות 2 תווים לחיפוש</div></div>' +
     '</div>';
 
@@ -604,6 +676,49 @@
     document.getElementById('ib-hamburger')?.addEventListener('click', openDrawer);
     document.getElementById('ib-drawer-close')?.addEventListener('click', closeDrawer);
     document.getElementById('ib-search-btn')?.addEventListener('click', openSearch);
+    function openHelp() {
+      const help = document.getElementById('help-btn');
+      if (help) help.click();
+      else location.href = '/help.html';
+    }
+    function openTuner() { document.querySelector('#uiTunerRoot .ut-fab')?.click(); }
+    document.getElementById('ib-help-open')?.addEventListener('click', openHelp);
+    document.getElementById('ib-drawer-help')?.addEventListener('click', () => { closeDrawer(); openHelp(); });
+    document.getElementById('ib-tuner-open')?.addEventListener('click', openTuner);
+    document.getElementById('ib-drawer-tuner')?.addEventListener('click', () => { closeDrawer(); openTuner(); });
+    document.addEventListener('click', event => {
+      const button = event.target.closest('[data-set-theme]');
+      if (!button) return;
+      applyVisualTheme(button.getAttribute('data-set-theme'));
+    });
+    for (const file of ['/theme-command.css', '/theme-blueprint.css']) {
+      if (document.querySelector('link[href="' + file + '"]')) continue;
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = file;
+      document.head.appendChild(link);
+    }
+    function markSkeletons(root) {
+      if (!document.documentElement.dataset.theme) return;
+      (root || document).querySelectorAll('body *').forEach(el => {
+        if (el.children.length) return;
+        const text = (el.textContent || '').trim();
+        if (text === 'טוען...' || text.startsWith('טוען ')) el.classList.add('ib-skeleton');
+      });
+    }
+    markSkeletons(document);
+    new MutationObserver(() => markSkeletons(document)).observe(document.body, { childList: true, subtree: true });
+    applyVisualTheme(document.documentElement.dataset.theme || '');
+    setTimeout(() => {
+      document.querySelectorAll('body *').forEach(el => {
+        if (el.children.length) return;
+        const text = (el.textContent || '').trim();
+        if (text === 'טוען...' || text.startsWith('טוען ')) {
+          el.classList.remove('ib-skeleton');
+          el.textContent = 'לא ניתן לטעון נתונים';
+        }
+      });
+    }, 12000);
     overlay.addEventListener('click', closeDrawer);
     drawer.addEventListener('click',e=>{if(e.target.closest('a.ib-dl'))closeDrawer();});
     bottomNav.addEventListener('click',e=>{if(e.target.closest('.ib-open-menu'))openDrawer();});

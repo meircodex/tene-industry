@@ -532,7 +532,7 @@ test('shared navigation module icons are clickable links', () => {
   assert.match(nav, /ib-link-label/);
   assert.match(nav, /ib-bn-icon/);
   assert.match(nav, /ib-bn-label/);
-  assert.match(nav, /<a href="\/dashboard\.html" title="דשבורד" aria-label="דשבורד"><img id="ib-drawer-logo"/);
+  assert.match(nav, /<a href="\/dashboard\.html" title="לוח בקרה" aria-label="לוח בקרה"><img id="ib-drawer-logo"/);
 });
 
 
