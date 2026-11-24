@@ -8,11 +8,13 @@ function required(name, value) {
 module.exports = function createBrandingRouter(deps) {
   const branding = required('branding', deps.branding);
 
-  // ── מיתוג ציבורי (ללא auth) — שם/לוגו/צבע בלבד ──────────────────
+  // מיתוג ציבורי לפני התחברות: שם, לוגו, צבע וטלפון תמיכה.
   // נטען על ידי כל דף דרך public/brand-client.js לפני התחברות.
   router.get('/branding', (req, res) => {
+    const { name, logoUrl, primaryColor, supportPhone } = branding.get();
     res.set('Cache-Control', 'public, max-age=60');
-    res.json(branding.get());
+    // שליחה כ-JSON מוכן שומרת על גוף התגובה ללא מטא-נתונים של הבקשה.
+    res.type('json').send(JSON.stringify({ name, logoUrl, primaryColor, supportPhone }));
   });
 
   return router;
