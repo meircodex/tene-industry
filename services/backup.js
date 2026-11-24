@@ -71,7 +71,11 @@ function uploadToServer(encryptedBuffer, { licenseKey, machineId, filename }) {
       res.on('data', c => { raw += c; });
       res.on('end', () => {
         if (res.statusCode === 200 || res.statusCode === 201) {
-          resolve(JSON.parse(raw || '{}'));
+          try {
+            resolve(JSON.parse(raw || '{}'));
+          } catch {
+            reject(new Error('Upload failed: invalid JSON response'));
+          }
         } else {
           reject(new Error(`Upload failed: HTTP ${res.statusCode} — ${raw}`));
         }
