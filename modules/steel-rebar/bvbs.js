@@ -2,13 +2,46 @@
 
 const { rebarKgPerMeter } = require('./weights');
 
+function readNumber(value) {
+  return /^-?\d+(?:[.,]\d+)?$/.test(value) ? Number(value.replace(',', '.')) : NaN;
+}
+
+function parseBF2D(line) {
+  const [, first, ...fields] = line.split('@');
+  const item = { project: first.startsWith('Hj') ? first.slice(2) : '' };
+
+  // שדות הגיאומטריה והמחברים יכולים להשתמש שוב במפתחות מהכותרת.
+  const blockStart = fields.findIndex(field => /^[A-Z]/.test(field));
+  const headerFields = blockStart < 0 ? fields : fields.slice(0, blockStart);
+  const firstBlock = fields[blockStart];
+  if (firstBlock && /^[GMA]/.test(firstBlock) &&
+      !/^Gl[\d.,]+@w0@C\d+@$/.test(fields.slice(blockStart).join('@'))) {
+    item.shape_code = 'BF2D';
+  }
+
+  for (const field of headerFields) {
+    const value = field.slice(1);
+    switch (field[0]) {
+      case 'j': item.project = value; break;
+      case 'p': item.mark = value; break;
+      case 'l': item.total_length = readNumber(value); break;
+      case 'n': item.quantity = readNumber(value); break;
+      case 'd': item.diameter = readNumber(value); break;
+      case 'g': item.grade = value; break;
+    }
+  }
+
+  return item;
+}
+
 /**
  * פרסר BVBS — פורמט תקני גרמני/ישראלי לקבצי כיפוף ברזל.
  * מקור: routes/bvbs.js — הועבר לכאן כדי שיהיה שייך למודול הפלדה.
  */
 function parseBVBSLine(line) {
   line = line.trim();
-  if (!line.startsWith('@3') && !line.startsWith('@')) return null;
+  if (line.startsWith('BF2D@H')) return withWeights(parseBF2D(line));
+  if (!line.startsWith('@')) return null;
 
   const item = {};
   const parts = line.split('^');
@@ -36,10 +69,10 @@ function parseBVBSLine(line) {
 
     const [, key, val] = m;
     switch (key.toLowerCase()) {
-      case 'd':  item.diameter     = parseFloat(val); break;
-      case 'l':  item.total_length = parseFloat(val); break;
+      case 'd':  item.diameter     = readNumber(val); break;
+      case 'l':  item.total_length = readNumber(val); break;
       case 'n':  item.mark         = val; break;
-      case 'p':  item.quantity     = parseInt(val, 10) || 1; break;
+      case 'p':  item.quantity     = readNumber(val); break;
       case 'a':  item.shape_code   = val; break;
       case 'r':
         item.grade_code = val;
@@ -52,18 +85,24 @@ function parseBVBSLine(line) {
     }
   }
 
-  if (!item.diameter || !item.quantity) return null;
+  return withWeights(item);
+}
+
+function withWeights(item) {
+  if (!Number.isFinite(item.diameter) || item.diameter <= 0 ||
+      !Number.isFinite(item.total_length) || item.total_length <= 0 ||
+      !Number.isSafeInteger(item.quantity) || item.quantity <= 0) return null;
 
   const kgPerM = rebarKgPerMeter(item.diameter);
   item.weight_per_unit = (item.total_length / 1000) * kgPerM;
   item.total_weight    = item.weight_per_unit * item.quantity;
-  return item;
+  return Number.isFinite(item.total_weight) && item.total_weight > 0 ? item : null;
 }
 
 function parseBVBS(content) {
   const lines = content.split(/\r?\n/);
   const items = [];
-  let header = {};
+  const header = {};
 
   for (const line of lines) {
     const t = line.trim();
@@ -82,7 +121,11 @@ function parseBVBS(content) {
     }
 
     const item = parseBVBSLine(t);
-    if (item) items.push(item);
+    if (item) {
+      if (item.project && !header.project) header.project = item.project;
+      delete item.project;
+      items.push(item);
+    }
   }
 
   return {
