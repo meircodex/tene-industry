@@ -35,11 +35,15 @@ module.exports = function createQrAccessRouter(deps) {
   });
 
   router.post('/qr-access/scan', (req, res) => {
-    const kind = String(req.body?.kind || '').trim().toLowerCase();
+    const { kind: rawKind, value: rawValue, order_id: rawOrderId } = req.body || {};
+    const kind = typeof rawKind === 'string' ? rawKind.trim().toLowerCase() : '';
     const permission = kind === 'order' ? 'warehouse' : kind === 'card' ? 'production' : '';
-    const value = String(req.body?.value || '').trim();
-    const orderId = Number(req.body?.order_id);
-    if (!permission || !value || value.length > 512 || (kind === 'order' && (!Number.isInteger(orderId) || orderId <= 0))) {
+    const value = typeof rawValue === 'string' ? rawValue.trim() : '';
+    const hasNumericOrderId = typeof rawOrderId === 'number'
+      || (typeof rawOrderId === 'string' && /^\d+$/.test(rawOrderId.trim()));
+    const orderId = hasNumericOrderId ? Number(rawOrderId) : NaN;
+    const invalidOrder = kind === 'order' && (!Number.isSafeInteger(orderId) || orderId <= 0);
+    if (!permission || !value || value.length > 512 || !value.isWellFormed() || invalidOrder) {
       return res.status(400).json({ error: 'invalid_qr_scan' });
     }
     const grant = qrAccess.authorize(req, permission);
