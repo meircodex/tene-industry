@@ -13,7 +13,7 @@ module.exports = function createProductionMetricsRouter(deps) {
   const productionActuals = required('productionActuals', deps.productionActuals);
 
   function selectedDay(req, res) {
-    const day = String(req.query?.date || productionActuals.israelDay()).trim();
+    const day = String(req.query?.date ?? productionActuals.israelDay()).trim();
     if (!productionActuals.validDay(day)) {
       res.status(400).json({ error: 'invalid_production_date' });
       return null;
