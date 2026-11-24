@@ -1109,7 +1109,7 @@ test('protected P0 routes enforce JWT roles over HTTP', async (t) => {
     assert.equal((await request('/api/intake/training', { method: 'POST', headers: authHeaders(office), body: emptyBody })).status, 403);
     assert.equal((await request('/api/intake/training', { method: 'POST', headers: authHeaders(manager), body: emptyBody })).status, 400);
     assert.equal((await request('/api/intake/training/1', { method: 'DELETE', headers: authHeaders(office) })).status, 403);
-    assert.equal((await request('/api/intake/training/1', { method: 'DELETE', headers: authHeaders(manager) })).status, 200);
+    assert.equal((await request('/api/intake/training/1', { method: 'DELETE', headers: authHeaders(manager) })).status, 404);
   });
 
   await t.test('intake file and BVBS endpoints require office role before disabled or parse gates', async () => {
