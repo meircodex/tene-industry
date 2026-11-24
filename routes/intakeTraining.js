@@ -21,10 +21,11 @@ module.exports = function createIntakeTrainingRouter(deps) {
   });
 
   router.post('/intake/training', requireAnyRole(['manager', 'admin']), (req, res) => {
-    const title = String(req.body.title || '').trim();
-    const documentType = String(req.body.document_type || 'general').trim() || 'general';
-    const problemText = String(req.body.problem_text || '').trim();
-    const correctionText = String(req.body.correction_text || '').trim();
+    const body = req.body || {};
+    const title = String(body.title || '').trim();
+    const documentType = String(body.document_type || 'general').trim() || 'general';
+    const problemText = String(body.problem_text || '').trim();
+    const correctionText = String(body.correction_text || '').trim();
     if (!title || !problemText || !correctionText) {
       return res.status(400).json({ error: 'title, problem_text and correction_text are required' });
     }
@@ -36,7 +37,8 @@ module.exports = function createIntakeTrainingRouter(deps) {
   });
 
   router.delete('/intake/training/:id', requireAnyRole(['manager', 'admin']), (req, res) => {
-    db.prepare('UPDATE intake_training_examples SET active=0 WHERE id=?').run(req.params.id);
+    const result = db.prepare('UPDATE intake_training_examples SET active=0 WHERE id=? AND active=1').run(req.params.id);
+    if (!result.changes) return res.status(404).json({ error: 'דוגמת ההדרכה לא נמצאה' });
     res.json({ success: true });
   });
 
