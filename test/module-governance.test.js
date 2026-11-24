@@ -1599,3 +1599,13 @@ test('routes use the active industry contract for steel-specific calculations', 
   assert.doesNotMatch(server, /createBvbsRouter\(\{[\s\S]*rebarKgPerMeter/);
   assert.doesNotMatch(server, /createPortalRouter\(\{[\s\S]*autoAssignMachine/);
 });
+
+test('public landing is mounted before static files and owned by the marketing router', () => {
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const marketing = require('../routes/marketing');
+  const mount = server.indexOf('app.use(createMarketingRouter(');
+  assert.ok(mount >= 0 && mount < server.indexOf('app.use(express.static('));
+  assert.throws(() => marketing({ env: {} }), /missing dependency: getSupportPhone/);
+  assert.equal(marketing.manifest.screens[0].path, '/tene');
+  assert.deepEqual(marketing.manifest.produces, []);
+});

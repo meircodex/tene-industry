@@ -1,5 +1,14 @@
 # API Registry
 
+## Public Tene landing
+
+Platform Core owns the public, read-only `GET /tene`, `GET /robots.txt`, and
+`GET /sitemap.xml` endpoints in `routes/marketing.js`. `GET /` serves the
+landing only on an exact Host match in the comma-separated `MARKETING_HOSTS`
+list. Canonicals prefer the `PUBLIC_SITE_URL` origin, then `BASE_URL`, then
+the request origin. The landing reads only the existing `BRAND_SUPPORT_PHONE`
+branding setting. Other HTML responses send `X-Robots-Tag: noindex, nofollow`.
+
 ## Station production queue (2026-11-16)
 
 Machine Integration owns GET `/api/machine-integration/station-queue`, guarded by `stationAccess` plus a verified source credential. The bound central machine supplies the scope; a caller cannot choose another machine. `limit` (1–100), `offset`, `q`, `diameter` and `status` are the only filters. Production owns `services/productionQueue.js`, the shared original query, eligibility, assignment and priority projection also consumed by `/api/production-queue`. No queue or business status writes.

@@ -88,6 +88,7 @@ const createSearchRouter = require('./routes/search');
 const createBvbsRouter = require('./routes/bvbs');
 const createLicenseRouter = require('./routes/license');
 const createBrandingRouter = require('./routes/branding');
+const createMarketingRouter = require('./routes/marketing');
 const createAccessRouter   = require('./routes/access');
 const createDeviceEnrollmentRouter = require('./routes/deviceEnrollment');
 const createWorkerInvitationsRouter = require('./routes/workerInvitations');
@@ -115,6 +116,10 @@ const INTAKE_AI_ENABLED = process.env.INTAKE_AI_ENABLED === 'true'; // default: 
 const PRIORITY_ENABLED  = process.env.PRIORITY_ENABLED  === 'true'; // default: false
 
 app.use(helmet({ contentSecurityPolicy: false }));
+app.use(createMarketingRouter({
+  env: process.env,
+  getSupportPhone: () => brandingService.get().supportPhone,
+}));
 const _allowedOriginsEnv = process.env.ALLOWED_ORIGINS || '';
 const ALLOWED_ORIGINS = _allowedOriginsEnv
   ? _allowedOriginsEnv.split(',').map(o => o.trim()).filter(Boolean)
@@ -373,6 +378,7 @@ const moduleMap = createModuleMapService({
     { file: 'routes/alerts.js', factory: createAlertsRouter },
     { file: 'routes/auth.js', factory: createAuthRouter },
     { file: 'routes/branding.js', factory: createBrandingRouter },
+    { file: 'routes/marketing.js', factory: createMarketingRouter },
     { file: 'routes/bvbs.js', factory: createBvbsRouter },
     { file: 'routes/catalog.js', factory: createCatalogRouter },
     { file: 'routes/companies.js', factory: createCompaniesRouter },

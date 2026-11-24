@@ -140,15 +140,18 @@ const AUTH_GUARD_MARKERS = [
 ];
 
 test('every active API route declares auth, scoped portal access, or a public allowlist entry', () => {
+  const serverSource = fs.readFileSync(serverPath, 'utf8');
   const sources = [
-    { file: 'server.js', source: fs.readFileSync(serverPath, 'utf8'), basePath: '' },
+    { file: 'server.js', source: serverSource, basePath: '' },
   ];
   if (fs.existsSync(routesDir)) {
     for (const fileName of fs.readdirSync(routesDir).filter(file => file.endsWith('.js'))) {
+      const rootMountedMarketing = fileName === 'marketing.js'
+        && /app\.use\(createMarketingRouter\(/.test(serverSource);
       sources.push({
         file: `routes/${fileName}`,
         source: fs.readFileSync(path.join(routesDir, fileName), 'utf8'),
-        basePath: '/api',
+        basePath: rootMountedMarketing ? '' : '/api',
       });
     }
   }
