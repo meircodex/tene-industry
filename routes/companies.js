@@ -14,7 +14,10 @@ module.exports = function createCompaniesRouter(deps) {
   });
 
   router.post('/companies', requireAnyRole(['manager', 'admin']), (req, res) => {
-    const { name, short_name, ownership_pct, erp_type, color } = req.body;
+    const { name, short_name, ownership_pct, erp_type, color } = req.body || {};
+    if (typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'שם החברה חובה' });
+    }
     const r = db.prepare(
       'INSERT INTO companies (name, short_name, ownership_pct, erp_type, color) VALUES (?,?,?,?,?)'
     ).run(name, short_name || name, ownership_pct ?? 100, erp_type || 'none', color || '#e07b39');
@@ -22,10 +25,11 @@ module.exports = function createCompaniesRouter(deps) {
   });
 
   router.patch('/companies/:id', requireAnyRole(['manager', 'admin']), (req, res) => {
-    const { name, short_name, ownership_pct, erp_type, color } = req.body;
-    db.prepare(
+    const { name, short_name, ownership_pct, erp_type, color } = req.body || {};
+    const r = db.prepare(
       'UPDATE companies SET name=COALESCE(?,name), short_name=COALESCE(?,short_name), ownership_pct=COALESCE(?,ownership_pct), erp_type=COALESCE(?,erp_type), color=COALESCE(?,color) WHERE id=?'
     ).run(name, short_name, ownership_pct, erp_type, color, req.params.id);
+    if (r.changes === 0) return res.status(404).json({ error: 'החברה לא נמצאה' });
     res.json({ success: true });
   });
 
