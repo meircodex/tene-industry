@@ -54,7 +54,7 @@ module.exports = function createMaintenanceRouter(deps) {
     res.json(db.prepare(sql).all(...params));
   });
   router.post('/maintenance', requireAnyRole(['maintenance', 'production', 'manager', 'admin']), (req, res) => {
-    const f = req.body;
+    const f = req.body || {};
     if (!f.machine_id||!f.description) return res.status(400).json({ error: 'מכונה ותיאור חובה' });
     if (f.log_type==='breakdown') {
       db.prepare("UPDATE machines SET status='תקלה' WHERE id=?").run(f.machine_id);
@@ -109,9 +109,10 @@ module.exports = function createMaintenanceRouter(deps) {
   });
 
   router.patch('/loto/:id/release', requireAnyRole(['maintenance', 'manager', 'admin']), (req, res) => {
-    const { released_by, release_notes } = req.body;
     const loto = db.prepare('SELECT * FROM loto WHERE id=?').get(req.params.id);
-    if (!loto) return res.status(404).json({ error: 'not found' });
+    if (!loto) return res.status(404).json({ error: 'לא נמצא' });
+    if (!req.body) return res.status(400).json({ error: 'פרטי שחרור חסרים' });
+    const { released_by, release_notes } = req.body;
     db.prepare(`
       UPDATE loto
       SET status='שוחרר', released_by=?, release_notes=?,
