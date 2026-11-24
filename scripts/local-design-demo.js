@@ -4,7 +4,7 @@
   This file is not required by server.js and does not open or write a database.
   Do not import it from production code.
 */
-const TODAY = '2026-11-23';
+const TODAY = '2026-11-24';
 const customers = [
   { id: 1, name: 'אקרשטיין', phone: '03-6102200', email: 'orders@ekerstein.co.il', address: 'ראשון לציון', contact_name: 'יוסי אקרשטיין', order_count: 2, total_weight_sum: 6120, balance: 18400, credit_limit: 250000 },
   { id: 2, name: 'דניה סיבוס', phone: '04-8501000', email: 'site@danya.co.il', address: 'חיפה', contact_name: 'מיכל דן', order_count: 1, total_weight_sum: 2860, balance: 0, credit_limit: 180000 },
