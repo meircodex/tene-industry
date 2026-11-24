@@ -1,4 +1,4 @@
-const router = require('express').Router();
+const { Router } = require('express');
 
 const REVIEW_STATUSES = new Set(['approved', 'rejected', 'revoked']);
 
@@ -30,6 +30,7 @@ function publicDevice(row) {
 }
 
 module.exports = function createDeviceEnrollmentRouter(deps) {
+  const router = Router();
   const getDb = required('getDb', deps.getDb);
   const requireRole = required('requireRole', deps.requireRole);
   const deviceEnrollment = required('deviceEnrollment', deps.deviceEnrollment);
