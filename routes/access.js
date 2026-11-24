@@ -17,7 +17,7 @@ function createAccessRouter({ requireRole, accessControl }) {
 
   // GET /api/access/me — returns screens + access level for the caller's role
   router.get('/access/me', requireRole('viewer'), (req, res) => {
-    const role = req.auth?.role || req.userRole;
+    const role = req.userRole || req.auth?.role;
     if (!role) return res.status(401).json({ error: 'Authentication required' });
     const screens = accessControl.screensForRole(role);
     res.json({ role, screens });
