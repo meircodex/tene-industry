@@ -16,7 +16,7 @@ module.exports = function createAlertsRouter(deps) {
   });
 
   router.post('/alerts', requireAnyRole(['office', 'production', 'kiosk', 'maintenance', 'quality', 'manager', 'admin']), (req, res) => {
-    const { message, level = 'warning', entity_type, entity_id } = req.body;
+    const { message, level = 'warning', entity_type } = req.body ?? {};
     if (!message) return res.status(400).json({ error: 'message required' });
     const r = db.prepare(`INSERT INTO alerts (type,level,message,resolved) VALUES (?,?,?,0)`)
       .run(entity_type || 'system', level, message);
@@ -25,7 +25,8 @@ module.exports = function createAlertsRouter(deps) {
   });
 
   router.patch('/alerts/:id/resolve', requireAnyRole(['office', 'production', 'maintenance', 'quality', 'manager', 'admin']), (req, res) => {
-    db.prepare('UPDATE alerts SET resolved=1 WHERE id=?').run(req.params.id);
+    const { changes } = db.prepare('UPDATE alerts SET resolved=1 WHERE id=?').run(req.params.id);
+    if (!changes) return res.status(404).json({ error: 'ההתראה לא נמצאה' });
     res.json({ success: true });
   });
 
