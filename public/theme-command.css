@@ -308,3 +308,136 @@ html[data-theme="command"] .orders-table .order-row[data-production-percent] > t
   background: transparent !important;
   color: var(--cmd-ink) !important;
 }
+
+/* Contrast: theme.css locks h1 and several labels to the dark ink. */
+html[data-theme="command"] :is(h1, h2, h3, .page-title, .section-title, .d-title, .daily-title h1, #dashboardTitle) {
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] :is(.daily-title span, #dayHeaderText, .section-head p, .kpi-label, .kpi-sub, .action-sub, .compact-row span, .muted-state) {
+  color: #C5D4E2 !important;
+}
+html[data-theme="command"] .action-item {
+  background: #101820 !important;
+  color: #E7EEF3 !important;
+  border: 1px solid var(--cmd-line) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+html[data-theme="command"] .action-title,
+html[data-theme="command"] .compact-row,
+html[data-theme="command"] .compact-row strong {
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] .action-link {
+  background: transparent !important;
+  color: #F6C7A4 !important;
+  border-color: #E07B39 !important;
+}
+html[data-theme="command"] body[data-page="dashboard"] details.panel > summary {
+  color: #E7EEF3 !important;
+  background: #172433 !important;
+}
+html[data-theme="command"] :is(.dashboard-detail-btn, .inline-detail-btn) {
+  color: #E7EEF3 !important;
+  background: transparent !important;
+  border-color: #7EA4C2 !important;
+}
+html[data-theme="command"] :is(#ib-topnav, #ib-drawer, #ib-bottom) {
+  background: #203F60 !important;
+  color: #E7EEF3 !important;
+  border-color: #16324C !important;
+}
+html[data-theme="command"] #ib-topnav :is(.ib-link, .ib-nav-toggle, .ib-nav-caret, .ib-group-label),
+html[data-theme="command"] #ib-drawer :is(.ib-dl, .ib-group-label),
+html[data-theme="command"] #ib-bottom .ib-bn {
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] #ib-topnav .ib-link.ib-active {
+  color: #fff !important;
+  background: transparent !important;
+  box-shadow: inset -3px 0 0 #E07B39 !important;
+}
+html[data-theme="command"] :is(#ib-logo, #ib-drawer-head) {
+  background: #fff !important;
+}
+html[data-theme="command"] :is(#ib-logo img, #ib-drawer-logo) {
+  background: #fff !important;
+}
+html[data-theme="command"] #ib-topnav .ib-link.ib-new-order,
+html[data-theme="command"] .ib-new-order {
+  background: #E07B39 !important;
+  color: #1A120C !important;
+  opacity: 1 !important;
+}
+html[data-theme="command"] #ib-topnav .ib-link.ib-new-order :is(span, .ib-mark, .ib-link-label),
+html[data-theme="command"] .ib-new-order :is(span, .ib-mark, .ib-link-label) {
+  color: #1A120C !important;
+  opacity: 1 !important;
+}
+html[data-theme="command"] #ordersPageTitle,
+html[data-theme="command"] .production-progress-main small {
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] .production-progress-main small { color: #C5D4E2 !important; }
+html[data-theme="command"] :is(.order-num, .weight-val, .line-add-btn, .item-order) {
+  color: #F6C7A4 !important;
+}
+html[data-theme="command"] .data-table span { color: #C5D4E2 !important; }
+html[data-theme="command"] .s-risk {
+  background: #3A2222 !important;
+  color: #F6D0CD !important;
+}
+html[data-theme="command"] .compact-edit-pill {
+  background: #E07B39 !important;
+  color: #1A120C !important;
+  border-color: #E07B39 !important;
+}
+html[data-theme="command"] .inspector-card h3,
+html[data-theme="command"] .card-title,
+html[data-theme="command"] .tab-btn,
+html[data-theme="command"] .inventory-plan-options summary,
+html[data-theme="command"] .material-shape,
+html[data-theme="command"] label {
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] .inspector-card p,
+html[data-theme="command"] .inventory-caption {
+  color: #C5D4E2 !important;
+}
+html[data-theme="command"] .inventory-shortage { color: #F6D0CD !important; }
+html[data-theme="command"] :is(.shift-stat .label, .machine-col-count, .queue-filters label, .queue-view-controls label, #queueMachineCount, .page-header div) {
+  color: #C5D4E2 !important;
+}
+html[data-theme="command"] .item-detail,
+html[data-theme="command"] .item-detail strong {
+  background: #101820 !important;
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] .item-status-badge {
+  background: #24384A !important;
+  color: #E7EEF3 !important;
+}
+html[data-theme="command"] .badge-urgent {
+  background: #3A2A1C !important;
+  color: #F6C7A4 !important;
+}
+html[data-theme="command"] button[data-lang="he"] {
+  background: #A85C2B !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+html[data-theme="command"] body[data-page="new"] .notes-section .compact-edit-pill {
+  background: #E07B39 !important;
+  color: #1A120C !important;
+  border-color: #E07B39 !important;
+}
+html[data-theme="command"] body[data-page="inventory"] .tab-btn.active {
+  background: #E07B39 !important;
+  color: #1A120C !important;
+  border-color: #E07B39 !important;
+}
+html[data-theme="command"] body[data-page="inventory"] .card-header,
+html[data-theme="command"] body[data-page="inventory"] .card-header .card-title {
+  background: #172433 !important;
+  color: #E7EEF3 !important;
+}

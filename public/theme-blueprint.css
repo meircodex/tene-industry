@@ -3,7 +3,7 @@ html[data-theme="blueprint"] {
   --bp-paper: #F7F5F0;
   --bp-ink: #1A2637;
   --bp-line: rgba(32, 63, 96, 0.28);
-  --bp-line-soft: rgba(32, 63, 96, 0.12);
+  --bp-line-soft: rgba(32, 63, 96, 0.06);
   --bp-orange: #A85C2B;
   --bp-mark: #E07B39;
   --bp-green: #44633C;
@@ -31,7 +31,7 @@ html[data-theme="blueprint"] .production-progress-main strong {
   color: var(--bp-ink) !important;
 }
 html[data-theme="blueprint"] :is(.kpi-card, .kpi-tile, .card, .panel, .orders-wrap, .table-card, .machine-card, [class*="-card"], .daily-header) {
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: #fff !important;
   border: 1px solid var(--bp-line) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -69,10 +69,20 @@ html[data-theme="blueprint"] :is(.btn-primary, .primary, .new-order-btn, .submit
   border: 1px solid var(--bp-ink) !important;
   border-radius: 0 !important;
 }
+html[data-theme="blueprint"] #ib-topnav .ib-link.ib-new-order,
+html[data-theme="blueprint"] #ib-topnav a.ib-new-order,
 html[data-theme="blueprint"] .ib-new-order {
-  background: var(--bp-ink) !important;
-  color: #F7F5F0 !important;
-  box-shadow: inset -3px 0 0 var(--bp-mark) !important;
+  background: #A85C2B !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+}
+html[data-theme="blueprint"] #ib-topnav .ib-link.ib-new-order span,
+html[data-theme="blueprint"] #ib-topnav .ib-link.ib-new-order .ib-mark,
+html[data-theme="blueprint"] .ib-new-order span,
+html[data-theme="blueprint"] .ib-new-order .ib-mark {
+  color: #fff !important;
+  opacity: 1 !important;
 }
 html[data-theme="blueprint"] :is(button, .btn, .btn-sm, .filter-btn, .tab-btn) {
   border-radius: 0 !important;
@@ -157,14 +167,14 @@ html[data-theme="blueprint"] body[data-page="new"] :is(
   .inspector-edit-shell, .summary-bar, #liveInventoryPanel, .wizard-summary-block,
   .order-notes, .notes-card
 ) {
-  background: rgba(255,255,255,.9) !important;
+  background: #fff !important;
   color: var(--bp-ink) !important;
   border: 1px solid var(--bp-line) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 html[data-theme="blueprint"] body[data-page="new"] .order-lines-body > .order-line-row:nth-of-type(even) {
-  background: rgba(247,245,240,.96) !important;
+  background: #F7F5F0 !important;
 }
 html[data-theme="blueprint"] body[data-page="new"] :is(.line-element, .line-qty, .line-diameter-select) {
   background: transparent !important;
@@ -182,7 +192,7 @@ html[data-theme="blueprint"] body[data-page="new"] :is(.primary-add-shape, butto
 }
 
 html[data-theme="blueprint"] :is(.shift-bar, .shift-stat, .queue-filters, .machine-col, .machine-col-header, .queue-item, .modal) {
-  background: rgba(255,255,255,.9) !important;
+  background: #fff !important;
   color: var(--bp-ink) !important;
   border: 1px solid var(--bp-line) !important;
   border-radius: 0 !important;
@@ -190,7 +200,7 @@ html[data-theme="blueprint"] :is(.shift-bar, .shift-stat, .queue-filters, .machi
 }
 html[data-theme="blueprint"] .machine-col-header { background: transparent !important; }
 html[data-theme="blueprint"] .queue-item.active-item {
-  background: rgba(255,255,255,.94) !important;
+  background: #fff !important;
   border-color: var(--bp-ink) !important;
   box-shadow: inset 0 -2px 0 var(--bp-mark) !important;
 }
@@ -231,7 +241,7 @@ html[data-theme="blueprint"] #sePageEdit .se-data-panel,
 html[data-theme="blueprint"] #seModal .se-data-panel-head,
 html[data-theme="blueprint"] #seModal .se-table-wrap,
 html[data-theme="blueprint"] #seModal .se-foot {
-  background: rgba(255,255,255,.88) !important;
+  background: #fff !important;
   border-color: var(--bp-line) !important;
   color: var(--bp-ink) !important;
 }
@@ -254,22 +264,48 @@ html[data-theme="blueprint"] #seModal .se-svg-wrap {
 html[data-theme="blueprint"] #seModal .se-data-panel-head:before { content: none !important; }
 html[data-theme="blueprint"] #seModal .se-stat-value { font-variant-numeric: tabular-nums; color: var(--bp-ink) !important; }
 
-html[data-theme="blueprint"] body[data-page=orders] .orders-table tr[class*="row-"] { background: rgba(255,255,255,.92) !important; }
+html[data-theme="blueprint"] body[data-page=orders] .orders-table tr[class*="row-"] { background: #fff !important; }
 html[data-theme="blueprint"] .orders-table .order-row > td {
-  background: rgba(255,255,255,.94) !important;
+  background: #fff !important;
   color: var(--bp-ink) !important;
 }
 html[data-theme="blueprint"] .orders-table .order-row.row-production > td:first-child { box-shadow: inset -3px 0 0 var(--bp-mark); }
 html[data-theme="blueprint"] .orders-table .order-row.row-approved > td:first-child { box-shadow: inset -3px 0 0 var(--bp-blue); }
 html[data-theme="blueprint"] .orders-table .order-row.row-waiting > td:first-child { box-shadow: inset -3px 0 0 #8E2F2A; }
 html[data-theme="blueprint"] .orders-table .order-row[data-production-percent] {
-  background: linear-gradient(to left, rgba(224,123,57,.45) 0 var(--production-progress), rgba(255,255,255,.94) var(--production-progress) 100%) !important;
+  background: linear-gradient(to left, rgba(224,123,57,.45) 0 var(--production-progress), #fff var(--production-progress) 100%) !important;
 }
 html[data-theme="blueprint"] .orders-table .order-row[data-production-percent] > td { background: transparent !important; }
 html[data-theme="blueprint"] body[data-page="new"] :is(.stat, .notes-section, .section, .order-draft-notice) {
-  background: rgba(255,255,255,.9) !important;
+  background: #fff !important;
   border: 1px solid var(--bp-line) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   color: var(--bp-ink) !important;
+}
+html[data-theme="blueprint"] #ib-topnav :is(#ib-search-btn, .ib-nav-toggle, .ib-group-label) {
+  color: #1A2637 !important;
+}
+html[data-theme="blueprint"] #ib-topnav .ib-link.ib-new-order,
+html[data-theme="blueprint"] #ib-topnav a.ib-new-order,
+html[data-theme="blueprint"] .ib-new-order,
+html[data-theme="blueprint"] #ib-topnav .ib-new-order :is(span, .ib-mark, .ib-link-label) {
+  background: #A85C2B !important;
+  color: #fff !important;
+  opacity: 1 !important;
+}
+html[data-theme="blueprint"] #ib-topnav .ib-new-order :is(span, .ib-mark, .ib-link-label) {
+  background: transparent !important;
+}
+html[data-theme="blueprint"] :is(.shift-stat .label, .machine-col-count, #queueMachineCount, .item-detail) {
+  color: #31465C !important;
+}
+html[data-theme="blueprint"] .item-status-badge {
+  color: #1A2637 !important;
+  background: #E7EEF3 !important;
+}
+html[data-theme="blueprint"] button[data-lang="he"] {
+  background: #A85C2B !important;
+  color: #fff !important;
+  opacity: 1 !important;
 }
