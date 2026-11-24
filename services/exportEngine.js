@@ -113,13 +113,13 @@ function deliveryRowsToLines(note) {
   return sourceRows.map((row, index) => compactObject({
     lineNo: index + 1,
     sourceType: Array.isArray(packages) && packages.length ? 'package' : 'item',
-    sourceId: row.id || row.item_id || null,
-    sourceRef: row.package_code || row.item_uid || row.shape_name || null,
-    description: row.description || row.shape_name || row.package_code || `Delivery line ${index + 1}`,
+    sourceId: row.id || row.item_id || row.parent_item_id || null,
+    sourceRef: row.package_code || row.item_uid || row.card_key || row.shape_name || null,
+    description: row.description || row.shape_name || row.package_code || row.title || `Delivery line ${index + 1}`,
     quantity: Number(row.quantity || row.production_qty || 1),
     unit: 'unit',
     weightKg: money(row.weight || row.total_weight || row.totalWeightKg || 0),
-    diameter: row.diameter || null,
+    diameter: row.diameter || row.diameter_mm || null,
     zone: row.zone || null,
     orderId: row.order_id || null,
     orderNum: row.order_num || null,
@@ -301,11 +301,11 @@ function exportAsCsv(payload) {
     line.lineNo,
     line.sourceRef || '',
     line.description || '',
-    line.quantity || '',
+    line.quantity,
     line.unit || '',
-    line.unitPrice || '',
-    line.amount || '',
-    line.weightKg || '',
+    line.unitPrice,
+    line.amount,
+    line.weightKg,
   ].map(csvEscape).join(','));
   return [header.join(','), ...csvRows].join('\n');
 }
@@ -348,7 +348,8 @@ function recordExportLog(db, result = {}) {
   }
 
   const destination = normalizeDestination(result.destination || payload?.destination || DEFAULT_DESTINATION);
-  const exportFormat = normalizeFormat(result.export_format || result.exportFormat || 'json');
+  const format = result.export_format || result.exportFormat || 'json';
+  const exportFormat = String(format).trim().toLowerCase() === 'api' ? 'api' : normalizeFormat(format);
   const externalRef = result.external_ref || result.externalRef || result.priority_ref || result.priorityRef || null;
   const row = database.prepare(`
     INSERT INTO export_log (
