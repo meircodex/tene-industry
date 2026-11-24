@@ -33,9 +33,10 @@ module.exports = function createProductionShiftsRouter(deps) {
   });
 
   router.patch('/shifts/:id/end', requireAnyRole(['production', 'kiosk', 'manager', 'admin']), (req, res) => {
-    const { total_pieces, total_weight, notes } = req.body;
-    db.prepare(`UPDATE shifts SET ended_at=CURRENT_TIMESTAMP, total_pieces=COALESCE(?,total_pieces), total_weight=COALESCE(?,total_weight), notes=COALESCE(?,notes) WHERE id=?`)
+    const { total_pieces, total_weight, notes } = req.body || {};
+    const { changes } = db.prepare(`UPDATE shifts SET ended_at=CURRENT_TIMESTAMP, total_pieces=COALESCE(?,total_pieces), total_weight=COALESCE(?,total_weight), notes=COALESCE(?,notes) WHERE id=?`)
       .run(total_pieces ?? null, total_weight ?? null, notes || null, req.params.id);
+    if (!changes) return res.status(404).json({ error: 'not found' });
     res.json({ ok: true });
   });
 
@@ -72,14 +73,12 @@ module.exports = function createProductionShiftsRouter(deps) {
   });
 
   router.patch('/machine-stops/:id/end', requireAnyRole(['production', 'kiosk', 'maintenance', 'manager', 'admin']), (req, res) => {
-    const stop = db.prepare('SELECT * FROM machine_stops WHERE id=?').get(req.params.id);
+    const stop = db.prepare(`UPDATE machine_stops
+      SET ended_at=CURRENT_TIMESTAMP,
+          duration_min=COALESCE(ROUND((unixepoch('now') - unixepoch(started_at, 'subsec')) / 60), 0)
+      WHERE id=? RETURNING duration_min`).get(req.params.id);
     if (!stop) return res.status(404).json({ error: 'not found' });
-    const durMin = stop.started_at
-      ? Math.round((Date.now() - new Date(stop.started_at).getTime()) / 60000)
-      : 0;
-    db.prepare(`UPDATE machine_stops SET ended_at=CURRENT_TIMESTAMP, duration_min=? WHERE id=?`)
-      .run(durMin, req.params.id);
-    res.json({ ok: true, duration_min: durMin });
+    res.json({ ok: true, duration_min: stop.duration_min });
   });
 
   return router;
