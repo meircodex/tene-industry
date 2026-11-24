@@ -60,7 +60,7 @@ function createQrAccessService({ db, settingsService, deviceEnrollment }) {
   }
 
   function setMode(value, updatedBy = null) {
-    const next = cleanText(value, 20).toLowerCase();
+    const next = typeof value === 'string' ? cleanText(value, 20).toLowerCase() : '';
     if (!ACCESS_MODES.has(next)) throw Object.assign(new Error('invalid_qr_access_mode'), { status: 400 });
     settingsService.set(ACCESS_MODE_KEY, next, { updatedBy });
     return next;
