@@ -68,8 +68,22 @@ function httpsPost(url, body, timeoutMs = 8000) {
 }
 
 // ── Lock Page HTML ────────────────────────────────────────────────
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function lockPage(message, supportPhone) {
-  const phone = supportPhone || process.env.SUPPORT_PHONE || 'Tene Industry';
+  const phone = String(supportPhone || 'Tene Industry');
+  const dialNumber = phone.replace(/[^0-9+-]/g, '');
+  const phoneLabel = escapeHtml(phone);
+  const contact = /[0-9]/.test(dialNumber)
+    ? `<a class="contact" href="tel:${dialNumber}">📞 ${phoneLabel}</a>`
+    : `<span class="contact">📞 ${phoneLabel}</span>`;
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -106,8 +120,8 @@ function lockPage(message, supportPhone) {
   <div class="card">
     <div class="lock">🔒</div>
     <h1>המערכת נעולה</h1>
-    <p>${message}</p>
-    <a class="contact" href="tel:${phone}">📞 ${phone}</a>
+    <p>${escapeHtml(message)}</p>
+    ${contact}
     <div class="version">IronBend — Tene Industry</div>
   </div>
 </body>
@@ -115,7 +129,7 @@ function lockPage(message, supportPhone) {
 }
 
 // ── License Service Factory ───────────────────────────────────────
-function createLicenseService(db) {
+function createLicenseService(db, { post = httpsPost } = {}) {
   if (!db) throw new Error('services/license missing dependency: db');
 
   const machineId = getMachineId();
@@ -167,7 +181,7 @@ function createLicenseService(db) {
   // ── בדיקה מול שרת ────────────────────────────────────────────
   async function checkRemote(licenseKey) {
     const activeUsers = activeUsersThisMonth();
-    return httpsPost(`${LICENSE_SERVER}/api/check`, {
+    return post(`${LICENSE_SERVER}/api/check`, {
       licenseKey,
       machineId,
       activeUsers,
