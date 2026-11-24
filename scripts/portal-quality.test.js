@@ -208,7 +208,8 @@ test('approval immediately updates home and physical weight agrees across the po
   await page.locator('#newOrderAction').click();
   await page.locator('.line-qty').fill('25');
   await page.locator('#quoteBtn').click();
-  assert.match(await page.locator('.line-mobile-meta').innerText(), /25 מ׳.*22\.20/s);
+  assert.match(await page.locator('.line-total-length').innerText(), /אורך כולל.*25 מ׳/s);
+  assert.match(await page.locator('.line-weight').innerText(), /משקל.*22\.20/s);
   await page.locator('#priceBox').waitFor();
   assert.match(await page.locator('#priceBreakdown').innerText(), /22\.20/);
   await page.goBack();
@@ -364,12 +365,29 @@ test('mobile history renders the existing orders, retains filters and pages with
     if (/\/api\/c\/(finance|orders\/history)/.test(req.url())) reads.push(new URL(req.url()).pathname);
   });
   await page.locator('#portalHistoryStatus').selectOption('הושלם');
-  await page.locator('#portalHistoryFrom').fill('2000-01-01');
+  for (const name of ['מסך בקרה כספי', 'היסטוריית הזמנות']) {
+    const heading = page.getByRole('heading', { name, exact: true });
+    assert.equal(await heading.evaluate(el => getComputedStyle(el).borderTopWidth), '0px');
+  }
+  const from = page.getByLabel('מתאריך', { exact: true });
+  const to = page.getByLabel('עד תאריך', { exact: true });
+  assert.equal(await page.locator('label[for=portalHistoryFrom]').isVisible(), true);
+  assert.equal(await page.locator('label[for=portalHistoryTo]').isVisible(), true);
+  await from.fill('31/02/2000');
   await page.locator('#portalHistoryApply').click();
+  assert.equal(await from.evaluate(el => el.validity.customError), true);
+  await from.fill('02/01/2000');
+  await to.fill('31122099');
+  const filtered = page.waitForRequest(req => new URL(req.url()).pathname === '/api/c/orders/history');
+  await page.locator('#portalHistoryApply').click();
+  const params = new URL((await filtered).url()).searchParams;
+  assert.equal(params.get('from'), '2000-01-02');
+  assert.equal(params.get('to'), '2099-12-31');
   await page.waitForFunction(() => document.querySelectorAll('#portalHistoryResults .order-card').length === 1);
   assert.match(await history.innerText(), /QA-LEGACY/);
   assert.equal(await page.locator('#portalHistoryStatus').inputValue(), 'הושלם');
-  assert.equal(await page.locator('#portalHistoryFrom').inputValue(), '2000-01-01');
+  assert.equal(await from.inputValue(), '02/01/2000');
+  assert.equal(await to.inputValue(), '31/12/2099');
   assert.deepEqual(reads, ['/api/c/orders/history']);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   await history.getByRole('button', { name: /QA-LEGACY/ }).click();
@@ -389,6 +407,26 @@ test('missing diameter price shows a persistent retry explanation and preserves 
   assert.equal((await rejected).status(), 409);
   await page.locator('#portalSubmitError').waitFor();
   assert.match(await page.locator('#portalSubmitError').innerText(), /Ø18.*נשמרו בטיוטה.*פנה למשרד טנא/);
+  const send = page.locator('#submitOrderBtn');
+  assert.equal(await send.getAttribute('aria-disabled'), 'true');
+  assert.equal(await send.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(232, 237, 242)');
+  const blockedRequests = [];
+  page.on('request', req => {
+    if (new URL(req.url()).pathname === '/api/c/order') blockedRequests.push(req);
+  });
+  await send.focus();
+  await page.keyboard.press('Enter');
+  await send.dispatchEvent('click');
+  assert.deepEqual(blockedRequests, []);
+  await page.locator('.line-element').fill('קורה');
+  assert.equal(await send.getAttribute('aria-disabled'), 'true');
+  await page.locator('.line-diameter-select').selectOption('12');
+  assert.equal(await send.getAttribute('aria-disabled'), null);
+  assert.equal(await page.locator('#portalSubmitError').isVisible(), false);
+  await page.locator('.line-diameter-select').selectOption('18');
+  await page.locator('#quoteBtn').click();
+  await page.locator('#submitOrderBtn[aria-disabled=true]').waitFor();
+  assert.match(await page.locator('#portalSubmitError').innerText(), /Ø18/);
   await page.reload();
   await page.locator('#screenOrder').waitFor();
   assert.equal(await page.locator('.line-diameter-select').inputValue(), '18');
@@ -473,4 +511,29 @@ test('phone sign-in requests a fresh OTP after logout in the same tab', async t 
   await page.locator('#authOtp').waitFor();
   await sendCode.click();
   await page.locator('#screenHome').waitFor();
+});
+
+test('390px order fields are labeled with a readable preview and a usable remove target', async t => {
+  const { url } = await isolatedPortal(t);
+  const page = await browserPage(t);
+  await openHome(page, url);
+  await page.locator('#newOrderAction').click();
+  for (const name of ['מסמך מקור להזמנה', 'הצעת מחיר לפני הזמנה']) {
+    const heading = page.getByRole('heading', { name, exact: true });
+    assert.equal(await heading.evaluate(el => getComputedStyle(el).borderTopWidth), '0px');
+  }
+  const row = page.locator('.order-line-row').first();
+  for (const name of ['אלמנט', 'צורה ומידות', 'קוטר (מ״מ)', 'כמות', 'אורך כולל', 'משקל']) {
+    assert.equal(await row.getByText(name, { exact: true }).isVisible(), true, name);
+  }
+  assert((await row.locator('.line-shape-sketch svg').boundingBox()).height >= 100);
+  const remove = row.getByRole('button', { name: 'מחיקת פריט 1' });
+  const bounds = await remove.boundingBox();
+  assert(bounds.width >= 44 && bounds.height >= 44);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+  const firstId = await row.getAttribute('data-item-id');
+  await page.getByRole('button', { name: 'הוסף פריט' }).click();
+  await remove.click();
+  assert.equal(await page.locator('.order-line-row').count(), 1);
+  assert.notEqual(await row.getAttribute('data-item-id'), firstId);
 });
