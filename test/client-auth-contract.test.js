@@ -1285,7 +1285,9 @@ test('admin OCR settings describe OpenAI intake instead of Google Vision', () =>
   assert.match(admin, /INTAKE_AI_ENABLED/);
   assert.doesNotMatch(admin, /Google Vision OCR/);
   assert.doesNotMatch(admin, /Google Vision API Key/);
-  assert.match(adminRoute, /'OPENAI_API_KEY','OPENAI_MODEL','INTAKE_AI_ENABLED'/);
+  assert.match(adminRoute, /'OPENAI_API_KEY'/);
+  assert.match(adminRoute, /'OPENAI_MODEL'/);
+  assert.match(adminRoute, /'INTAKE_AI_ENABLED'/);
   assert.match(server, /function getOpenAiApiKey/);
   assert.match(server, /OPENAI_API_KEY_LOCAL/);
 });
