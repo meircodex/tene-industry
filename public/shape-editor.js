@@ -1400,7 +1400,7 @@ LiftEngine.render = function(lift, w = 300, h = 260) {
   g += `<line x1="${f(x + bw * 0.72)}" y1="${f(y - 4)}" x2="${f(x + bw * 0.72)}" y2="${f(y + bh + 4)}" stroke="#1a2332" stroke-width="2.4"/>`;
   g += `<text data-se-focus="lift-bar-length" x="${f(w / 2)}" y="${f(y - 16)}" text-anchor="middle" font-size="12" font-family="Heebo,Arial" font-weight="800" fill="#1a2533">L ${barLengthMm ? Math.round(barLengthMm / 10) : "—"} ס״מ</text>`;
   g += `<text data-se-focus="lift-diameter" x="${f(w / 2)}" y="${f(y + bh + 22)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#526070">&#216;${diameter || "—"} מ״מ</text>`;
-  g += `<text data-se-focus="lift-packages lift-weighed" x="${f(w / 2)}" y="${f(y + bh + 38)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#526070">${packages || "—"} חבילות · ${weighed ? weighed.toFixed(1) + " ק״ג סה״כ" : "טרם נשקל"}</text>`;
+  g += `<text data-se-focus="lift-packages lift-weighed" x="${f(w / 2)}" y="${f(y + bh + 38)}" text-anchor="middle" font-size="11" font-family="Heebo,Arial" font-weight="800" fill="#526070">${packages || "—"} חבילות · ${weighed ? weighed.toFixed(2) + " ק״ג סה״כ" : "טרם נשקל"}</text>`;
   g += `</g>`;
   return g;
 };
@@ -1940,7 +1940,7 @@ function legacyApprovedShapeFields(shape, contract) {
     shapeType: contract.shapeType,
     family,
   };
-  if (family === 'mesh' || family === 'piles') return { ...base, ...contract.data };
+  if (family === 'mesh' || family === 'piles' || family === 'lifts') return { ...base, ...contract.data };
   if (family === 'spirals') return {
     ...base,
     ...contract.data,
@@ -1963,7 +1963,8 @@ function legacyApprovedShapeFields(shape, contract) {
 
 // ── SHAPE EDITOR CLASS ────────────────────────────────────────────
 class ShapeEditorModal {
-  constructor(onSelect) {
+  constructor(onSelect, { catalogueUrl = () => '/api/shape-definitions' } = {}) {
+    this._catalogueUrl = catalogueUrl;
     this.onSelect   = onSelect;
     this.current    = null;
     this._camTheta  = Math.PI / 4; // camera azimuth  (default 45°, matches isometric)
@@ -1988,6 +1989,7 @@ class ShapeEditorModal {
   display:flex;align-items:center;justify-content:center;
   opacity:0;pointer-events:none;transition:opacity 0.2s;backdrop-filter:blur(4px);
 }
+#seOverlay:not(.show){visibility:hidden;}
 #seOverlay.show{opacity:1;pointer-events:all;}
 #seModal{
   background:#ffffff;border:1px solid #d0d8e4;border-radius:12px;
@@ -3056,7 +3058,7 @@ class ShapeEditorModal {
   font:900 11px/1.1 Heebo,Arial,sans-serif;
   cursor:pointer;
 }
-#seModal .se-pile-group-tab[aria-selected="true"]{
+#seModal .se-pile-group-tab[aria-pressed="true"]{
   border-color:#172033;
   background:#172033;
   color:#fff;
@@ -3680,7 +3682,7 @@ class ShapeEditorModal {
       <div class="se-svg-wrap" id="seSvgWrap">
         <svg id="seShapeSvg" viewBox="0 0 300 290" preserveAspectRatio="xMidYMid meet"></svg>
       </div>
-      <div class="se-pile-component-gallery" id="sePileComponentGallery" hidden aria-label="רכיבי הכלוב"></div>
+      <div class="se-pile-component-gallery" id="sePileComponentGallery" hidden role="group" aria-label="רכיבי הכלוב"></div>
     </div>
     <!-- Right: dimension table -->
     <div class="se-data-panel">
@@ -3772,8 +3774,8 @@ class ShapeEditorModal {
         <div class="se-summary-item primary"><span>סה״כ אורך</span><div><strong id="sePerimeter">0</strong><small>ס״מ</small></div></div>
         <div class="se-summary-item"><span>אורך בס״מ</span><div><strong id="seBarLength">0</strong><small>ס״מ</small></div></div>
         <div class="se-summary-item"><span>משקל מחושב</span><div><strong id="seTotalWeight">0.00</strong><small>ק״ג</small></div></div>
-        <div class="se-summary-item se-quantity-item" style="display:none"><span>כמות</span><div><input id="seQuantityInput" class="se-quantity-input" type="number" min="1" step="1" value="1" onfocus="this.select()" oninput="window._seEditor?._setQuantity(this.value)"><small>יח׳</small></div></div>
-        <div class="se-summary-item" id="seDiameterItem" style="display:none"><span>קוטר</span><div><select id="seDiameterSelect" class="se-quantity-input" onchange="window._seEditor?._setDiameter(this.value)"><option value="0">—</option>${[5.5,6,8,'8|smooth',10,'10|smooth',12,14,16,18,20,22,25,28,32,36,40].map(option => { const smooth = String(option).endsWith('|smooth'); const d = String(option).replace('|smooth',''); return `<option value="${option}">${d}${smooth ? ' חלק' : ''}</option>`; }).join('')}</select><small>מ״מ</small></div></div>
+        <div class="se-summary-item se-quantity-item" style="display:none"><span>כמות</span><div><input id="seQuantityInput" aria-label="כמות יחידות" class="se-quantity-input" type="number" min="1" step="1" value="1" onfocus="this.select()" oninput="window._seEditor?._setQuantity(this.value)"><small>יח׳</small></div></div>
+        <div class="se-summary-item" id="seDiameterItem" style="display:none"><span>קוטר</span><div><select id="seDiameterSelect" aria-label="קוטר ברזל במילימטרים" class="se-quantity-input" onchange="window._seEditor?._setDiameter(this.value)"><option value="0">—</option>${[5.5,6,8,'8|smooth',10,'10|smooth',12,14,16,18,20,22,25,28,32,36,40].map(option => { const smooth = String(option).endsWith('|smooth'); const d = String(option).replace('|smooth',''); return `<option value="${option}">${d}${smooth ? ' חלק' : ''}</option>`; }).join('')}</select><small>מ״מ</small></div></div>
         <div class="se-summary-item" id="seRadiusItem" style="display:none"><span>רדיוס כיפוף</span><div><input id="seRadiusInput" class="se-quantity-input" type="number" min="0" step="0.1" placeholder="אוטומטי" onfocus="this.select()" oninput="window._seEditor?._setBendRadius(this.value)"><small>ס״מ</small></div></div>
         <div class="se-summary-item"><span>כיפופים</span><strong id="seBends">0</strong></div>
       </div>
@@ -3846,7 +3848,7 @@ class ShapeEditorModal {
     this._canManageCatalogue = false;
     this._syncCatalogueMode();
     try {
-      const response = await fetch('/api/shape-definitions');
+      const response = await fetch(this._catalogueUrl());
       if (!response.ok) throw await window.IronBendMessages.responseError(response, 'catalogue unavailable');
       const result = await response.json();
       this._sharedShapes = Array.isArray(result.entries) ? result.entries : [];
@@ -4351,7 +4353,12 @@ class ShapeEditorModal {
       const bySideCount = candidates.find(shape => Array.isArray(shape.sides) && shape.sides.length === requestedSideCount);
       if (bySideCount) return bySideCount;
     }
-    return candidates[0] || presets.find(shape => (shape.family || 'bars') === normalizedFamily) || fallback;
+    const preset = candidates[0] || presets.find(shape => (shape.family || 'bars') === normalizedFamily);
+    if (preset) return preset;
+    if (normalizedFamily === 'piles' || normalizedFamily === 'lifts') {
+      return this._catalogueEntries().find(entry => entry.shape.family === normalizedFamily)?.shape || null;
+    }
+    return fallback;
   }
 
   _startDefaultEdit(family = 'bars') {
@@ -4363,7 +4370,11 @@ class ShapeEditorModal {
     this._selectedCategory = '';
     if (this._selectedSideCount === undefined) this._selectedSideCount = this._selectedCount || null;
     const preset = this._defaultPresetForFamily(family);
-    if (preset) this._loadPreset(preset);
+    if (!preset) {
+      this._showToast('אין כרגע צורה זמינה במשפחה זו בקטלוג');
+      return;
+    }
+    this._loadPreset(preset);
     if(authoring) {
       this._shapeMode='authoring';this._catalogueEditTarget=target;
       this.current.catalogIdentity=target;
@@ -4454,7 +4465,7 @@ class ShapeEditorModal {
   _goToEdit() {
     this._currentPage = 'edit';
     this._activeSeg = null; // clear selection when entering edit page
-    if (this.current?.roundPileCage) this._activePileSection = 'general';
+    if (this.current?.roundPileCage) this._activePileSection = this.current.hoopQuantity === '' ? 'hoops' : 'general';
     document.getElementById('sePageCount').style.display  = 'none';
     document.getElementById('sePageSelect').style.display = 'none';
     document.getElementById('sePageEdit').style.display   = '';
@@ -4833,6 +4844,8 @@ class ShapeEditorModal {
     const focusAttrs = focusKey
       ? ` data-se-param="${focusKey}" onmouseenter="window._seEditor?._setFieldFocus('${focusKey}')" onmouseleave="window._seEditor?._clearFieldFocus('${focusKey}')" onfocusin="window._seEditor?._setFieldFocus('${focusKey}')" onfocusout="window._seEditor?._clearFieldFocus('${focusKey}')"`
       : '';
+    const accessibleName = svgEscape([label, unit].filter(Boolean).join(' '));
+    input = input?.replace(/<(input|select|textarea)\b(?![^>]*aria-label=)/, `<$1 aria-label="${accessibleName}"`) || '';
     return `<div class="se-field-shell"${focusAttrs}><span class="se-param-label">${label}</span>${input}<span class="se-param-unit">${unit}</span><span class="se-param-example">${example}</span></div>`;
   }
 
@@ -5057,8 +5070,7 @@ class ShapeEditorModal {
     const n = Number(val);
     if (!Number.isFinite(n) || n < 0) return;
     this.current[key] = key === 'barLength' ? n * 10 : n;
-    this._render();
-    this._updateSummaryValues();
+    this._updatePreview();
   }
 
   _renderMeshEditor() {
@@ -5349,13 +5361,13 @@ class ShapeEditorModal {
         ['bars', 'זיון אורך', 'straightBarCount'],
         ['spiral', 'ספירלה', 'spiralDiameter'],
         ['hoops', 'טבעות', 'hoopQuantity'],
-      ].map(([id, label, fieldKey]) => `<button type="button" class="se-pile-group-tab" data-pile-group-tab="${id}" aria-selected="${activeSection === id}" onclick="window._seEditor._activatePileCageField('${id}','${fieldKey}')">${label}</button>`).join('');
+      ].map(([id, label, fieldKey]) => `<button type="button" class="se-pile-group-tab" data-pile-group-tab="${id}" aria-pressed="${activeSection === id}" onclick="window._seEditor._activatePileCageField('${id}','${fieldKey}')">${label}</button>`).join('');
       const cageName = svgEscape(pile.structElement ?? this._pendingElementName ?? '');
       body.innerHTML = `
         <tr class="se-pile-engineering-grid-row"><td colspan="5">
           <nav class="se-pile-group-tabs" data-pile-quick-entry aria-label="קיצורי הזנה מהירה">${groupTabs}</nav>
           <div class="se-pile-engineering-grid">
-            ${section('general', 'כלוב', sectionSummary.general, `<div class="se-pile-identity-grid"><div class="se-pile-name-field"><label>סימון</label><input type="text" value="${cageName}" data-pile-element-name autocomplete="off" placeholder="A / P-01" oninput="window._seEditor._setElementName(this.value)"></div>${compactField('pileDiameter', 1)}${compactField('pileLength', 1)}</div>${advanced(`<div class="se-pile-template-row"><label>תבנית<select data-pile-template onchange="window._seEditor._applyPileCageTemplate(this.value)"><option value="${ROUND_PILE_CAGE_STANDARD_TEMPLATE}" ${templateValue === ROUND_PILE_CAGE_STANDARD_TEMPLATE ? 'selected' : ''}>סטנדרטית</option><option value="custom" ${templateValue === 'custom' ? 'selected' : ''}>מותאמת</option></select></label></div>`)}<div class="se-pile-inline-error" data-pile-errors="general"></div>`)}
+            ${section('general', 'כלוב', sectionSummary.general, `<div class="se-pile-identity-grid"><div class="se-pile-name-field"><label>סימון</label><input type="text" aria-label="סימון" value="${cageName}" data-pile-element-name autocomplete="off" placeholder="A / P-01" oninput="window._seEditor._setElementName(this.value)"></div>${compactField('pileDiameter', 1)}${compactField('pileLength', 1)}</div>${advanced(`<div class="se-pile-template-row"><label>תבנית<select data-pile-template onchange="window._seEditor._applyPileCageTemplate(this.value)"><option value="${ROUND_PILE_CAGE_STANDARD_TEMPLATE}" ${templateValue === ROUND_PILE_CAGE_STANDARD_TEMPLATE ? 'selected' : ''}>סטנדרטית</option><option value="custom" ${templateValue === 'custom' ? 'selected' : ''}>מותאמת</option></select></label></div>`)}<div class="se-pile-inline-error" data-pile-errors="general"></div>`)}
             ${section('bars', 'זיון אורך', sectionSummary.bars, `<div class="se-pile-bars-grid">${compactField('straightBarCount', 0)}${compactField('bentBarCount', 0)}${compactField('longitudinalDiameter', 1)}${compactField('straightBarLength', 1)}${compactField('bendLength', 0)}${compactField('bendAngle', 0)}${bendOrientationField()}${compactSelect('barSpacingDisplayMode', [['center','C/C'], ['clear','CLEAR']])}</div>`)}
             ${section('spiral', 'ספירלה', sectionSummary.spiral, `<div class="se-pile-spiral-head">${compactField('spiralDiameter', 1)}${compactField('spiralOuterDiameter', 1)}<div class="se-derived-chip" data-pile-derived="spiralTurns">${displaySpiralTurns} ↻</div></div><div class="se-zone-engineering-grid">${segmentRows}</div><button type="button" class="se-add-btn se-zone-add" onclick="window._seEditor._addSpiralZone()">+ מקטע</button><div class="se-pile-inline-error" data-pile-errors="spiral"></div>`)}
             ${section('hoops', 'טבעות', sectionSummary.hoops, `<div class="se-pile-hoops-grid">${compactField('hoopQuantity', 0)}${compactField('hoopDiameter', 1)}${compactField('hoopOuterDiameter', 1)}${compactField('hoopStart', 0)}${compactField('hoopSpacing', 1)}</div><div class="se-pile-inline-error" data-pile-errors="hoops">${localizedValidation.join(' · ')}</div>`)}
@@ -5767,7 +5779,7 @@ class ShapeEditorModal {
       if (row) row.hidden = false;
     });
     document.querySelectorAll('#seModal [data-pile-group-tab]').forEach(tab => {
-      tab.setAttribute('aria-selected', String(tab.dataset.pileGroupTab === sectionId));
+      tab.setAttribute('aria-pressed', String(tab.dataset.pileGroupTab === sectionId));
     });
     document.querySelectorAll('#seModal [data-pile-component-section]').forEach(card => {
       const selected = card.dataset.pileComponentCard === this._activePileComponent;
@@ -6734,6 +6746,11 @@ class ShapeEditorModal {
     if (enteredCode.toLowerCase() !== selectedCode.toLowerCase()) {
       document.getElementById('seCatalogStatus').textContent = 'יש לאשר את קוד הפריט באמצעות Enter או לבחור צורה מהחץ';
       document.getElementById('seItemCode').focus();
+      return;
+    }
+    if (this.current.family === 'lifts' && !(this.current.weighedKg > 0 && this.current.barLength > 0 && this.current.diameter >= 5.5)) {
+      this._showToast('יש להזין קוטר, אורך ומשקל שקילה חיוביים');
+      document.querySelector('[data-lift-field="weighedKg"]')?.focus();
       return;
     }
     if (this.current.roundPileCage) {

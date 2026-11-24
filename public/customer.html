@@ -3,7 +3,7 @@
 <head>
 <script src="/user-messages.js?v=1"></script>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>IronBend – הזמנת ברזל</title>
   <meta name="theme-color" content="#e07b39"/>
   <style>
@@ -22,11 +22,12 @@
     .header-name{font-size:14px;font-weight:700;color:#fff}
 
     /* ── Toast ── */
-    #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#233044;color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;display:none;box-shadow:var(--shadow);max-width:min(92vw,560px);text-align:center}
+    #toast{position:fixed;top:76px;pointer-events:none;left:50%;transform:translateX(-50%);background:#233044;color:#fff;padding:12px 22px;border-radius:12px;font-size:14px;font-weight:700;z-index:9999;display:none;box-shadow:var(--shadow);max-width:min(92vw,560px);text-align:center}
     #toast.show{display:block}
     #toast.err{background:var(--red)}
 
     /* ── Screen ── */
+    body > main{margin-inline:auto}
     .screen{display:none;padding:20px;max-width:600px;margin:0 auto}
     #screenHome{max-width:760px}
     #screenOrder{max-width:980px}
@@ -156,15 +157,17 @@
     .site-report-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:end;background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px;margin-bottom:14px}
     .site-report-toolbar .field{margin:0;min-width:150px;flex:1}
 
-    .order-card{background:#fff;border:0;border-radius:14px;padding:14px 16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:10px;cursor:pointer;border-right:4px solid transparent}
+    .order-card-content{position:relative;background:#fff;padding:14px 16px;border-inline-start:4px solid transparent}
+    .order-card-content .order-card{display:flex;width:100%;align-items:center;justify-content:space-between;text-align:right;font:inherit;color:inherit;background:none!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0;padding:0;cursor:pointer;position:static}
+    .order-card::after{content:'';position:absolute;inset:0}
+    .order-card:focus-visible::after{outline:2px solid var(--blue);outline-offset:-3px}
     .order-card-shell{margin-bottom:10px;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.06);overflow:hidden;background:#fff}
-    .order-card-shell .order-card{margin-bottom:0;box-shadow:none;border-radius:0}
     .order-project-assignment{display:grid;grid-template-columns:auto minmax(160px,1fr);gap:8px;align-items:center;padding:8px 12px;background:#f8fafc;border-top:1px solid var(--border)}
     .order-project-assignment label{font-size:12px;font-weight:800;color:var(--dim)}
     .order-project-assignment select{padding:8px 10px;font-size:13px}
-    .order-card.status-pending{border-right-color:#f39c12}
-    .order-card.status-prod{border-right-color:var(--blue)}
-    .order-card.status-done{border-right-color:var(--green)}
+    .order-card-content.status-pending{border-right-color:#f39c12}
+    .order-card-content.status-prod{border-right-color:var(--blue)}
+    .order-card-content.status-done{border-right-color:var(--green)}
     .order-num{font-weight:800;font-size:15px}
     .order-meta{font-size:12px;color:var(--dim);margin-top:4px;display:flex;gap:12px;flex-wrap:wrap}
     .status-badge{padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700}
@@ -281,7 +284,7 @@
     .item-detail-preview{width:92px;height:76px;background:#f8fafc;border:1px solid #e2e8ef;border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden}
     .item-detail-preview svg{width:86px;height:68px}
     .item-detail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-    .item-detail-diam{font-weight:900;font-size:18px;color:var(--orange);white-space:nowrap}
+    .item-detail-diam{font-weight:900;font-size:18px;color:#94420c;white-space:nowrap}
     .item-detail-name{font-size:15px;font-weight:900;color:var(--dark)}
     .item-detail-info{min-width:0}
     .item-detail-pills{display:flex;gap:6px;flex-wrap:wrap}
@@ -315,6 +318,33 @@
     @media(min-width:600px){.shapes-grid{grid-template-columns:repeat(4,1fr)}}
     @media(max-width:720px){.portal-shape-edit{grid-template-columns:1fr}.portal-shape-preview{min-height:150px}.portal-upload-grid{grid-template-columns:1fr}.portal-action-grid{grid-template-columns:1fr 1fr}.portal-dashboard{grid-template-columns:1fr 1fr}.finance-kpis,.finance-site-metrics{grid-template-columns:1fr 1fr}.portal-home-tabs{grid-template-columns:repeat(2,1fr)}.support-preview-banner{top:62px;align-items:stretch;flex-direction:column}.support-exit{width:100%!important}.portal-profile-grid{grid-template-columns:1fr}.portal-profile-grid .full{grid-column:auto}.new-order-btn{min-height:76px}.header-logo img{width:132px}.site-summary-grid{grid-template-columns:1fr}.site-management-toolbar{grid-template-columns:1fr 1fr}.site-management-toolbar .field{grid-column:1/-1}.site-management-toolbar .btn{width:100%}.site-detail-kpis{grid-template-columns:repeat(2,1fr)}.portal-user-form{grid-template-columns:1fr}.portal-user-form .full,.portal-user-form-head,.portal-role-help,.portal-permissions,.portal-form-error{grid-column:1}.portal-permissions{grid-template-columns:1fr}}
     @media(max-width:430px){.portal-action-grid{grid-template-columns:1fr}.portal-stepper{grid-template-columns:1fr}.screen{padding:14px}.portal-home-tabs{gap:6px}.support-preview-banner{position:relative;top:auto}.support-preview-description{display:none}}
+    .portal-icon{width:1em;height:1em;vertical-align:-.12em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+    body #portalHomeTabs .portal-home-tab.active, body .order-approval-hint{color:#94420c}
+    body #screenOrder .line-index{color:#54647a!important}
+    body .screen .btn-primary,body #screenOrder #submitOrderBtn,body #screenDetail .btn-primary,body #seModal #seOk{background:#9e4515!important;color:#fff!important}
+    body #seModal #sePerimeter,body #seModal #seItemNumber,
+    body #seModal .se-family-card.active,body #seModal #seView2D,body #seModal #seView3D{color:#803608!important}
+    body #seModal label[for="seElementName"]{color:#42556a!important}
+    body #seModal #seOk.se-blocked{background:#932c25!important;opacity:1}
+    .auth-error:empty,.pin-error:empty{display:none}
+    .auth-error,.pin-error{color:#a32828;margin:12px 0}
+    .pin-form{margin:12px 0}
+    .pin-form-actions{display:flex;gap:8px}
+    body #screenOrder .upload-choice{cursor:pointer;color:#26364a!important;background:#e8edf4!important}
+    @media(max-width:430px){
+      .header{padding:8px 14px}.header-logo img{width:105px}
+      .header-sub,.portal-action-card span,.portal-home-tab small{display:none}
+      .welcome-banner{padding:12px;margin-bottom:8px}.welcome-actions{margin-top:6px}
+      .welcome-actions #manageSitesBtn{display:none!important}
+      .portal-dashboard{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin-bottom:8px}
+      .portal-kpi{padding:6px}.portal-kpi strong{font-size:17px}.portal-kpi span{font-size:10px}
+      .portal-action-grid{grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+      .portal-action-card,.portal-action-grid .new-order-btn{min-height:44px;padding:6px 8px;font-size:14px}.portal-action-card strong{font-size:13px;margin:0}
+      .portal-home-tabs{grid-template-columns:repeat(3,minmax(0,1fr));margin-bottom:8px}
+      .portal-home-tab{min-height:44px;padding:6px}.portal-home-tab strong{margin:0}
+      #portalApprovalCenter{display:none}
+      #toast{top:56px}
+    }
   </style>
 <link rel="stylesheet" href="/theme.css">
 <link rel="stylesheet" href="/order-item-row.css?v=1">
@@ -322,17 +352,33 @@
 </head>
 <body>
 
-<div class="header">
+<header class="header">
   <div class="header-logo"><img src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל"></div>
   <div class="header-sub">כיפוף ברזל מקצועי</div>
   <div class="header-name" id="headerName"></div>
-</div>
+</header>
 
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+<svg aria-hidden="true" width="0" height="0" style="position:absolute">
+  <symbol id="portal-icon-orders" viewBox="0 0 24 24"><path d="M5 3h14v18H5z M8 7h8M8 12h8M8 17h6"/></symbol>
+  <symbol id="portal-icon-profile" viewBox="0 0 24 24"><path d="M5 21v-2a7 7 0 0114 0v2 M12 3a4 4 0 100 8 4 4 0 000-8"/></symbol>
+  <symbol id="portal-icon-site" viewBox="0 0 24 24"><path d="M3 21h18M6 21V6h8v15M14 11h4v10M9 10v1m0 3v1m0 3v1"/></symbol>
+  <symbol id="portal-icon-finance" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 10h18m-15 5h4"/></symbol>
+  <symbol id="portal-icon-price" viewBox="0 0 24 24"><path d="M3 4h8l10 10-7 7L3 10z M7 8h.01"/></symbol>
+  <symbol id="portal-icon-docs" viewBox="0 0 24 24"><path d="M3 5h7l2 3h9v12H3z"/></symbol>
+  <symbol id="portal-icon-calendar" viewBox="0 0 24 24"><path d="M4 6h16v15H4z M8 3v6m8-6v6M4 11h16"/></symbol>
+  <symbol id="portal-icon-clock" viewBox="0 0 24 24"><path d="M12 3a9 9 0 100 18 9 9 0 000-18 M12 7v5l3 2"/></symbol>
+  <symbol id="portal-icon-weight" viewBox="0 0 24 24"><path d="M8 8h8l4 12H4z M10 8V6a2 2 0 014 0v2"/></symbol>
+  <symbol id="portal-icon-pin" viewBox="0 0 24 24"><path d="M12 22s7-6 7-12a7 7 0 10-14 0c0 6 7 12 7 12z M12 8a2 2 0 100 4 2 2 0 000-4"/></symbol>
+  <symbol id="portal-icon-attachment" viewBox="0 0 24 24"><path d="M8 13l6-6a3 3 0 014 4l-8 8a4 4 0 01-6-6l8-8"/></symbol>
+</svg>
+<main>
+<div class="screen active" id="screenLoading"><p class="loader" role="status">טוען את פורטל הלקוחות…</p></div>
 <!-- ══ AUTH SCREEN ══ -->
-<div class="screen active" id="screenAuth">
+<div class="screen" id="screenAuth">
   <div class="auth-box" style="margin-top:40px">
+    <div id="portalAuthError" class="auth-error" role="alert"></div>
     <div class="auth-logo"><img src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל"></div>
     <h2>ברוכים הבאים</h2>
     <p>הכנסו פרטים כדי לבצע הזמנה ולעקוב אחרי הזמנות קיימות</p>
@@ -394,14 +440,29 @@
     <button type="button" class="btn support-exit" onclick="exitSupportMode()">יציאה ממצב לקוח</button>
   </div>
   <div class="welcome-banner">
-    <h2 id="welcomeName">שלום 👋</h2>
+    <h1 id="welcomeName" style="font-size:20px">שלום</h1>
     <p id="welcomeSub"><span id="portalRoleLabel">פורטל לקוח</span> · <span id="tierLabel">מחירון</span></p>
     <div class="welcome-actions">
-      <button class="btn btn-secondary btn-sm" onclick="changePortalPin()">שינוי PIN</button>
+      <button type="button" id="changePinBtn" class="btn btn-secondary btn-sm" aria-controls="portalPinPanel" aria-expanded="false" onclick="togglePortalPinForm(true)">שינוי PIN</button>
       <button class="btn btn-secondary btn-sm" id="manageSitesBtn" onclick="openProjectPanel(false)" style="display:none">אתרים ומנהלי עבודה</button>
       <button class="btn btn-secondary btn-sm" onclick="logoutPortal()">התנתק</button>
     </div>
   </div>
+  <section id="portalPinPanel" class="section-card pin-form" aria-labelledby="portalPinTitle" hidden>
+    <h2 id="portalPinTitle" class="card-title">שינוי PIN</h2>
+    <p id="portalPinUnavailable">כדי לשנות PIN, יש להיכנס ממכשיר שאושר באמצעות סיסמה זמנית מטנא.</p>
+    <form id="portalPinForm" onsubmit="changePortalPin(event)" hidden>
+      <div class="field"><label for="portalOldPin">PIN נוכחי</label><input id="portalOldPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" required></div>
+      <div class="field"><label for="portalNewPin">PIN חדש בן 6 ספרות</label><input id="portalNewPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" required></div>
+      <div class="field"><label for="portalConfirmPin">אימות PIN חדש</label><input id="portalConfirmPin" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" required></div>
+      <p id="portalPinError" class="pin-error" role="alert"></p>
+      <div class="pin-form-actions">
+        <button type="submit" id="savePortalPinBtn" class="btn btn-secondary btn-sm">עדכן PIN</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="togglePortalPinForm(false)">ביטול</button>
+      </div>
+    </form>
+    <button type="button" id="closePortalPinInfo" class="btn btn-secondary btn-sm" onclick="togglePortalPinForm(false)">סגור</button>
+  </section>
   <div class="portal-dashboard" id="portalDashboard" aria-label="סיכום פעילות"></div>
   <div class="portal-action-grid">
     <button class="new-order-btn" id="newOrderAction" onclick="startNewOrder()">+ הזמנה חדשה</button>
@@ -410,15 +471,15 @@
     <button type="button" class="portal-action-card" onclick="setHomeSection('profile')"><strong>פרטי לקוח</strong><span>עדכון שם, כתובת ואימייל לקבלת מסמכים</span></button>
   </div>
   <nav class="portal-home-tabs" id="portalHomeTabs" role="tablist" aria-label="ניווט פורטל לקוח">
-    <button type="button" role="tab" aria-selected="true" aria-controls="homeSectionOrders" class="portal-home-tab active" id="homeTabOrders" onclick="setHomeSection('orders')"><strong>📋 הזמנות</strong><small>מעקב, אישור ושיוך לאתר</small></button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionProfile" class="portal-home-tab" id="homeTabProfile" onclick="setHomeSection('profile')"><strong>👤 פרטי לקוח</strong><small>פרטי חברה ואנשי קשר</small></button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden><strong>🏗️ אתרים והרשאות</strong><small>פרויקטים, מנהלי עבודה וגישה</small></button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionFinance" class="portal-home-tab" id="homeTabFinance" onclick="setHomeSection('finance')" hidden><strong>💳 כספים</strong><small>תקציב, משקל וחשבוניות</small></button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionPriceList" class="portal-home-tab" id="homeTabPriceList" onclick="setHomeSection('priceList')" hidden><strong>🏷️ מחירון</strong><small>המחירים שאושרו ללקוח</small></button>
-    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionDocs" class="portal-home-tab" id="homeTabDocs" onclick="setHomeSection('docs')"><strong>📁 מסמכים</strong><small>ערבויות וקבצים משותפים</small></button>
+    <button type="button" role="tab" aria-selected="true" aria-controls="homeSectionOrders" class="portal-home-tab active" id="homeTabOrders" onclick="setHomeSection('orders')"><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-orders"/></svg> הזמנות</strong><small>מעקב, אישור ושיוך לאתר</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionProfile" class="portal-home-tab" id="homeTabProfile" onclick="setHomeSection('profile')"><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-profile"/></svg> פרטי לקוח</strong><small>פרטי חברה ואנשי קשר</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionSites" class="portal-home-tab" id="homeTabSites" onclick="setHomeSection('sites')" hidden><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-site"/></svg> אתרים והרשאות</strong><small>פרויקטים, מנהלי עבודה וגישה</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionFinance" class="portal-home-tab" id="homeTabFinance" onclick="setHomeSection('finance')" hidden><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-finance"/></svg> כספים</strong><small>תקציב, משקל וחשבוניות</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionPriceList" class="portal-home-tab" id="homeTabPriceList" onclick="setHomeSection('priceList')" hidden><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-price"/></svg> מחירון</strong><small>המחירים שאושרו ללקוח</small></button>
+    <button type="button" role="tab" aria-selected="false" aria-controls="homeSectionDocs" class="portal-home-tab" id="homeTabDocs" onclick="setHomeSection('docs')"><strong><svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-docs"/></svg> מסמכים</strong><small>ערבויות וקבצים משותפים</small></button>
   </nav>
 
-  <section class="portal-home-section active" role="tabpanel" id="homeSectionOrders">
+  <section class="portal-home-section active" role="tabpanel" aria-labelledby="homeTabOrders" id="homeSectionOrders">
     <div id="portalApprovalCenter" class="approval-center"></div>
     <div class="section-heading"><h3>הזמנות אחרונות</h3><span id="ordersCount"></span></div>
     <div class="orders-toolbar">
@@ -428,23 +489,23 @@
     <div id="ordersList"><div class="loader">טוען...</div></div>
   </section>
 
-  <section class="portal-home-section" role="tabpanel" id="homeSectionProfile">
+  <section class="portal-home-section" role="tabpanel" aria-labelledby="homeTabProfile" id="homeSectionProfile">
     <div id="customerProfilePanel" class="section-card"></div>
   </section>
 
-  <section class="portal-home-section" role="tabpanel" id="homeSectionSites">
+  <section class="portal-home-section" role="tabpanel" aria-labelledby="homeTabSites" id="homeSectionSites">
     <div id="customerSitesPanel" class="section-card"></div>
   </section>
 
-  <section class="portal-home-section" role="tabpanel" id="homeSectionFinance">
+  <section class="portal-home-section" role="tabpanel" aria-labelledby="homeTabFinance" id="homeSectionFinance">
     <div id="customerFinanceDashboard"></div>
   </section>
 
-  <section class="portal-home-section" role="tabpanel" id="homeSectionPriceList">
+  <section class="portal-home-section" role="tabpanel" aria-labelledby="homeTabPriceList" id="homeSectionPriceList">
     <div id="portalPriceListPanel"></div>
   </section>
 
-  <section class="portal-home-section" role="tabpanel" id="homeSectionDocs">
+  <section class="portal-home-section" role="tabpanel" aria-labelledby="homeTabDocs" id="homeSectionDocs">
     <div class="section-card guarantee-panel">
       <div class="guarantee-head">
         <div>
@@ -454,7 +515,7 @@
         <span id="guaranteeStatus" class="guarantee-status">לא הועלה</span>
       </div>
       <div class="portal-upload-grid">
-        <input type="file" id="guaranteeFile" accept=".pdf,.jpg,.jpeg,.png"/>
+        <input type="file" id="guaranteeFile" accept=".pdf,.jpg,.jpeg,.png" aria-label="בחר טופס ערבות חתום"/>
         <button type="button" class="btn btn-secondary btn-sm" id="uploadGuaranteeBtn" onclick="uploadGuaranteeDocument(event)">העלה טופס חתום</button>
       </div>
       <div id="guaranteeDocsList" class="guarantee-list"></div>
@@ -465,7 +526,7 @@
 <!-- ══ NEW ORDER SCREEN ══ -->
 <div class="screen" id="screenOrder">
   <button class="back-btn" onclick="showScreen('screenHome')">← חזרה</button>
-  <div style="display:flex;gap:8px;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" onclick="savePortalDraft()">שמור טיוטה</button><button type="button" id="restorePortalDraftBtn" class="btn btn-secondary btn-sm" onclick="restorePortalDraft()" style="display:none">שחזר טיוטה</button></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" onclick="savePortalDraft()">שמור טיוטה</button></div>
 
   <ol class="portal-stepper" aria-label="שלבי יצירת הזמנה">
     <li class="active" aria-current="step">1. פריטים וצורות — שלב נוכחי</li>
@@ -478,8 +539,8 @@
   <div class="section-card portal-upload-card">
     <div class="card-title">מסמך מקור להזמנה</div>
     <div class="portal-upload-grid">
-      <input type="file" id="portalSourceFiles" accept=".pdf,image/*,.csv,.tsv,.xlsx,.xls" multiple onchange="handlePortalFiles(this.files)"/>
-      <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('portalSourceFiles').click()">בחר PDF / הדפסת הזמנה</button>
+      <input type="file" id="portalSourceFiles" accept=".pdf,image/*,.csv,.tsv,.xlsx,.xls" multiple hidden onchange="handlePortalFiles(this.files)"/>
+      <button type="button" class="btn btn-secondary btn-sm upload-choice" onclick="document.getElementById('portalSourceFiles').click()">בחר מסמך מקור</button>
     </div>
     <div class="portal-upload-note">
       הקובץ יועלה עם ההזמנה לבדיקה במשרד. תוכן הקובץ אינו נקרא אוטומטית.
@@ -532,7 +593,7 @@
       <div class="price-note">* המחיר כולל את התוספת לחיוב המפורטת בהצעה · אינו כולל מע"מ</div>
     </div>
     <button class="btn btn-secondary" id="quoteBtn" onclick="calcQuote(event)" style="margin-bottom:10px;width:100%">קבל הצעת מחיר</button>
-    <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder(event)">שלח הזמנה ✓</button>
+    <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder(event)">שלח הזמנה</button>
   </div>
 </div>
 
@@ -548,14 +609,16 @@
   <div id="siteDetailContent"><div class="loader">טוען אתר...</div></div>
 </div>
 
+</main>
+
 <script src="/rebar-weights.js"></script>
 <script src="/display-units.js?v=4"></script>
 <script src="/shapeSnapshot.js?v=1"></script>
 <script src="/steelRebarShapes.js?v=2-mesh"></script>
 <script src="/shapeCommercial.js?v=2"></script>
 <script src="/shapeRecognition.js?v=1"></script>
-<script src="/shape-editor.js?v=94-mesh-open"></script>
-<script src="/order-line-renderer.js?v=2"></script>
+<script src="/shape-editor.js?v=95-portal"></script>
+<script src="/order-line-renderer.js?v=3"></script>
 <script>
 // ──────────────────────────────────────────────────────
 // State
@@ -588,6 +651,11 @@ let orderItems  = []; // [{id, shapeId, shapeName, diameter, sides, angles, qty,
 let portalSourceFiles = [];
 let createdOrderId = null;
 let portalDraftIdempotencyKey = null;
+let portalDraftCustomerId = null;
+let portalPendingOrder = null;
+let portalSubmissionUserId = null;
+let PORTAL_CAN_CHANGE_PIN = false;
+let portalScreen = 'screenLoading';
 let portalHistoryFilters = { status: '', from: '', to: '', limit: 20, offset: 0, hasMore: false };
 let guaranteeDocuments = [];
 let itemIdSeq   = 0;
@@ -607,53 +675,74 @@ async function apiFetch(url, opts = {}, timeoutMs = 20000) {
 }
 
 const DIAMETERS = [5.5,6,8,10,12,14,16,18,20,22,25,28,32,36,40];
-const WEIGHTS   = {6:0.222,8:0.395,10:0.617,12:0.888,14:1.21,16:1.58,18:2.00,20:2.47,22:2.98,25:3.85,28:4.83,32:6.31,36:7.99,40:9.86};
+const portalDateFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' });
+const portalWeightFormatter = new Intl.NumberFormat('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // ──────────────────────────────────────────────────────
 // Boot
 // ──────────────────────────────────────────────────────
-(async function init() {
+function authError(status, fallback = 'לא ניתן להתחבר כרגע. יש לנסות שוב.') {
+  if (status === 429) return 'בוצעו יותר מדי ניסיונות. יש להמתין מעט ולנסות שוב.';
+  if (status === 401 || status === 403) return 'קישור הגישה אינו תקין או שפג תוקפו. יש להתחבר מחדש.';
+  return fallback;
+}
+
+function setAuthError(message = '') {
+  document.getElementById('portalAuthError').textContent = message;
+}
+
+async function init() {
   const params = new URLSearchParams(location.search);
   PENDING_ENROLLMENT_TOKEN = params.get('enroll') || '';
   if (PENDING_ENROLLMENT_TOKEN) {
     showDeviceEnrollment();
-    showScreen('screenAuth');
+    showScreen('screenAuth', { replace: true });
     return;
   }
-  // Trusted-device sessions live only for the current browser session. The
-  // long-lived device credential itself remains in an HttpOnly cookie.
   const tokenFromUrl = params.get('token');
   const trustedSessionToken = globalThis.sessionStorage?.getItem('ib_portal_session');
   TOKEN = tokenFromUrl || trustedSessionToken || localStorage.getItem('ib_token');
 
   if (TOKEN) {
-    try {
-      const me = await fetch(`/api/c/me?token=${TOKEN}`).then(r=>r.json());
-      if (me.customer) {
-        if (me.token) {
-          TOKEN = me.token;
-          const url = new URL(location.href);
-          url.searchParams.set('token', TOKEN);
-          history.replaceState({}, '', url);
-        }
-        setPortalContext(me);
-        if (!me.supportPreview) {
-          if (trustedSessionToken) globalThis.sessionStorage?.setItem('ib_portal_session', TOKEN);
-          else localStorage.setItem('ib_token', TOKEN);
-        }
-        await loadShapes();
-        await loadPriceList();
-        showHome(me.orders);
-        return;
+    const response = await apiFetch('/api/c/me?' + new URLSearchParams({ token: TOKEN })).catch(() => null);
+    const me = response?.ok ? await response.json().catch(() => null) : null;
+    if (me?.customer) {
+      TOKEN = me.token || TOKEN;
+      if (me.token) {
+        const url = new URL(location.href);
+        url.searchParams.set('token', TOKEN);
+        history.replaceState(history.state, '', url);
       }
-    } catch {}
+      setPortalContext(me);
+      if (!me.supportPreview) {
+        if (trustedSessionToken) globalThis.sessionStorage?.setItem('ib_portal_session', TOKEN);
+        else localStorage.setItem('ib_token', TOKEN);
+      }
+      await Promise.all([loadShapes(), loadPriceList()]);
+      const state = history.state;
+      if (state?.customerId === ME.id && state.screen === 'screenOrder' && PORTAL_CAPS.canOrder) {
+        showOrderScreen({ replace: true });
+        await showHome(me.orders, { background: true });
+      } else {
+        await showHome(me.orders, { replace: true });
+        if (state?.customerId === ME.id && state.screen === 'screenDetail') await openOrder(state.recordId, { replace: true });
+        if (state?.customerId === ME.id && state.screen === 'screenSiteDetail') await openSiteDetail(state.recordId, '', '', { replace: true });
+      }
+      return;
+    }
+    setAuthError(authError(response?.status));
+    if ([401, 403].includes(response?.status)) {
+      localStorage.removeItem('ib_token');
+      globalThis.sessionStorage?.removeItem('ib_portal_session');
+      const url = new URL(location.href);
+      url.searchParams.delete('token');
+      history.replaceState(null, '', url);
+    }
     TOKEN = null;
-    localStorage.removeItem('ib_token');
-    globalThis.sessionStorage?.removeItem('ib_portal_session');
   }
   await loadTrustedDeviceStatus();
-  showScreen('screenAuth');
-})();
+  showScreen('screenAuth', { replace: true });
+}
 
 async function loadShapes() {
   SHAPES = await fetch('/api/c/shapes').then(r=>r.json()).catch(()=>[]);
@@ -677,8 +766,9 @@ async function loadPriceList() {
 function setPortalContext(data) {
   if (!data) return;
   if (data.customer) ME = data.customer;
+  if ('canChangePin' in data || data.trustedDevice) PORTAL_CAN_CHANGE_PIN = Boolean(data.canChangePin || data.trustedDevice);
   PORTAL_SITES = Array.isArray(data.sites) ? data.sites : PORTAL_SITES;
-  PORTAL_DEFAULT_SITE_ID = data.defaultSiteId || data.default_site_id || PORTAL_DEFAULT_SITE_ID || null;
+  if ('defaultSiteId' in data || 'default_site_id' in data) PORTAL_DEFAULT_SITE_ID = data.defaultSiteId ?? data.default_site_id ?? null;
   PORTAL_CAN_CHOOSE_SITE = Boolean(data.canChooseSite || data.can_choose_site);
   PORTAL_USER = data.portalUser || data.portal_user || PORTAL_USER;
   PORTAL_ROLE = data.role || PORTAL_USER?.role || PORTAL_ROLE;
@@ -782,14 +872,14 @@ function renderCustomerProfilePanel() {
     </div>
     ${pending ? `<div class="loader" style="padding:12px;text-align:right">בקשת שינוי נשלחה לאישור. מבוקש: ${escapeHtml([requested?.name, requested?.email, requested?.address].filter(Boolean).join(' · '))}</div>` : ''}
     <div class="portal-profile-grid">
-      <div class="field"><label>שם לקוח</label><input id="profileCustomerName" value="${escapeHtml(ME?.name || '')}"></div>
-      <div class="field"><label>ח.פ</label><input class="portal-readonly" value="${escapeHtml(ME?.tax_id || '-')}" readonly></div>
-      <div class="field"><label>טלפון ראשי</label><input class="portal-readonly" value="${escapeHtml(ME?.phone || '-')}" readonly></div>
-      <div class="field"><label>אימייל למסמכים</label><input id="profileCustomerEmail" value="${escapeHtml(ME?.email || '')}"></div>
-      <div class="field full"><label>כתובת חברה</label><input id="profileCustomerAddress" value="${escapeHtml(ME?.address || '')}"></div>
-      <div class="field"><label>איש קשר להזמנות</label><input id="profileContactName" value="${escapeHtml(ME?.contact_name || '')}" placeholder="שם מלא"></div>
-      <div class="field"><label>טלפון איש קשר</label><input id="profileContactPhone" value="${escapeHtml(ME?.contact_phone || '')}" inputmode="tel" placeholder="05X-XXXXXXX"></div>
-      <div class="field full"><label>תנאי תשלום</label><input class="portal-readonly" value="${escapeHtml(ME?.payment_terms || 'לא הוגדר')}" readonly></div>
+      <div class="field"><label for="profileCustomerName">שם לקוח</label><input id="profileCustomerName" value="${escapeHtml(ME?.name || '')}"></div>
+      <div class="field"><label for="profileTaxId">ח.פ</label><input id="profileTaxId" class="portal-readonly" value="${escapeHtml(ME?.tax_id || '-')}" readonly></div>
+      <div class="field"><label for="profileMainPhone">טלפון ראשי</label><input id="profileMainPhone" class="portal-readonly" value="${escapeHtml(ME?.phone || '-')}" readonly></div>
+      <div class="field"><label for="profileCustomerEmail">אימייל למסמכים</label><input id="profileCustomerEmail" type="email" maxlength="254" autocomplete="email" value="${escapeHtml(ME?.email || '')}"></div>
+      <div class="field full"><label for="profileCustomerAddress">כתובת חברה</label><input id="profileCustomerAddress" value="${escapeHtml(ME?.address || '')}"></div>
+      <div class="field"><label for="profileContactName">איש קשר להזמנות</label><input id="profileContactName" value="${escapeHtml(ME?.contact_name || '')}" placeholder="שם מלא"></div>
+      <div class="field"><label for="profileContactPhone">טלפון איש קשר</label><input id="profileContactPhone" value="${escapeHtml(ME?.contact_phone || '')}" inputmode="tel" placeholder="05X-XXXXXXX"></div>
+      <div class="field full"><label for="profilePaymentTerms">תנאי תשלום</label><input id="profilePaymentTerms" class="portal-readonly" value="${escapeHtml(ME?.payment_terms || 'לא הוגדר')}" readonly></div>
       <button type="button" class="btn btn-primary full" id="saveProfileBtn" onclick="saveCustomerProfile(event)">${locked ? 'שלח בקשת שינוי' : 'שמור פרטי לקוח'}</button>
     </div>
  `;
@@ -1052,6 +1142,11 @@ async function saveCustomerProfile(event) {
     contactPhone: document.getElementById('profileContactPhone')?.value.trim(),
   };
   if (!body.name) { toast('שם לקוח חובה', true); return; }
+  if (body.email && !/^[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+$/.test(body.email)) {
+    document.getElementById('profileCustomerEmail').focus();
+    toast('יש להזין כתובת אימייל תקינה', true);
+    return;
+  }
   setButtonBusy(btn, true, 'שומר...');
   const res = await fetch('/api/c/profile', {
     method: 'POST',
@@ -1062,7 +1157,7 @@ async function saveCustomerProfile(event) {
   ME = res.data.customer || ME;
   if (res.data.request) ME.pending_profile_change_request = res.data.request;
   document.getElementById('headerName').textContent = ME?.name || '';
-  document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}! 👋`;
+  document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}!`;
   renderCustomerProfilePanel();
   toast(res.data.pendingApproval ? 'בקשת השינוי נשלחה לאישור' : 'פרטי הלקוח נשמרו');
 }
@@ -1175,9 +1270,9 @@ async function loadSiteSummaries() {
   PORTAL_SITE_SUMMARIES = Object.fromEntries(entries);
 }
 
-async function openSiteDetail(siteId, from = '', to = '') {
+async function openSiteDetail(siteId, from = '', to = '', navigation = {}) {
   PORTAL_ACTIVE_SITE_ID = Number(siteId);
-  showScreen('screenSiteDetail');
+  showScreen('screenSiteDetail', { ...navigation, recordId: siteId });
   const host = document.getElementById('siteDetailContent');
   if (host) host.innerHTML = '<div class="loader">טוען נתוני אתר...</div>';
   const query = new URLSearchParams({ token:TOKEN });
@@ -1282,7 +1377,7 @@ async function createPortalUser(event) {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
-  }).then(async r => ({ ok:r.ok, status:r.status, data: await r.json().catch(()=>null) })).catch(()=>null);
+  }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) {
     setButtonBusy(btn, false);
     setPortalUserFormError('אין חיבור לשרת. בדקו את החיבור ונסו שוב.');
@@ -1442,7 +1537,9 @@ function showStandardPortalLogin() {
 }
 
 async function loadTrustedDeviceStatus() {
-  const data = await fetch('/api/c/auth/device-status', { credentials:'same-origin' }).then(r=>r.json()).catch(()=>null);
+  const response = await apiFetch('/api/c/auth/device-status').catch(() => null);
+  if (response?.status === 429) setAuthError(authError(429));
+  const data = response?.ok ? await response.json().catch(() => null) : null;
   if (!data?.trusted) { showStandardPortalLogin(); return; }
   document.getElementById('deviceEnrollPanel').style.display = 'none';
   document.getElementById('standardAuthOptions').style.display = 'none';
@@ -1459,8 +1556,8 @@ async function activateTrustedDevice() {
   const res = await fetch('/api/c/device/activate', {
     method: 'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ enrollmentToken:PENDING_ENROLLMENT_TOKEN, pin, deviceName:navigator.platform || 'דפדפן מאושר' })
-  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן להפעיל את המחשב', true); return; }
+  }).then(async r => ({ ok:r.ok, status:r.status, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { setAuthError(res?.status === 429 ? authError(429) : res?.data?.user_message || res?.data?.error || 'לא ניתן להפעיל את המחשב'); return; }
   PENDING_ENROLLMENT_TOKEN = '';
   await completeAuth(res.data);
   toast('המחשב אושר. מעכשיו נכנסים באמצעות ה-PIN בלבד.');
@@ -1471,8 +1568,8 @@ async function loginWithTrustedDevicePin() {
   if (pin.length !== 6) { toast('יש להזין PIN בן 6 ספרות', true); return; }
   const res = await fetch('/api/c/auth/device-pin', {
     method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ pin })
-  }).then(async r => ({ ok:r.ok, data:await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res || !res.ok) { toast(res?.data?.user_message || res?.data?.error || 'לא ניתן להיכנס', true); return; }
+  }).then(async r => ({ ok:r.ok, status:r.status, data:await r.json().catch(()=>null) })).catch(()=>null);
+  if (!res || !res.ok) { setAuthError(res?.status === 429 ? authError(429) : res?.data?.user_message || res?.data?.error || 'לא ניתן להיכנס'); return; }
   document.getElementById('trustedDevicePin').value = '';
   await completeAuth(res.data);
 }
@@ -1491,9 +1588,9 @@ function normalizePortalAccessCode(value) {
 async function loginWithPortalCode() {
   const token = normalizePortalAccessCode(document.getElementById('portalAccessCode').value);
   if (token.length < 12) { toast('הכנס קוד גישה תקין', true); return; }
-  const data = await fetch(`/api/c/me?token=${encodeURIComponent(token)}`).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
+  const data = await fetch(`/api/c/me?token=${encodeURIComponent(token)}`).then(async r => ({ ok:r.ok, status:r.status, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!data || !data.ok || !data.data?.customer) {
-    toast('קוד הגישה לא תקין או בוטל', true);
+    setAuthError(authError(data?.status));
     return;
   }
   await completeAuth({ ...data.data, token });
@@ -1508,9 +1605,9 @@ async function loginWithPassword() {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ phone, password })
-  }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
+  }).then(async r => ({ ok:r.ok, status:r.status, data: await r.json().catch(()=>null) })).catch(()=>null);
   if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok) { toast(res.data?.user_message || res.data?.error || 'טלפון או סיסמה שגויים', true); return; }
+  if (!res.ok) { setAuthError(res?.status === 429 ? authError(429) : res.data?.user_message || res.data?.error || 'טלפון או סיסמה שגויים'); return; }
   if (!res.data?.enrollmentToken) { toast('לא ניתן לאשר את המחשב', true); return; }
   PENDING_ENROLLMENT_TOKEN = res.data.enrollmentToken;
   showDeviceEnrollment();
@@ -1530,9 +1627,9 @@ async function doAuth() {
     if (code.length !== 6) { toast('הכנס קוד אימות בן 6 ספרות', true); return; }
     const data = await fetch('/api/c/auth/verify', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ phone: _pendingOtpPhone || phone, code })
-    }).then(async r => ({ ok: r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
+    }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json().catch(()=>null) })).catch(()=>null);
     if (!data) { toast('שגיאה בחיבור לשרת', true); return; }
-    if (!data.ok) { toast('קוד האימות שגוי או פג תוקף', true); return; }
+    if (!data.ok) { setAuthError(data.status === 429 ? authError(429) : 'קוד האימות שגוי או פג תוקף'); return; }
     await completeAuth(data.data);
     return;
   }
@@ -1546,11 +1643,11 @@ async function doAuth() {
 
   const data = await fetch('/api/c/auth', {
     method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-  }).then(r=>r.json()).catch(()=>null);
+  }).then(async r => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => null) })).catch(() => null);
+  if (!data?.ok) { setAuthError(authError(data?.status, portalErrorMessage(data?.data, 'לא ניתן לשלוח קוד אימות'))); return; }
+  const result = data.data || {};
 
-  if (!data) { toast('שגיאה בחיבור לשרת', true); return; }
-
-  if (data.needName) {
+  if (result.needName) {
     _needName = true;
     document.getElementById('authNameField').style.display = '';
     document.getElementById('authName').focus();
@@ -1558,22 +1655,25 @@ async function doAuth() {
     return;
   }
 
-  if (data.otpRequired) {
+  if (result.otpRequired) {
     _otpRequested = true;
     _pendingOtpPhone = phone;
     document.getElementById('authOtpField').style.display = '';
-    if (data.devOtp) document.getElementById('authOtp').value = data.devOtp;
+    if (result.devOtp) document.getElementById('authOtp').value = result.devOtp;
     document.getElementById('authOtp').focus();
     toast('שלחנו לך קוד אימות');
     return;
   }
 
-  await completeAuth(data);
+  await completeAuth(result);
 }
 
 async function completeAuth(data) {
+  if (!data?.token) { setAuthError(authError()); return; }
+  setAuthError();
   TOKEN = data.token;
   setPortalContext(data);
+  showScreen('screenLoading', { replace: true });
   if (data.trustedDevice) {
     globalThis.sessionStorage?.setItem('ib_portal_session', TOKEN);
     localStorage.removeItem('ib_token');
@@ -1589,26 +1689,55 @@ async function completeAuth(data) {
   else url.searchParams.set('token', TOKEN);
   history.replaceState({}, '', url);
 
-  await loadShapes();
-  await loadPriceList();
-  showHome(null);
+  await Promise.all([loadShapes(), loadPriceList()]);
+  await showHome(data.orders, { replace: true });
 }
 
-async function changePortalPin() {
-  if (!TOKEN) return;
-  const oldPassword = (prompt('הכנס את ה-PIN הנוכחי של המחשב הזה:') || '').replace(/\D/g, '');
-  if (!oldPassword) return;
-  const newPassword = (prompt('בחר PIN חדש בן 6 ספרות למחשב הזה:') || '').replace(/\D/g, '');
-  if (!newPassword) return;
-  if (newPassword.length !== 6) { toast('ה-PIN חייב להכיל 6 ספרות', true); return; }
-  const res = await fetch('/api/c/password/change', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ token:TOKEN, oldPassword, newPassword })
-  }).then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res) { toast('שגיאה בחיבור לשרת', true); return; }
-  if (!res.ok) { toast(res.data?.user_message || res.data?.error || 'לא ניתן לשנות PIN', true); return; }
-  toast('ה-PIN עודכן');
+function togglePortalPinForm(open) {
+  const panel = document.getElementById('portalPinPanel');
+  const form = document.getElementById('portalPinForm');
+  panel.hidden = !open;
+  document.getElementById('changePinBtn').setAttribute('aria-expanded', String(open));
+  document.getElementById('portalPinUnavailable').hidden = PORTAL_CAN_CHANGE_PIN;
+  document.getElementById('closePortalPinInfo').hidden = PORTAL_CAN_CHANGE_PIN;
+  form.hidden = !PORTAL_CAN_CHANGE_PIN;
+  form.reset();
+  document.getElementById('portalPinError').textContent = '';
+  document.getElementById(open ? (PORTAL_CAN_CHANGE_PIN ? 'portalOldPin' : 'closePortalPinInfo') : 'changePinBtn').focus();
+}
+
+async function changePortalPin(event) {
+  event.preventDefault();
+  if (!TOKEN || !PORTAL_CAN_CHANGE_PIN) return;
+  const oldPassword = document.getElementById('portalOldPin').value;
+  const newPassword = document.getElementById('portalNewPin').value;
+  const confirmation = document.getElementById('portalConfirmPin').value;
+  const error = document.getElementById('portalPinError');
+  if (![oldPassword, newPassword].every(pin => /^[0-9]{6}$/.test(pin))) {
+    error.textContent = 'יש להזין PIN בן 6 ספרות בשני השדות';
+    return;
+  }
+  if (newPassword !== confirmation) { error.textContent = 'ה-PIN החדש והאימות אינם זהים'; return; }
+  error.textContent = '';
+  const button = document.getElementById('savePortalPinBtn');
+  setButtonBusy(button, true, 'מעדכן…');
+  try {
+    const response = await apiFetch('/api/c/password/change', {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: TOKEN, oldPassword, newPassword }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      error.textContent = response.status === 429 ? authError(429) : portalErrorMessage(data, 'לא ניתן לשנות PIN');
+      return;
+    }
+    togglePortalPinForm(false);
+    toast('קוד הכניסה עודכן');
+  } catch {
+    error.textContent = 'שגיאה בחיבור לשרת. יש לנסות שוב.';
+  } finally {
+    setButtonBusy(button, false);
+  }
 }
 
 function logoutPortal() {
@@ -1620,12 +1749,26 @@ function logoutPortal() {
   globalThis.sessionStorage?.removeItem('ib_portal_session');
   TOKEN = null;
   ME = null;
+  PORTAL_USER = null;
+  PORTAL_CAN_CHANGE_PIN = false;
+  PORTAL_ORDERS = [];
+  PORTAL_FINANCE = null;
+  portalDraftCustomerId = null;
+  orderItems = [];
+  portalSourceFiles = [];
+  portalPendingOrder = null;
+  portalSubmissionUserId = null;
+  document.getElementById('portalPinPanel').hidden = true;
+  document.getElementById('portalPinForm').reset();
+  document.getElementById('changePinBtn').setAttribute('aria-expanded', 'false');
+  setAuthError();
   SUPPORT_PREVIEW = false;
   document.body.classList.remove('support-preview');
   const url = new URL(location.href);
   url.searchParams.delete('token');
   history.replaceState({}, '', url);
-  loadTrustedDeviceStatus().finally(() => showScreen('screenAuth'));
+  showScreen('screenLoading', { replace: true });
+  loadTrustedDeviceStatus().finally(() => showScreen('screenAuth', { replace: true }));
 }
 
 function exitSupportMode() {
@@ -1696,13 +1839,13 @@ function renderPortalDashboard(orders = []) {
   `;
 }
 
-async function showHome(preloaded) {
+async function showHome(preloaded, navigation = {}) {
   document.getElementById('headerName').textContent = ME?.name || '';
-  document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}! 👋`;
+  document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}!`;
   const tierTxt = ME?.price_tier === 'customer' ? 'לקוח קבוע' : 'מחירון';
   document.getElementById('tierLabel').textContent = tierTxt;
   document.getElementById('portalRoleLabel').textContent = portalRoleLabel(PORTAL_ROLE);
-  showScreen('screenHome');
+  if (!navigation.background) showScreen('screenHome', navigation);
 
   let orders = preloaded ?? [];
   if (!preloaded) {
@@ -1712,18 +1855,17 @@ async function showHome(preloaded) {
       orders = d.orders ?? [];
     } catch { toast('שגיאה בטעינת הזמנות', true); }
   }
+  renderOrdersList(orders);
+  renderPortalDashboard(orders);
   await Promise.all([
     loadPortalUsers().catch(() => {}),
     loadSiteArchive().catch(() => {}),
     loadSiteSummaries().catch(() => {}),
   ]);
   syncCustomerSitesPanel();
-  await loadCustomerFinanceDashboard().catch(() => {});
-  await loadGuaranteeDocuments().catch(() => {});
+  await Promise.all([loadCustomerFinanceDashboard().catch(() => {}), loadGuaranteeDocuments().catch(() => {})]);
   renderPortalPriceListPanel();
   renderCustomerProfilePanel();
-  renderOrdersList(orders);
-  renderPortalDashboard(orders);
   configurePortalActions();
   updatePortalHomeTabs();
   setHomeSection(currentHomeSection());
@@ -1731,8 +1873,8 @@ async function showHome(preloaded) {
 
 function formatKg(value) {
   const n = Number(value);
-  if (!Number.isFinite(n)) return '-';
-  return `${n.toLocaleString('he-IL', { maximumFractionDigits: 1 })} ק"ג`;
+  if (value == null || !Number.isFinite(n)) return '-';
+  return `${portalWeightFormatter.format(n)} ק"ג`;
 }
 
 function paymentStatusText(status, days) {
@@ -1742,12 +1884,13 @@ function paymentStatusText(status, days) {
   return 'לא הגיע מועד';
 }
 
-async function loadCustomerFinanceDashboard() {
 function portalHistoryUrl() {
   const q = new URLSearchParams({ token: TOKEN, limit: String(portalHistoryFilters.limit), offset: String(portalHistoryFilters.offset) });
   for (const key of ['status', 'from', 'to']) if (portalHistoryFilters[key]) q.set(key, portalHistoryFilters[key]);
   return '/api/c/orders/history?' + q.toString();
 }
+
+async function loadCustomerFinanceDashboard() {
   const host = document.getElementById('customerFinanceDashboard');
   if (!host) return;
   if (!canViewCustomerFinance()) {
@@ -1772,7 +1915,6 @@ function portalHistoryUrl() {
   renderCustomerFinanceDashboard();
 }
 
-function renderCustomerFinanceDashboard() {
 async function applyPortalHistoryFilters() {
   portalHistoryFilters.status = document.getElementById('portalHistoryStatus')?.value || '';
   portalHistoryFilters.from = document.getElementById('portalHistoryFrom')?.value || '';
@@ -1785,6 +1927,7 @@ async function loadMorePortalHistory() {
   await loadCustomerFinanceDashboard();
 }
 
+function renderCustomerFinanceDashboard() {
   const host = document.getElementById('customerFinanceDashboard');
   if (!host || !PORTAL_FINANCE?.summary) {
     if (host) host.innerHTML = '';
@@ -1855,7 +1998,7 @@ async function loadMorePortalHistory() {
 }
 
 function formatPriceListDate(value) {
-  if (!value) return new Date().toLocaleDateString('he-IL');
+  if (!value || /^2020-01-01(?:$|[ T])/.test(String(value))) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
   return date.toLocaleDateString('he-IL');
@@ -2155,25 +2298,25 @@ function portalOrderCardsHtml(orders) {
   return (orders || []).map(o => {
     const cls = statusClass(o.status);
     const date = o.delivery_date ? `אספקה: ${o.delivery_date}` : '';
-    const weight = o.billing_weight ? `${(+o.billing_weight).toFixed(1)} ק"ג` : '';
+    const weight = o.total_weight ? formatKg(o.total_weight) : '';
     const price = o.portal_price ? `₪${(+o.portal_price).toLocaleString('he')}` : '';
     const site = o.site_name ? `אתר: ${o.site_name}` : '';
     const needsApproval = o.customerCanApprove === true;
     return `
     <div class="order-card-shell">
-      <button type="button" class="order-card ${cls}" onclick="openOrder(${o.id})" aria-label="פתיחת הזמנה ${escapeHtml(o.order_num)} — ${escapeHtml(o.status)}" style="width:100%;text-align:right;font-family:inherit;color:inherit;${needsApproval?'border:2px solid #f39c12;background:#fffdf5':''}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="order-num">${o.order_num}</div>
-          <span class="status-badge ${badgeCls(o.status)}">${needsApproval?'⏳ '+o.status:o.status}</span>
-        </div>
+      <div class="order-card-content ${cls}"${needsApproval ? ' style="border:2px solid #f39c12;background:#fffdf5"' : ''}>
+        <button type="button" class="order-card" onclick="openOrder(${o.id})" aria-label="פתיחת הזמנה ${escapeHtml(o.order_num)} — ${escapeHtml(o.status)}">
+          <span class="order-num">${escapeHtml(o.order_num)}</span>
+          <span class="status-badge ${badgeCls(o.status)}">${needsApproval ? portalIcon('clock') + ' ' : ''}${escapeHtml(o.status)}</span>
+        </button>
         <div class="order-meta">
-          ${date ? `<span>📅 ${date}</span>` : ''}
-          ${site ? `<span>🏗️ ${escapeHtml(site)}</span>` : '<span>🏗️ ללא פרויקט</span>'}
-          ${weight ? `<span>⚖️ ${weight}</span>` : ''}
-          ${price  ? `<span style="font-weight:700;color:var(--orange)">💰 ${price}</span>` : ''}
+          ${date ? `<span>${portalIcon('calendar')} ${escapeHtml(date)}</span>` : ''}
+          <span>${portalIcon('site')} ${site ? escapeHtml(site) : 'ללא פרויקט'}</span>
+          ${weight ? `<span>${portalIcon('weight')} ${weight}</span>` : ''}
+          ${price  ? `<span style="font-weight:700;color:#94420c"> ${price}</span>` : ''}
         </div>
-        ${needsApproval ? `<div style="margin-top:10px;font-size:12px;color:#e07b39;font-weight:700">👆 לחץ לאישור פרטי ההזמנה ושליחה לבדיקה</div>` : ''}
-      </button>
+        ${needsApproval ? `<div class="order-approval-hint" style="margin-top:8px;font-size:12px;font-weight:700"> לחץ לאישור פרטי ההזמנה ושליחה לבדיקה</div>` : ''}
+      </div>
       ${canAssignOrdersToProjects() ? `<div class="order-project-assignment"><label>שיוך לפרויקט</label><select aria-label="שיוך הזמנה ${escapeHtml(o.order_num)} לפרויקט" onchange="assignOrderToSite(${o.id},this.value,event)">${portalOrderSiteOptions(o)}</select></div>` : ''}
     </div>`;
   }).join('');
@@ -2198,13 +2341,14 @@ function badgeCls(s) {
 // ──────────────────────────────────────────────────────
 // Order detail
 // ──────────────────────────────────────────────────────
-async function openOrder(id) {
-  showScreen('screenDetail');
+async function openOrder(id, navigation = {}) {
+  showScreen('screenDetail', { ...navigation, recordId: id });
   document.getElementById('detailContent').innerHTML = '<div class="loader">טוען...</div>';
   const order = await fetch(`/api/c/orders/${id}?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
- if (!order) { document.getElementById('detailContent').innerHTML = '<div class="loader">לא נמצא</div>'; return; }
+  if (!order?.id) { document.getElementById('detailContent').innerHTML = '<div class="loader">ההזמנה לא נמצאה</div>'; return; }
   const documents = await loadOrderDocuments(id);
- renderDetail(order, documents);
+  if (portalScreen !== 'screenDetail' || (window.history && Number(window.history.state?.recordId) !== Number(id))) return;
+  renderDetail(order, documents);
   renderOrderDocuments(order.id, documents);
 }
 
@@ -2285,8 +2429,12 @@ function portalItemShapeMetrics(item = {}) {
     }) : {};
   const totalLengthMm = metrics.totalLengthMm ?? (Number(item.total_length_mm || 0) || (item.sides || []).reduce((sum, side) => sum + (Number(side) || 0), 0));
   const diameter = portalItemDiameter(item);
-  const kgPerM = window.IronBendRebar?.kgPerMeter(diameter) ?? WEIGHTS[diameter] ?? (diameter * diameter * 0.00617);
-  const unitWeightKg = metrics.unitWeightKg ?? (totalLengthMm / 1000) * kgPerM;
+  const barUnitWeightKg = (totalLengthMm / 1000) * window.IronBendRebar.kgPerMeter(diameter);
+  // The editor snapshot rounds the unit weight. Price the draft from its geometry.
+  if (snapshot?.family === 'bars' && snapshot.source === 'shape-editor') {
+    return { totalLengthMm, unitWeightKg: barUnitWeightKg, totalWeightKg: barUnitWeightKg * qty, quantity: qty };
+  }
+  const unitWeightKg = metrics.unitWeightKg ?? barUnitWeightKg;
   const totalWeightKg = metrics.totalWeightKg ?? (Number(item.total_weight || 0) || unitWeightKg * qty);
   return { totalLengthMm, unitWeightKg, totalWeightKg, quantity: qty };
 }
@@ -2370,7 +2518,7 @@ function renderDetail(order) {
   const isPendingApproval = order.customerStatus === 'awaiting_customer_approval' || order.customer_status === 'awaiting_customer_approval' || order.status === 'ממתינה לאישור לקוח';
   const currentIdx = STATUS_TIMELINE.findIndex(s => s.key === (order.customerStatus || order.customer_status));
   const totalQty = allItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
-  const totalWeight = Number(order.billing_weight || order.total_weight || allItems.reduce((sum, item) => sum + Number(portalItemShapeMetrics(item).totalWeightKg || item.total_weight || 0), 0));
+  const totalWeight = Number(order.total_weight || allItems.reduce((sum, item) => sum + Number(portalItemShapeMetrics(item).totalWeightKg || item.total_weight || 0), 0));
 
   const timelineHtml = STATUS_TIMELINE.map((s,i) => {
     const cls = i < currentIdx ? 'done' : i === currentIdx ? 'active' : '';
@@ -2386,7 +2534,7 @@ function renderDetail(order) {
       const angle = item.angles[i];
       return `${formatMm(side)}${angle ? ` @ ${angle}°` : ''}`;
     }).join(' · ') : '';
-    const weightLabel = itemMetrics.totalWeightKg ? `${Number(itemMetrics.totalWeightKg).toFixed(1)} \u05e7\"\u05d2` : '-';
+    const weightLabel = itemMetrics.totalWeightKg ? formatKg(itemMetrics.totalWeightKg) : '-';
     return `
     <div class="item-detail-row">
       <div class="item-detail-preview">${shapePreviewSvg(item)}</div>
@@ -2415,7 +2563,7 @@ function renderDetail(order) {
   }).join('');
 
   const price = order.portal_price ? `<div class="price-box" style="margin-top:16px">
-    <div class="price-row"><span>משקל לחיוב</span><span>${(+order.billing_weight).toFixed(2)} ק"ג</span></div>
+    <div class="price-row"><span>משקל לחיוב</span><span>${formatKg(order.billing_weight)}</span></div>
     <div class="price-row total"><span>סה"כ לתשלום</span><span>₪${(+order.portal_price).toLocaleString('he',{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
     <div class="price-note">* לא כולל מע"מ</div>
   </div>` : '';
@@ -2423,13 +2571,13 @@ function renderDetail(order) {
   // Approval banner — shown when pending customer approval
   const approvalBanner = isPendingApproval && (order.customerCanApprove ?? PORTAL_CAPS.canApprove) ? `
     <div style="background:#fff8e1;border:2px solid #f39c12;border-radius:14px;padding:18px;margin-bottom:16px;text-align:center">
-      <div style="font-size:32px;margin-bottom:8px">⏳</div>
-      <div style="font-weight:800;font-size:16px;color:#e07b39;margin-bottom:6px">ממתינה לאישורך</div>
+      <div style="font-size:32px;margin-bottom:8px">${portalIcon('clock')}</div>
+      <div style="font-weight:800;font-size:16px;color:#94420c;margin-bottom:6px">ממתינה לאישורך</div>
       <div style="font-size:13px;color:#666;margin-bottom:16px">אשר את פרטי ההזמנה כדי שנשלח אותה לבדיקה פנימית</div>
       ${price}
       <button onclick="approveOrder(${order.id}, event)"
-        style="background:#27ae60;color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:16px;font-weight:800;cursor:pointer;width:100%;margin-top:12px">
-        ✅ אשר פרטים ושלח לבדיקה
+        style="background:#186438;color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:16px;font-weight:800;cursor:pointer;width:100%;margin-top:12px">
+        אשר פרטים ושלח לבדיקה
       </button>
     </div>` : '';
 
@@ -2442,14 +2590,14 @@ function renderDetail(order) {
         </div>
         <span class="status-badge ${badgeCls(order.status)}">${order.status}</span>
       </div>
-      ${order.delivery_date?`<div style="font-size:13px;margin-top:4px">📅 אספקה: ${escapeHtml(order.delivery_date)}${order.delivery_time?' '+escapeHtml(order.delivery_time):''}</div>`:''}
-      ${order.delivery_address?`<div style="font-size:13px;color:var(--dim)">📍 ${escapeHtml(order.delivery_address)}</div>`:''}
+      ${order.delivery_date?`<div style="font-size:13px;margin-top:4px">${portalIcon('calendar')} אספקה: ${escapeHtml(order.delivery_date)}${order.delivery_time?' '+escapeHtml(order.delivery_time):''}</div>`:''}
+      ${order.delivery_address?`<div style="font-size:13px;color:var(--dim)">${portalIcon('pin')} ${escapeHtml(order.delivery_address)}</div>`:''}
       <div class="order-detail-summary">
         <div class="order-detail-kpi"><span>פריטים</span><strong>${allItems.length}</strong></div>
         <div class="order-detail-kpi"><span>כמות כוללת</span><strong>${totalQty}</strong></div>
-        <div class="order-detail-kpi"><span>משקל</span><strong>${totalWeight ? totalWeight.toFixed(1) + ' ק"ג' : '-'}</strong></div>
+        <div class="order-detail-kpi"><span>משקל</span><strong>${totalWeight ? formatKg(totalWeight) : '-'}</strong></div>
       </div>
-      ${canAssignOrdersToProjects() ? `<div class="field" style="margin:12px 0 0"><label for="detailOrderSiteAssign">שיוך ההזמנה לפרויקט</label><select id="detailOrderSiteAssign" onchange="assignOrderToSite(${order.id},this.value,event)">${portalOrderSiteOptions(order)}</select></div>` : (order.site_name ? `<div style="font-size:13px;margin-top:10px">🏗️ פרויקט: ${escapeHtml(order.site_name)}</div>` : '')}
+      ${canAssignOrdersToProjects() ? `<div class="field" style="margin:12px 0 0"><label for="detailOrderSiteAssign">שיוך ההזמנה לפרויקט</label><select id="detailOrderSiteAssign" onchange="assignOrderToSite(${order.id},this.value,event)">${portalOrderSiteOptions(order)}</select></div>` : (order.site_name ? `<div style="font-size:13px;margin-top:10px">${portalIcon('site')} פרויקט: ${escapeHtml(order.site_name)}</div>` : '')}
     </div>
 
     <div style="margin:12px 0"><button type="button" class="btn btn-secondary btn-sm" onclick="openPortalOrderPdf(${order.id})">PDF / הדפסת הזמנה</button></div>
@@ -2470,17 +2618,28 @@ async function approveOrder(orderId, event) {
   const btn = event?.currentTarget || event?.target;
   btn.disabled = true;
   btn.textContent = '...שולח';
-  const res = await fetch('/api/c/approve', {
+  const res = await apiFetch('/api/c/approve', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ token:TOKEN, orderId })
   }).then(r=>r.json()).catch(()=>null);
   if (res?.success) {
-    toast('✅ פרטי ההזמנה אושרו ונשלחו לבדיקה');
-    setTimeout(() => openOrder(orderId), 1000);
+    toast('פרטי ההזמנה אושרו ונשלחו לבדיקה');
+    const orders = PORTAL_ORDERS.map(order => Number(order.id) === Number(orderId) ? {
+      ...order,
+      status: res.status,
+      customerStatus: res.customerStatus,
+      customer_status: res.customerStatus,
+      customerStatusLabel: res.customerStatusLabel,
+      customer_status_label: res.customerStatusLabel,
+      customerCanApprove: false,
+    } : order);
+    renderOrdersList(orders);
+    renderPortalDashboard(orders);
+    if (portalScreen === 'screenDetail') await openOrder(orderId);
   } else {
     toast(portalErrorMessage(res, 'לא ניתן לאשר את פרטי ההזמנה'), true);
     btn.disabled = false;
-    btn.textContent = '✅ אשר פרטים ושלח לבדיקה';
+    btn.textContent = 'אשר פרטים ושלח לבדיקה';
   }
 }
 
@@ -2501,54 +2660,107 @@ function startNewOrder() {
     toast('אין הרשאה לפתיחת הזמנות', true);
     return;
   }
-  showScreen('screenOrder');
+  showOrderScreen();
 }
 
-function showOrderScreen() {
-function portalDraftStorageKey() { return 'ironbend.portal.draft.' + String(PORTAL_USER?.id || ME?.id || ''); }
-function savePortalDraft() {
+const portalDraftFields = {
+  deliveryDate: 'delivDate',
+  deliveryTime: 'delivTime',
+  deliveryAddress: 'delivAddr',
+  deliveryMode: 'delivMode',
+  notes: 'orderNotes',
+  siteId: 'orderSiteId',
+};
+
+function portalDraftStorageKey() {
+  return ME?.id && !SUPPORT_PREVIEW ? 'ironbend.portal.draft.customer.' + ME.id : null;
+}
+
+function ensurePortalDraftKey() {
+  portalDraftIdempotencyKey ||= window.crypto?.randomUUID?.() || 'portal-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  return portalDraftIdempotencyKey;
+}
+
+function savePortalDraft(notify = true) {
   const key = portalDraftStorageKey();
-  if (key.endsWith('.')) { toast('יש להתחבר כדי לשמור טיוטה', true); return; }
-  const draft = { orderItems, deliveryDate: document.getElementById('delivDate').value, deliveryTime: document.getElementById('delivTime').value, deliveryAddress: document.getElementById('delivAddr').value, deliveryMode: document.getElementById('delivMode').value, notes: document.getElementById('orderNotes').value };
-  localStorage.setItem(key, JSON.stringify(draft));
-  toast('הטיוטה נשמרה במכשיר זה; מסמכים מצורפים אינם נשמרים.');
-}
-function restorePortalDraft() {
+  if (!key || !orderItems.length) return false;
+  const fields = Object.fromEntries(Object.entries(portalDraftFields).map(([name, id]) => [name, document.getElementById(id).value]));
   try {
-    const draft = JSON.parse(localStorage.getItem(portalDraftStorageKey()) || 'null');
-    if (!draft) return;
-    orderItems = Array.isArray(draft.orderItems) ? draft.orderItems : orderItems;
-    document.getElementById('delivDate').value = draft.deliveryDate || '';
-    document.getElementById('delivTime').value = draft.deliveryTime || '';
-    document.getElementById('delivAddr').value = draft.deliveryAddress || '';
-    document.getElementById('delivMode').value = draft.deliveryMode || 'משלוח';
-    document.getElementById('orderNotes').value = draft.notes || '';
-    renderItems(); toast('הטיוטה שוחזרה');
-  } catch { toast('לא ניתן לשחזר את הטיוטה', true); }
+    localStorage.setItem(key, JSON.stringify({
+      ...fields, orderItems, idempotencyKey: ensurePortalDraftKey(), pendingOrder: portalPendingOrder, submissionUserId: portalSubmissionUserId,
+      createdOrderId, attachments: portalSourceFiles.map(({ name, size, type, uploaded }) => ({ name, size, type, uploaded })),
+    }));
+    if (notify) toast('הטיוטה נשמרה במכשיר זה. לאחר רענון יש לבחור מחדש קבצים שטרם הועלו.');
+    return true;
+  } catch {
+    if (notify) toast('לא ניתן לשמור טיוטה במכשיר זה', true);
+    return false;
+  }
 }
-   orderItems = [];
-   portalSourceFiles = [];
+
+function restorePortalDraft() {
+  const key = portalDraftStorageKey();
+  if (!key) return false;
+  try {
+    const legacyKey = 'ironbend.portal.draft.' + (PORTAL_USER?.id || ME.id);
+    const draft = JSON.parse(localStorage.getItem(key) || localStorage.getItem(legacyKey) || 'null');
+    if (!Array.isArray(draft?.orderItems) || !draft.orderItems.length) return false;
+    orderItems = draft.orderItems;
+    itemIdSeq = Math.max(0, ...orderItems.map(item => Number(item.id) || 0));
+    portalDraftIdempotencyKey = draft.idempotencyKey || null;
+    portalPendingOrder = draft.pendingOrder || null;
+    portalSubmissionUserId = draft.submissionUserId ?? null;
+    createdOrderId = draft.createdOrderId || null;
+    portalSourceFiles = Array.isArray(draft.attachments) ? draft.attachments : [];
+    for (const [field, id] of Object.entries(portalDraftFields)) {
+      if (field === 'siteId' && !PORTAL_SITES.some(site => String(site.id) === draft.siteId)) continue;
+      document.getElementById(id).value = draft[field] || (field === 'deliveryMode' ? 'משלוח' : '');
+    }
+    if (savePortalDraft(false)) localStorage.removeItem(legacyKey);
+    return true;
+  } catch {
+    toast('לא ניתן לשחזר את הטיוטה', true);
+    return false;
+  }
+}
+
+function showOrderScreen(navigation = {}) {
+  if (portalDraftCustomerId !== ME?.id || !orderItems.length) {
+    portalDraftCustomerId = ME?.id;
+    portalSourceFiles = [];
     createdOrderId = null;
+    portalPendingOrder = null;
+    portalSubmissionUserId = null;
     portalDraftIdempotencyKey = null;
+    for (const [field, id] of Object.entries(portalDraftFields)) {
+      document.getElementById(id).value = field === 'deliveryMode' ? 'משלוח' : '';
+    }
+    document.getElementById('portalSourceFiles').value = '';
+    renderOrderSitePicker();
+    if (!restorePortalDraft()) addItem();
+    else renderItems();
+    renderPortalFileList();
+  }
+  document.getElementById('delivDate').min = portalDateFormatter.format();
+  showScreen('screenOrder', navigation);
+}
+
+function clearPortalDraft() {
+  const key = portalDraftStorageKey();
+  if (key) {
+    try { localStorage.removeItem(key); } catch {}
+  }
+  orderItems = [];
+  portalSourceFiles = [];
   createdOrderId = null;
- portalDraftIdempotencyKey = (window.crypto?.randomUUID ? window.crypto.randomUUID() : 'portal-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-  const restore = document.getElementById('restorePortalDraftBtn'); if (restore) restore.style.display = localStorage.getItem(portalDraftStorageKey()) ? '' : 'none';
-  document.getElementById('priceBox').style.display = 'none';
-  document.getElementById('delivDate').value = '';
-  document.getElementById('delivTime').value = '';
-  document.getElementById('delivAddr').value = '';
-  document.getElementById('orderNotes').value = '';
-  renderOrderSitePicker();
-  const sourceInput = document.getElementById('portalSourceFiles');
-  if (sourceInput) sourceInput.value = '';
-  renderPortalFileList();
-  addItem();
-  showScreen('screenOrder');
+  portalPendingOrder = null;
+  portalSubmissionUserId = null;
+  portalDraftIdempotencyKey = null;
 }
 
 function addItem() {
   const id = ++itemIdSeq;
-  const shape = SHAPES[0] || { id:'s1', name:'ישר', bends:0, sides_default:'[1000]', angles_default:'[]' };
+  const shape = SHAPES.find(shape => shape.id === 's1') || { id:'s1', name:'ישר', sides_default:'[1000]', angles_default:'[]' };
   const sides = JSON.parse(shape.sides_default||'[1000]');
   const angles = JSON.parse(shape.angles_default||'[]');
   orderItems.push({ id, shapeId:shape.id, shapeName:shape.name, diameter:12, sides:[...sides], angles:[...angles], azAngles:[], elAngles:[], is3d:0, qty:1, note:'' });
@@ -2566,25 +2778,32 @@ function renderItems() {
   const el = document.getElementById('itemsList');
   const rowsHtml = orderItems.map((item,idx) => renderPortalOrderItemCard(item, idx+1)).join('');
   el.innerHTML = window.IronBendOrderLineRenderer
-    ? window.IronBendOrderLineRenderer.table({ rowsHtml, addCall:'addItem()', addLabel:'הוסף פריט', ariaLabel:'פריטי הזמנת לקוח' })
+    ? window.IronBendOrderLineRenderer.table({ rowsHtml, grouped:true, addCall:'addItem()', addLabel:'הוסף פריט', ariaLabel:'פריטי הזמנת לקוח' })
     : rowsHtml;
+  savePortalDraft(false);
+}
+
+function formatPortalTotalLength({ totalLengthMm, quantity }) {
+  if (!(totalLengthMm > 0)) return '—';
+  return ((totalLengthMm * quantity) / 1000).toLocaleString('he-IL', { maximumFractionDigits: 3 }) + ' מ׳';
 }
 
 function renderPortalOrderItemCard(item, num) {
   const itemMetrics = portalItemShapeMetrics(item);
   const totalMm = Number(itemMetrics.totalLengthMm) || (item.sides || []).reduce((sum, value) => sum + (Number(value) || 0), 0);
   const diameter = portalItemDiameter(item);
-  const kgUnit = WEIGHTS[diameter] ?? (diameter * diameter * 0.00617);
-  const weight = Number(itemMetrics.totalWeightKg) || ((totalMm / 1000) * kgUnit * item.qty);
+  const weight = itemMetrics.totalWeightKg;
   const shapeLabel = escapeHtml(item.shapeName || 'צורה');
- const lengthLabel = totalMm > 0 ? `${Math.round(totalMm).toLocaleString('he-IL')} מ"מ` : 'לחץ לעריכה';
+  const lengthLabel = totalMm > 0 ? formatMm(totalMm) : 'לחץ לעריכה';
   const diameterOptions = (DIAMETERS || []).map(d => '<option value="' + d + '"' + (Number(d) === Number(diameter) ? ' selected' : '') + '>Ø' + d + '</option>').join('');
   if (window.IronBendOrderLineRenderer) return window.IronBendOrderLineRenderer.render({
     id: item.id, lineLabel: num + '/' + (orderItems.length || num), elementName: item.elementName || '',
     qty: item.qty, diameter, hasShape: totalMm > 0, isPileCage: false,
     shapeSketch: shapePreviewSvg(item), diameterOptions,
-    unitLengthCm: Math.round(totalMm / 10), totalLength: lengthLabel, weight: weight > 0 ? weight.toFixed(2) + ' ק"ג' : '',
-    openCall: 'openPortalShapeEditor(' + item.id + ')',
+    unitLengthCm: totalMm / 10, totalLength: formatPortalTotalLength(itemMetrics), weight: weight > 0 ? formatKg(weight) : '',
+    diameterReadOnly: Boolean(item.family && item.family !== 'bars'),
+    mobileShapeLabel: item.family && item.family !== 'bars' ? item.shapeName : '',
+    openCall: 'openPortalShapeEditor(' + item.id + ')', shapeLabel: 'עריכת צורה: ' + (item.shapeName || 'מוט'),
     updateQtyCall: "updateField(" + item.id + ",'qty',+this.value||1)",
     updateElementCall: "updateField(" + item.id + ",'elementName',this.value)",
     updateDiamCall: "updateField(" + item.id + ",'diameter',+this.value)",
@@ -2605,7 +2824,7 @@ function renderPortalOrderItemCard(item, num) {
         <div class="no-metric ib-metric"><span>קוטר</span><strong>Ø${escapeHtml(diameter)}</strong></div>
         <div class="no-metric ib-metric"><span>אורך</span><strong>${lengthLabel}</strong></div>
         <div class="no-metric ib-metric"><span>כמות</span><strong>${escapeHtml(item.qty)}</strong></div>
-        <div class="no-metric ib-metric"><span>משקל</span><strong>${weight > 0 ? weight.toFixed(2) + ' ק"ג' : '-'}</strong></div>
+        <div class="no-metric ib-metric"><span>משקל</span><strong>${weight > 0 ? formatKg(weight) : '-'}</strong></div>
       </div>
       <div class="no-item-fields ib-line-fields">
         <label class="no-field-mini ib-field-label">כמות
@@ -2630,8 +2849,8 @@ function renderItemRow(item, num) {
 
   const segsHtml = item.sides.map((s,i) => `
     <div>
-      <input class="seg-input" type="number" inputmode="decimal" min="0" step="0.1" value="${IronBendDisplayUnits.millimetersToCentimeters(s) ?? ''}"
-        onchange="updateSeg(${item.id},${i},IronBendDisplayUnits.centimetersToMillimeters(this.value)||0)"
+      <input class="seg-input" type="number" inputmode="decimal" min="0" step="0.1" value="${window.IronBendDisplayUnits.millimetersToCentimeters(s) ?? ''}"
+        onchange="updateSeg(${item.id},${i},window.IronBendDisplayUnits.centimetersToMillimeters(this.value)||0)"
         placeholder="${i===0?'ס"מ':''}" style="width:70px"/>
       <div class="seg-label">קטע ${i+1}</div>
     </div>
@@ -2639,8 +2858,7 @@ function renderItemRow(item, num) {
 
   // Weight estimate
   const totalMm = item.sides.reduce((s,v)=>s+v,0);
-  const kgUnit  = WEIGHTS[item.diameter] ?? (item.diameter*item.diameter*0.00617);
-  const weight  = (totalMm/1000)*kgUnit*item.qty;
+  const weight = portalItemShapeMetrics(item).totalWeightKg;
   const price   = (PRICE_LIST[item.diameter]||0)*weight;
   const shapeLabel = escapeHtml(item.shapeName || 'צורה');
   const segmentLabel = item.sides.length ? item.sides.map(v => escapeHtml(formatMm(v))).join(' / ') : 'ללא צלעות';
@@ -2652,7 +2870,7 @@ function renderItemRow(item, num) {
       <span class="portal-line-head">
         <span class="portal-pill">כמות <strong>${escapeHtml(item.qty)}</strong></span>
         <span class="portal-pill">Ø <strong>${escapeHtml(item.diameter)}</strong></span>
-        <span class="portal-pill">משקל <strong>${weight.toFixed(2)} ק"ג</strong></span>
+        <span class="portal-pill">משקל <strong>${formatKg(weight)}</strong></span>
       </span>
       <button class="remove-item" onclick="removeItem(${item.id})">✕</button>
     </div>
@@ -2696,7 +2914,7 @@ function renderItemRow(item, num) {
       </div>
     </div>
     <div style="font-size:12px;color:var(--dim);margin-top:6px">
-      ⚖️ ${weight.toFixed(2)} ק"ג${price?' · ≈ '+formatMoney(price):''}
+      ${portalIcon('weight')} ${formatKg(weight)}${price?' · ≈ '+formatMoney(price):''}
     </div>
   </div>`;
 }
@@ -2727,11 +2945,36 @@ function updateSeg(id, segIdx, val) {
   renderItems();
 }
 
-function updateField(id, field, val) {
-  const item = orderItems.find(i=>i.id===id);
-  if (!item) return;
-  item[field] = val;
-  if (field === 'diameter') { item.shapeSnapshot = null; item.editorData = null; }
+function updateField(id, field, value) {
+  const item = orderItems.find(entry => entry.id === id);
+  if (!item || (field === 'diameter' && (item.family || 'bars') !== 'bars')) return;
+  item[field] = value;
+  const row = document.getElementById('item-row-' + id);
+  if (field === 'qty' || field === 'elementName') {
+    document.getElementById('priceBox').style.display = 'none';
+    const meta = row?.querySelector?.('.line-mobile-meta');
+    if (field === 'qty') {
+      const metrics = portalItemShapeMetrics(item);
+      const length = formatPortalTotalLength(metrics);
+      const weight = metrics.totalWeightKg > 0 ? formatKg(metrics.totalWeightKg) : '—';
+      const weightCell = row?.querySelector?.('.line-weight');
+      const lengthCell = row?.querySelector?.('.line-total-length');
+      if (weightCell) weightCell.textContent = weight;
+      if (lengthCell) lengthCell.textContent = length;
+      if (meta) {
+        meta.children[2].textContent = length;
+        meta.children[3].textContent = weight;
+      }
+    } else if (meta) {
+      meta.children[0].textContent = item.family && item.family !== 'bars' ? item.shapeName : value || 'ללא אלמנט';
+    }
+    savePortalDraft(false);
+    return;
+  }
+  if (field === 'diameter') {
+    if (item.editorData) item.editorData.diameter = value;
+    if (item.shapeSnapshot) item.shapeSnapshot = buildShapeDataContractV2({ ...item.editorData, ...item, diameter: value });
+  }
   renderItems();
 }
 
@@ -2758,7 +3001,7 @@ function openPortalShapeEditor(id) {
     return;
   }
   portalShapeTargetId = id;
-  if (!portalShapeEditor) portalShapeEditor = new ShapeEditorModal(portalShapeSelected);
+  if (!portalShapeEditor) portalShapeEditor = new ShapeEditorModal(portalShapeSelected, { catalogueUrl: () => '/api/c/shape-definitions?' + new URLSearchParams({ token: TOKEN }) });
   const snapshot = portalParsedShapeSnapshot(item.shapeSnapshot || item.shape_snapshot_json);
   const snapshotData = snapshot?.contractVersion === 2 && snapshot.data && typeof snapshot.data === 'object' ? snapshot.data : null;
   // Keep the editor's own input units (pile dimensions use centimetres),
@@ -2823,18 +3066,28 @@ function portalShapeSelected(data) {
 }
 
 function formatMm(value) {
-  return IronBendDisplayUnits.formatLengthCmFromMm(value);
+  return window.IronBendDisplayUnits.formatLengthCmFromMm(value);
 }
 
 function formatDateTime(value) {
-  if (!value) return '';
+  if (!value || /^2020-01-01(?:$|[ T])/.test(String(value))) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function handlePortalFiles(files) {
-  portalSourceFiles = Array.from(files || []).map(file => ({ file, name: file.name, size: file.size || 0, type: file.type || '' }));
+  const selected = Array.from(files || []).map(file => ({ file, name: file.name, size: file.size, type: file.type }));
+  if (portalPendingOrder || createdOrderId) {
+    for (const entry of portalSourceFiles) {
+      if (!entry.uploaded && !entry.file) {
+        entry.file = selected.find(file => file.name === entry.name && file.size === entry.size)?.file;
+      }
+    }
+  } else {
+    portalSourceFiles = selected;
+  }
+  savePortalDraft(false);
   renderPortalFileList();
 }
 
@@ -2845,13 +3098,17 @@ function renderPortalFileList() {
     el.innerHTML = '<span class="portal-upload-note">לא צורף מסמך מקור.</span>';
     return;
   }
-  el.innerHTML = portalSourceFiles.map(file => '<span class="attached-doc">📎 ' + escapeHtml(file.name) + (file.uploaded ? ' · הועלה' : '') + '</span>').join('')
-    + (createdOrderId && portalSourceFiles.some(file => !file.uploaded)
-      ? '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="retrySourceDocumentUploads()">נסה שוב להעלות מסמכים</button>' : '');
+  el.innerHTML = portalSourceFiles.map(file => '<span class="attached-doc">' + portalIcon('attachment') + ' ' + escapeHtml(file.name)
+    + (file.uploaded ? ' · הועלה' : file.file ? '' : ' · יש לבחור מחדש') + '</span>').join('')
+    + (createdOrderId && portalSourceFiles.some(file => !file.uploaded) ? '<button type="button" class="btn btn-secondary btn-sm" onclick="submitOrder()">נסה שוב להעלות מסמכים</button>' : '');
 }
 
 async function uploadSourceDocuments(orderId) {
-  const pending = portalSourceFiles.filter(entry => !entry.uploaded && entry.file);
+  const pending = portalSourceFiles.filter(entry => !entry.uploaded);
+  if (pending.some(entry => !entry.file)) {
+    toast('יש לבחור מחדש את מסמכי המקור שטרם הועלו', true);
+    return false;
+  }
   for (const entry of pending) {
     const form = new FormData();
     form.append('token', TOKEN);
@@ -2859,11 +3116,11 @@ async function uploadSourceDocuments(orderId) {
     const result = await apiFetch('/api/c/orders/' + orderId + '/source-documents', { method: 'POST', body: form }).then(response => response.json().catch(() => ({}))).catch(() => null);
     if (!result?.success) { renderPortalFileList(); toast(portalErrorMessage(result || 'network', 'ההזמנה נוצרה, אך העלאת מסמך נכשלה. אפשר לנסות שוב.'), true); return false; }
     entry.uploaded = true;
+    savePortalDraft(false);
     renderPortalFileList();
   }
   return true;
 }
-async function retrySourceDocumentUploads() { if (createdOrderId) await uploadSourceDocuments(createdOrderId); }
 
 function shapePreviewSvg(item) {
   if (typeof item?.shape_svg === 'string' && item.shape_svg.includes('<svg')) return item.shape_svg;
@@ -2872,16 +3129,19 @@ function shapePreviewSvg(item) {
   const name = String(item.shapeName || '');
   const snapshot = portalParsedShapeSnapshot(item.shapeSnapshot || item.shape_snapshot_json) || {};
   const source = snapshot.data || {};
+  if ((snapshot.family === 'piles' || snapshot.family === 'lifts') && window.IronBendShapeGeometry?.ShapeEngineRouter) {
+    const shape = item.editorData || { ...source, family: snapshot.family, shapeType: snapshot.shapeType };
+    return `<svg viewBox="0 0 112 88" aria-hidden="true">${window.IronBendShapeGeometry.ShapeEngineRouter.render(shape, 112, 88)}</svg>`;
+  }
   if (portalItemThumb3D && sides.length && window.IronBendShapeGeometry?.shape3DSVG) {
     return `<svg viewBox="0 0 132 92" width="132" height="92" aria-hidden="true">${window.IronBendShapeGeometry.shape3DSVG(sides, angles, 132, 92, item.diameter || 12, { showAxes:false, showDims:true, dark:false, azAngles:item.is3d ? (item.azAngles || null) : null, elAngles:item.is3d ? (item.elAngles || []) : [] })}</svg>`;
   }
-  if ((snapshot.family === 'mesh' || snapshot.family === 'piles') && window.IronBendShapeGeometry?.ShapeEngineRouter) {
+  if (snapshot.family === 'mesh' && window.IronBendShapeGeometry?.ShapeEngineRouter) {
     const shape = {
       ...snapshot,
       ...source,
       family: snapshot.family,
       shapeType: snapshot.shapeType,
-      roundPileCage: source.roundPileCage === true || snapshot.shapeType === 'round_pile_cage',
     };
     return `<svg viewBox="0 0 112 88" aria-hidden="true">${window.IronBendShapeGeometry.ShapeEngineRouter.render(shape, 112, 88)}</svg>`;
   }
@@ -2921,11 +3181,15 @@ function shapePreviewSvg(item) {
       }
     }
   } catch(e) {}
-  const label = sides.length ? IronBendDisplayUnits.formatLengthCmFromMm(sides.reduce((a,b)=>a+b,0)) : 'צורה';
+  const label = sides.length ? window.IronBendDisplayUnits.formatLengthCmFromMm(sides.reduce((a,b)=>a+b,0)) : 'צורה';
   return `<svg viewBox="0 0 112 88" aria-hidden="true">
     <path d="M16 44 H96" fill="none" stroke="#0e5a78" stroke-width="7" stroke-linecap="round"/>
     <text x="56" y="32" text-anchor="middle" font-size="11" font-weight="800" fill="#1a1a2e">${escapeHtml(label)}</text>
   </svg>`;
+}
+
+function portalIcon(name) {
+  return `<svg class="portal-icon" aria-hidden="true" focusable="false"><use href="#portal-icon-${name}"/></svg>`;
 }
 
 function escapeHtml(value) {
@@ -2935,6 +3199,8 @@ function escapeHtml(value) {
 }
 
 function portalErrorMessage(value, fallback = 'לא ניתן להשלים את הפעולה') {
+  const localized = value?.user_message || value?.error;
+  if (typeof localized === 'string' && /[\u0590-\u05ff]/.test(localized)) return localized;
   const code = String(value?.code || value?.user_message || value?.error || value || '').toLowerCase();
   if (code.includes('length') || code.includes('positive')) return 'יש להזין אורכי קטעים חיוביים בכל פריט.';
   if (code.includes('shape') || code.includes('unsupported')) return 'יש לשמור את הצורה בעורך לפני המשך.';
@@ -2980,7 +3246,7 @@ async function calcQuote(event) {
 
   const bkd = data.breakdown.map(b => {
     const ppu = b.price_per_kg ?? b.pricePerKg;
-    return `<div class="price-row"><span>Ø${b.diameter} – ${Number(b.weight).toFixed(2)} ק"ג × ${formatMoney(ppu)}</span><span>${formatMoney(b.price)}</span></div>`;
+    return `<div class="price-row"><span>Ø${b.diameter} – ${formatKg(b.weight)} × ${formatMoney(ppu)}</span><span>${formatMoney(b.price)}</span></div>`;
   }).join('');
 
   document.getElementById('priceBreakdown').innerHTML = `
@@ -3001,86 +3267,131 @@ async function submitOrder(event) {
   submitOrder.inFlight = true;
   const button = event?.currentTarget || document.getElementById('submitOrderBtn');
   try { return await performPortalOrderSubmit(event); }
-  catch (error) { toast(window.IronBendMessages.text(error), true); }
+  catch (error) { toast(portalErrorMessage(error, 'לא ניתן לשלוח את ההזמנה'), true); }
   finally { submitOrder.inFlight = false; setButtonBusy(button, false); }
 }
 
 async function performPortalOrderSubmit(event) {
   const btn = event?.currentTarget || document.getElementById('submitOrderBtn');
-  if (!orderItems.length) { toast('הוסף לפחות פריט אחד', true); return; }
-  for (const item of orderItems) {
-    const snapshot = portalParsedShapeSnapshot(item.shapeSnapshot || item.shape_snapshot_json);
-    if ((item.family || snapshot?.family || 'bars') === 'bars' && (!Array.isArray(item.sides) || !item.sides.every(s=>s>0))) {
-      toast('הכנס אורכי קטעים תקינים', true); return;
-    }
-    if ((item.family || snapshot?.family) && (item.family || snapshot?.family) !== 'bars' && snapshot?.contractVersion !== 2) {
-      toast('יש לשמור את הצורה בעורך לפני שליחת ההזמנה', true); return;
-    }
+  if (portalPendingOrder && portalSubmissionUserId !== (PORTAL_USER?.id ?? null)) {
+    toast('יש להתחבר כמשתמש שהתחיל את השליחה כדי להשלים את ההזמנה', true);
+    return;
   }
-
-  const docNote = portalSourceFiles.length
-    ? `\n\nמסמכי מקור שצורפו בפורטל לבדיקה משרדית: ${portalSourceFiles.map(f => f.name).join(', ')}`
-    : '';
-
-  const body = {
-    token:       TOKEN,
-    items:       orderItems.map(portalOrderItemPayload),
-    deliveryDate: document.getElementById('delivDate').value,
-    deliveryTime: document.getElementById('delivTime').value,
-    deliveryAddress: document.getElementById('delivAddr').value + ' ' + document.getElementById('delivMode').value,
-    siteId:       selectedPortalSiteId(),
-    idempotency_key: portalDraftIdempotencyKey,
-    notes:        `${document.getElementById('orderNotes').value || ''}${docNote}`,
-  };
-
-  setButtonBusy(btn, true, 'שולח הזמנה...');
-
+  if (portalSourceFiles.some(entry => !entry.uploaded && !entry.file)) {
+    toast('יש לבחור מחדש את מסמכי המקור המצורפים', true);
+    return;
+  }
   if (createdOrderId) {
-    setButtonBusy(btn, true, 'מעלה מסמכים...');
-    const uploaded = await uploadSourceDocuments(createdOrderId);
-    setButtonBusy(btn, false);
-    if (uploaded) {
-      orderItems = []; portalSourceFiles = []; createdOrderId = null; portalDraftIdempotencyKey = null;
-      await showHome(null);
+    setButtonBusy(btn, true, 'מעלה מסמכים…');
+    if (await uploadSourceDocuments(createdOrderId)) {
+      clearPortalDraft();
+      await showHome(null, { replace: true });
     }
     return;
   }
-  const res = await apiFetch('/api/c/order',{
-    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
-  }).then(r=>r.json()).catch(()=>null);
 
-  if (!res?.success) { setButtonBusy(btn, false); toast(portalErrorMessage(res, 'לא ניתן לשלוח את ההזמנה'), true); return; }
-  createdOrderId = res.orderId;
-  if (portalSourceFiles.length && !(await uploadSourceDocuments(createdOrderId))) {
-    setButtonBusy(btn, false);
+  if (!portalPendingOrder) {
+    if (!orderItems.length) { toast('הוסף לפחות פריט אחד', true); return; }
+    for (const item of orderItems) {
+      const snapshot = portalParsedShapeSnapshot(item.shapeSnapshot || item.shape_snapshot_json);
+      const family = snapshot?.family || item.family || 'bars';
+      if (family === 'bars' && (!item.sides?.length || !item.sides.every(side => side > 0))) {
+        toast('הכנס אורכי קטעים תקינים', true);
+        return;
+      }
+      if (family !== 'bars' && snapshot?.contractVersion !== 2) {
+        toast('יש לשמור את הצורה בעורך לפני שליחת ההזמנה', true);
+        return;
+      }
+    }
+
+    const date = document.getElementById('delivDate');
+    date.min = portalDateFormatter.format();
+    if (date.value && date.value < date.min) {
+      toast('יש לבחור תאריך אספקה מהיום ואילך', true);
+      date.focus();
+      return;
+    }
+
+    const docNote = portalSourceFiles.length
+      ? '\n\nמסמכי מקור שצורפו בפורטל לבדיקה משרדית: ' + portalSourceFiles.map(file => file.name).join(', ')
+      : '';
+    portalSubmissionUserId = PORTAL_USER?.id ?? null;
+    ensurePortalDraftKey();
+    portalPendingOrder = {
+      idempotency_key: portalDraftIdempotencyKey,
+      items: orderItems.map(portalOrderItemPayload),
+      deliveryDate: date.value,
+      deliveryTime: document.getElementById('delivTime').value,
+      deliveryAddress: document.getElementById('delivAddr').value + ' ' + document.getElementById('delivMode').value,
+      siteId: selectedPortalSiteId(),
+      notes: (document.getElementById('orderNotes').value || '') + docNote,
+    };
+    savePortalDraft(false);
+  }
+
+  setButtonBusy(btn, true, 'שולח הזמנה…');
+  const response = await apiFetch('/api/c/order', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...portalPendingOrder, token: TOKEN }),
+  }).catch(() => null);
+  const result = await response?.json().catch(() => null);
+  if (!result?.success) {
+    // Ambiguous failures keep the original request for a safe replay.
+    if (response?.status >= 400 && response.status < 500 && result?.code !== 'idempotency_key_conflict') {
+      portalPendingOrder = null;
+      portalSubmissionUserId = null;
+      savePortalDraft(false);
+    }
+    toast(response?.status === 429 ? authError(429) : portalErrorMessage(result || 'network', 'לא ניתן לשלוח את ההזמנה'), true);
     return;
   }
+  createdOrderId = result.orderId;
+  savePortalDraft(false);
+  if (!(await uploadSourceDocuments(createdOrderId))) return;
 
-  if (res.awaitingApproval) {
-    toast(`הזמנה ${res.orderNum} נקלטה וממתינה לאישורך בפורטל`);
-  } else {
-    toast(`הזמנה ${res.orderNum} נשלחה בהצלחה! ✓`);
-  }
-  setTimeout(async () => {
-    orderItems = [];
-    portalSourceFiles = [];
-    setButtonBusy(btn, false);
-    await showHome(null);
-    if (res.awaitingApproval) {
-      // Auto-open the order so customer can approve inline too
-      setTimeout(() => openOrder(res.orderId), 500);
-    }
-  }, 1200);
+  clearPortalDraft();
+  toast(result.awaitingApproval ? `הזמנה ${result.orderNum} נקלטה וממתינה לאישורך בפורטל` : `הזמנה ${result.orderNum} נשלחה בהצלחה`);
+  await showHome(null, { replace: true });
+  if (result.awaitingApproval && portalScreen === 'screenHome') await openOrder(result.orderId);
 }
 
-// ──────────────────────────────────────────────────────
-// Utils
-// ──────────────────────────────────────────────────────
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+function showScreen(id, { replace = false, fromHistory = false, recordId = null } = {}) {
+  const current = window.history?.state;
+  if (!fromHistory && (replace || current?.screen !== id || current?.recordId !== recordId)) {
+    const state = { screen: id, customerId: ME?.id ?? null, recordId };
+    if (replace) window.history?.replaceState(state, '');
+    else window.history?.pushState(state, '');
+  }
+  if (portalScreen === id && current?.recordId === recordId) return;
+  if (portalScreen === 'screenOrder' && id !== 'screenOrder') portalShapeEditor?.close?.();
+  portalScreen = id;
+  document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  if (id === 'screenOrder' && !orderItems.length) showOrderScreen();
-  window.scrollTo(0,0);
+  window.scrollTo(0, 0);
+}
+
+function resumePortalHistory(event) {
+  if (!TOKEN || !ME) { showScreen('screenAuth', { replace: true }); return; }
+  const state = event.state;
+  const navigation = { fromHistory: true };
+  if (state?.customerId === ME.id) {
+    if (state.screen === 'screenOrder' && PORTAL_CAPS.canOrder) { showOrderScreen(navigation); return; }
+    if (state.screen === 'screenDetail' && state.recordId) { openOrder(state.recordId, navigation); return; }
+    if (state.screen === 'screenSiteDetail' && state.recordId) { openSiteDetail(state.recordId, '', '', navigation); return; }
+  }
+  showScreen('screenHome', state?.screen === 'screenHome' ? navigation : { replace: true });
+}
+
+function persistPortalOrderInput(event) {
+  const field = event.target;
+  if (field.matches('.line-element, .line-qty')) {
+    const id = Number(field.closest('[data-item-id]')?.dataset.itemId);
+    if (field.matches('.line-element')) updateField(id, 'elementName', field.value);
+    else if (Number(field.value) > 0) updateField(id, 'qty', Number(field.value));
+    return;
+  }
+  savePortalDraft(false);
 }
 
 function toast(msg, err=false) {
@@ -3091,6 +3402,14 @@ function toast(msg, err=false) {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.className = '', 3500);
 }
+
+window.addEventListener?.('popstate', resumePortalHistory);
+document.getElementById('screenOrder').addEventListener('input', persistPortalOrderInput);
+document.getElementById('screenOrder').addEventListener('change', persistPortalOrderInput);
+init().catch(() => {
+  setAuthError(authError());
+  showScreen('screenAuth', { replace: true });
+});
 </script>
 </body>
 </html>

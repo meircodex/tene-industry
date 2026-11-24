@@ -17,6 +17,7 @@
     "test:intake": "node test/intake-parser.test.js",
     "test:modules": "node test/module-governance.test.js",
     "test:security": "node test/security-routes.test.js",
+    "test:portal-quality": "node --test scripts/portal-quality.test.js",
     "test:smoke": "node test/app-smoke.test.js",
     "test:status": "node test/status-contracts.test.js",
     "auth:migrate:dry-run": "node scripts/migrate-auth.js",
@@ -47,7 +48,9 @@
     "ws": "^8.20.0"
   },
   "devDependencies": {
+    "axe-core": "^4.14.1",
     "mammoth": "^1.12.0",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "playwright-core": "^1.65.1"
   }
 }

@@ -321,6 +321,8 @@ function buildBarsSnapshot(snapshot, rawData = {}) {
     elAngles: is3d ? rawData.elAngles : null,
     shapeType: snapshot.shapeType,
   });
+  const totalLengthMm = contract.calculated.unitLengthMm;
+  const weightPerUnit = (totalLengthMm / 1000) * rebarKgPerMeter(diameter);
   const shapeType = snapshot.shapeType || (sides.length === 1 ? 'straight_bar' : 'custom_bar');
   const shapeId = canonicalShapeId(snapshot.shapeId, `portal-${shapeType}-${crypto.randomUUID()}`);
   const shapeSnapshot = buildFullShapeSnapshot({
@@ -332,8 +334,8 @@ function buildBarsSnapshot(snapshot, rawData = {}) {
     displayName: cleanText(snapshot.displayName, shapeTypeLabel(shapeType)),
     data: { ...contract.data, segments: contract.generic.segments, shapeType },
     calculated: {
-      totalLengthMm: contract.calculated.unitLengthMm,
-      weightKg: contract.calculated.unitWeightKg,
+      totalLengthMm,
+      weightKg: weightPerUnit,
       bendCount: contract.calculated.bendCount,
     },
     machineOutput: { generic: contract.generic },
@@ -348,8 +350,8 @@ function buildBarsSnapshot(snapshot, rawData = {}) {
     sides,
     angles,
     segments: contract.generic.segments.map(segment => ({ length_mm: segment.lengthMm, angle_deg: segment.angle_deg })),
-    totalLengthMm: contract.calculated.unitLengthMm,
-    weightPerUnit: contract.calculated.unitWeightKg,
+    totalLengthMm,
+    weightPerUnit,
     shapeDimsText: buildDimsText(sides, angles),
   };
 }

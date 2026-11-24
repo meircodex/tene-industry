@@ -8,7 +8,11 @@ const { portalShapeDraftToOrderItem } = require('../services/customerPortalShape
 const productionCards = require('../services/productionCards');
 const portalGuarantees = require('../services/portalGuarantees');
 const { portalInvoices } = require('../services/customerPortalFinance');
+const { createSavedShapeCatalog } = require('../services/savedShapeCatalog');
+const { isPortalDeliveryDateValid, withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { evaluatePortalBudget } = require('../services/portalBudget');
+
+const portalWeight = new Intl.NumberFormat('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function required(name, value) {
   if (!value) throw new Error(`routes/portal missing dependency: ${name}`);
@@ -68,8 +72,8 @@ module.exports = function createPortalRouter(deps) {
     return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
   }
   function portalIdempotencyKey(value) {
-    const key = String(value || '').trim();
-    return key ? key.slice(0, 200) : null;
+    const key = typeof value === 'string' ? value.trim() : '';
+    return key && key.length <= 200 ? key : null;
   }
   function portalWastePct() {
     const value = Number(settingsService.get('WASTE_PCT_DEFAULT', 3));
@@ -97,6 +101,7 @@ module.exports = function createPortalRouter(deps) {
     revokePortalDevice,
   } = portalAccess;
 
+  const savedShapeCatalog = createSavedShapeCatalog(db);
   const PORTAL_DEVICE_COOKIE = 'ib_portal_device';
   function readCookie(req, name) {
     const header = String(req.headers?.cookie || '');
@@ -492,10 +497,10 @@ module.exports = function createPortalRouter(deps) {
     });
   });
 
-  router.post('/c/password/change', customerPortalActionLimiter, (req, res) => {
+  router.post('/c/password/change', customerPortalAuthLimiter, (req, res) => {
     const s = session(req.body.token);
     if (!s) return res.status(401).json({ error: 'לא מורשה' });
-    if (s.supportPreview) return res.status(403).json({ error: 'במצב סיוע לא משנים את סיסמת הלקוח' });
+    if (s.supportPreview || !s.user) return res.status(403).json({ error: 'אפשר לשנות PIN רק מתוך חשבון הלקוח במכשיר מאושר' });
     const result = changePortalDevicePin(
       readCookie(req, PORTAL_DEVICE_COOKIE),
       s.user.id,
@@ -698,7 +703,7 @@ module.exports = function createPortalRouter(deps) {
       FROM orders o
       LEFT JOIN customer_sites cs ON cs.id=o.site_id
       WHERE ${access.where}
-      ORDER BY o.created_at DESC LIMIT 100
+      ORDER BY o.created_at DESC, o.id DESC LIMIT 100
     `).all(...access.params);
     const pendingProfileChangeRequest = db.prepare(`
       SELECT id,status,requested_json,created_at,updated_at
@@ -707,7 +712,8 @@ module.exports = function createPortalRouter(deps) {
       ORDER BY updated_at DESC, created_at DESC LIMIT 1
     `).get(c.id) || null;
     const projectedOrders = projectOrdersForPortal(orders, s);
-    res.json({
+    const device = resolvePortalDevice(readCookie(req, PORTAL_DEVICE_COOKIE));
+    res.set('Cache-Control', 'no-store').json({
       customer: projectCustomerForPortal(c, s, { pendingProfileChangeRequest }),
       role: s.role,
       caps: s.caps,
@@ -721,6 +727,7 @@ module.exports = function createPortalRouter(deps) {
       supportPreview: Boolean(s.supportPreview),
       supportActorUserId: s.supportActorUserId || null,
       supportPreviewExpiresAt: s.supportPreviewExpiresAt || null,
+      canChangePin: Boolean(!s.supportPreview && s.user && device?.portal_user_id === s.user.id),
       actionRequired: projectedOrders.filter(order => order.customerStatus === 'awaiting_customer_approval' || order.customerStatus === 'needs_info'),
       activeOrdersSummary: projectedOrders.slice(0, 5),
       orders: projectedOrders
@@ -732,6 +739,9 @@ module.exports = function createPortalRouter(deps) {
     if (!s) return res.status(401).json({ error: 'Unauthorized' });
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim() || null;
+    if (email && (email.length > 254 || !/^[^\s@<>]+@[^\s@<>.]+(?:\.[^\s@<>.]+)+$/.test(email))) {
+      return res.status(400).json({ error: 'יש להזין כתובת אימייל תקינה' });
+    }
     const address = String(req.body.address || '').trim() || null;
     const contactName = String(req.body.contactName || '').trim() || null;
     const contactPhone = String(req.body.contactPhone || '').trim() || null;
@@ -1041,7 +1051,7 @@ module.exports = function createPortalRouter(deps) {
         row.status,
         Number(row.total_weight || 0).toFixed(2),
         Number(row.billing_weight || 0).toFixed(2),
-        row.delivery_date || '',
+        withoutPlaceholderDate(row.delivery_date) || '',
       ];
       if (canSeeMoney) values.push(Number(row.portal_price || 0).toFixed(2));
       lines.push(values.map(csvCell).join(','));
@@ -1195,7 +1205,19 @@ module.exports = function createPortalRouter(deps) {
 
   // Shapes (public)
   router.get('/c/shapes', customerPortalActionLimiter, (req, res) => {
-    res.json(db.prepare('SELECT * FROM shapes WHERE active=1 ORDER BY id').all());
+    res.json(db.prepare('SELECT id,name,bends,sides_default,angles_default FROM shapes WHERE active=1 AND definition_json IS NULL ORDER BY id').all());
+  });
+
+  router.get('/c/shape-definitions', customerPortalActionLimiter, (req, res) => {
+    if (!session(req.query.token)) return res.status(401).json({ error: 'נדרש זיהוי' });
+    const entries = savedShapeCatalog.list().map(({ id, itemCode, version, name, definition, billingPolicy }) => ({
+      id, itemCode, version, name, definition, billingPolicy,
+    }));
+    res.set('Cache-Control', 'no-store').json({
+      entries,
+      hiddenBuiltinIds: savedShapeCatalog.archived().map(entry => entry.builtinId).filter(Boolean),
+      permissions: { canManage: false },
+    });
   });
 
   // Price list for this customer
@@ -1343,7 +1365,7 @@ module.exports = function createPortalRouter(deps) {
 
     const wastePct = portalWastePct();
     const result = pricer.calcOrderPriceForCustomer(portalItems, c, { wastePct });
-    res.json({ ...result, wastePct });
+    res.json({ ...result, breakdown: result.breakdown.map((row, i) => ({ ...row, weight: portalItems[i].totalWeight })), wastePct });
   });
 
   // Submit order from portal
@@ -1353,20 +1375,26 @@ module.exports = function createPortalRouter(deps) {
     if (!s) return res.status(401).json({ error: 'נדרש זיהוי' });
     const c = s.customer;
     if (!s.caps.canOrder) return res.status(403).json({ error: 'Portal user cannot create orders' });
-    if (!items?.length) return res.status(400).json({ error: 'חסרים פריטים' });
+    if (!Array.isArray(items) || !items.length) return res.status(400).json({ error: 'חסרים פריטים' });
     const idempotencyKey = portalIdempotencyKey(req.body.idempotency_key ?? req.body.idempotencyKey);
+    if (!idempotencyKey) return res.status(400).json({ error: 'יש לרענן את הפורטל ולנסות לשלוח את ההזמנה שוב', code: 'idempotency_key_required' });
     const idempotencyPayload = { items, deliveryDate, deliveryTime, deliveryAddress, notes, siteId };
     const payloadFingerprint = portalPayloadFingerprint(idempotencyPayload);
     const replaySite = resolveAuthorizedSite(c.id, s.user, siteId);
     if (!replaySite.ok) return res.status(replaySite.status).json({ error: replaySite.error });
-    if (idempotencyKey) {
-      const replay = db.prepare(`SELECT payload_fingerprint,response_json FROM customer_portal_order_idempotency
-        WHERE customer_id=? AND portal_user_id IS ? AND idempotency_key=?`).get(s.customer.id, s.user?.id ?? null, idempotencyKey);
-      if (replay) {
-        if (replay.payload_fingerprint !== payloadFingerprint) return res.status(409).json({ error: 'idempotency_key_conflict', code: 'idempotency_key_conflict' });
-        const saved = JSON.parse(replay.response_json);
-        return res.json({ ...saved, token, ...(s.caps.seePrice ? {} : { summary: { totalWeight: saved.summary.totalWeight, billingWeight: saved.summary.billingWeight } }), replay: true });
-      }
+    const findReplay = () => db.prepare(`SELECT payload_fingerprint,response_json FROM customer_portal_order_idempotency
+      WHERE customer_id=? AND portal_user_id IS ? AND idempotency_key=?`).get(c.id, s.user?.id ?? null, idempotencyKey);
+    const sendReplay = replay => {
+      if (replay.payload_fingerprint !== payloadFingerprint) return res.status(409).json({ error: 'בקשת ההזמנה כבר שימשה לשליחה אחרת', code: 'idempotency_key_conflict' });
+      const saved = JSON.parse(replay.response_json);
+      if (!s.caps.seePrice) delete saved.summary.portalPrice;
+      return res.json({ ...saved, token, replay: true });
+    };
+    const replay = findReplay();
+    if (replay) return sendReplay(replay);
+
+    if (!isPortalDeliveryDateValid(deliveryDate)) {
+      return res.status(400).json({ error: 'יש לבחור תאריך אספקה תקין מהיום ואילך', code: 'invalid_delivery_date' });
     }
 
     let portalItems;
@@ -1455,23 +1483,20 @@ module.exports = function createPortalRouter(deps) {
       token,
       awaitingApproval: true
     };
-    if (idempotencyKey) {
-      const persistedResponse = { ...responsePayload }; delete persistedResponse.token;
-      db.prepare(`INSERT INTO customer_portal_order_idempotency
-        (customer_id,portal_user_id,idempotency_key,payload_fingerprint,order_id,response_json)
-        VALUES (?,?,?,?,?,?)`).run(c.id, s.user?.id ?? null, idempotencyKey, payloadFingerprint, orderId, JSON.stringify(persistedResponse));
-    }
+    const persistedResponse = { ...responsePayload };
+    delete persistedResponse.token;
+    db.prepare(`INSERT INTO customer_portal_order_idempotency
+      (customer_id,portal_user_id,idempotency_key,payload_fingerprint,order_id,response_json)
+      VALUES (?,?,?,?,?,?)`).run(c.id, s.user?.id ?? null, idempotencyKey, payloadFingerprint, orderId, JSON.stringify(persistedResponse));
     return responsePayload;
     });
     try {
       createOrderTransaction();
     } catch (err) {
       if (err.budgetResult) return res.status(err.budgetResult.status || 409).json(err.budgetResult);
-      if (idempotencyKey && /UNIQUE|constraint/i.test(String(err.message || ''))) {
-        const replay = db.prepare(`SELECT payload_fingerprint,response_json FROM customer_portal_order_idempotency
-          WHERE customer_id=? AND portal_user_id IS ? AND idempotency_key=?`).get(c.id, s.user?.id ?? null, idempotencyKey);
-        if (replay?.payload_fingerprint !== payloadFingerprint) return res.status(409).json({ error: 'idempotency_key_conflict', code: 'idempotency_key_conflict' });
-        if (replay) return res.json({ ...JSON.parse(replay.response_json), token, replay: true });
+      if (/UNIQUE|constraint/i.test(String(err.message || ''))) {
+        const concurrentReplay = findReplay();
+        if (concurrentReplay) return sendReplay(concurrentReplay);
       }
       throw err;
     }
@@ -1605,12 +1630,12 @@ module.exports = function createPortalRouter(deps) {
         <td>${orderPrintEsc(item.diameter || '')}</td>
         <td>${orderPrintEsc(item.total_length_mm == null ? '' : Number(item.total_length_mm) / 10)}</td>
         <td>${orderPrintEsc(item.quantity || '')}</td>
-        <td>${orderPrintEsc(item.total_weight ? Number(item.total_weight).toFixed(1) : '')}</td>
+        <td>${orderPrintEsc(item.total_weight ? portalWeight.format(item.total_weight) : '')}</td>
         <td>${orderPrintEsc([item.struct_floor,item.struct_element,item.note].filter(Boolean).join(' / '))}</td>
       </tr>
     `).join('');
     const priceHtml = canSeeMoney && order.portal_price ? `
-      <div class="totals"><span>משקל לחיוב: ${orderPrintEsc(Number(order.billing_weight || 0).toFixed(2))} ק"ג</span><b>סה"כ לפני מע"מ: ₪${orderPrintEsc(Number(order.portal_price || 0).toLocaleString('he-IL', { minimumFractionDigits: 2 }))}</b></div>
+      <div class="totals"><span>משקל לחיוב: ${orderPrintEsc(portalWeight.format(order.billing_weight || 0))} ק"ג</span><b>סה"כ לפני מע"מ: ₪${orderPrintEsc(Number(order.portal_price || 0).toLocaleString('he-IL', { minimumFractionDigits: 2 }))}</b></div>
     ` : '';
     res.type('html').send(`<!doctype html><html lang="he" dir="rtl"><head>
       <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1634,9 +1659,9 @@ module.exports = function createPortalRouter(deps) {
       </div>
       <div class="grid">
         <div class="box"><b>לקוח</b><br>${orderPrintEsc(s.customer.name || '')}<br>${orderPrintEsc(s.customer.tax_id ? 'ח.פ ' + s.customer.tax_id : '')}</div>
-        <div class="box"><b>אתר / אספקה</b><br>${orderPrintEsc(order.site_name || 'ללא אתר')}<br>${orderPrintEsc([order.delivery_date,order.delivery_time,order.delivery_address].filter(Boolean).join(' / '))}</div>
+        <div class="box"><b>אתר / אספקה</b><br>${orderPrintEsc(order.site_name || 'ללא אתר')}<br>${orderPrintEsc([withoutPlaceholderDate(order.delivery_date),order.delivery_time,order.delivery_address].filter(Boolean).join(' / '))}</div>
         <div class="box"><b>סטטוס</b><br>${orderPrintEsc(safePrintOrder.status || '')}</div>
-        <div class="box"><b>משקל</b><br>${orderPrintEsc(Number(order.billing_weight || order.total_weight || 0).toFixed(1))} ק"ג</div>
+        <div class="box"><b>משקל הזמנה</b><br>${orderPrintEsc(portalWeight.format(order.total_weight || 0))} ק"ג</div>
       </div>
       <table><thead><tr><th>#</th><th>צורה</th><th>קוטר ברזל (מ"מ)</th><th>אורך (ס"מ)</th><th>כמות</th><th>משקל ק"ג</th><th>שייך ל / תיאור</th></tr></thead><tbody>${itemRows || '<tr><td colspan="7">אין פריטים להצגה</td></tr>'}</tbody></table>
       ${priceHtml}

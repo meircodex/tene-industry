@@ -1,6 +1,7 @@
 'use strict';
 
 const router = require('express').Router();
+const { withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { createPortalAccessService } = require('../services/portalAccess');
 
 function required(name, value) { if (!value) throw new Error(`routes/portalDocuments missing dependency: ${name}`); return value; }
@@ -37,7 +38,7 @@ module.exports = function createPortalDocumentsRouter(deps) {
         const linked = [row.order_id, ...items.map(item => item?.order_id)].filter(id => id != null);
         if (linked.some(id => !orderFor(s, id))) continue;
         const { order_id, items_json, ...summary } = row;
-        docs.push({ ...summary, title: 'חשבונית — סיכום, לא מסמך מקור' });
+        docs.push({ ...summary, issued_at: withoutPlaceholderDate(summary.issued_at), title: 'חשבונית — סיכום, לא מסמך מקור' });
       }
     }
     if (s.caps.canViewDeliveryNotes) {
@@ -46,7 +47,7 @@ module.exports = function createPortalDocumentsRouter(deps) {
         const linked = [row.order_id, ...db.prepare('SELECT order_id FROM delivery_note_orders WHERE delivery_note_id=?').all(row.id).map(x => x.order_id)].filter(id => id != null);
         if (row.id && linked.length && linked.some(orderId => !orderFor(s, orderId))) return;
         const { order_id, ...summary } = row;
-        docs.push({ ...summary, title: 'תעודת משלוח — סיכום, לא מסמך מקור' });
+        docs.push({ ...summary, issued_at: withoutPlaceholderDate(summary.issued_at), delivered_at: withoutPlaceholderDate(summary.delivered_at), title: 'תעודת משלוח — סיכום, לא מסמך מקור' });
       });
     }
     return docs;
@@ -67,7 +68,7 @@ module.exports = function createPortalDocumentsRouter(deps) {
     const type = req.params.type;
     const doc = allowedDocuments(s, order).find(row => row.type === type && Number(row.id) === Number(req.params.documentId));
     if (!doc) return res.status(404).send('לא נמצא');
-    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:8px}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${Object.entries(doc).filter(([key]) => !['id','type','title'].includes(key) && key !== 'customer_id').map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join('')}</table></html>`);
+    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:8px}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${Object.entries(doc).filter(([key, value]) => value != null && !['id','type','title','customer_id'].includes(key)).map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join('')}</table></html>`);
   });
   return router;
 };

@@ -13,5 +13,17 @@ db.prepare('INSERT INTO customer_site_users(customer_id,site_id,portal_user_id,i
 const book=db.prepare("INSERT INTO pricing_price_books(code,name,price_type,status) VALUES ('QA','מחירון בדיקה','general','active')").run().lastInsertRowid;
 for(const diameter of [6,8,10,12,14,16,20,25,28,32]) db.prepare('INSERT INTO pricing_price_items(price_book_id,sku,description,diameter,unit,price_before_vat) VALUES (?,?,?,?,?,?)').run(book,'D'+diameter,'ברזל בדיקה',diameter,'kg',5);
 db.prepare("INSERT INTO users(username,display_name,role,pin_hash,active) VALUES ('smoke-admin','מנהל בדיקה','admin',?,1)").run(require('../auth-core').hashPin('9101',4));
-server.listen(port,'127.0.0.1',()=>console.log(`Isolated QA: http://127.0.0.1:${port}/customer.html?token=smoke-only-token`));
-process.on('SIGTERM',()=>closeServer(()=>{db.close();process.exit(0);}));
+if (process.env.PORTAL_SMOKE_QUALITY_FIXTURES === '1') {
+  const catalog = require('../services/savedShapeCatalog').createSavedShapeCatalog(db);
+  const commercial = require('../modules/steel-rebar/shape-commercial');
+  const definition = { family: 'bars', sides: [1250], angles: [] };
+  const billingPolicy = commercial.defaultPolicy(definition);
+  const saved = catalog.create({ name: 'צורת קטלוג לבדיקה', itemCode: '9501', definition, billingPolicy });
+  if (!saved.entry) throw new Error(saved.error);
+  db.prepare("UPDATE portal_users SET password_hash=? WHERE id=?").run(require('bcryptjs').hashSync('smoke-pin-enrollment', 4), uid);
+  db.prepare("INSERT INTO portal_users(customer_id,phone,name,role,token,token_expires_at) VALUES (?,'0500000903','משתמש שפג תוקפו','customer_admin','smoke-expired-token','2001-01-01')").run(cid);
+  const legacyOrder = db.prepare("INSERT INTO orders(order_num,customer_id,site_id,status,delivery_date) VALUES ('QA-LEGACY',?,?,'הושלמה','2020-01-01')").run(cid,site).lastInsertRowid;
+  db.prepare("INSERT INTO invoices(invoice_num,customer_id,order_id,issue_date,items_json) VALUES ('QA-INVOICE',?,?,'2020-01-01','[]')").run(cid,legacyOrder);
+}
+server.listen(port,'127.0.0.1',()=>console.log(`Isolated QA: http://127.0.0.1:${server.address().port}/customer.html?token=smoke-only-token`));
+process.on('SIGTERM',()=>closeServer(()=>{db.close();fs.rmSync(dir,{recursive:true,force:true});process.exit(0);}));
