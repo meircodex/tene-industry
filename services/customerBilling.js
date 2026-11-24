@@ -21,6 +21,17 @@ const CLOSED_INVOICE_STATUSES = [
   '\u05d1\u05d9\u05d8\u05d5\u05dc',
 ];
 
+// Consolidated invoices keep their order IDs in items_json.
+const INVOICE_CONTAINS_ORDER = `
+  (inv.order_id = o.id OR (
+    inv.customer_id = o.customer_id AND EXISTS (
+      SELECT 1 FROM json_each(CASE WHEN json_valid(inv.items_json) THEN inv.items_json ELSE '[]' END) AS line
+      WHERE CASE WHEN line.type = 'object' THEN json_extract(line.value, '$.order_id') END
+        IN (o.id, CAST(o.id AS TEXT))
+    )
+  ))
+`;
+
 function requiredDb(db) {
   if (!db) throw new Error('services/customerBilling missing dependency: db');
   return db;
@@ -90,10 +101,11 @@ function getCustomerAccountSummary(db, { customer_id } = {}) {
     WHERE o.customer_id = ?
       AND o.status IN (${placeholders(BILLABLE_ORDER_STATUSES)})
       AND COALESCE(ob.billed_amount, 0) <= 0
+      AND COALESCE(ob.billed_by, '') <> 'customerBilling'
       AND NOT EXISTS (
         SELECT 1
         FROM invoices inv
-        WHERE inv.order_id = o.id
+        WHERE ${INVOICE_CONTAINS_ORDER}
           AND inv.status NOT IN (${placeholders(CLOSED_INVOICE_STATUSES.slice(1))})
       )
     ORDER BY COALESCE(o.delivery_date, o.created_at) ASC, o.id ASC
@@ -283,10 +295,11 @@ function createInvoiceDraftFromBillableOrders(db, { customer_id, order_ids } = {
       AND o.id IN (${placeholders(orderIds)})
       AND o.status IN (${placeholders(BILLABLE_ORDER_STATUSES)})
       AND COALESCE(ob.billed_amount, 0) <= 0
+      AND COALESCE(ob.billed_by, '') <> 'customerBilling'
       AND NOT EXISTS (
         SELECT 1
         FROM invoices inv
-        WHERE inv.order_id = o.id
+        WHERE ${INVOICE_CONTAINS_ORDER}
           AND inv.status NOT IN (${placeholders(CLOSED_INVOICE_STATUSES.slice(1))})
       )
     ORDER BY COALESCE(o.delivery_date, o.created_at) ASC, o.id ASC
@@ -317,7 +330,7 @@ function createInvoiceDraftFromBillableOrders(db, { customer_id, order_ids } = {
         type: 'order',
         order_id: order.id,
         order_num: order.order_num,
-        description: `äæîðä ${order.order_num}`,
+        description: `×”×–×ž× ×” ${order.order_num}`,
         status: order.status,
         site_id: order.site_id || null,
         site_name: order.site_name || null,
@@ -371,7 +384,7 @@ function createInvoiceDraftFromBillableOrders(db, { customer_id, order_ids } = {
       vatRate,
       vatAmount,
       total,
-      'èéåèä',
+      '×˜×™×•×˜×”',
       'Invoice draft from billable customer orders',
       null
     );
@@ -379,7 +392,7 @@ function createInvoiceDraftFromBillableOrders(db, { customer_id, order_ids } = {
     return {
       id: result.lastInsertRowid,
       invoice_num: invoiceNum,
-      status: 'èéåèä',
+      status: '×˜×™×•×˜×”',
       customer_id: customer.id,
       customer_name: customer.name,
       order_ids: orderIds,
@@ -409,7 +422,7 @@ function invoiceLineAmountMap(invoice) {
   for (const item of parseInvoiceItems(invoice)) {
     const orderId = Number(item.order_id || 0);
     if (!orderId) continue;
-    map.set(orderId, money((map.get(orderId) || 0) + Number(item.amount || 0)));
+    map.set(orderId, (map.get(orderId) || 0) + Number(item.amount || 0));
   }
   return map;
 }
@@ -458,11 +471,12 @@ function linkInvoiceToOrders(db, { invoice_id, order_ids } = {}) {
       AND o.id IN (${placeholders(orderIds)})
       AND o.status IN (${placeholders(BILLABLE_ORDER_STATUSES)})
       AND COALESCE(ob.billed_amount, 0) <= 0
+      AND COALESCE(ob.billed_by, '') <> 'customerBilling'
       AND NOT EXISTS (
         SELECT 1
         FROM invoices inv
         WHERE inv.id <> ?
-          AND inv.order_id = o.id
+          AND ${INVOICE_CONTAINS_ORDER}
           AND inv.status NOT IN (${placeholders(CLOSED_INVOICE_STATUSES.slice(1))})
       )
     ORDER BY o.id ASC
@@ -513,7 +527,7 @@ function linkInvoiceToOrders(db, { invoice_id, order_ids } = {}) {
     `);
 
     const linkedOrders = orders.map(order => {
-      const billedAmount = money(itemAmounts.get(Number(order.id)) || order.expected_amount);
+      const billedAmount = money(itemAmounts.get(Number(order.id)) ?? order.expected_amount);
       upsertBilling.run(
         order.id,
         order.order_num,
