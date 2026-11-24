@@ -24,12 +24,6 @@ module.exports = function createProductionMachinesRouter(deps) {
     const applied=registry.applyMachineCatalog(db,require('../db/approvedMachineCatalog.json'));
     if(applied.changed)wsBroadcast('machine_registry_changed',applied);
   }
-  router.use('/machines/:id',requireAnyRole(['production','kiosk','maintenance','office','manager','admin']),(req,res,next)=>{
-    if(req.params.id==='oee')return next();
-    if(!db.prepare('SELECT id FROM machines WHERE id=? AND retired_at IS NULL').get(req.params.id))return res.status(404).json({error:'המכונה אינה פעילה במערכת'});
-    next();
-  });
-
   // ── MACHINES ──────────────────────────────────────────────────────
   router.get('/machines', requireAnyRole(['production', 'kiosk', 'maintenance', 'office', 'manager', 'admin']), (req, res) => {
     const machines = db.prepare('SELECT * FROM machines WHERE retired_at IS NULL ORDER BY id').all();
@@ -48,10 +42,11 @@ module.exports = function createProductionMachinesRouter(deps) {
       min_diameter, max_diameter,
       single_min_diameter, single_max_diameter, double_min_diameter, double_max_diameter
     } = req.body;
-    if (!name) return res.status(400).json({ error: 'שם מכונה נדרש' });
+    const machineName = typeof name === 'string' ? name.trim() : '';
+    if (!machineName) return res.status(400).json({ error: 'שם מכונה נדרש' });
     const result = db.prepare(`INSERT INTO machines (name,label,conn_mode,tcp_host,tcp_port,rtu_port,baud_rate,parity,stop_bits,slave_id,min_diameter,max_diameter,single_min_diameter,single_max_diameter,double_min_diameter,double_max_diameter)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(name.trim(), label||name.substring(0,1).toUpperCase(), conn_mode||'tcp',
+      .run(machineName, label||machineName.substring(0,1).toUpperCase(), conn_mode||'tcp',
            tcp_host||null, tcp_port||502, rtu_port||null, baud_rate||9600,
            parity||'none', stop_bits||1,
            slave_id||1, min_diameter||8, max_diameter||32,
@@ -64,8 +59,15 @@ module.exports = function createProductionMachinesRouter(deps) {
 
   // Delete machine
   router.delete('/machines/:id', requireRole('manager'), (req, res) => {
-    db.prepare('DELETE FROM machines WHERE id=?').run(req.params.id);
+    const result = db.prepare('DELETE FROM machines WHERE id=? AND retired_at IS NULL').run(req.params.id);
+    if (!result.changes) return res.status(404).json({ error: 'המכונה אינה פעילה במערכת' });
     res.json({ success: true });
+  });
+
+  router.use('/machines/:id',requireAnyRole(['production','kiosk','maintenance','office','manager','admin']),(req,res,next)=>{
+    if(req.params.id==='oee')return next();
+    if(!db.prepare('SELECT id FROM machines WHERE id=? AND retired_at IS NULL').get(req.params.id))return res.status(404).json({error:'המכונה אינה פעילה במערכת'});
+    next();
   });
 
   router.post('/machines/:id/send-params', requireAnyRole(['production', 'kiosk', 'manager', 'admin']), async (req, res) => {
@@ -105,6 +107,13 @@ module.exports = function createProductionMachinesRouter(deps) {
       name, label, can_3d
     } = req.body;
     const mode = conn_mode || 'tcp';
+    if (!['tcp', 'rtu', 'disabled'].includes(mode)) {
+      return res.status(400).json({ error: 'סוג חיבור לא תקין' });
+    }
+    const port = tcp_port == null ? 502 : (typeof tcp_port === 'string' ? Number(tcp_port) : tcp_port);
+    if (mode === 'tcp' && !(Number.isInteger(port) && port >= 1 && port <= 65535)) {
+      return res.status(400).json({ error: 'יציאת TCP חייבת להיות מספר שלם בין 1 ל-65535' });
+    }
     db.prepare(`UPDATE machines SET
       conn_mode=?,
       tcp_host=?,
@@ -127,7 +136,7 @@ module.exports = function createProductionMachinesRouter(deps) {
       .run(
         mode,
         mode === 'tcp' ? (tcp_host || null) : null,
-        mode === 'tcp' ? (tcp_port || 502)  : null,
+        mode === 'tcp' ? port : null,
         mode === 'rtu' ? (rtu_port || null) : null,
         baud_rate || null, parity || null, stop_bits || null, slave_id || null,
         min_diameter || null, max_diameter || null,
@@ -230,7 +239,7 @@ module.exports = function createProductionMachinesRouter(deps) {
       FROM machine_state_log sl
       LEFT JOIN users u ON sl.operator_id = u.id
       WHERE sl.machine_id = ?
-      ORDER BY sl.created_at DESC
+      ORDER BY sl.created_at DESC, sl.id DESC
       LIMIT 100
     `).all(req.params.id);
     res.json(rows);
