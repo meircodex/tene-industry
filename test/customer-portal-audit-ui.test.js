@@ -142,8 +142,8 @@ test('order submission contracts preserve idempotency and retryable source files
   assert.match(html, /form\.append\('file', entry\.file, entry\.name\)/);
   assert.match(html, /entry\.uploaded = true/);
   assert.match(html, /createdOrderId && portalSourceFiles\.some/);
-  assert.match(html, /portalHistoryUrl\(\)/);
-  assert.match(html, /portalHistoryFilters\.offset \+= portalHistoryFilters\.limit/);
+  assert.match(html, /portalHistoryUrl\(offset\)/);
+  assert.match(html, /id="portalHistoryResults"/);
   assert.match(html, /id="portalHistoryStatus"/);
   assert.match(html, /id="portalHistoryFrom"/);
   assert.match(html, /id="portalHistoryTo"/);

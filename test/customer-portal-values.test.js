@@ -96,13 +96,12 @@ test('quote and submission use identical item bodies and clear state for the nex
   await client.run('calcQuote()');
   assert.match(client.element('priceBreakdown').innerHTML, /5%/);
   assert.match(client.element('priceBreakdown').innerHTML, /93\.24/);
-  const homeCalls = [];
-  client.context.showHome = async (...args) => { homeCalls.push(args); };
+  const receipts = [];
+  client.context.showPortalOrderReceipt = async (...args) => { receipts.push(args); };
   await client.run('submitOrder()');
   assert.deepEqual(sent[0].body.items, sent[1].body.items);
   assert.ok(sent[1].body.idempotency_key);
-  assert.equal(homeCalls.length, 1);
-  assert.equal(homeCalls[0][1].replace, true);
+  assert.deepEqual(receipts, [[1, undefined]]);
   assert.equal(client.json('orderItems.length'), 0);
   assert.equal(client.run('portalDraftIdempotencyKey'), null);
   assert.equal(client.element('submitOrderBtn').disabled, false);

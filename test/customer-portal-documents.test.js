@@ -53,6 +53,10 @@ test('portal document library returns only authorized real docs and safe summary
   assert.equal(printable.status, 200);
   const html = await printable.text();
   assert.match(html, /INV-1/);
+  assert.match(html, /<html lang="he" dir="rtl">/);
+  assert.match(html, /name="viewport" content="width=device-width, initial-scale=1"/);
+  assert.match(html, /<th scope="row">סכום ששולם<\/th><td>25<\/td>/);
+  assert.doesNotMatch(html, />paid_amount<|>issued_at</);
   assert.doesNotMatch(html, /secret_cost|RAW-SIGNATURE|PERSON|items_json/);
   assert.equal((await get(`/api/c/orders/${orderB}/documents?token=doc-token`)).r.status, 404);
   assert.equal((await get(`/api/c/orders/${other}/documents?token=doc-token`)).r.status, 404);

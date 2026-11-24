@@ -29,7 +29,7 @@ test('real file upload failure releases submit button and retry never creates a 
   c.context.file=new File(['a,b\n1,2'],'source.csv',{type:'text/csv'});
   c.run('handlePortalFiles([file]); portalDraftIdempotencyKey="retry-file"; TOKEN="test"');
   const calls=[];let fail=true;
-  c.context.showHome=async()=>{};
+  c.context.showPortalOrderReceipt=async()=>{};
   c.context.fetch=async(url,options)=>{
     calls.push(url);
     if(url==='/api/c/order')return{ok:true,json:async()=>({success:true,orderId:77,orderNum:'TEST'})};

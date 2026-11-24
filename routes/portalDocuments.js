@@ -4,6 +4,16 @@ const router = require('express').Router();
 const { withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { createPortalAccessService } = require('../services/portalAccess');
 
+const documentFields = {
+  number: 'מספר מסמך',
+  issued_at: 'תאריך הפקה',
+  delivered_at: 'תאריך אספקה',
+  total: 'סכום',
+  paid_amount: 'סכום ששולם',
+  status: 'סטטוס',
+  total_weight: 'משקל כולל (ק״ג)',
+};
+
 function required(name, value) { if (!value) throw new Error(`routes/portalDocuments missing dependency: ${name}`); return value; }
 function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 
@@ -68,7 +78,7 @@ module.exports = function createPortalDocumentsRouter(deps) {
     const type = req.params.type;
     const doc = allowedDocuments(s, order).find(row => row.type === type && Number(row.id) === Number(req.params.documentId));
     if (!doc) return res.status(404).send('לא נמצא');
-    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:8px}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${Object.entries(doc).filter(([key, value]) => value != null && !['id','type','title','customer_id'].includes(key)).map(([key, value]) => `<tr><td>${esc(key)}</td><td>${esc(value)}</td></tr>`).join('')}</table></html>`);
+    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto;padding:0 16px;overflow-wrap:anywhere}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:start}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${Object.entries(doc).filter(([key, value]) => value != null && Object.hasOwn(documentFields, key)).map(([key, value]) => `<tr><th scope="row">${documentFields[key]}</th><td>${esc(value)}</td></tr>`).join('')}</table></html>`);
   });
   return router;
 };
