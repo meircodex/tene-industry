@@ -15,7 +15,7 @@ function predictProductionTime(items) {
     const avgRow = _db.prepare(`
       SELECT AVG(
         (JULIANDAY(completed_at) - JULIANDAY(started_at)) * 24 * 60
-      ) as avg_min, COUNT(*) as sample_count
+      ) as avg_min, AVG(quantity) as avg_qty, COUNT(*) as sample_count
       FROM items
       WHERE status = 'הושלם'
         AND completed_at IS NOT NULL AND started_at IS NOT NULL
@@ -28,17 +28,14 @@ function predictProductionTime(items) {
 
     if (avgRow?.avg_min && avgRow.sample_count >= 3) {
       // Scale by quantity ratio
-      const avgQtyRow = _db.prepare(`
-        SELECT AVG(quantity) as avg_qty FROM items WHERE status='הושלם' AND ABS(diameter-?) < 1
-      `).get(item.diameter);
-      const qtyFactor = avgQtyRow?.avg_qty > 0 ? (item.production_qty || item.quantity) / avgQtyRow.avg_qty : 1;
+      const qtyFactor = avgRow.avg_qty > 0 ? (item.production_qty || item.quantity) / avgRow.avg_qty : 1;
       estMinutes = avgRow.avg_min * qtyFactor;
       confidence = Math.min(avgRow.sample_count / 20, 1); // up to 100% at 20 samples
     } else {
       // Fallback: rule-based estimate
       // Base rate: ~1 min per 10 units + 0.5 min per bend
       const segs = tryParseJSON(item.segments, []);
-      const bends = Math.max(0, segs.length - 1);
+      const bends = Array.isArray(segs) ? Math.max(0, segs.length - 1) : 0;
       const baseRate = item.diameter <= 12 ? 0.08 : item.diameter <= 20 ? 0.12 : 0.18; // min per unit
       estMinutes = (item.production_qty || item.quantity) * baseRate + bends * 0.5 + 2;
       confidence = 0.3; // low confidence for rule-based
@@ -135,7 +132,7 @@ function getMachineEfficiency(days = 7) {
       ), 1) as avg_cycle_min,
       ROUND(100.0 * SUM(actual_waste) / MAX(SUM(quantity), 1), 1) as waste_pct
     FROM items
-    WHERE status = 'הושלם' AND completed_at >= ?
+    WHERE status = 'הושלם' AND JULIANDAY(completed_at) >= JULIANDAY(?)
     GROUP BY machine
     ORDER BY machine
   `).all(since);
