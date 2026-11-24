@@ -628,7 +628,6 @@ app.use('/api', requireModule('fleet'), createFleetRouter({
   requireAnyRole,
   wsBroadcast,
   auditLog,
-  upload,
 }));
 
 app.use('/api', requireModule('logistics'), createLogisticsRouter({
