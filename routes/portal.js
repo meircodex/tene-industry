@@ -9,7 +9,7 @@ const productionCards = require('../services/productionCards');
 const portalGuarantees = require('../services/portalGuarantees');
 const { portalInvoices } = require('../services/customerPortalFinance');
 const { createSavedShapeCatalog } = require('../services/savedShapeCatalog');
-const { isPortalDeliveryDateValid, withoutPlaceholderDate } = require('../services/customerPortalDates');
+const { formatPortalDate, isPortalDeliveryDateValid, withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { evaluatePortalBudget } = require('../services/portalBudget');
 
 const portalHistoryStatuses = {
@@ -1650,6 +1650,12 @@ module.exports = function createPortalRouter(deps) {
     const priceHtml = canSeeMoney && order.portal_price ? `
       <div class="totals"><span>משקל לחיוב: ${orderPrintEsc(portalWeight.format(order.billing_weight || 0))} ק"ג</span><b>סה"כ לפני מע"מ: ₪${orderPrintEsc(Number(order.portal_price || 0).toLocaleString('he-IL', { minimumFractionDigits: 2 }))}</b></div>
     ` : '';
+    const deliveryDate = formatPortalDate(withoutPlaceholderDate(order.delivery_date));
+    const deliveryDetails = [
+      deliveryDate && `<bdi>${deliveryDate}</bdi>`,
+      order.delivery_time && `<bdi>${orderPrintEsc(order.delivery_time)}</bdi>`,
+      orderPrintEsc(order.delivery_address || ''),
+    ].filter(Boolean).join(' / ');
     res.type('html').send(`<!doctype html><html lang="he" dir="rtl"><head>
       <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
       <title>הזמנה ${orderPrintEsc(order.order_num)}</title>
@@ -1667,12 +1673,12 @@ module.exports = function createPortalRouter(deps) {
     </head><body><div class="page">
       <div class="actions"><button onclick="window.print()">הדפס / שמור PDF</button></div>
       <div class="top">
-        <div><h1>הזמנה ${orderPrintEsc(order.order_num)}</h1><div class="muted">${orderPrintEsc(order.created_at || '')}</div></div>
+        <div><h1>הזמנה ${orderPrintEsc(order.order_num)}</h1><div class="muted"><bdi>${formatPortalDate(order.created_at, { withTime: true })}</bdi></div></div>
         <img class="logo" src="/brand/tene-logo.png" alt="טנא">
       </div>
       <div class="grid">
         <div class="box"><b>לקוח</b><br>${orderPrintEsc(s.customer.name || '')}<br>${orderPrintEsc(s.customer.tax_id ? 'ח.פ ' + s.customer.tax_id : '')}</div>
-        <div class="box"><b>אתר / אספקה</b><br>${orderPrintEsc(order.site_name || 'ללא אתר')}<br>${orderPrintEsc([withoutPlaceholderDate(order.delivery_date),order.delivery_time,order.delivery_address].filter(Boolean).join(' / '))}</div>
+        <div class="box"><b>אתר / אספקה</b><br>${orderPrintEsc(order.site_name || 'ללא אתר')}<br>${deliveryDetails}</div>
         <div class="box"><b>סטטוס</b><br>${orderPrintEsc(safePrintOrder.status || '')}</div>
         <div class="box"><b>משקל הזמנה</b><br>${orderPrintEsc(portalWeight.format(order.total_weight || 0))} ק"ג</div>
       </div>
