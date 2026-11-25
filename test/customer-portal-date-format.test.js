@@ -89,7 +89,7 @@ test('order history, details and finance display dates from ISO data', () => {
     renderDetail(order);
     PORTAL_FINANCE = {
       summary: {}, sites: [], history: [order],
-      payments: [{ invoiceNum: 'QA-INVOICE', dueDate: '2026-12-03' }],
+      payments: { status: 'ready', rows: [{ invoiceNum: 'QA-INVOICE', dueDate: '2026-12-03' }] },
     };
     renderCustomerFinanceDashboard();
   `);

@@ -2014,6 +2014,66 @@ async function fetchPortalHistory(offset) {
   return response?.ok ? response.json().catch(() => null) : null;
 }
 
+async function fetchPortalFinancePayments(token) {
+  try {
+    const response = await apiFetch(`/api/c/finance/payments-due?token=${token}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.financeHidden === true) return { status: 'hidden' };
+      if (Array.isArray(data?.payments) && data.payments.every(row => row && typeof row === 'object' && !Array.isArray(row))) {
+        return { status: 'ready', rows: data.payments, canSeeMoney: data.canSeeMoney === true };
+      }
+    }
+  } catch {
+    // A response that cannot be read is not a successful empty list.
+  }
+  return { status: 'error' };
+}
+
+async function retryPortalFinancePayments() {
+  const finance = PORTAL_FINANCE;
+  const token = TOKEN;
+  const region = document.getElementById('portalFinancePayments');
+  if (!region || !token || !canViewCustomerFinance() || finance?.payments.status !== 'error') return;
+  const retry = document.getElementById('portalFinancePaymentsRetry');
+  const restoreFocus = Boolean(retry && document.activeElement === retry);
+  finance.payments = { status: 'loading' };
+  region.innerHTML = portalFinancePaymentsHtml(finance);
+  if (restoreFocus) region.focus({ preventScroll: true });
+
+  const payments = await fetchPortalFinancePayments(token);
+  if (PORTAL_FINANCE !== finance || TOKEN !== token || !canViewCustomerFinance()) return;
+  finance.payments = payments;
+  const currentRegion = document.getElementById('portalFinancePayments');
+  if (!currentRegion) return;
+  const keepFocus = restoreFocus && (document.activeElement === currentRegion || document.activeElement === retry);
+  currentRegion.innerHTML = portalFinancePaymentsHtml(finance);
+  if (keepFocus && payments.status === 'error') {
+    document.getElementById('portalFinancePaymentsRetry')?.focus({ preventScroll: true });
+  }
+}
+
+function portalFinancePaymentsHtml(finance) {
+  const result = finance.payments;
+  if (result.status === 'loading') {
+    return '<div class="finance-alert"><b>טוען את רשימת החשבוניות לתשלום…</b></div>';
+  }
+  if (result.status === 'hidden') {
+    return '<div class="finance-alert"><b>רשימת החשבוניות לתשלום אינה זמינה בהרשאות שלך</b></div>';
+  }
+  if (result.status === 'error') {
+    return '<div class="finance-alert"><b>רשימת החשבוניות לתשלום לא נטענה</b><p><button type="button" id="portalFinancePaymentsRetry" class="btn btn-secondary btn-sm" aria-label="נסה לטעון שוב את רשימת החשבוניות לתשלום" onclick="retryPortalFinancePayments()">נסה שוב</button></p></div>';
+  }
+  const payments = result.rows.slice(0, 3);
+  const canMoney = finance.canSeeMoney || result.canSeeMoney;
+  return payments.length ? payments.map(row => `
+    <div class="finance-alert">
+      <b>${escapeHtml(paymentStatusText(row.status, row.days))} · ${escapeHtml(row.siteName || 'ללא אתר')}</b>
+      <p>${escapeHtml(row.invoiceNum ? `חשבונית ${row.invoiceNum}` : '')}${row.invoiceNum && row.orderNum ? ' · ' : ''}${escapeHtml(row.orderNum || '')}${row.dueDate ? ` · מועד <bdi>${formatPortalDate(row.dueDate)}</bdi>` : ''}${canMoney ? ` · ${formatMoney(row.amount || 0)}` : ''}</p>
+    </div>
+  `).join('') : '<div class="finance-alert"><b>לא נמצאו יתרות חשבוניות שהגיע מועדן באתרים המורשים</b><p>הזמנות מוצגות בנפרד כהתחייבויות; הן אינן חוב.</p></div>';
+}
+
 async function loadCustomerFinanceDashboard() {
   const host = document.getElementById('customerFinanceDashboard');
   if (!host) return;
@@ -2023,21 +2083,21 @@ async function loadCustomerFinanceDashboard() {
   }
   const requestId = ++financeRequestId;
   host.innerHTML = '<div class="section-card finance-dashboard"><div class="loader" style="padding:18px">טוען מסך בקרה כספי...</div></div>';
-  const [summaryData, sitesData, paymentsData, historyData] = await Promise.all([
+  const [summaryData, sitesData, payments, historyData] = await Promise.all([
     fetch(`/api/c/finance/summary?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
     fetch(`/api/c/finance/sites?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
-    fetch(`/api/c/finance/payments-due?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
+    fetchPortalFinancePayments(TOKEN),
     fetchPortalHistory(0),
   ]);
   if (requestId !== financeRequestId) return;
   PORTAL_FINANCE = {
     summary: summaryData?.summary || null,
     sites: Array.isArray(sitesData?.sites) ? sitesData.sites : [],
-    payments: Array.isArray(paymentsData?.payments) ? paymentsData.payments : [],
+    payments,
     history: historyData?.orders || [],
     historyHasMore: Boolean(historyData?.hasMore),
     historyError: !historyData,
-    canSeeMoney: Boolean(summaryData?.summary?.canSeeMoney || sitesData?.canSeeMoney || paymentsData?.canSeeMoney),
+    canSeeMoney: Boolean(summaryData?.summary?.canSeeMoney || sitesData?.canSeeMoney || payments.canSeeMoney),
   };
   portalFinanceNeedsRefresh = false;
   renderCustomerFinanceDashboard();
@@ -2082,7 +2142,6 @@ function renderCustomerFinanceDashboard() {
   }
   const s = PORTAL_FINANCE.summary;
   const canMoney = PORTAL_FINANCE.canSeeMoney;
-  const payments = PORTAL_FINANCE.payments.slice(0, 3);
   const siteRows = PORTAL_FINANCE.sites.slice(0, 5).map(site => `
     <div class="finance-site ${site.overBudget ? 'over' : ''}">
       <div class="finance-site-head">
@@ -2102,12 +2161,6 @@ function renderCustomerFinanceDashboard() {
       </div>
     </div>
   `).join('');
-  const paymentRows = payments.length ? payments.map(row => `
-    <div class="finance-alert">
-      <b>${escapeHtml(paymentStatusText(row.status, row.days))} · ${escapeHtml(row.siteName || 'ללא אתר')}</b>
-      <p>${escapeHtml(row.invoiceNum ? `חשבונית ${row.invoiceNum}` : '')}${row.invoiceNum && row.orderNum ? ' · ' : ''}${escapeHtml(row.orderNum || '')}${row.dueDate ? ` · מועד <bdi>${formatPortalDate(row.dueDate)}</bdi>` : ''}${canMoney ? ` · ${formatMoney(row.amount || 0)}` : ''}</p>
-    </div>
-  `).join('') : '<div class="finance-alert"><b>לא נמצאו יתרות חשבוניות שהגיע מועדן באתרים המורשים</b><p>הזמנות מוצגות בנפרד כהתחייבויות; הן אינן חוב.</p></div>';
   const historyCount = PORTAL_FINANCE.history.length;
   host.innerHTML = `
     <section class="section-card portal-history" aria-labelledby="portalHistoryTitle">
@@ -2147,7 +2200,9 @@ function renderCustomerFinanceDashboard() {
         <div class="finance-kpi"><span>משקל שהוזמן</span><strong>${formatKg(s.orderedKg)}</strong></div>
         <div class="finance-kpi"><span>אתרים בחריגה</span><strong>${s.overBudgetSites || 0}</strong></div>
       </div>
-     ${paymentRows}
+      <div id="portalFinancePayments" role="region" aria-label="חשבוניות לתשלום" aria-live="polite" tabindex="-1">
+        ${portalFinancePaymentsHtml(PORTAL_FINANCE)}
+      </div>
      <div class="card-title" style="margin-top:12px">פירוק לפי אתר</div>
       <div class="finance-sites">${siteRows || '<div class="loader" style="padding:12px">אין אתרים להצגה</div>'}</div>
       <div class="finance-history-actions" style="display:none">
