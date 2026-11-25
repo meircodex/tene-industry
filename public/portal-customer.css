@@ -386,6 +386,19 @@ html[data-tene-portal] {
 }
 .portal-app #screenOrder .ib-order-lines :is(input, select, button):focus-visible { outline-offset: -3px !important; }
 
+@media (min-width: 801px) {
+  .portal-app #screenOrder .ib-order-lines :is(.order-lines-head, .order-lines-grid-guides, .order-line-row, .order-line-add-row) {
+    grid-template-columns: 42px minmax(104px, .85fr) minmax(190px, 1.75fr) 68px 60px 76px 84px 88px 36px !important;
+    min-inline-size: 748px !important;
+  }
+  .portal-app #screenOrder .ib-order-lines .order-lines-head > * {
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+}
+
 .portal-app .finance-history-filters {
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: end;
@@ -564,17 +577,25 @@ html[data-tene-portal] {
 @media (max-width: 800px) {
   [data-tene-portal]:has(#screenOrder.active) { scroll-padding-block-end: 76px; }
   .portal-header { position: relative; }
-  .portal-header-inner { min-block-size: 60px; gap: 8px; padding-inline: 14px; }
+  .portal-header-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    padding-inline: 14px;
+  }
   .portal-header .header-logo img,
   .portal-header .logo-img,
   .portal-header .portal-logo { inline-size: 111px; }
   .portal-header .header-sub { display: none; }
   .portal-header .header-name {
-    flex: 1 1 auto;
     min-inline-size: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    justify-self: end;
+    text-align: end;
+  }
+  .portal-header .portal-contrast-toggle {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-inline-start: 0;
   }
   .portal-app :is(#screenHome, #screenOrder, #screenDetail, #screenSiteDetail) { padding: 14px; }
   .portal-app :is(.section-card, .card) { padding: 14px; }

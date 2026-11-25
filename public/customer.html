@@ -635,7 +635,7 @@
       </div>
       <div class="field">
         <label for="delivDate">תאריך אספקה</label>
-        <input type="date" id="delivDate"/>
+        <input id="delivDate" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)"/>
       </div>
       <div class="delivery-fields">
         <div class="field">
@@ -1389,8 +1389,8 @@ function renderSiteDetail(data) {
       <div class="site-detail-kpi"><span>ממתין לאישור</span><strong>${Number(data.pending_approval_count || 0)}</strong></div>
     </div>
     <div class="site-report-toolbar">
-      <div class="field"><label for="siteReportFrom">מתאריך</label><input id="siteReportFrom" type="date" value="${escapeHtml(data.from || '')}"></div>
-      <div class="field"><label for="siteReportTo">עד תאריך</label><input id="siteReportTo" type="date" value="${escapeHtml(data.to || '')}"></div>
+      <div class="field"><label for="siteReportFrom">מתאריך</label><input id="siteReportFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(data.from || ''))}"></div>
+      <div class="field"><label for="siteReportTo">עד תאריך</label><input id="siteReportTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(data.to || ''))}"></div>
       <button type="button" class="btn btn-secondary btn-sm" onclick="applySiteReportPeriod()">הצג תקופה</button>
       <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSiteReport(${site.id})">הורד דוח CSV</button>
     </div>
@@ -1399,15 +1399,24 @@ function renderSiteDetail(data) {
   `;
 }
 
+function readSiteReportPeriod() {
+  const from = readPortalDate(document.getElementById('siteReportFrom'));
+  if (from === null) return null;
+  const to = readPortalDate(document.getElementById('siteReportTo'));
+  return to === null ? null : { from, to };
+}
+
 function applySiteReportPeriod() {
   if (!PORTAL_ACTIVE_SITE_ID) return;
-  openSiteDetail(PORTAL_ACTIVE_SITE_ID, document.getElementById('siteReportFrom')?.value || '', document.getElementById('siteReportTo')?.value || '');
+  const period = readSiteReportPeriod();
+  if (period) openSiteDetail(PORTAL_ACTIVE_SITE_ID, period.from, period.to);
 }
 
 function downloadSiteReport(siteId) {
+  const period = readSiteReportPeriod();
+  if (!period) return;
+  const { from, to } = period;
   const query = new URLSearchParams({ token:TOKEN });
-  const from = document.getElementById('siteReportFrom')?.value || '';
-  const to = document.getElementById('siteReportTo')?.value || '';
   if (from) query.set('from', from);
   if (to) query.set('to', to);
   const link = document.createElement('a');
@@ -2032,29 +2041,48 @@ async function loadCustomerFinanceDashboard() {
   renderCustomerFinanceDashboard();
 }
 
-function historyDateInputValue(iso) {
+function portalDateInputValue(iso) {
   return iso.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1');
 }
 
-function readPortalHistoryDate(input) {
-  const value = input.value.trim().replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3');
-  if (!value) return '';
-  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
-  if (parts && parts[3] !== '0000') {
-    const iso = `${parts[3]}-${parts[2]}-${parts[1]}`;
-    const date = new Date(iso + 'T00:00:00Z');
-    if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso) return iso;
+function maskPortalDate(input) {
+  input.setCustomValidity('');
+  const previous = input.value;
+  const localized = portalDateInputValue(previous.trim());
+  const digits = localized.replace(/\D/g, '').slice(0, 8);
+  const value = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
+  if (value === previous) return;
+
+  const digitsBeforeCaret = previous.slice(0, input.selectionStart).replace(/\D/g, '').length;
+  const caret = digitsBeforeCaret + Number(digitsBeforeCaret > 2) + Number(digitsBeforeCaret > 4);
+  input.value = value;
+  input.setSelectionRange(caret, caret);
+}
+
+function parsePortalDate(value) {
+  const localized = value.trim().replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3');
+  if (!localized) return '';
+  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(localized);
+  if (!parts || parts[3] === '0000') return null;
+  const iso = `${parts[3]}-${parts[2]}-${parts[1]}`;
+  const date = new Date(iso + 'T00:00:00Z');
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+}
+
+function readPortalDate(input) {
+  const iso = parsePortalDate(input.value);
+  if (iso === null) {
+    input.setCustomValidity('יש להזין תאריך תקין בפורמט יום/חודש/שנה.');
+    input.reportValidity();
   }
-  input.setCustomValidity('יש להזין תאריך תקין בפורמט יום/חודש/שנה.');
-  input.reportValidity();
-  return null;
+  return iso;
 }
 
 async function applyPortalHistoryFilters(event) {
   event.preventDefault();
-  const from = readPortalHistoryDate(document.getElementById('portalHistoryFrom'));
+  const from = readPortalDate(document.getElementById('portalHistoryFrom'));
   if (from === null) return;
-  const to = readPortalHistoryDate(document.getElementById('portalHistoryTo'));
+  const to = readPortalDate(document.getElementById('portalHistoryTo'));
   if (to === null) return;
   Object.assign(portalHistoryFilters, { status: document.getElementById('portalHistoryStatus').value, from, to });
   await updatePortalHistory(document.getElementById('portalHistoryApply'), 0);
@@ -2126,11 +2154,11 @@ function renderCustomerFinanceDashboard() {
         </div>
         <div class="field">
           <label for="portalHistoryFrom">מתאריך</label>
-          <input id="portalHistoryFrom" type="text" lang="he-IL" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${escapeHtml(historyDateInputValue(portalHistoryFilters.from))}" oninput="this.setCustomValidity('')">
+          <input id="portalHistoryFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(portalHistoryFilters.from))}">
         </div>
         <div class="field">
           <label for="portalHistoryTo">עד תאריך</label>
-          <input id="portalHistoryTo" type="text" lang="he-IL" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${escapeHtml(historyDateInputValue(portalHistoryFilters.to))}" oninput="this.setCustomValidity('')">
+          <input id="portalHistoryTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(portalHistoryFilters.to))}">
         </div>
         <button type="submit" class="btn btn-secondary btn-sm" id="portalHistoryApply">סנן היסטוריה</button>
       </form>
@@ -2812,7 +2840,7 @@ function renderDetail(order) {
     ${isPendingApproval ? '' : price}
 
     <section class="section-card portal-detail-items">
-      <h2 class="step-title" id="portalDetailItemsTitle">פריטים (<bdi>${allItems.length}</bdi>)</h2>
+      <h2 class="step-title" id="portalDetailItemsTitle">פריטים <bdi dir="ltr">(${allItems.length})</bdi></h2>
       ${itemsHtml ? `<div class="portal-detail-table" role="table" aria-labelledby="portalDetailItemsTitle">
         <div class="portal-detail-table-head" role="row">
           <span role="columnheader">פריט</span><span role="columnheader">קוטר</span><span role="columnheader">כמות</span>
@@ -2909,6 +2937,7 @@ function savePortalDraft(notify = true) {
   const key = portalDraftStorageKey();
   if (!key || !orderItems.length) return false;
   const fields = Object.fromEntries(Object.entries(portalDraftFields).map(([name, id]) => [name, document.getElementById(id).value]));
+  fields.deliveryDate = parsePortalDate(fields.deliveryDate) || '';
   try {
     localStorage.setItem(key, JSON.stringify({
       ...fields, orderItems, idempotencyKey: ensurePortalDraftKey(), pendingOrder: portalPendingOrder, submissionUserId: portalSubmissionUserId,
@@ -2938,7 +2967,8 @@ function restorePortalDraft() {
     portalSourceFiles = Array.isArray(draft.attachments) ? draft.attachments : [];
     for (const [field, id] of Object.entries(portalDraftFields)) {
       if (field === 'siteId' && !PORTAL_SITES.some(site => String(site.id) === draft.siteId)) continue;
-      document.getElementById(id).value = draft[field] || (field === 'deliveryMode' ? 'משלוח' : '');
+      const value = draft[field] || (field === 'deliveryMode' ? 'משלוח' : '');
+      document.getElementById(id).value = field === 'deliveryDate' ? portalDateInputValue(value) : value;
     }
     if (savePortalDraft(false)) localStorage.removeItem(legacyKey);
     return true;
@@ -2966,7 +2996,6 @@ function showOrderScreen(navigation = {}) {
     else renderItems();
     renderPortalFileList();
   }
-  document.getElementById('delivDate').min = portalDateFormatter.format();
   showScreen('screenOrder', navigation);
   setPortalOrderStep(0);
 }
@@ -3546,8 +3575,9 @@ async function performPortalOrderSubmit(event) {
     }
 
     const date = document.getElementById('delivDate');
-    date.min = portalDateFormatter.format();
-    if (date.value && date.value < date.min) {
+    const deliveryDate = readPortalDate(date);
+    if (deliveryDate === null) return;
+    if (deliveryDate && deliveryDate < portalDateFormatter.format()) {
       toast('יש לבחור תאריך אספקה מהיום ואילך', true);
       date.focus();
       return;
@@ -3561,7 +3591,7 @@ async function performPortalOrderSubmit(event) {
     portalPendingOrder = {
       idempotency_key: portalDraftIdempotencyKey,
       items: orderItems.map(portalOrderItemPayload),
-      deliveryDate: date.value,
+      deliveryDate,
       deliveryTime: document.getElementById('delivTime').value,
       deliveryAddress: document.getElementById('delivAddr').value + ' ' + document.getElementById('delivMode').value,
       siteId: selectedPortalSiteId(),
