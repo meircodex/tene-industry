@@ -34,47 +34,12 @@
   <span aria-hidden="true" class="portal-contrast-icon"></span><span>ניגודיות: <strong class="portal-contrast-normal">רגילה</strong> / <strong class="portal-contrast-high">גבוהה</strong></span>
 </button></div></header>
 <main><h1>מסמכי ערבויות לקוחות</h1><a href="/portal-requests.html">חזרה לבקשות לקוח</a><p>בדיקה ותיעוד מסמכים בלבד. החלטה כאן אינה מאשרת הזמנה לייצור.</p><label for="status">מצב</label><select id="status" onchange="load()"><option value="">הכול</option><option value="uploaded_pending_review">ממתינה לבדיקה</option><option value="approved">מאושרת</option><option value="rejected">נדחתה</option><option value="expired">פג תוקף</option><option value="revoked">בוטלה</option></select><button onclick="load()">רענן</button><p id="error" role="alert"></p><section id="list">טוען…</section></main>
+<script src="/portal-dates.js"></script>
 <script>
+const { formatPortalDate, maskPortalDate, readPortalDate } = window.IronBendPortalDates;
 const labels={uploaded_pending_review:'ממתינה לבדיקה',approved:'מאושרת',rejected:'נדחתה',expired:'פג תוקף',revoked:'בוטלה'},busy=new Set();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function portalDateInputValue(iso) {
-  return iso.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1');
-}
-
-function maskPortalDate(input) {
-  input.setCustomValidity('');
-  const previous = input.value;
-  const localized = portalDateInputValue(previous.trim());
-  const digits = localized.replace(/\D/g, '').slice(0, 8);
-  const value = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
-  if (value === previous) return;
-
-  const digitsBeforeCaret = previous.slice(0, input.selectionStart).replace(/\D/g, '').length;
-  const caret = digitsBeforeCaret + Number(digitsBeforeCaret > 2) + Number(digitsBeforeCaret > 4);
-  input.value = value;
-  input.setSelectionRange(caret, caret);
-}
-
-function parsePortalDate(value) {
-  const localized = value.trim().replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3');
-  if (!localized) return '';
-  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(localized);
-  if (!parts || parts[3] === '0000') return null;
-  const iso = `${parts[3]}-${parts[2]}-${parts[1]}`;
-  const date = new Date(iso + 'T00:00:00Z');
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
-}
-
-function readPortalDate(input) {
-  const iso = parsePortalDate(input.value);
-  if (iso === null) {
-    input.setCustomValidity('יש להזין תאריך תקין בפורמט יום/חודש/שנה.');
-    input.reportValidity();
-  }
-  return iso;
-}
-
-async function load(){try{const q=document.getElementById('status').value;const r=await fetch('/api/portal/guarantees'+(q?'?status='+encodeURIComponent(q):''));const d=await r.json();if(!r.ok)throw Error(d.user_message || d.error||'אין הרשאה לצפות במסמכי הערבות');document.getElementById('error').textContent='';document.getElementById('list').innerHTML=d.documents.map(x=>`<article class="portal-office-card"><div class="portal-office-row"><b><bdi>${esc(x.original_name)}</bdi></b><span>${esc(labels[x.computed_status]||x.computed_status)}</span></div><small>לקוח #<bdi>${x.customer_id}</bdi> · הועלה <bdi>${esc(x.uploaded_at||'')}</bdi> · תוקף <bdi>${esc(x.valid_until||'טרם נקבע')}</bdi></small><p>${esc(x.notes||'')}</p><button onclick="download(${x.id},this)">הורד מסמך</button>${d.canReview?`<div class="portal-office-row"><label for="date-${x.id}">תוקף עד</label><input id="date-${x.id}" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${esc(portalDateInputValue(x.valid_until || ''))}"><label for="note-${x.id}">נימוק / הערה</label><input id="note-${x.id}" maxlength="1000"><button onclick="review(${x.id},'approved',this)">אישור</button><button onclick="review(${x.id},'rejected',this)">דחייה</button><button onclick="review(${x.id},'revoked',this)">ביטול אישור</button></div>`:''}</article>`).join('')||'<p>אין מסמכים בתצוגה זו.</p>';}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}}
+async function load(){try{const q=document.getElementById('status').value;const r=await fetch('/api/portal/guarantees'+(q?'?status='+encodeURIComponent(q):''));const d=await r.json();if(!r.ok)throw Error(d.user_message || d.error||'אין הרשאה לצפות במסמכי הערבות');document.getElementById('error').textContent='';document.getElementById('list').innerHTML=d.documents.map(x=>`<article class="portal-office-card"><div class="portal-office-row"><b><bdi>${esc(x.original_name)}</bdi></b><span>${esc(labels[x.computed_status]||x.computed_status)}</span></div><small>לקוח #<bdi>${x.customer_id}</bdi> · הועלה <bdi>${formatPortalDate(x.uploaded_at, { withTime: true })}</bdi> · תוקף <bdi>${formatPortalDate(x.valid_until) || 'טרם נקבע'}</bdi></small><p>${esc(x.notes||'')}</p><button onclick="download(${x.id},this)">הורד מסמך</button>${d.canReview?`<div class="portal-office-row"><label for="date-${x.id}">תוקף עד</label><input id="date-${x.id}" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${formatPortalDate(x.valid_until)}"><label for="note-${x.id}">נימוק / הערה</label><input id="note-${x.id}" maxlength="1000"><button onclick="review(${x.id},'approved',this)">אישור</button><button onclick="review(${x.id},'rejected',this)">דחייה</button><button onclick="review(${x.id},'revoked',this)">ביטול אישור</button></div>`:''}</article>`).join('')||'<p>אין מסמכים בתצוגה זו.</p>';}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}}
 async function download(id,button){button.disabled=true;try{const r=await fetch('/api/portal/guarantees/'+id+'/download');if(!r.ok)throw await window.IronBendMessages.responseError(r, 'הורדת המסמך נכשלה');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;const name=r.headers.get('Content-Disposition')?.split("filename*=UTF-8''")[1];a.download=name?decodeURIComponent(name):'guarantee';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}finally{button.disabled=false;}}
 async function review(id,status,button){if(busy.has(id))return;const date=readPortalDate(document.getElementById('date-'+id));if(date===null||!confirm('לשמור החלטה: '+labels[status]+'? הפעולה תירשם ביומן הבקרה.'))return;busy.add(id);button.disabled=true;try{const valid_until=date||null,notes=document.getElementById('note-'+id).value;const r=await fetch('/api/portal/guarantees/'+id,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({status,valid_until,notes})});const d=await r.json();if(!r.ok)throw Error(d.user_message || d.error||'ההחלטה לא נשמרה');await load();}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}finally{busy.delete(id);button.disabled=false;}}
 load();

@@ -21,7 +21,10 @@ test('portal date mask presents day first and validates calendar dates before co
     assert.equal(client.run("readPortalDate(document.getElementById('delivDate'))"), '2028-02-29');
   }
 
-  input.value = '29/02/2027';
+  input.value = '2027-02-29';
+  input.selectionStart = input.value.length;
+  client.run("maskPortalDate(document.getElementById('delivDate'))");
+  assert.equal(input.value, '29/02/2027');
   assert.equal(client.run("readPortalDate(document.getElementById('delivDate'))"), null);
   assert.match(input.error, /יום\/חודש\/שנה/);
   assert.equal(input.reported, true);
@@ -64,4 +67,40 @@ test('submitting a day-first delivery date sends the existing ISO API value', as
   assert.equal(requests.length, 1);
   assert.equal(requests[0].url, '/api/c/order');
   assert.equal(requests[0].body.deliveryDate, today);
+});
+
+test('the shared display formatter zero-pads dates and preserves the recorded calendar day', () => {
+  const { formatPortalDate } = require('../public/portal-dates');
+  assert.equal(formatPortalDate('2026-01-05'), '05/01/2026');
+  assert.equal(formatPortalDate('2026-11-25T23:07:06.789Z'), '25/11/2026');
+  assert.equal(formatPortalDate('2026-11-25 09:07:06', { withTime: true }), '25/11/2026 09:07');
+  assert.equal(formatPortalDate('2026-11-25', { withTime: true }), '25/11/2026');
+  assert.equal(formatPortalDate('invalid'), '');
+  assert.equal(formatPortalDate(null), '');
+});
+
+test('order history, details and finance display dates from ISO data', () => {
+  const client = loadPortalClient();
+  client.context.order = {
+    id: 1, order_num: 'QA', status: 'נשלחה לבדיקה', created_at: '2026-11-25 09:07:00',
+    delivery_date: '2026-12-06', delivery_time: '10:30', pallets: [],
+  };
+  client.run(`
+    renderDetail(order);
+    PORTAL_FINANCE = {
+      summary: {}, sites: [], history: [order],
+      payments: [{ invoiceNum: 'QA-INVOICE', dueDate: '2026-12-03' }],
+    };
+    renderCustomerFinanceDashboard();
+  `);
+  const detail = client.element('detailContent').innerHTML;
+  assert.match(detail, /<bdi>25\/11\/2026<\/bdi>/);
+  assert.match(detail, /<bdi>06\/12\/2026<\/bdi> <bdi>10:30<\/bdi>/);
+  assert.doesNotMatch(detail, /2026-(?:11|12)-\d{2}/);
+
+  const finance = client.element('customerFinanceDashboard').innerHTML;
+  assert.match(finance, /אספקה<\/span><bdi>06\/12\/2026<\/bdi>/);
+  assert.match(finance, /מועד <bdi>03\/12\/2026<\/bdi>/);
+  assert.doesNotMatch(finance, /2026-12-\d{2}/);
+  assert.match(client.run('portalOrderCardsHtml([order])'), /אספקה: <bdi>06\/12\/2026<\/bdi>/);
 });

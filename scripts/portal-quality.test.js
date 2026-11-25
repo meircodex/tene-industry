@@ -87,7 +87,9 @@ test('portal draft saves, survives Back and reload, and replays an interrupted s
   await page.locator('#newOrderAction').click();
   await page.locator('.line-qty').fill('25');
   await page.locator('.line-element').fill('קורה לבדיקה');
-  await page.locator('#delivDate').fill(businessDate.format());
+  const deliveryDate = businessDate.format();
+  const displayedDate = deliveryDate.split('-').reverse().join('/');
+  await page.locator('#delivDate').fill(displayedDate);
   await page.locator('#delivAddr').fill('רחוב בדיקה');
   await page.locator('#orderNotes').fill('נשמר גם לפני יציאה מהשדה');
   await page.getByRole('button', { name: 'שמור טיוטה' }).click();
@@ -98,12 +100,14 @@ test('portal draft saves, survives Back and reload, and replays an interrupted s
     return JSON.parse(localStorage.getItem(key));
   });
   assert.ok(draft.idempotencyKey);
+  assert.equal(draft.deliveryDate, deliveryDate);
   await page.goBack();
   await page.locator('#screenHome').waitFor();
   await page.goForward();
   await page.locator('#screenOrder').waitFor();
   await page.reload();
   await page.locator('#screenOrder').waitFor();
+  assert.equal(await page.locator('#delivDate').inputValue(), displayedDate);
   assert.equal(await page.locator('.line-qty').inputValue(), '25');
   assert.equal(await page.locator('.line-element').inputValue(), 'קורה לבדיקה');
   assert.equal(await page.locator('#delivAddr').inputValue(), 'רחוב בדיקה');
@@ -299,8 +303,8 @@ test('profile email, delivery date, upload and zoom are validated on mobile', as
   assert.match(await page.locator('#toast').innerText(), /אימייל תקינה/);
   await assertAccessible(page, 'profile');
   await page.locator('#newOrderAction').click();
-  assert.equal(await page.locator('#delivDate').getAttribute('min'), today);
-  await page.locator('#delivDate').fill(yesterday);
+  assert.equal(await page.locator('#delivDate').getAttribute('placeholder'), 'dd/mm/yyyy');
+  await page.locator('#delivDate').fill(yesterday.split('-').reverse().join('/'));
   await page.locator('#submitOrderBtn').click();
   assert.match(await page.locator('#toast').innerText(), /מהיום ואילך/);
   assert.doesNotMatch(await page.locator('meta[name=viewport]').getAttribute('content'), /maximum-scale|user-scalable/);

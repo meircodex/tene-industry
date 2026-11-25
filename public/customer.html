@@ -699,7 +699,9 @@
 <script src="/shapeRecognition.js?v=1"></script>
 <script src="/shape-editor.js?v=95-portal"></script>
 <script src="/order-line-renderer.js?v=4"></script>
+<script src="/portal-dates.js"></script>
 <script>
+const { formatPortalDate, withoutPlaceholderDate, maskPortalDate, parsePortalDate, readPortalDate } = window.IronBendPortalDates;
 // ──────────────────────────────────────────────────────
 // State
 // ──────────────────────────────────────────────────────
@@ -1389,8 +1391,8 @@ function renderSiteDetail(data) {
       <div class="site-detail-kpi"><span>ממתין לאישור</span><strong>${Number(data.pending_approval_count || 0)}</strong></div>
     </div>
     <div class="site-report-toolbar">
-      <div class="field"><label for="siteReportFrom">מתאריך</label><input id="siteReportFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(data.from || ''))}"></div>
-      <div class="field"><label for="siteReportTo">עד תאריך</label><input id="siteReportTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(data.to || ''))}"></div>
+      <div class="field"><label for="siteReportFrom">מתאריך</label><input id="siteReportFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(formatPortalDate(data.from || ''))}"></div>
+      <div class="field"><label for="siteReportTo">עד תאריך</label><input id="siteReportTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(formatPortalDate(data.to || ''))}"></div>
       <button type="button" class="btn btn-secondary btn-sm" onclick="applySiteReportPeriod()">הצג תקופה</button>
       <button type="button" class="btn btn-secondary btn-sm" onclick="downloadSiteReport(${site.id})">הורד דוח CSV</button>
     </div>
@@ -2041,43 +2043,6 @@ async function loadCustomerFinanceDashboard() {
   renderCustomerFinanceDashboard();
 }
 
-function portalDateInputValue(iso) {
-  return iso.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1');
-}
-
-function maskPortalDate(input) {
-  input.setCustomValidity('');
-  const previous = input.value;
-  const localized = portalDateInputValue(previous.trim());
-  const digits = localized.replace(/\D/g, '').slice(0, 8);
-  const value = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/');
-  if (value === previous) return;
-
-  const digitsBeforeCaret = previous.slice(0, input.selectionStart).replace(/\D/g, '').length;
-  const caret = digitsBeforeCaret + Number(digitsBeforeCaret > 2) + Number(digitsBeforeCaret > 4);
-  input.value = value;
-  input.setSelectionRange(caret, caret);
-}
-
-function parsePortalDate(value) {
-  const localized = value.trim().replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3');
-  if (!localized) return '';
-  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(localized);
-  if (!parts || parts[3] === '0000') return null;
-  const iso = `${parts[3]}-${parts[2]}-${parts[1]}`;
-  const date = new Date(iso + 'T00:00:00Z');
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
-}
-
-function readPortalDate(input) {
-  const iso = parsePortalDate(input.value);
-  if (iso === null) {
-    input.setCustomValidity('יש להזין תאריך תקין בפורמט יום/חודש/שנה.');
-    input.reportValidity();
-  }
-  return iso;
-}
-
 async function applyPortalHistoryFilters(event) {
   event.preventDefault();
   const from = readPortalDate(document.getElementById('portalHistoryFrom'));
@@ -2140,7 +2105,7 @@ function renderCustomerFinanceDashboard() {
   const paymentRows = payments.length ? payments.map(row => `
     <div class="finance-alert">
       <b>${escapeHtml(paymentStatusText(row.status, row.days))} · ${escapeHtml(row.siteName || 'ללא אתר')}</b>
-      <p>${escapeHtml(row.invoiceNum ? `חשבונית ${row.invoiceNum}` : '')}${row.invoiceNum && row.orderNum ? ' · ' : ''}${escapeHtml(row.orderNum || '')}${row.dueDate ? ` · מועד ${escapeHtml(row.dueDate)}` : ''}${canMoney ? ` · ${formatMoney(row.amount || 0)}` : ''}</p>
+      <p>${escapeHtml(row.invoiceNum ? `חשבונית ${row.invoiceNum}` : '')}${row.invoiceNum && row.orderNum ? ' · ' : ''}${escapeHtml(row.orderNum || '')}${row.dueDate ? ` · מועד <bdi>${formatPortalDate(row.dueDate)}</bdi>` : ''}${canMoney ? ` · ${formatMoney(row.amount || 0)}` : ''}</p>
     </div>
   `).join('') : '<div class="finance-alert"><b>לא נמצאו יתרות חשבוניות שהגיע מועדן באתרים המורשים</b><p>הזמנות מוצגות בנפרד כהתחייבויות; הן אינן חוב.</p></div>';
   const historyCount = PORTAL_FINANCE.history.length;
@@ -2154,11 +2119,11 @@ function renderCustomerFinanceDashboard() {
         </div>
         <div class="field">
           <label for="portalHistoryFrom">מתאריך</label>
-          <input id="portalHistoryFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(portalHistoryFilters.from))}">
+          <input id="portalHistoryFrom" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(formatPortalDate(portalHistoryFilters.from))}">
         </div>
         <div class="field">
           <label for="portalHistoryTo">עד תאריך</label>
-          <input id="portalHistoryTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(portalDateInputValue(portalHistoryFilters.to))}">
+          <input id="portalHistoryTo" type="text" lang="he" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" oninput="maskPortalDate(this)" value="${escapeHtml(formatPortalDate(portalHistoryFilters.to))}">
         </div>
         <button type="submit" class="btn btn-secondary btn-sm" id="portalHistoryApply">סנן היסטוריה</button>
       </form>
@@ -2194,13 +2159,6 @@ function renderCustomerFinanceDashboard() {
     </div>
   `;
   document.getElementById('portalHistoryStatus').value = portalHistoryFilters.status;
-}
-
-function formatPriceListDate(value) {
-  if (!value || /^2020-01-01(?:$|[ T])/.test(String(value))) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  return date.toLocaleDateString('he-IL');
 }
 
 function formatMoney(value) {
@@ -2242,7 +2200,7 @@ function renderPortalPriceListPanel() {
       <div class="portal-price-meta">
         <div><span>לקוח</span><strong>${escapeHtml(PRICE_LIST_DOCUMENT.customer?.name || ME?.name || '')}</strong></div>
         <div><span>ח.פ</span><strong>${escapeHtml(PRICE_LIST_DOCUMENT.customer?.tax_id || ME?.tax_id || '-')}</strong></div>
-        <div><span>תאריך מחירון</span><strong>${escapeHtml(formatPriceListDate(PRICE_LIST_DOCUMENT.updatedAt))}</strong></div>
+        <div><span>תאריך מחירון</span><strong><bdi>${formatPortalDate(withoutPlaceholderDate(PRICE_LIST_DOCUMENT.updatedAt)) || '—'}</bdi></strong></div>
       </div>
       <div class="portal-price-preview">
         ${items.length ? `<table>
@@ -2274,7 +2232,7 @@ function buildPriceListPrintHtml() {
   const doc = PRICE_LIST_DOCUMENT || {};
   const customer = doc.customer || ME || {};
   const items = Array.isArray(doc.items) ? doc.items : [];
-  const date = formatPriceListDate(doc.updatedAt);
+  const date = formatPortalDate(withoutPlaceholderDate(doc.updatedAt)) || '—';
   const vatNote = doc.vatNote || 'המחירים אינם כוללים מע"מ';
   return `<!doctype html>
 <html lang="he" dir="rtl">
@@ -2312,7 +2270,7 @@ function buildPriceListPrintHtml() {
   <main class="sheet">
     <section class="top">
       <div class="brand"><img src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל"><small>ברזל בניין, כיפוף, אספקה ותכנון ייצור</small></div>
-      <div class="title">מחירון ללקוח<span>תאריך מחירון: ${escapeHtml(date)}</span></div>
+      <div class="title">מחירון ללקוח<span>תאריך מחירון: <bdi>${date}</bdi></span></div>
     </section>
     <section class="customer-box">
       <div class="box">
@@ -2381,7 +2339,7 @@ function renderGuaranteeDocuments() {
   status.className = 'guarantee-status' + (approved ? ' ok' : '');
   list.innerHTML = guaranteeDocuments.map(doc => `
     <div class="guarantee-row">
-      <div><b>${escapeHtml(doc.original_name)}</b><br><span>${formatDateTime(doc.uploaded_at)}</span></div>
+      <div><b>${escapeHtml(doc.original_name)}</b><br><span><bdi>${formatPortalDate(withoutPlaceholderDate(doc.uploaded_at), { withTime: true })}</bdi></span></div>
       <span>${doc.status === 'approved' ? 'מאושר' : 'ממתין לבדיקה'}</span>
     </div>
   `).join('');
@@ -2503,7 +2461,7 @@ function portalHistoryTable(orders) {
         ${order.customerCanApprove === true ? '<span class="order-approval-hint">לחץ לאישור פרטי ההזמנה ושליחה לבדיקה</span>' : ''}
       </td>
       <td role="cell"><span class="portal-cell-label">סטטוס</span><span class="status-badge ${badgeCls(order.status)}">${escapeHtml(order.status)}</span></td>
-      <td role="cell"><span class="portal-cell-label">אספקה</span><bdi>${escapeHtml(order.delivery_date || '—')}</bdi></td>
+      <td role="cell"><span class="portal-cell-label">אספקה</span><bdi>${formatPortalDate(order.delivery_date) || '—'}</bdi></td>
       <td role="cell"><span class="portal-cell-label">פרויקט</span><bdi>${escapeHtml(order.site_name || 'ללא פרויקט')}</bdi></td>
       <td role="cell"><span class="portal-cell-label">משקל</span>${order.total_weight ? formatKg(order.total_weight) : '—'}</td>
       ${order.portal_price ? `<td role="cell"><span class="portal-cell-label">מחיר</span><bdi>₪${(+order.portal_price).toLocaleString('he')}</bdi></td>` : showPrice ? '<td role="cell" class="portal-no-price">—</td>' : ''}
@@ -2523,7 +2481,7 @@ function portalHistoryTable(orders) {
 function portalOrderCardsHtml(orders) {
   return (orders || []).map(o => {
     const cls = statusClass(o.status);
-    const date = o.delivery_date;
+    const date = formatPortalDate(o.delivery_date);
     const weight = o.total_weight ? formatKg(o.total_weight) : '';
     const price = o.portal_price ? `₪${(+o.portal_price).toLocaleString('he')}` : '';
     const site = o.site_name ? `אתר: ${o.site_name}` : '';
@@ -2536,7 +2494,7 @@ function portalOrderCardsHtml(orders) {
           <span class="status-badge ${badgeCls(o.status)}">${needsApproval ? portalIcon('clock') + ' ' : ''}${escapeHtml(o.status)}</span>
         </button>
         <div class="order-meta">
-          ${date ? `<span>${portalIcon('calendar')} אספקה: <bdi>${escapeHtml(date)}</bdi></span>` : ''}
+          ${date ? `<span>${portalIcon('calendar')} אספקה: <bdi>${date}</bdi></span>` : ''}
           <span>${portalIcon('site')} ${site ? escapeHtml(site) : 'ללא פרויקט'}</span>
           ${weight ? `<span>${portalIcon('weight')} ${weight}</span>` : ''}
           ${price  ? `<bdi class="order-price">${price}</bdi>` : ''}
@@ -2815,11 +2773,11 @@ function renderDetail(order) {
       <div class="portal-page-heading">
         <div>
           <h1 class="detail-status">הזמנה <bdi>${escapeHtml(order.order_num)}</bdi></h1>
-          <div style="font-size:13px;color:var(--dim)"><bdi>${escapeHtml(order.created_at?.slice(0,10) || '')}</bdi></div>
+          <div style="font-size:13px;color:var(--dim)"><bdi>${formatPortalDate(order.created_at)}</bdi></div>
         </div>
         <span class="status-badge ${badgeCls(order.status)}">${escapeHtml(order.status)}</span>
       </div>
-      ${order.delivery_date?`<div style="font-size:13px;margin-top:4px">${portalIcon('calendar')} אספקה: <bdi>${escapeHtml(order.delivery_date)}</bdi>${order.delivery_time ? ' <bdi>' + escapeHtml(order.delivery_time) + '</bdi>' : ''}</div>`:''}
+      ${order.delivery_date?`<div style="font-size:13px;margin-top:4px">${portalIcon('calendar')} אספקה: <bdi>${formatPortalDate(order.delivery_date)}</bdi>${order.delivery_time ? ' <bdi>' + escapeHtml(order.delivery_time) + '</bdi>' : ''}</div>`:''}
       ${order.delivery_address?`<div style="font-size:13px;color:var(--dim)">${portalIcon('pin')} ${escapeHtml(order.delivery_address)}</div>`:''}
       <div class="order-detail-summary">
         <div class="order-detail-kpi"><span>פריטים</span><strong>${allItems.length}</strong></div>
@@ -2968,7 +2926,7 @@ function restorePortalDraft() {
     for (const [field, id] of Object.entries(portalDraftFields)) {
       if (field === 'siteId' && !PORTAL_SITES.some(site => String(site.id) === draft.siteId)) continue;
       const value = draft[field] || (field === 'deliveryMode' ? 'משלוח' : '');
-      document.getElementById(id).value = field === 'deliveryDate' ? portalDateInputValue(value) : value;
+      document.getElementById(id).value = field === 'deliveryDate' ? formatPortalDate(value) : value;
     }
     if (savePortalDraft(false)) localStorage.removeItem(legacyKey);
     return true;
@@ -3316,13 +3274,6 @@ function portalShapeSelected(data) {
 
 function formatMm(value) {
   return window.IronBendDisplayUnits.formatLengthCmFromMm(value);
-}
-
-function formatDateTime(value) {
-  if (!value || /^2020-01-01(?:$|[ T])/.test(String(value))) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 function handlePortalFiles(files) {
