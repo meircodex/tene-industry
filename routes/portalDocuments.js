@@ -1,7 +1,7 @@
 'use strict';
 
 const router = require('express').Router();
-const { withoutPlaceholderDate } = require('../services/customerPortalDates');
+const { formatPortalDate, withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { createPortalAccessService } = require('../services/portalAccess');
 
 const documentFields = {
@@ -78,7 +78,15 @@ module.exports = function createPortalDocumentsRouter(deps) {
     const type = req.params.type;
     const doc = allowedDocuments(s, order).find(row => row.type === type && Number(row.id) === Number(req.params.documentId));
     if (!doc) return res.status(404).send('לא נמצא');
-    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto;padding:0 16px;overflow-wrap:anywhere}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:start}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${Object.entries(doc).filter(([key, value]) => value != null && Object.hasOwn(documentFields, key)).map(([key, value]) => `<tr><th scope="row">${documentFields[key]}</th><td>${esc(value)}</td></tr>`).join('')}</table></html>`);
+    const rows = Object.entries(doc)
+      .filter(([key, value]) => value != null && Object.hasOwn(documentFields, key))
+      .map(([key, value]) => {
+        const cell = key === 'issued_at' || key === 'delivered_at'
+          ? `<bdi>${formatPortalDate(value, { withTime: true })}</bdi>`
+          : esc(value);
+        return `<tr><th scope="row">${documentFields[key]}</th><td>${cell}</td></tr>`;
+      }).join('');
+    res.set('Cache-Control', 'no-store').type('html').send(`<!doctype html><html lang="he" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(doc.title)} ${esc(doc.number)}</title><style>body{font:16px Arial;max-width:760px;margin:30px auto;padding:0 16px;overflow-wrap:anywhere}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:start}</style><h1>${esc(doc.title)} ${esc(doc.number)}</h1><p>מסמך עבור הזמנה ${esc(order.order_num)} בלבד</p><table>${rows}</table></html>`);
   });
   return router;
 };

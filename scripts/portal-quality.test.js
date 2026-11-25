@@ -87,7 +87,9 @@ test('portal draft saves, survives Back and reload, and replays an interrupted s
   await page.locator('#newOrderAction').click();
   await page.locator('.line-qty').fill('25');
   await page.locator('.line-element').fill('קורה לבדיקה');
-  await page.locator('#delivDate').fill(businessDate.format());
+  const deliveryDate = businessDate.format();
+  const displayedDate = deliveryDate.split('-').reverse().join('/');
+  await page.locator('#delivDate').fill(displayedDate);
   await page.locator('#delivAddr').fill('רחוב בדיקה');
   await page.locator('#orderNotes').fill('נשמר גם לפני יציאה מהשדה');
   await page.getByRole('button', { name: 'שמור טיוטה' }).click();
@@ -98,12 +100,14 @@ test('portal draft saves, survives Back and reload, and replays an interrupted s
     return JSON.parse(localStorage.getItem(key));
   });
   assert.ok(draft.idempotencyKey);
+  assert.equal(draft.deliveryDate, deliveryDate);
   await page.goBack();
   await page.locator('#screenHome').waitFor();
   await page.goForward();
   await page.locator('#screenOrder').waitFor();
   await page.reload();
   await page.locator('#screenOrder').waitFor();
+  assert.equal(await page.locator('#delivDate').inputValue(), displayedDate);
   assert.equal(await page.locator('.line-qty').inputValue(), '25');
   assert.equal(await page.locator('.line-element').inputValue(), 'קורה לבדיקה');
   assert.equal(await page.locator('#delivAddr').inputValue(), 'רחוב בדיקה');
@@ -299,8 +303,8 @@ test('profile email, delivery date, upload and zoom are validated on mobile', as
   assert.match(await page.locator('#toast').innerText(), /אימייל תקינה/);
   await assertAccessible(page, 'profile');
   await page.locator('#newOrderAction').click();
-  assert.equal(await page.locator('#delivDate').getAttribute('min'), today);
-  await page.locator('#delivDate').fill(yesterday);
+  assert.equal(await page.locator('#delivDate').getAttribute('placeholder'), 'dd/mm/yyyy');
+  await page.locator('#delivDate').fill(yesterday.split('-').reverse().join('/'));
   await page.locator('#submitOrderBtn').click();
   assert.match(await page.locator('#toast').innerText(), /מהיום ואילך/);
   assert.doesNotMatch(await page.locator('meta[name=viewport]').getAttribute('content'), /maximum-scale|user-scalable/);
@@ -537,3 +541,54 @@ test('390px order fields are labeled with a readable preview and a usable remove
   assert.equal(await page.locator('.order-line-row').count(), 1);
   assert.notEqual(await row.getAttribute('data-item-id'), firstId);
 });
+
+for (const width of [1280, 390]) {
+  test(`finance due invoice retry preserves the balance at ${width}px`, async t => {
+    const { url } = await isolatedPortal(t, 'finance');
+    const page = await browserPage(t, width);
+    let payments = 0;
+    await page.route('**/api/c/finance/summary?*', async route => {
+      const response = await route.fetch();
+      assert.equal(response.ok(), true);
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, summary: { ...body.summary, dueNow: 1250 } } });
+    });
+    await page.route('**/api/c/finance/payments-due?*', async route => {
+      if (++payments === 1) {
+        return route.fulfill({ status: 503, json: { error: 'induced test failure' } });
+      }
+      return route.fulfill({ json: { canSeeMoney: true, payments: [{
+        status: 'overdue', days: -1, amount: 1250, invoiceNum: 'QA-RETRY-001',
+        siteName: 'אתר בדיקה', dueDate: '2026-11-30',
+      }] } });
+    });
+
+    await openHome(page, url);
+    await page.locator('#homeTabFinance').click();
+    const region = page.getByRole('region', { name: 'חשבוניות לתשלום' });
+    const retry = region.getByRole('button', { name: /נסה לטעון שוב/ });
+    const balance = page.locator('.finance-kpi.due strong');
+    await retry.waitFor();
+    assert.match(await balance.innerText(), /1,250/);
+    assert.match(await region.innerText(), /רשימת החשבוניות לתשלום לא נטענה/);
+    assert.doesNotMatch(await region.innerText(), /לא נמצאו יתרות/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+    if (process.env.PORTAL_FINANCE_QA_SCREENSHOTS) {
+      await page.locator('.finance-kpi.due').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(process.env.PORTAL_FINANCE_QA_SCREENSHOTS, `invoice-retry-${width}.png`) });
+    }
+
+    const sameBalance = await balance.elementHandle();
+    const reads = [];
+    page.on('request', req => reads.push(new URL(req.url()).pathname));
+    await retry.focus();
+    await page.keyboard.press('Enter');
+    await region.getByText('חשבונית QA-RETRY-001', { exact: false }).waitFor();
+    assert.deepEqual(reads.filter(p => p.startsWith('/api/')), ['/api/c/finance/payments-due']);
+    assert.equal(payments, 2);
+    assert.equal(await region.locator('bdi').innerText(), '30/11/2026');
+    assert.equal(await sameBalance.evaluate(el => el.isConnected), true);
+    assert.match(await balance.innerText(), /1,250/);
+    assert.equal(await region.evaluate(el => document.activeElement === el), true);
+  });
+}

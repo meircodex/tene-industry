@@ -1,145 +1,53 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he" dir="rtl" data-tene-portal>
 <head>
 <script src="/user-messages.js?v=1"></script>
 <meta charset="UTF-8">
+<script data-portal-contrast-bootstrap>
+  (() => {
+    const key = 'tene-portal-contrast';
+    const root = document.documentElement;
+    const preference = window.matchMedia('(prefers-contrast: more)');
+    let choice;
+    try { choice = localStorage.getItem(key); } catch {}
+    const apply = () => {
+      const high = choice === 'high' || (choice !== 'normal' && preference.matches);
+      root.dataset.portalContrast = high ? 'high' : 'normal';
+      document.getElementById('portalContrastToggle')?.setAttribute('aria-pressed', String(high));
+    };
+    apply();
+    preference.addEventListener('change', apply);
+    document.addEventListener('DOMContentLoaded', () => {
+      apply();
+      document.getElementById('portalContrastToggle').addEventListener('click', () => {
+        choice = root.dataset.portalContrast === 'high' ? 'normal' : 'high';
+        try { localStorage.setItem(key, choice); } catch {}
+        apply();
+      });
+    });
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>פורטל לקוח – IronBend</title>
-<meta name="theme-color" content="#c9621a">
+<meta name="theme-color" content="#1C3C64">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-:root {
-  --accent: #c9621a;
-  --accent-light: #e07b39;
-  --text: #1a2533;
-  --text-dim: #526070;
-  --text-muted: #8fa0b0;
-  --border: rgba(0,0,0,0.09);
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  font-family: 'Heebo', sans-serif;
-  background: #f0f4f8;
-  color: var(--text);
-  direction: rtl;
-  min-height: 100vh;
-}
-.topbar {
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  padding: 0 20px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-}
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.logo-img {
-  width: 160px;
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 3px 8px rgba(2,26,72,0.10));
-}
-.logo-name {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--text);
-}
-.logo-sub {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-}
-.topbar-badge {
-  padding: 6px 14px;
-  border-radius: 20px;
-  background: rgba(201,98,26,0.08);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid rgba(201,98,26,0.15);
-}
-.main {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 24px 16px;
-}
-.entry-card {
-  background: #fff;
-  border-radius: 18px;
-  padding: 36px 32px;
-  text-align: center;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-  margin-top: 40px;
-}
-.entry-icon {
-  font-size: 56px;
-  margin-bottom: 16px;
-}
-.entry-title {
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.entry-sub {
-  font-size: 14px;
-  color: var(--text-dim);
-  margin-bottom: 22px;
-  line-height: 1.7;
-}
-.btn-primary {
-  display: inline-block;
-  padding: 14px 28px;
-  background: linear-gradient(135deg,var(--accent-light),var(--accent));
-  color: #fff;
-  border-radius: 12px;
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 800;
-  box-shadow: 0 4px 16px rgba(201,98,26,0.30);
-  cursor: pointer;
-  border: none;
-}
-.entry-note {
-  margin-top: 18px;
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.6;
-}
-@media (max-width: 480px) {
-  .entry-card {
-    margin-top: 24px;
-    padding: 30px 22px;
-  }
-  .entry-title {
-    font-size: 21px;
-  }
-}
-</style>
-<link rel="stylesheet" href="/theme.css">
+<link rel="stylesheet" href="/portal-customer.css">
 </head>
-<body>
-  <div class="topbar">
+<body class="portal-entry">
+  <header class="portal-header">
+    <div class="portal-header-inner">
     <div class="logo">
       <img class="logo-img" src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל">
-      <div>
-        <div class="logo-name">IronBend</div>
-        <div class="logo-sub">פורטל לקוח</div>
-      </div>
+      <span class="header-sub">פורטל לקוחות</span>
     </div>
-    <div class="topbar-badge">🔒 גישה מוגבלת</div>
-  </div>
+    <button type="button" class="portal-contrast-toggle" id="portalContrastToggle" aria-label="ניגודיות: רגילה / גבוהה" aria-pressed="false">
+  <span aria-hidden="true" class="portal-contrast-icon"></span><span>ניגודיות: <strong class="portal-contrast-normal">רגילה</strong> / <strong class="portal-contrast-high">גבוהה</strong></span>
+</button>
+    </div>
+  </header>
 
-  <div class="main">
+  <main class="portal-entry-main">
     <section class="entry-card">
-      <div class="entry-icon">🔐</div>
       <h1 class="entry-title">פורטל לקוח מאובטח</h1>
       <p class="entry-sub">
         הגישה לפורטל הלקוחות מתבצעת באמצעות קישור או קוד מאובטח.
@@ -149,6 +57,6 @@ body {
         אם לא הגיע אליכם קישור מאובטח, פנו למוקד השיווק או לשירות לקוחות לקבלת גישה.
       </p>
     </section>
-  </div>
+  </main>
 </body>
 </html>

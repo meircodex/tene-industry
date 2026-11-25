@@ -1,17 +1,50 @@
 <!doctype html>
-<html lang="he" dir="rtl"><head>
-<script src="/user-messages.js?v=1"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>בקשות לקוח — טנא</title>
+<html lang="he" dir="rtl" data-tene-portal><head>
+<script src="/user-messages.js?v=1"></script>
+<meta charset="utf-8">
+<script data-portal-contrast-bootstrap>
+  (() => {
+    const key = 'tene-portal-contrast';
+    const root = document.documentElement;
+    const preference = window.matchMedia('(prefers-contrast: more)');
+    let choice;
+    try { choice = localStorage.getItem(key); } catch {}
+    const apply = () => {
+      const high = choice === 'high' || (choice !== 'normal' && preference.matches);
+      root.dataset.portalContrast = high ? 'high' : 'normal';
+      document.getElementById('portalContrastToggle')?.setAttribute('aria-pressed', String(high));
+    };
+    apply();
+    preference.addEventListener('change', apply);
+    document.addEventListener('DOMContentLoaded', () => {
+      apply();
+      document.getElementById('portalContrastToggle').addEventListener('click', () => {
+        choice = root.dataset.portalContrast === 'high' ? 'normal' : 'high';
+        try { localStorage.setItem(key, choice); } catch {}
+        apply();
+      });
+    });
+  })();
+</script>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>בקשות לקוח — טנא</title>
 <link rel="stylesheet" href="/theme.css"><script src="/auth-client.js"></script><script src="/nav.js" defer></script>
-<style>body{font-family:Arial,sans-serif;background:#f0f4f8;color:#1a2533;margin:0}main{max-width:1100px;margin:auto;padding:24px}a{color:#a74b0c}button,select{font:inherit;padding:9px;margin:4px;border:1px solid #bcc7d4;border-radius:8px;background:white}article{background:white;border:1px solid #d5dee8;border-right:5px solid #c9621a;border-radius:12px;padding:18px;margin:14px 0}article.read{border-right-color:#8194a8}.meta{color:#526070;font-size:.9rem;line-height:1.7}.error{color:#b83227}header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}</style></head>
-<body><main><header><h1>בקשות לקוח</h1><a href="/orders.html">חזרה להזמנות</a></header>
+<link rel="stylesheet" href="/portal-customer.css">
+</head>
+<body class="portal-office">
+<header class="portal-header"><div class="portal-header-inner"><img class="portal-logo" src="/brand/tene-pdf-logo.jpg" alt="טנא תעשיות ברזל"><button type="button" class="portal-contrast-toggle" id="portalContrastToggle" aria-label="ניגודיות: רגילה / גבוהה" aria-pressed="false">
+  <span aria-hidden="true" class="portal-contrast-icon"></span><span>ניגודיות: <strong class="portal-contrast-normal">רגילה</strong> / <strong class="portal-contrast-high">גבוהה</strong></span>
+</button></div></header>
+<main><header><h1>בקשות לקוח</h1><a href="/orders.html">חזרה להזמנות</a></header>
 <p>תיבה נפרדת מהזמנות שאושרו לייצור. קבלת אחריות וסימון טיפול אינם אישור הזמנה.</p><p><a href="/portal-guarantees.html">מסמכי ערבות — בדיקת משרד</a></p>
 <p id="summary" aria-live="polite">טוען…</p><label for="showHandled">תצוגה</label><select id="showHandled" onchange="render()"><option value="pending">ממתינות לטיפול</option><option value="all">כל הממתינות, כולל טופלו</option></select><button onclick="load()">רענן</button>
 <p id="error" class="error" role="alert"></p><section id="requests"></section></main>
+<script src="/portal-dates.js"></script>
 <script>
+const { formatPortalDate } = window.IronBendPortalDates;
 let rows=[];const busy=new Set();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function load(){try{const r=await fetch('/api/portal-requests');const d=await r.json();if(!r.ok)throw Error(d.user_message || d.error||'אין הרשאה לתיבת הבקשות');rows=d.orders;document.getElementById('summary').textContent=`${d.pendingCount} בקשות לטיפול · ${d.unreadCount} חדשות`;document.getElementById('error').textContent='';render();}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}}
-function render(){const visible=rows.filter(o=>document.getElementById('showHandled').value==='all'||!o.handled_at);document.getElementById('requests').innerHTML=visible.map(o=>`<article class="${o.unread?'':'read'}"><h2>${esc(o.order_num)} · ${esc(o.customer_name)} ${o.unread?'— חדש':''}</h2><p>${esc(o.status)}</p><p class="meta">נשלחה: ${esc(new Date(o.created_at).toLocaleString('he-IL'))} · אחראי: ${esc(o.owner_name||'טרם שויך')} ${o.handled_at?'· טופלה במשרד':''}</p><a href="/orders.html?id=${o.id}">פתח הזמנה</a><button onclick="act(${o.id},'read')">סמן כנקראה</button><button onclick="act(${o.id},'claim')">קבל אחריות</button><button onclick="act(${o.id},'${o.handled_at?'reopen':'handled'}')">${o.handled_at?'החזר לטיפול':'סמן שטופלה'}</button></article>`).join('')||'<p>אין בקשות בתצוגה זו.</p>';}
+function render(){const visible=rows.filter(o=>document.getElementById('showHandled').value==='all'||!o.handled_at);document.getElementById('requests').innerHTML=visible.map(o=>`<article class="${o.unread?'':'read'}"><h2><bdi>${esc(o.order_num)}</bdi> · ${esc(o.customer_name)} ${o.unread?'— חדש':''}</h2><p>${esc(o.status)}</p><p class="portal-office-meta">נשלחה: <bdi>${formatPortalDate(o.created_at, { withTime: true })}</bdi> · אחראי: ${esc(o.owner_name||'טרם שויך')} ${o.handled_at?'· טופלה במשרד':''}</p><a href="/orders.html?id=${o.id}">פתח הזמנה</a><button onclick="act(${o.id},'read')">סמן כנקראה</button><button onclick="act(${o.id},'claim')">קבל אחריות</button><button onclick="act(${o.id},'${o.handled_at?'reopen':'handled'}')">${o.handled_at?'החזר לטיפול':'סמן שטופלה'}</button></article>`).join('')||'<p>אין בקשות בתצוגה זו.</p>';}
 async function act(id,action){if(busy.has(id))return;busy.add(id);try{const r=await fetch('/api/portal-requests/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});const d=await r.json();if(!r.ok)throw Error(d.user_message || d.error||'הפעולה נכשלה');await load();}catch(e){document.getElementById('error').textContent=(window.IronBendMessages?.text(e.message) ?? e.message);}finally{busy.delete(id);}}
 load();setInterval(load,30000);
 </script></body></html>

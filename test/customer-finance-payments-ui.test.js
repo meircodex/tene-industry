@@ -6,7 +6,7 @@ const { loadPortalClient } = require('./helpers/customer-portal-client');
 
 const emptyCopy = /לא נמצאו יתרות חשבוניות/;
 const failedCopy = /רשימת החשבוניות לתשלום לא נטענה/;
-const invoice = { invoiceNum: 'TEST-17', siteName: 'אתר בדיקה', status: 'due_now', amount: 1250 };
+const invoice = { invoiceNum: 'TEST-17', siteName: 'אתר בדיקה', status: 'due_now', amount: 1250, dueDate: '2026-11-30' };
 
 function setup(payment) {
   const portal = loadPortalClient();
@@ -72,6 +72,7 @@ test('retry fetches just the invoice list, guards concurrent clicks, and restore
   resolveRetry(response({ payments: [invoice], canSeeMoney: true }));
   await pending;
   assert.match(region.innerHTML, /TEST-17/);
+  assert.match(region.innerHTML, /<bdi>30\/11\/2026<\/bdi>/);
   assert.doesNotMatch(region.innerHTML, failedCopy);
   assert.equal(portal.dashboard.innerHTML, dashboardBefore);
   assert.equal(focused, 1);

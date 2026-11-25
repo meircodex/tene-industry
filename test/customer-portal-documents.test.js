@@ -48,6 +48,7 @@ test('portal document library returns only authorized real docs and safe summary
   const inv = db.prepare('DELETE FROM delivery_note_orders WHERE delivery_note_id=1 AND order_id=101').run();
   const safe = await get(`/api/c/orders/${orderA}/documents?token=doc-token`);
   assert.deepEqual(safe.b.documents.map(x => x.type).sort(), ['delivery_note','invoice']);
+  assert.equal(safe.b.documents.find(doc => doc.type === 'invoice').issued_at, '2026-09-01');
   assert.doesNotMatch(JSON.stringify(safe.b), /secret_cost|RAW-SIGNATURE|items_json|subtotal/);
   const printable = await fetch(`${base}/api/c/orders/${orderA}/documents/invoice/1?token=doc-token`);
   assert.equal(printable.status, 200);
@@ -56,6 +57,7 @@ test('portal document library returns only authorized real docs and safe summary
   assert.match(html, /<html lang="he" dir="rtl">/);
   assert.match(html, /name="viewport" content="width=device-width, initial-scale=1"/);
   assert.match(html, /<th scope="row">סכום ששולם<\/th><td>25<\/td>/);
+  assert.match(html, /<th scope="row">תאריך הפקה<\/th><td><bdi>01\/09\/2026<\/bdi><\/td>/);
   assert.doesNotMatch(html, />paid_amount<|>issued_at</);
   assert.doesNotMatch(html, /secret_cost|RAW-SIGNATURE|PERSON|items_json/);
   assert.equal((await get(`/api/c/orders/${orderB}/documents?token=doc-token`)).r.status, 404);

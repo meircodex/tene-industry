@@ -30,7 +30,7 @@ function loadPortalClient() {
     fetch: async () => { throw new Error('unexpected HTTP call'); },
   });
   const root = path.resolve(__dirname, '../..');
-  for (const file of ['services/shapeSnapshot.js', 'public/rebar-weights.js', 'public/display-units.js', 'public/shape-editor.js', 'public/order-line-renderer.js']) {
+  for (const file of ['services/shapeSnapshot.js', 'public/rebar-weights.js', 'public/display-units.js', 'public/portal-dates.js', 'public/shape-editor.js', 'public/order-line-renderer.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
   }
   const html = fs.readFileSync(path.join(root, 'public/customer.html'), 'utf8');
