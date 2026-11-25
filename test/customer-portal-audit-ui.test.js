@@ -15,7 +15,7 @@ test('customer portal has linked delivery/auth labels and honest step state', ()
   for (const id of ['deviceEnrollPin', 'deviceEnrollPinConfirm', 'trustedDevicePin', 'portalAccessCode', 'authPhone', 'authPassword', 'authName', 'authOtp', 'orderSiteId', 'delivDate', 'delivTime', 'delivMode', 'delivAddr', 'orderNotes']) {
     assert.match(html, new RegExp(`<label[^>]*for="${id}"`), `missing label for ${id}`);
   }
-  assert.match(html, /class="active" aria-current="step">1\. פריטים וצורות/);
+  assert.match(html, /aria-current="step" onclick="goToPortalOrderStep\('portalOrderItems'\)"><bdi>1<\/bdi> פריטים וצורות/);
   assert.match(html, /הקובץ יועלה עם ההזמנה/);
   assert.doesNotMatch(html, /OCR מלא לפורטל יחובר כ-endpoint נפרד/);
 });
