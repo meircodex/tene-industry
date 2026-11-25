@@ -65,6 +65,47 @@
     .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.06);margin-bottom:12px}
     .card-title{font-size:15px;font-weight:700;margin-bottom:6px}
 
+    .portal-section-heading{margin:0 0 8px;font-size:16px;font-weight:800;line-height:1.4}
+    .portal-history-heading{margin-top:14px}
+    .finance-history-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+    .finance-history-filters .field{margin:0}
+    .finance-history-filters input{direction:ltr;text-align:center}
+    #portalHistoryStatus,#portalHistoryApply{grid-column:1/-1}
+    body #screenOrder #submitOrderBtn[aria-disabled="true"]{background:#e8edf2!important;border-color:#c8d1dc!important;color:#475569!important;cursor:not-allowed;opacity:1;transition:none}
+    #screenOrder .line-mobile-label,#screenOrder .line-mobile-shape-name{display:none}
+    @media(max-width:640px){
+      #screenOrder .ib-order-lines .order-line-row{
+        grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        grid-template-areas:"index delete" "element element" "shape shape" "diam qty" "length weight"!important;
+        gap:10px 12px!important;padding:12px!important
+      }
+      #screenOrder .ib-order-lines .line-index{justify-content:flex-start!important}
+      #screenOrder .ib-order-lines .line-delete{
+        width:44px!important;height:44px!important;min-width:44px;min-height:44px;justify-self:end;
+        border:1px solid #c8d1dc!important;border-radius:8px;background:#fff!important;color:#475569!important;font-size:22px!important
+      }
+      #screenOrder .line-field-element{grid-area:element}
+      #screenOrder .line-field-shape{grid-area:shape}
+      #screenOrder .line-field-diameter{grid-area:diam}
+      #screenOrder .line-field-qty{grid-area:qty}
+      #screenOrder .line-total-length{grid-area:length}
+      #screenOrder .line-weight{grid-area:weight}
+      #screenOrder .ib-order-lines :is(.line-field,.line-total-length,.line-weight){
+        display:flex!important;flex-direction:column;align-items:stretch!important;gap:4px;padding:0!important
+      }
+      #screenOrder .line-mobile-label{display:block;color:#42556a;font-size:13px;font-weight:700}
+      #screenOrder .ib-order-lines :is(.line-element,.line-diameter-select,.line-qty){
+        height:44px!important;border:1px solid #c8d1dc!important;border-radius:8px!important;background:#fff!important;padding-inline:10px!important;font-size:16px!important
+      }
+      #screenOrder .ib-order-lines .line-shape{
+        flex-direction:column;gap:2px;padding:8px!important;border:1px solid #c8d1dc!important;border-radius:8px;background:#f7fafd!important;height:auto!important
+      }
+      #screenOrder .ib-order-lines .line-shape-sketch{height:110px!important}
+      #screenOrder .ib-order-lines .line-shape-sketch svg{width:100%!important;height:110px!important;max-height:none!important}
+      #screenOrder .line-mobile-shape-name{display:block;font-size:13px;font-weight:800;color:#26364a}
+      #screenOrder .line-metric-value{font-size:14px}
+    }
+
     /* ── Home screen ── */
     .welcome-banner{background:linear-gradient(135deg,var(--dark),#203b64);color:#fff;border-radius:18px;padding:22px;margin-bottom:16px;box-shadow:var(--shadow)}
     .welcome-banner h2{font-size:20px;margin-bottom:4px}
@@ -76,7 +117,7 @@
     .portal-action-grid .new-order-btn{margin-bottom:0;height:100%;min-height:76px}
     .portal-action-card{background:#fff;border:1.5px solid var(--border);border-radius:14px;padding:14px;text-align:right;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.05);font-family:inherit;color:var(--text);min-height:76px}
     .portal-action-card:hover,.portal-home-tab:hover{border-color:#efad80;transform:translateY(-1px)}
-    .portal-action-card[hidden]{display:none}
+    .portal-action-card[hidden],.new-order-btn[hidden]{display:none}
     .portal-action-card strong{display:block;font-size:15px;margin-bottom:4px}
     .portal-action-card span{display:block;font-size:12px;color:var(--dim);line-height:1.45}
     .portal-profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -88,7 +129,7 @@
     .portal-home-tab small{display:block;font-size:10px;font-weight:600;line-height:1.35;color:var(--dim)}
     .portal-home-tab.active{border-color:var(--orange);background:#fff7ef;color:#c95700}
     .portal-home-tab.active small{color:#9b5500}
-    .portal-home-tab[hidden]{display:none}
+    .portal-home-tab[hidden],#quoteBtn[hidden],#portalHistoryMore[hidden]{display:none}
     .portal-home-section{display:none}
     .portal-home-section.active{display:block}
     .portal-dashboard{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px}
@@ -320,6 +361,11 @@
     @media(max-width:430px){.portal-action-grid{grid-template-columns:1fr}.portal-stepper{grid-template-columns:1fr}.screen{padding:14px}.portal-home-tabs{gap:6px}.support-preview-banner{position:relative;top:auto}.support-preview-description{display:none}}
     .portal-icon{width:1em;height:1em;vertical-align:-.12em;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
     body #portalHomeTabs .portal-home-tab.active, body .order-approval-hint{color:#94420c}
+    body #welcomeName{color:#fff!important}
+    body .screen .back-btn{color:#94420c}
+    body #screenHome #ordersCount,body #screenDetail .tl-sub{color:#475569}
+    body #screenOrder .order-lines-head small{opacity:1!important}
+    body #seModal .se-summary-item.primary{background:#fff!important}
     body #screenOrder .line-index{color:#54647a!important}
     body .screen .btn-primary,body #screenOrder #submitOrderBtn,body #screenDetail .btn-primary,body #seModal #seOk{background:#9e4515!important;color:#fff!important}
     body #seModal #sePerimeter,body #seModal #seItemNumber,
@@ -441,7 +487,7 @@
   </div>
   <div class="welcome-banner">
     <h1 id="welcomeName" style="font-size:20px">שלום</h1>
-    <p id="welcomeSub"><span id="portalRoleLabel">פורטל לקוח</span> · <span id="tierLabel">מחירון</span></p>
+    <p id="welcomeSub"><span id="portalRoleLabel">פורטל לקוח</span><span id="tierLabel" hidden></span></p>
     <div class="welcome-actions">
       <button type="button" id="changePinBtn" class="btn btn-secondary btn-sm" aria-controls="portalPinPanel" aria-expanded="false" onclick="togglePortalPinForm(true)">שינוי PIN</button>
       <button class="btn btn-secondary btn-sm" id="manageSitesBtn" onclick="openProjectPanel(false)" style="display:none">אתרים ומנהלי עבודה</button>
@@ -525,7 +571,7 @@
 
 <!-- ══ NEW ORDER SCREEN ══ -->
 <div class="screen" id="screenOrder">
-  <button class="back-btn" onclick="showScreen('screenHome')">← חזרה</button>
+  <button class="back-btn" onclick="returnToPortalHome()">→ חזרה</button>
   <div style="display:flex;gap:8px;margin-bottom:12px"><button type="button" class="btn btn-secondary btn-sm" onclick="savePortalDraft()">שמור טיוטה</button></div>
 
   <ol class="portal-stepper" aria-label="שלבי יצירת הזמנה">
@@ -537,7 +583,7 @@
   <div class="step-title"><span class="step-num">1</span> בחר פריטים</div>
 
   <div class="section-card portal-upload-card">
-    <div class="card-title">מסמך מקור להזמנה</div>
+    <h2 class="portal-section-heading">מסמך מקור להזמנה</h2>
     <div class="portal-upload-grid">
       <input type="file" id="portalSourceFiles" accept=".pdf,image/*,.csv,.tsv,.xlsx,.xls" multiple hidden onchange="handlePortalFiles(this.files)"/>
       <button type="button" class="btn btn-secondary btn-sm upload-choice" onclick="document.getElementById('portalSourceFiles').click()">בחר מסמך מקור</button>
@@ -585,27 +631,28 @@
   </div>
 
   <div id="quoteActionPanel" class="section-card">
-    <div class="card-title">הצעת מחיר לפני הזמנה</div>
-    <p style="font-size:12px;color:var(--dim);line-height:1.5;margin-bottom:10px">הלקוח מזין צורות וכמויות, מקבל הערכת מחיר לפי המחירון שמותר לו לראות, ורק אחר כך מחליט אם לשלוח הזמנה.</p>
+    <h2 class="portal-section-heading">הצעת מחיר לפני הזמנה</h2>
+    <p id="portalQuoteHelp" style="font-size:12px;color:var(--dim);line-height:1.5;margin-bottom:10px">בחר צורות וכמויות כדי לקבל הערכת מחיר לפני שליחת ההזמנה.</p>
     <div id="priceBox" class="price-box" style="display:none">
       <div style="font-size:13px;color:rgba(255,255,255,.7);margin-bottom:10px">הערכת מחיר</div>
       <div id="priceBreakdown"></div>
       <div class="price-note">* המחיר כולל את התוספת לחיוב המפורטת בהצעה · אינו כולל מע"מ</div>
     </div>
     <button class="btn btn-secondary" id="quoteBtn" onclick="calcQuote(event)" style="margin-bottom:10px;width:100%">קבל הצעת מחיר</button>
-    <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder(event)">שלח הזמנה</button>
+    <p id="portalSubmitError" class="field-error" role="alert"></p>
+    <button class="btn btn-primary" id="submitOrderBtn" aria-describedby="portalSubmitError" onclick="submitOrder(event)">שלח הזמנה</button>
   </div>
 </div>
 
 <!-- ══ ORDER DETAIL SCREEN ══ -->
 <div class="screen" id="screenDetail">
-  <button class="back-btn" onclick="showScreen('screenHome')">← חזרה</button>
+  <button class="back-btn" onclick="returnToPortalHome()">→ חזרה</button>
   <div id="detailContent"><div class="loader">טוען...</div></div>
 </div>
 
 <!-- ══ SITE DETAIL SCREEN ══ -->
 <div class="screen" id="screenSiteDetail">
-  <button class="back-btn" onclick="showHome(PORTAL_ORDERS)">← חזרה לפרויקטים</button>
+  <button class="back-btn" onclick="returnToPortalHome()">→ חזרה לפרויקטים</button>
   <div id="siteDetailContent"><div class="loader">טוען אתר...</div></div>
 </div>
 
@@ -618,7 +665,7 @@
 <script src="/shapeCommercial.js?v=2"></script>
 <script src="/shapeRecognition.js?v=1"></script>
 <script src="/shape-editor.js?v=95-portal"></script>
-<script src="/order-line-renderer.js?v=3"></script>
+<script src="/order-line-renderer.js?v=4"></script>
 <script>
 // ──────────────────────────────────────────────────────
 // State
@@ -647,6 +694,7 @@ let PORTAL_INVITE_MESSAGE = '';
 let SUPPORT_PREVIEW = false;
 let SUPPORT_PREVIEW_EXPIRES_AT = null;
 let SUPPORT_ACTOR_USER_ID = null;
+let portalPriceBlock = null;
 let orderItems  = []; // [{id, shapeId, shapeName, diameter, sides, angles, qty, note}]
 let portalSourceFiles = [];
 let createdOrderId = null;
@@ -656,7 +704,10 @@ let portalPendingOrder = null;
 let portalSubmissionUserId = null;
 let PORTAL_CAN_CHANGE_PIN = false;
 let portalScreen = 'screenLoading';
-let portalHistoryFilters = { status: '', from: '', to: '', limit: 20, offset: 0, hasMore: false };
+const portalHistoryFilters = { status: '', from: '', to: '', limit: 20 };
+let financeRequestId = 0;
+let portalFinanceNeedsRefresh = false;
+let portalSitesNeedRefresh = false;
 let guaranteeDocuments = [];
 let itemIdSeq   = 0;
 let portalShapeEditor = null;
@@ -797,6 +848,8 @@ function configurePortalActions() {
   const project = document.getElementById('projectAction');
   if (newOrder) newOrder.hidden = !canOrder;
   if (quote) quote.hidden = !canQuote;
+  document.getElementById('quoteBtn').hidden = !canQuote;
+  document.getElementById('portalQuoteHelp').hidden = !canQuote;
   if (project) project.hidden = !canOpenProjects;
   const title = document.getElementById('projectActionTitle');
   if (title) title.textContent = 'אתרים ומנהלי עבודה';
@@ -883,8 +936,6 @@ function renderCustomerProfilePanel() {
       <button type="button" class="btn btn-primary full" id="saveProfileBtn" onclick="saveCustomerProfile(event)">${locked ? 'שלח בקשת שינוי' : 'שמור פרטי לקוח'}</button>
     </div>
  `;
-  const more = document.getElementById('portalHistoryMore');
-  if (more) more.style.display = PORTAL_FINANCE.historyHasMore ? '' : 'none';
 }
 
 function renderCustomerSitesPanel() {
@@ -1671,6 +1722,14 @@ async function doAuth() {
 async function completeAuth(data) {
   if (!data?.token) { setAuthError(authError()); return; }
   setAuthError();
+  _needName = false;
+  _otpRequested = false;
+  _pendingOtpPhone = '';
+  document.getElementById('authNameField').style.display = 'none';
+  document.getElementById('authOtpField').style.display = 'none';
+  for (const id of ['authName', 'authPassword', 'authOtp', 'portalAccessCode', 'trustedDevicePin']) {
+    document.getElementById(id).value = '';
+  }
   TOKEN = data.token;
   setPortalContext(data);
   showScreen('screenLoading', { replace: true });
@@ -1753,6 +1812,10 @@ function logoutPortal() {
   PORTAL_CAN_CHANGE_PIN = false;
   PORTAL_ORDERS = [];
   PORTAL_FINANCE = null;
+  financeRequestId++;
+  portalFinanceNeedsRefresh = false;
+  portalSitesNeedRefresh = false;
+  Object.assign(portalHistoryFilters, { status: '', from: '', to: '' });
   portalDraftCustomerId = null;
   orderItems = [];
   portalSourceFiles = [];
@@ -1806,6 +1869,17 @@ function setHomeSection(name) {
     item.classList.toggle('active', active);
     item.setAttribute('aria-selected', active ? 'true' : 'false');
   });
+  if (fallback === 'Finance' && portalFinanceNeedsRefresh) {
+    portalFinanceNeedsRefresh = false;
+    void loadCustomerFinanceDashboard();
+  }
+  if (fallback === 'Sites' && portalSitesNeedRefresh) {
+    portalSitesNeedRefresh = false;
+    const token = TOKEN;
+    void loadSiteSummaries().then(() => {
+      if (TOKEN === token) syncCustomerSitesPanel();
+    });
+  }
 }
 
 function updatePortalHomeTabs() {
@@ -1842,8 +1916,9 @@ function renderPortalDashboard(orders = []) {
 async function showHome(preloaded, navigation = {}) {
   document.getElementById('headerName').textContent = ME?.name || '';
   document.getElementById('welcomeName').textContent = `שלום, ${ME?.name || ''}!`;
-  const tierTxt = ME?.price_tier === 'customer' ? 'לקוח קבוע' : 'מחירון';
-  document.getElementById('tierLabel').textContent = tierTxt;
+  const tierLabel = document.getElementById('tierLabel');
+  tierLabel.hidden = !PRICE_LIST_DOCUMENT;
+  tierLabel.textContent = ME?.price_tier === 'customer' ? ' · לקוח קבוע' : ' · מחירון';
   document.getElementById('portalRoleLabel').textContent = portalRoleLabel(PORTAL_ROLE);
   if (!navigation.background) showScreen('screenHome', navigation);
 
@@ -1884,10 +1959,15 @@ function paymentStatusText(status, days) {
   return 'לא הגיע מועד';
 }
 
-function portalHistoryUrl() {
-  const q = new URLSearchParams({ token: TOKEN, limit: String(portalHistoryFilters.limit), offset: String(portalHistoryFilters.offset) });
+function portalHistoryUrl(offset) {
+  const q = new URLSearchParams({ token: TOKEN, limit: String(portalHistoryFilters.limit), offset: String(offset) });
   for (const key of ['status', 'from', 'to']) if (portalHistoryFilters[key]) q.set(key, portalHistoryFilters[key]);
   return '/api/c/orders/history?' + q.toString();
+}
+
+async function fetchPortalHistory(offset) {
+  const response = await apiFetch(portalHistoryUrl(offset)).catch(() => null);
+  return response?.ok ? response.json().catch(() => null) : null;
 }
 
 async function loadCustomerFinanceDashboard() {
@@ -1897,34 +1977,75 @@ async function loadCustomerFinanceDashboard() {
     host.innerHTML = '';
     return;
   }
+  const requestId = ++financeRequestId;
   host.innerHTML = '<div class="section-card finance-dashboard"><div class="loader" style="padding:18px">טוען מסך בקרה כספי...</div></div>';
   const [summaryData, sitesData, paymentsData, historyData] = await Promise.all([
     fetch(`/api/c/finance/summary?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
     fetch(`/api/c/finance/sites?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
     fetch(`/api/c/finance/payments-due?token=${TOKEN}`).then(r=>r.json()).catch(()=>null),
-    fetch(portalHistoryUrl()).then(r=>r.json()).catch(()=>null),
+    fetchPortalHistory(0),
   ]);
+  if (requestId !== financeRequestId) return;
   PORTAL_FINANCE = {
     summary: summaryData?.summary || null,
     sites: Array.isArray(sitesData?.sites) ? sitesData.sites : [],
-   payments: Array.isArray(paymentsData?.payments) ? paymentsData.payments : [],
-    history: portalHistoryFilters.offset ? [...(PORTAL_FINANCE.history || []), ...(Array.isArray(historyData?.orders) ? historyData.orders : [])] : (Array.isArray(historyData?.orders) ? historyData.orders : []),
+    payments: Array.isArray(paymentsData?.payments) ? paymentsData.payments : [],
+    history: historyData?.orders || [],
     historyHasMore: Boolean(historyData?.hasMore),
+    historyError: !historyData,
     canSeeMoney: Boolean(summaryData?.summary?.canSeeMoney || sitesData?.canSeeMoney || paymentsData?.canSeeMoney),
   };
+  portalFinanceNeedsRefresh = false;
   renderCustomerFinanceDashboard();
 }
 
-async function applyPortalHistoryFilters() {
-  portalHistoryFilters.status = document.getElementById('portalHistoryStatus')?.value || '';
-  portalHistoryFilters.from = document.getElementById('portalHistoryFrom')?.value || '';
-  portalHistoryFilters.to = document.getElementById('portalHistoryTo')?.value || '';
-  portalHistoryFilters.offset = 0;
-  await loadCustomerFinanceDashboard();
+function historyDateInputValue(iso) {
+  return iso.replace(/^(\d{4})-(\d{2})-(\d{2})$/, '$3/$2/$1');
 }
-async function loadMorePortalHistory() {
-  portalHistoryFilters.offset += portalHistoryFilters.limit;
-  await loadCustomerFinanceDashboard();
+
+function readPortalHistoryDate(input) {
+  const value = input.value.trim().replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3');
+  if (!value) return '';
+  const parts = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (parts && parts[3] !== '0000') {
+    const iso = `${parts[3]}-${parts[2]}-${parts[1]}`;
+    const date = new Date(iso + 'T00:00:00Z');
+    if (!Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso) return iso;
+  }
+  input.setCustomValidity('יש להזין תאריך תקין בפורמט יום/חודש/שנה.');
+  input.reportValidity();
+  return null;
+}
+
+async function applyPortalHistoryFilters(event) {
+  event.preventDefault();
+  const from = readPortalHistoryDate(document.getElementById('portalHistoryFrom'));
+  if (from === null) return;
+  const to = readPortalHistoryDate(document.getElementById('portalHistoryTo'));
+  if (to === null) return;
+  Object.assign(portalHistoryFilters, { status: document.getElementById('portalHistoryStatus').value, from, to });
+  await updatePortalHistory(document.getElementById('portalHistoryApply'), 0);
+}
+
+async function updatePortalHistory(button, offset) {
+  const requestId = ++financeRequestId;
+  setButtonBusy(button, true, 'טוען…');
+  const more = document.getElementById('portalHistoryMore');
+  if (!offset) more.disabled = true;
+  const data = await fetchPortalHistory(offset);
+  if (!offset) more.disabled = false;
+  setButtonBusy(button, false);
+  if (requestId !== financeRequestId) return;
+  if (!data && offset) {
+    toast('לא ניתן לטעון הזמנות נוספות. נסה שוב.', true);
+    return;
+  }
+  PORTAL_FINANCE.history = [...(offset ? PORTAL_FINANCE.history : []), ...(data?.orders || [])];
+  PORTAL_FINANCE.historyHasMore = Boolean(data?.hasMore);
+  PORTAL_FINANCE.historyError = !data;
+  renderCustomerFinanceDashboard();
+  document.getElementById(button.id === 'portalHistoryMore' && PORTAL_FINANCE.historyHasMore
+    ? 'portalHistoryMore' : 'portalHistoryResults').focus({ preventScroll: true });
 }
 
 function renderCustomerFinanceDashboard() {
@@ -1966,14 +2087,8 @@ function renderCustomerFinanceDashboard() {
     <div class="section-card finance-dashboard">
       <div class="finance-head">
         <div>
-          <div class="card-title">מסך בקרה כספי</div>
+          <h2 class="portal-section-heading">מסך בקרה כספי</h2>
          <p>יתרות לפי חשבוניות שנרשמו במערכת ובאתרים המורשים; הזמנות אינן חוב. חשבוניות ללא שיוך לאתר אינן כלולות.</p>
-          <div class="finance-history-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-            <select id="portalHistoryStatus" aria-label="סינון סטטוס הזמנה"><option value="">כל הסטטוסים</option><option value="ממתינה">ממתינה</option><option value="אושרה">אושרה</option><option value="בייצור">בייצור</option><option value="הושלם">הושלם</option></select>
-            <input id="portalHistoryFrom" type="date" aria-label="מתאריך" title="מתאריך">
-            <input id="portalHistoryTo" type="date" aria-label="עד תאריך" title="עד תאריך">
-            <button type="button" class="btn btn-secondary btn-sm" onclick="applyPortalHistoryFilters()">סנן היסטוריה</button>
-          </div>
         </div>
         <span class="guarantee-status">${historyCount} הזמנות</span>
       </div>
@@ -1984,7 +2099,25 @@ function renderCustomerFinanceDashboard() {
         <div class="finance-kpi"><span>אתרים בחריגה</span><strong>${s.overBudgetSites || 0}</strong></div>
       </div>
      ${paymentRows}
-      <button type="button" id="portalHistoryMore" class="btn btn-secondary btn-sm" style="display:none;margin-top:8px" onclick="loadMorePortalHistory()">טען עוד הזמנות</button>
+      <h3 class="portal-section-heading portal-history-heading">היסטוריית הזמנות</h3>
+      <form class="finance-history-filters" onsubmit="applyPortalHistoryFilters(event)">
+        <select id="portalHistoryStatus" aria-label="סינון סטטוס הזמנה"><option value="">כל הסטטוסים</option><option value="ממתינה">ממתינה</option><option value="אושרה">אושרה</option><option value="בייצור">בייצור</option><option value="הושלם">הושלם</option></select>
+        <div class="field">
+          <label for="portalHistoryFrom">מתאריך</label>
+          <input id="portalHistoryFrom" type="text" lang="he-IL" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${escapeHtml(historyDateInputValue(portalHistoryFilters.from))}" oninput="this.setCustomValidity('')">
+        </div>
+        <div class="field">
+          <label for="portalHistoryTo">עד תאריך</label>
+          <input id="portalHistoryTo" type="text" lang="he-IL" dir="ltr" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" value="${escapeHtml(historyDateInputValue(portalHistoryFilters.to))}" oninput="this.setCustomValidity('')">
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm" id="portalHistoryApply">סנן היסטוריה</button>
+      </form>
+      <div id="portalHistoryResults" tabindex="-1">
+        ${PORTAL_FINANCE.historyError ? '<p role="alert">לא ניתן לטעון את היסטוריית ההזמנות. נסה לסנן שוב.</p>'
+          : historyCount ? portalOrderCardsHtml(PORTAL_FINANCE.history)
+          : '<div class="empty-state"><strong>אין הזמנות לפי הסינון שנבחר</strong></div>'}
+      </div>
+      <button type="button" id="portalHistoryMore" class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="updatePortalHistory(this, PORTAL_FINANCE.history.length)" ${PORTAL_FINANCE.historyHasMore ? '' : 'hidden'}>טען עוד הזמנות</button>
      <div class="card-title" style="margin-top:12px">פירוק לפי אתר</div>
       <div class="finance-sites">${siteRows || '<div class="loader" style="padding:12px">אין אתרים להצגה</div>'}</div>
       <div class="finance-history-actions" style="display:none">
@@ -1995,6 +2128,7 @@ function renderCustomerFinanceDashboard() {
       </div>
     </div>
   `;
+  document.getElementById('portalHistoryStatus').value = portalHistoryFilters.status;
 }
 
 function formatPriceListDate(value) {
@@ -2344,10 +2478,18 @@ function badgeCls(s) {
 async function openOrder(id, navigation = {}) {
   showScreen('screenDetail', { ...navigation, recordId: id });
   document.getElementById('detailContent').innerHTML = '<div class="loader">טוען...</div>';
-  const order = await fetch(`/api/c/orders/${id}?token=${TOKEN}`).then(r=>r.json()).catch(()=>null);
-  if (!order?.id) { document.getElementById('detailContent').innerHTML = '<div class="loader">ההזמנה לא נמצאה</div>'; return; }
+  const isCurrentOrder = () => portalScreen === 'screenDetail' && (!window.history || Number(window.history.state?.recordId) === Number(id));
+  const response = await apiFetch('/api/c/orders/' + id + '?' + new URLSearchParams({ token: TOKEN })).catch(() => null);
+  const order = response?.ok ? await response.json().catch(() => null) : null;
+  if (!isCurrentOrder()) return;
+  if (!order?.id) {
+    const message = response?.status === 404 ? 'ההזמנה לא נמצאה'
+      : authError(response?.status, 'לא ניתן לטעון את ההזמנה כרגע. נסה שוב.');
+    document.getElementById('detailContent').innerHTML = `<p class="loader" role="alert">${escapeHtml(message)}</p>`;
+    return;
+  }
   const documents = await loadOrderDocuments(id);
-  if (portalScreen !== 'screenDetail' || (window.history && Number(window.history.state?.recordId) !== Number(id))) return;
+  if (!isCurrentOrder()) return;
   renderDetail(order, documents);
   renderOrderDocuments(order.id, documents);
 }
@@ -2618,10 +2760,11 @@ async function approveOrder(orderId, event) {
   const btn = event?.currentTarget || event?.target;
   btn.disabled = true;
   btn.textContent = '...שולח';
-  const res = await apiFetch('/api/c/approve', {
+  const response = await apiFetch('/api/c/approve', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ token:TOKEN, orderId })
-  }).then(r=>r.json()).catch(()=>null);
+  }).catch(() => null);
+  const res = await response?.json().catch(() => null);
   if (res?.success) {
     toast('פרטי ההזמנה אושרו ונשלחו לבדיקה');
     const orders = PORTAL_ORDERS.map(order => Number(order.id) === Number(orderId) ? {
@@ -2635,9 +2778,11 @@ async function approveOrder(orderId, event) {
     } : order);
     renderOrdersList(orders);
     renderPortalDashboard(orders);
+    portalFinanceNeedsRefresh = true;
+    portalSitesNeedRefresh = true;
     if (portalScreen === 'screenDetail') await openOrder(orderId);
   } else {
-    toast(portalErrorMessage(res, 'לא ניתן לאשר את פרטי ההזמנה'), true);
+    toast(response?.status === 429 ? authError(429) : portalErrorMessage(res, 'לא ניתן לאשר את פרטי ההזמנה'), true);
     btn.disabled = false;
     btn.textContent = 'אשר פרטים ושלח לבדיקה';
   }
@@ -2726,6 +2871,7 @@ function restorePortalDraft() {
 
 function showOrderScreen(navigation = {}) {
   if (portalDraftCustomerId !== ME?.id || !orderItems.length) {
+    setPortalPriceBlock();
     portalDraftCustomerId = ME?.id;
     portalSourceFiles = [];
     createdOrderId = null;
@@ -2774,6 +2920,7 @@ function removeItem(id) {
 }
 
 function renderItems() {
+  if (portalPriceBlock && portalPriceBlock !== portalPricingSignature()) setPortalPriceBlock();
   document.getElementById('priceBox').style.display = 'none';
   const el = document.getElementById('itemsList');
   const rowsHtml = orderItems.map((item,idx) => renderPortalOrderItemCard(item, idx+1)).join('');
@@ -2802,7 +2949,7 @@ function renderPortalOrderItemCard(item, num) {
     shapeSketch: shapePreviewSvg(item), diameterOptions,
     unitLengthCm: totalMm / 10, totalLength: formatPortalTotalLength(itemMetrics), weight: weight > 0 ? formatKg(weight) : '',
     diameterReadOnly: Boolean(item.family && item.family !== 'bars'),
-    mobileShapeLabel: item.family && item.family !== 'bars' ? item.shapeName : '',
+    labeledMobile: true, deleteLabel: 'מחיקת פריט ' + num,
     openCall: 'openPortalShapeEditor(' + item.id + ')', shapeLabel: 'עריכת צורה: ' + (item.shapeName || 'מוט'),
     updateQtyCall: "updateField(" + item.id + ",'qty',+this.value||1)",
     updateElementCall: "updateField(" + item.id + ",'elementName',this.value)",
@@ -2952,21 +3099,14 @@ function updateField(id, field, value) {
   const row = document.getElementById('item-row-' + id);
   if (field === 'qty' || field === 'elementName') {
     document.getElementById('priceBox').style.display = 'none';
-    const meta = row?.querySelector?.('.line-mobile-meta');
     if (field === 'qty') {
       const metrics = portalItemShapeMetrics(item);
       const length = formatPortalTotalLength(metrics);
       const weight = metrics.totalWeightKg > 0 ? formatKg(metrics.totalWeightKg) : '—';
-      const weightCell = row?.querySelector?.('.line-weight');
-      const lengthCell = row?.querySelector?.('.line-total-length');
+      const weightCell = row?.querySelector?.('.line-weight .line-metric-value');
+      const lengthCell = row?.querySelector?.('.line-total-length .line-metric-value');
       if (weightCell) weightCell.textContent = weight;
       if (lengthCell) lengthCell.textContent = length;
-      if (meta) {
-        meta.children[2].textContent = length;
-        meta.children[3].textContent = weight;
-      }
-    } else if (meta) {
-      meta.children[0].textContent = item.family && item.family !== 'bars' ? item.shapeName : value || 'ללא אלמנט';
     }
     savePortalDraft(false);
     return;
@@ -3212,6 +3352,20 @@ function portalErrorMessage(value, fallback = 'לא ניתן להשלים את �
 // ──────────────────────────────────────────────────────
 // Quote
 // ──────────────────────────────────────────────────────
+function portalPricingSignature(items = orderItems.map(portalOrderItemPayload)) {
+  return JSON.stringify(items.map(({ elementName, note, quantity, ...item }) => item));
+}
+
+function setPortalPriceBlock(message = '', signature = null) {
+  portalPriceBlock = signature;
+  const button = document.getElementById('submitOrderBtn');
+  if (message) button.setAttribute('aria-disabled', 'true');
+  else button.removeAttribute('aria-disabled');
+  const errorBox = document.getElementById('portalSubmitError');
+  errorBox.textContent = message;
+  errorBox.classList.toggle('show', Boolean(message));
+}
+
 async function calcQuote(event) {
   const btn = event?.currentTarget || document.getElementById('quoteBtn');
   if (!orderItems.length) { toast('הוסף לפחות פריט אחד', true); return; }
@@ -3236,14 +3390,20 @@ async function calcQuote(event) {
     const missing = (data.warnings || []).map(w => `Ø${w.diameter} (${w.pricingLabel || 'מחירון'})`).join(', ');
     document.getElementById('priceBreakdown').innerHTML = `
       <div class="price-row total"><span>מחירון דורש עדכון</span><span>${escapeHtml(missing)}</span></div>
+      <p>כדי להמשיך, פנה למשרד טנא לעדכון המחירון.</p>
     `;
     document.getElementById('priceBox').style.display = '';
+    // A quote cannot block retrying an order whose submission or upload is in progress.
+    if (!portalPriceBlock && !portalPendingOrder && !createdOrderId) {
+      const diameters = [...new Set((data.warnings || []).map(w => 'Ø' + w.diameter))].join(', ');
+      setPortalPriceBlock(`חסר מחיר${diameters ? ' לקוטר ' + diameters : ''}. פנה למשרד טנא לעדכון המחירון.`, portalPricingSignature(items));
+    }
     setButtonBusy(btn, false);
-    toast('מחירון דורש עדכון לפני הצעת מחיר', true);
     return;
   }
   if (!Array.isArray(data.breakdown)) { setButtonBusy(btn, false); toast('לא ניתן לחשב הצעת מחיר. בדוק את פרטי הפריטים ונסה שוב.', true); return; }
 
+  setPortalPriceBlock();
   const bkd = data.breakdown.map(b => {
     const ppu = b.price_per_kg ?? b.pricePerKg;
     return `<div class="price-row"><span>Ø${b.diameter} – ${formatKg(b.weight)} × ${formatMoney(ppu)}</span><span>${formatMoney(b.price)}</span></div>`;
@@ -3263,7 +3423,7 @@ async function calcQuote(event) {
 // Submit
 // ──────────────────────────────────────────────────────
 async function submitOrder(event) {
-  if (submitOrder.inFlight) return;
+  if (submitOrder.inFlight || portalPriceBlock) return;
   submitOrder.inFlight = true;
   const button = event?.currentTarget || document.getElementById('submitOrderBtn');
   try { return await performPortalOrderSubmit(event); }
@@ -3285,7 +3445,7 @@ async function performPortalOrderSubmit(event) {
     setButtonBusy(btn, true, 'מעלה מסמכים…');
     if (await uploadSourceDocuments(createdOrderId)) {
       clearPortalDraft();
-      await showHome(null, { replace: true });
+      await showPortalOrderReceipt(null, false);
     }
     return;
   }
@@ -3330,6 +3490,7 @@ async function performPortalOrderSubmit(event) {
     savePortalDraft(false);
   }
 
+  const submittedPricing = portalPricingSignature(portalPendingOrder.items);
   setButtonBusy(btn, true, 'שולח הזמנה…');
   const response = await apiFetch('/api/c/order', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -3343,7 +3504,17 @@ async function performPortalOrderSubmit(event) {
       portalSubmissionUserId = null;
       savePortalDraft(false);
     }
-    toast(response?.status === 429 ? authError(429) : portalErrorMessage(result || 'network', 'לא ניתן לשלוח את ההזמנה'), true);
+    if (result?.requiresPriceListUpdate) {
+      const diameter = result.diameter ? ` לקוטר Ø${result.diameter}` : '';
+      if (submittedPricing === portalPricingSignature()) {
+        setPortalPriceBlock(`חסר מחיר${diameter}. ההזמנה טרם נשלחה והפריטים נשמרו בטיוטה. פנה למשרד טנא לעדכון המחירון. לאחר העדכון, רענן את הדף ונסה שוב.`, submittedPricing);
+        document.getElementById('toast').classList.remove('show');
+      } else {
+        toast('ההזמנה טרם נשלחה. פרטי הפריטים השתנו, אפשר לנסות שוב.', true);
+      }
+    } else {
+      toast(response?.status === 429 ? authError(429) : portalErrorMessage(result || 'network', 'לא ניתן לשלוח את ההזמנה'), true);
+    }
     return;
   }
   createdOrderId = result.orderId;
@@ -3352,8 +3523,24 @@ async function performPortalOrderSubmit(event) {
 
   clearPortalDraft();
   toast(result.awaitingApproval ? `הזמנה ${result.orderNum} נקלטה וממתינה לאישורך בפורטל` : `הזמנה ${result.orderNum} נשלחה בהצלחה`);
-  await showHome(null, { replace: true });
-  if (result.awaitingApproval && portalScreen === 'screenHome') await openOrder(result.orderId);
+  await showPortalOrderReceipt(result.orderId, result.awaitingApproval);
+}
+
+async function showPortalOrderReceipt(orderId, awaitingApproval) {
+  portalFinanceNeedsRefresh = true;
+  portalSitesNeedRefresh = true;
+  showScreen('screenHome', { replace: true });
+  const token = TOKEN;
+  const response = await apiFetch('/api/c/me?' + new URLSearchParams({ token })).catch(() => null);
+  const data = response?.ok ? await response.json().catch(() => null) : null;
+  if (TOKEN !== token) return;
+  if (data?.customer) {
+    setPortalContext(data);
+    renderOrdersList(data.orders ?? []);
+    renderPortalDashboard(data.orders ?? []);
+  }
+  if (awaitingApproval && portalScreen === 'screenHome') await openOrder(orderId);
+  else if (portalScreen === 'screenHome') setHomeSection(currentHomeSection());
 }
 
 function showScreen(id, { replace = false, fromHistory = false, recordId = null } = {}) {
@@ -3371,6 +3558,11 @@ function showScreen(id, { replace = false, fromHistory = false, recordId = null 
   window.scrollTo(0, 0);
 }
 
+function returnToPortalHome() {
+  showScreen('screenHome');
+  setHomeSection(currentHomeSection());
+}
+
 function resumePortalHistory(event) {
   if (!TOKEN || !ME) { showScreen('screenAuth', { replace: true }); return; }
   const state = event.state;
@@ -3381,6 +3573,7 @@ function resumePortalHistory(event) {
     if (state.screen === 'screenSiteDetail' && state.recordId) { openSiteDetail(state.recordId, '', '', navigation); return; }
   }
   showScreen('screenHome', state?.screen === 'screenHome' ? navigation : { replace: true });
+  setHomeSection(currentHomeSection());
 }
 
 function persistPortalOrderInput(event) {

@@ -377,7 +377,7 @@ test('customer portal exposes finance dashboard with explicit money permissions'
   assert.match(portalRoute, /router\.get\('\/c\/finance\/payments-due'/);
   assert.match(portalRoute, /router\.get\('\/c\/orders\/history'/);
   assert.match(portalRoute, /canViewCustomerFinance/);
-  assert.match(portalRoute, /projectOrdersForPortal\(rows, s\)/);
+  assert.match(portalRoute, /projectOrdersForPortal\(rows\.slice\(0, limit\), s\)/);
   assert.match(portalRoute, /customerPortalProjection/);
   assert.doesNotMatch(portalRoute, /canCreateSites && !s\.caps\.canManageUsers && !s\.caps\.canApprove/);
   assert.match(customerPage, /id="customerFinanceDashboard"/);

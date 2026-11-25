@@ -14,6 +14,15 @@ const book=db.prepare("INSERT INTO pricing_price_books(code,name,price_type,stat
 for(const diameter of [6,8,10,12,14,16,20,25,28,32]) db.prepare('INSERT INTO pricing_price_items(price_book_id,sku,description,diameter,unit,price_before_vat) VALUES (?,?,?,?,?,?)').run(book,'D'+diameter,'ברזל בדיקה',diameter,'kg',5);
 db.prepare("INSERT INTO users(username,display_name,role,pin_hash,active) VALUES ('smoke-admin','מנהל בדיקה','admin',?,1)").run(require('../auth-core').hashPin('9101',4));
 if (process.env.PORTAL_SMOKE_QUALITY_FIXTURES === '1') {
+  const role = process.env.PORTAL_SMOKE_CUSTOMER_ROLE;
+  if (role) {
+    if (!['orderer', 'field_manager', 'approver', 'finance', 'both'].includes(role)) throw new Error('Unknown QA role');
+    db.prepare(`UPDATE portal_users SET role=?, can_create_orders=?, can_approve_orders=?, can_view_prices=?,
+      can_manage_users=0,can_create_sites=0,can_view_budget=?,can_set_budget=0,can_view_invoices=?
+      WHERE id=?`).run(role, Number(role !== 'finance'), Number(['approver', 'both'].includes(role)),
+        Number(['finance', 'both'].includes(role)), Number(role === 'finance'), Number(role === 'finance'), uid);
+  }
+  db.prepare("UPDATE customers SET portal_price_list_visibility='general' WHERE id=?").run(cid);
   const catalog = require('../services/savedShapeCatalog').createSavedShapeCatalog(db);
   const commercial = require('../modules/steel-rebar/shape-commercial');
   const definition = { family: 'bars', sides: [1250], angles: [] };
@@ -24,6 +33,7 @@ if (process.env.PORTAL_SMOKE_QUALITY_FIXTURES === '1') {
   db.prepare("INSERT INTO portal_users(customer_id,phone,name,role,token,token_expires_at) VALUES (?,'0500000903','משתמש שפג תוקפו','customer_admin','smoke-expired-token','2001-01-01')").run(cid);
   const legacyOrder = db.prepare("INSERT INTO orders(order_num,customer_id,site_id,status,delivery_date) VALUES ('QA-LEGACY',?,?,'הושלמה','2020-01-01')").run(cid,site).lastInsertRowid;
   db.prepare("INSERT INTO invoices(invoice_num,customer_id,order_id,issue_date,items_json) VALUES ('QA-INVOICE',?,?,'2020-01-01','[]')").run(cid,legacyOrder);
+  db.prepare("INSERT INTO delivery_notes(note_num,customer_id,order_id,issued_at,total_weight,items_json) VALUES ('DN-1',?,?,CURRENT_TIMESTAMP,12,'[]')").run(cid,legacyOrder);
 }
 server.listen(port,'127.0.0.1',()=>console.log(`Isolated QA: http://127.0.0.1:${server.address().port}/customer.html?token=smoke-only-token`));
 process.on('SIGTERM',()=>closeServer(()=>{db.close();fs.rmSync(dir,{recursive:true,force:true});process.exit(0);}));

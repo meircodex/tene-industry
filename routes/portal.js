@@ -2,7 +2,7 @@ const router = require('express').Router();
 const { createPortalAccessService } = require('../services/portalAccess');
 const { buildOrderItemUid } = require('../services/orderContracts');
 const { itemShapeMetrics } = require('../services/shapeSnapshot');
-const { ORDER_STATUS } = require('../status-contracts');
+const { ORDER_STATUS, ORDER_STATUS_ALIASES } = require('../status-contracts');
 const { projectPortalCustomer, projectPortalOrder, projectPortalOrderDetail } = require('../services/customerPortalProjection');
 const { portalShapeDraftToOrderItem } = require('../services/customerPortalShapeDraft');
 const productionCards = require('../services/productionCards');
@@ -11,6 +11,13 @@ const { portalInvoices } = require('../services/customerPortalFinance');
 const { createSavedShapeCatalog } = require('../services/savedShapeCatalog');
 const { isPortalDeliveryDateValid, withoutPlaceholderDate } = require('../services/customerPortalDates');
 const { evaluatePortalBudget } = require('../services/portalBudget');
+
+const portalHistoryStatuses = {
+  'ממתינה': ['ממתינה', ORDER_STATUS.PENDING_APPROVAL, ORDER_STATUS.CUSTOMER_PENDING_APPROVAL],
+  'אושרה': [ORDER_STATUS.PRODUCTION_QUEUE],
+  'בייצור': [ORDER_STATUS.IN_PRODUCTION],
+  'הושלם': ['הושלם', 'הושלמה', ORDER_STATUS.DONE_WAITING_PICKUP, ORDER_STATUS.DELIVERED_CONFIRMED],
+};
 
 const portalWeight = new Intl.NumberFormat('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -1187,7 +1194,13 @@ module.exports = function createPortalRouter(deps) {
     const to = String(req.query.to || '').trim();
     const extra = [];
     const paramsExtra = [];
-    if (status) { extra.push('o.status=?'); paramsExtra.push(status); }
+    if (status) {
+      const canonical = Object.hasOwn(portalHistoryStatuses, status) ? portalHistoryStatuses[status] : [status];
+      const aliases = Object.keys(ORDER_STATUS_ALIASES).filter(alias => canonical.includes(ORDER_STATUS_ALIASES[alias]));
+      const statuses = [...new Set([...canonical, ...aliases])];
+      extra.push(`o.status IN (${statuses.map(() => '?').join(',')})`);
+      paramsExtra.push(...statuses);
+    }
     if (/^\d{4}-\d{2}-\d{2}$/.test(from)) { extra.push('DATE(o.created_at)>=?'); paramsExtra.push(from); }
     if (/^\d{4}-\d{2}-\d{2}$/.test(to)) { extra.push('DATE(o.created_at)<=?'); paramsExtra.push(to); }
     const rows = db.prepare(`
@@ -1196,10 +1209,10 @@ module.exports = function createPortalRouter(deps) {
       FROM orders o
       LEFT JOIN customer_sites cs ON cs.id=o.site_id
       WHERE ${access.where}${extra.length ? ' AND ' + extra.join(' AND ') : ''}
-      ORDER BY o.created_at DESC
+      ORDER BY o.created_at DESC, o.id DESC
       LIMIT ? OFFSET ?
-    `).all(...access.params, ...paramsExtra, limit, offset);
-    res.json({ orders: projectOrdersForPortal(rows, s), caps: s.caps, limit, offset, hasMore: rows.length === limit });
+    `).all(...access.params, ...paramsExtra, limit + 1, offset);
+    res.json({ orders: projectOrdersForPortal(rows.slice(0, limit), s), caps: s.caps, limit, offset, hasMore: rows.length > limit });
 
   });
 
