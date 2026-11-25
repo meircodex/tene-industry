@@ -284,6 +284,7 @@
     .guarantee-status{background:#fff7e8;border:1px solid #f3d19b;color:#9b6200;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap}
     .guarantee-status.ok{background:#eafaf1;border-color:#bde9cf;color:#176a37}
     .guarantee-list{display:grid;gap:7px;margin-top:10px}
+    #guaranteeListRetry[hidden]{display:none}
     .guarantee-row{display:flex;justify-content:space-between;gap:10px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:10px;padding:9px 10px;font-size:12px}
     .guarantee-row b{font-size:13px}
     .guarantee-row span{color:var(--dim)}
@@ -583,12 +584,14 @@
           <div class="card-title">מסמכי ערבות ותנאי תשלום</div>
           <p>אם יש לך תנאי תשלום, העלה כאן את טופס הערבות החתום. המשרד יבדוק ויאשר.</p>
         </div>
-        <span id="guaranteeStatus" class="guarantee-status">לא הועלה</span>
+        <span id="guaranteeStatus" class="guarantee-status" role="status">טוען סטטוס ערבות…</span>
       </div>
       <div class="portal-upload-grid">
         <input type="file" id="guaranteeFile" accept=".pdf,.jpg,.jpeg,.png" aria-label="בחר טופס ערבות חתום"/>
         <button type="button" class="btn btn-secondary btn-sm" id="uploadGuaranteeBtn" onclick="uploadGuaranteeDocument(event)">העלה טופס חתום</button>
       </div>
+      <p id="guaranteeListNotice" class="portal-upload-note" role="status" hidden></p>
+      <button type="button" class="btn btn-secondary btn-sm" id="guaranteeListRetry" onclick="loadGuaranteeDocuments()" hidden>נסה לטעון את הרשימה שוב</button>
       <div id="guaranteeDocsList" class="guarantee-list"></div>
     </div>
   </section>
@@ -743,7 +746,7 @@ const portalHistoryFilters = { status: '', from: '', to: '', limit: 20 };
 let financeRequestId = 0;
 let portalFinanceNeedsRefresh = false;
 let portalSitesNeedRefresh = false;
-let guaranteeDocuments = [];
+let guaranteeState = null;
 let itemIdSeq   = 0;
 let portalShapeEditor = null;
 let portalShapeTargetId = null;
@@ -1851,6 +1854,7 @@ function logoutPortal() {
   if (!SUPPORT_PREVIEW) localStorage.removeItem('ib_token');
   globalThis.sessionStorage?.removeItem('ib_portal_session');
   TOKEN = null;
+  clearGuaranteePanel();
   ME = null;
   PORTAL_USER = null;
   PORTAL_CAN_CHANGE_PIN = false;
@@ -1880,6 +1884,7 @@ function logoutPortal() {
 
 function exitSupportMode() {
   TOKEN = null;
+  clearGuaranteePanel();
   ME = null;
   SUPPORT_PREVIEW = false;
   document.body.classList.remove('support-preview');
@@ -2371,28 +2376,93 @@ function printPortalPriceList() {
   setTimeout(() => w.print(), 250);
 }
 
-async function loadGuaranteeDocuments() {
-  const data = await fetch(`/api/c/guarantee-documents?token=${encodeURIComponent(TOKEN)}`)
-    .then(r=>r.json()).catch(()=>({ documents: [] }));
-  guaranteeDocuments = Array.isArray(data.documents) ? data.documents : [];
-  renderGuaranteeDocuments();
+function currentGuaranteeState() {
+  if (!guaranteeState || guaranteeState.token !== TOKEN) {
+    guaranteeState = { token: TOKEN, documents: [], confirmed: null, phase: 'loading', requestId: 0, uploading: false };
+  }
+  return guaranteeState;
 }
 
-function renderGuaranteeDocuments() {
+function clearGuaranteePanel() {
+  const input = document.getElementById('guaranteeFile');
+  if (input) input.value = '';
+  const button = document.getElementById('uploadGuaranteeBtn');
+  if (guaranteeState?.uploading) setButtonBusy(button, false);
+  const retry = document.getElementById('guaranteeListRetry');
+  if (retry) retry.hidden = true;
+  guaranteeState = null;
+  renderGuaranteeDocuments(currentGuaranteeState());
+}
+
+async function loadGuaranteeDocuments() {
+  if (!TOKEN) return;
+  const state = currentGuaranteeState();
+  const requestId = ++state.requestId;
+  const isCurrent = () => state === guaranteeState && state.token === TOKEN && state.requestId === requestId;
+  state.phase = 'loading';
+  renderGuaranteeDocuments(state);
+  try {
+    const response = await fetch(`/api/c/guarantee-documents?token=${encodeURIComponent(state.token)}`);
+    if (!isCurrent()) return;
+    if (response.status === 401 || response.status === 403) {
+      state.documents = [];
+      state.confirmed = null;
+      state.phase = 'restricted';
+    } else {
+      if (!response.ok) throw new Error('Guarantee list request failed');
+      const data = await response.json();
+      if (!isCurrent()) return;
+      if (!Array.isArray(data?.documents) || data.documents.some(doc => !doc || typeof doc !== 'object')) throw new Error('Invalid guarantee list');
+      state.documents = data.documents;
+      if (state.confirmed && state.documents.some(doc => String(doc.id) === String(state.confirmed.id))) {
+        state.confirmed = null;
+      }
+      state.phase = state.confirmed ? 'stale' : 'ready';
+    }
+  } catch {
+    if (!isCurrent()) return;
+    state.phase = 'error';
+  }
+  renderGuaranteeDocuments(state);
+}
+
+function renderGuaranteeDocuments(state) {
   const status = document.getElementById('guaranteeStatus');
   const list = document.getElementById('guaranteeDocsList');
-  if (!status || !list) return;
-  const latest = guaranteeDocuments[0];
-  if (!latest) {
-    status.textContent = 'לא הועלה';
-    status.className = 'guarantee-status';
+  const notice = document.getElementById('guaranteeListNotice');
+  const retry = document.getElementById('guaranteeListRetry');
+  if (!status || !list || !notice || !retry) return;
+  const latest = state.confirmed || state.documents[0];
+  const messages = {
+    loading: 'טוען סטטוס ערבות…',
+    ready: 'לא הועלה',
+    error: 'לא ניתן לבדוק את סטטוס הערבות',
+    stale: 'לא ניתן לבדוק את סטטוס הערבות',
+    restricted: 'אין גישה למסמכי הערבות',
+  };
+  status.textContent = latest
+    ? latest.status === 'approved' ? 'מאושר' : 'ממתין לבדיקת המשרד'
+    : messages[state.phase];
+  status.className = 'guarantee-status' + (latest?.status === 'approved' ? ' ok' : '');
+  notice.textContent = state.phase === 'error' || state.phase === 'stale'
+    ? (state.confirmed
+      ? 'הטופס נקלט. הרשימה עדיין לא עודכנה. אין צורך להעלות שוב.'
+      : state.documents.length
+        ? 'לא הצלחנו לעדכן את הרשימה. מוצג המידע האחרון שנשמר במסך.'
+        : 'לא הצלחנו לטעון את רשימת מסמכי הערבות.')
+    : '';
+  notice.hidden = !notice.textContent;
+  if (state.phase === 'error' || state.phase === 'stale') retry.hidden = false;
+  else if (state.phase !== 'loading') retry.hidden = true;
+  retry.disabled = state.phase === 'loading';
+  if (!latest && state.phase === 'ready') {
     list.innerHTML = '<div class="portal-upload-note">אין עדיין טופס ערבות חתום במערכת.</div>';
     return;
   }
-  const approved = latest.status === 'approved';
-  status.textContent = approved ? 'מאושר' : 'ממתין לבדיקת משרד';
-  status.className = 'guarantee-status' + (approved ? ' ok' : '');
-  list.innerHTML = guaranteeDocuments.map(doc => `
+  const confirmedRow = state.confirmed
+    ? `<div class="guarantee-row"><div><b>${escapeHtml(state.confirmed.original_name)}</b></div><span>נקלט וממתין לבדיקה</span></div>`
+    : '';
+  list.innerHTML = confirmedRow + state.documents.map(doc => `
     <div class="guarantee-row">
       <div><b>${escapeHtml(doc.original_name)}</b><br><span><bdi>${formatPortalDate(withoutPlaceholderDate(doc.uploaded_at), { withTime: true })}</bdi></span></div>
       <span>${doc.status === 'approved' ? 'מאושר' : 'ממתין לבדיקה'}</span>
@@ -2401,21 +2471,44 @@ function renderGuaranteeDocuments() {
 }
 
 async function uploadGuaranteeDocument(event) {
+  if (!TOKEN) return;
+  const state = currentGuaranteeState();
+  if (state.uploading) return;
   const btn = event?.currentTarget || document.getElementById('uploadGuaranteeBtn');
   const input = document.getElementById('guaranteeFile');
   const file = input?.files?.[0];
   if (!file) { toast('בחר קובץ ערבות חתום', true); return; }
-  setButtonBusy(btn, true, 'מעלה...');
-  const fd = new FormData();
-  fd.append('token', TOKEN);
-  fd.append('file', file);
-  const res = await fetch('/api/c/guarantee-documents', { method:'POST', body: fd })
-    .then(async r => ({ ok:r.ok, data: await r.json().catch(()=>null) })).catch(()=>null);
-  if (!res?.ok) { setButtonBusy(btn, false); toast(res?.data?.user_message || res?.data?.error || 'העלאת הטופס נכשלה', true); return; }
-  input.value = '';
-  toast('הטופס הועלה וממתין לבדיקת משרד');
-  await loadGuaranteeDocuments();
-  setButtonBusy(btn, false);
+  const isCurrent = () => state === guaranteeState && state.token === TOKEN;
+  state.uploading = true;
+  setButtonBusy(btn, true, 'מעלה…');
+  try {
+    const fd = new FormData();
+    fd.append('token', state.token);
+    fd.append('file', file);
+    const response = await fetch('/api/c/guarantee-documents', { method:'POST', body: fd });
+    const data = await response.json().catch(() => null);
+    if (!isCurrent()) return;
+    if (response.status >= 400 && response.status < 500) {
+      toast(data?.user_message || data?.error || 'העלאת הטופס נכשלה', true);
+      return;
+    }
+    if (!response.ok || data?.success !== true || !Number.isSafeInteger(data.id) || data.id <= 0 || data.status !== 'uploaded_pending_review') {
+      throw new Error('Unconfirmed guarantee upload');
+    }
+    state.confirmed = { id: data.id, status: data.status, original_name: file.name };
+    if (input.files?.[0] === file) input.value = '';
+    toast('הטופס הועלה וממתין לבדיקת משרד');
+    await loadGuaranteeDocuments();
+  } catch {
+    if (!isCurrent()) return;
+    toast('לא התקבל אישור קליטה. בדוק את הרשימה לפני העלאה נוספת.', true);
+    void loadGuaranteeDocuments();
+  } finally {
+    if (isCurrent()) {
+      state.uploading = false;
+      setButtonBusy(btn, false);
+    }
+  }
 }
 
 function renderOrdersList(orders) {
